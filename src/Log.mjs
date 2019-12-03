@@ -74,6 +74,6 @@ export default class Log {
 
     static log(color, type, tag, ...message){
         this.exportLog('WRN', tag, ...message);
-        console.warn(color + `[${new Date().toLocaleTimeString()}] [${tag}]`, ...message, colors.Reset);
+        console.warn(color + `[${tag}]`, ...message, colors.Reset);
     }
 }
