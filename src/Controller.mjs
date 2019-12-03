@@ -9,6 +9,7 @@ import VmModule from "./vue-music/VmModule";
 import BerberModule from "./berber-api/BerberModule";
 import Log from "./Log";
 import SignalModule from "./signal-server/SignalModule";
+import StatusModule from "./status/StatusModule";
 
 
 class Controller {
@@ -21,6 +22,7 @@ class Controller {
             new VmModule(),
             new BerberModule(),
             new SignalModule(),
+            new StatusModule(),
         ];
     }
 
