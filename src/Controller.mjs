@@ -27,20 +27,19 @@ class Controller {
             module.setRoutes(this.app);
     }
 
-    static getHttpsCredentials() {
+    static getHttpsCredentials(key, cert) {
         try {
             return {
-                key: fs.readFileSync('/etc/letsencrypt/live/ruurd.dev/privkey.pem'),
-                cert: fs.readFileSync('/etc/letsencrypt/live/ruurd.dev/fullchain.pem'),
+                key: fs.readFileSync(key),
+                cert: fs.readFileSync(cert),
             }
         } catch (e) {
-            // Log.l("HTTPS READ ERROR: ", e);
             return false;
         }
     }
 
-    start(port = 3000) {
-        let credentials = Controller.getHttpsCredentials();
+    start(port = 3000, key, cert) {
+        let credentials = Controller.getHttpsCredentials(key, cert);
         if (credentials) {
             const httpsServer = https.createServer(credentials, this.app);
             httpsServer.listen(port, () => Log.l('Controller', `HTTPS app listening on port ${port}!`));
