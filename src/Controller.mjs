@@ -57,7 +57,7 @@ class Controller {
         }
         this.io = socketIo(server);
         this.setRoutes();
-        server.listen(port, () => console.log(`Signal server listening on port ${port}!`));
+        server.listen(port, () => console.log(`${credentials?'HTTPS':'HTTP'} server listening on port ${port}!`));
     }
 }
 
