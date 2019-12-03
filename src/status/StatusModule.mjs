@@ -5,7 +5,7 @@ import {exec} from "child_process";
 
 export default class StatusModule extends ApiModule {
     setRoutes(app) {
-        app.post('/status/', async (req, res) => {
+        app.get('/status/', async (req, res) => {
             exec('sensors', (err, stdout, stderr) => {
                 if (err) {
                     // node couldn't execute the command
