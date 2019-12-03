@@ -10,10 +10,6 @@ import BerberModule from "./berber-api/BerberModule";
 import Log from "./Log";
 import SignalModule from "./signal-server/SignalModule";
 
-//TODO:
-//SOCKET IO implement
-//SignalServer implement
-
 
 class Controller {
     constructor() {
@@ -30,7 +26,7 @@ class Controller {
 
     setRoutes() {
         for (let module of this.modules) {
-            Log.l("Controller", module.constructor.name, " initialized");
+            Log.l("Controller", 'Initialized ' + module.constructor.name);
             module.setRoutes(this.app, this.io);
         }
     }

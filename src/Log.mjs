@@ -36,7 +36,7 @@ export default class Log {
     }
 
     static exportLog(type, tag, ...message) {
-        let concatenatedMessage = `[${type}] [${tag}] ` + message.join(', ') + os.EOL;
+        let concatenatedMessage = `[${new Date().toLocaleTimeString()}] [${type}] [${tag}] ` + message.join(',') + os.EOL;
         let d = new Date();
 
         let fileName = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}.log`;
@@ -57,22 +57,23 @@ export default class Log {
     }
 
     static d(tag, ...message) {
-        this.exportLog('DBG', tag, ...message);
-        console.debug(colors.FgCyan + `[${tag}]`, ...message, colors.Reset);
+        this.log(colors.FgCyan, 'DBG', tag, ...message);
     }
 
     static l(tag, ...message) {
-        this.exportLog('LOG', tag, ...message);
-        console.log(`[${tag}]`, ...message, colors.Reset);
+        this.log(colors.FgWhite, 'LOG', tag, ...message);
     }
 
     static e(tag, ...message) {
-        this.exportLog('ERR', tag, ...message);
-        console.error(colors.FgRed + `[${tag}]`, ...message, colors.Reset);
+        this.log(colors.FgRed, 'ERR', tag, ...message);
     }
 
     static w(tag, ...message) {
+        this.log(colors.FgYellow, 'WRN', tag, ...message);
+    }
+
+    static log(color, type, tag, ...message){
         this.exportLog('WRN', tag, ...message);
-        console.warn(colors.FgYellow + `[${tag}]`, ...message, colors.Reset);
+        console.warn(color + `[${new Date().toLocaleTimeString()}] [${tag}]`, ...message, colors.Reset);
     }
 }
