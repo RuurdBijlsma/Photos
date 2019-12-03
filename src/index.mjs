@@ -1,7 +1,6 @@
 import ApiController from "./Controller";
 import Commander from 'commander';
 import pJson from '../package.json';
-import fs from "fs";
 
 Commander
     .version(pJson.version)

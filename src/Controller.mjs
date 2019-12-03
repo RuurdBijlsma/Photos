@@ -1,12 +1,18 @@
 import express from 'express';
 import https from "https";
+import http from "http";
+import socketIo from "socket.io";
 import bodyParser from "body-parser";
 import cors from "cors";
 import fs from 'fs';
-import path from 'path';
 import VmModule from "./vue-music/VmModule";
 import BerberModule from "./berber-api/BerberModule";
 import Log from "./Log";
+import SignalModule from "./signal-server/SignalModule";
+
+//TODO:
+//SOCKET IO implement
+//SignalServer implement
 
 
 class Controller {
@@ -18,13 +24,15 @@ class Controller {
         this.modules = [
             new VmModule(),
             new BerberModule(),
+            new SignalModule(),
         ];
-        this.setRoutes();
     }
 
     setRoutes() {
-        for (let module of this.modules)
-            module.setRoutes(this.app);
+        for (let module of this.modules) {
+            Log.l("Controller", module.constructor.name, " initialized");
+            module.setRoutes(this.app, this.io);
+        }
     }
 
     static getHttpsCredentials(key, cert) {
@@ -40,13 +48,16 @@ class Controller {
 
     start(port = 3000, key, cert) {
         let credentials = Controller.getHttpsCredentials(key, cert);
+        let server;
         if (credentials) {
-            const httpsServer = https.createServer(credentials, this.app);
-            httpsServer.listen(port, () => Log.l('Controller', `HTTPS app listening on port ${port}!`));
+            server = https.createServer(credentials, this.app);
         } else {
-            Log.w('Controller',"Could not get HTTPS credentials, switching to HTTP");
-            this.app.listen(port, () => Log.l('Controller', `HTTP app listening on port ${port}!`));
+            server = http.createServer(this.app);
+            Log.w('Controller', "Could not get HTTPS credentials, switching to HTTP");
         }
+        this.io = socketIo(server);
+        this.setRoutes();
+        server.listen(port, () => console.log(`Signal server listening on port ${port}!`));
     }
 }
 

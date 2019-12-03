@@ -2,7 +2,7 @@ export default class ApiModule {
     constructor() {
     }
 
-    setRoutes(app) {
+    setRoutes(app, io) {
         throw new Error('Implement setRoutes!');
     }
 }
