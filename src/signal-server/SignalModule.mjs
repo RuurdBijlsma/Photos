@@ -23,24 +23,24 @@ export default class SignalModule extends ApiModule {
             socket.emit('socketId', socket.id);
             socket.on('disconnect', () => {
                 this.onDisconnect(socket);
-                Log.l('Signal',`${socket.id} disconnected`);
+                Log.l('Signal', `${socket.id} disconnected`);
             });
             socket.on('roomCount', room => {
                 let roomCount = this.getRoomCount(room);
-                Log.l('Signal',`${socket.id} requested roomCount ${roomCount}`);
+                Log.l('Signal', `${socket.id} requested roomCount ${roomCount}`);
                 socket.emit('roomCount', roomCount);
             });
             socket.on('join', room => {
                 for (let room in this.getRooms(socket))
                     socket.leave(room);
-                Log.l('Signal',`${socket.id} joined room ${room}`);
+                Log.l('Signal', `${socket.id} joined room ${room}`);
                 socket.join(room);
                 this.socketRooms[socket.id] = room;
                 this.socketBroadcast(socket, 'initialize', socket.id);
                 this.io.in(room).emit('roomCount', this.getRoomCount(room));
             });
             socket.on('leave', room => {
-                Log.l('Signal',`${socket.id} left room ${room}`);
+                Log.l('Signal', `${socket.id} left room ${room}`);
                 this.onDisconnect(socket);
                 socket.leave(room);
             });
@@ -48,11 +48,11 @@ export default class SignalModule extends ApiModule {
                 this.socketBroadcast(socket, event, message);
             });
             socket.on('message', ([socketId, event, message]) => {
-                Log.l('Signal',`${socket.id} send message to ${socketId}:this.io.to(socketId).emit('signal', 'test2');`);
+                Log.l('Signal', `${socket.id} send message to ${socketId}:this.io.to(socketId).emit('signal', 'test2');`);
                 this.io.to(`${socketId}`).emit(event, [socket.id, message]);
                 // this.io.to(`${socketId}`).emit('hey', 'I just met you');
             });
-            Log.l(`${socket.id} connected`);
+            Log.l('Signal', `${socket.id} connected`);
         });
     }
 
