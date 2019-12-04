@@ -31,14 +31,34 @@ const colors = {
 };
 
 export default class Log {
+    static init() {
+        let handler = () => {
+
+            let d = new Date();
+            let fileName = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}.log`;
+            let fullPath = path.join(this.directory, fileName);
+
+            fs.access(fullPath, fs.R_OK | fs.W_OK, err => {
+                if (err) {
+                    fs.writeFile(fullPath, '', {flag: 'wx'}, err => {
+                        if (err)
+                            console.error("Could not create log file", err);
+                    });
+                }
+            });
+
+        };
+        handler();
+        setInterval(handler, 10000);
+    }
+
     static get directory() {
         return 'res/log/';
     }
 
     static exportLog(type, tag, ...message) {
-        let concatenatedMessage = `[${new Date().toLocaleTimeString()}] [${type}] [${tag}] ` + message.join(',') + os.EOL;
         let d = new Date();
-
+        let concatenatedMessage = `[${d.toLocaleTimeString()}] [${type}] [${tag}] ` + message.join(',') + os.EOL;
         let fileName = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}.log`;
         let fullPath = path.join(this.directory, fileName);
         fs.access(fullPath, fs.R_OK | fs.W_OK, err => {
@@ -46,7 +66,7 @@ export default class Log {
                 fs.writeFile(fullPath, concatenatedMessage, {flag: 'wx'}, err => {
                     if (err)
                         console.error("Could not write to log file", err);
-                })
+                });
             } else {
                 fs.appendFile(fullPath, concatenatedMessage, err => {
                     if (err)
@@ -72,7 +92,7 @@ export default class Log {
         this.log(colors.FgYellow, 'WRN', tag, ...message);
     }
 
-    static log(color, type, tag, ...message){
+    static log(color, type, tag, ...message) {
         this.exportLog('WRN', tag, ...message);
         console.warn(color + `[${tag}]`, ...message, colors.Reset);
     }

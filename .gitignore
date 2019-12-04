@@ -9,6 +9,7 @@ yarn-error.log*
 files
 secrets.json
 credentials.json
+authorization.json
 
 # Runtime data
 pids

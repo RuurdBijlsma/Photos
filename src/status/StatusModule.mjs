@@ -2,36 +2,23 @@ import sendMail from 'gmail-send';
 import credentials from "../../res/berber-api/credentials.json";
 import ApiModule from "../ApiModule";
 import {exec} from "child_process";
+import Log from "../Log";
+import si from 'systeminformation';
+import Utils from "../Utils";
 
 export default class StatusModule extends ApiModule {
     setRoutes(app) {
-        app.get('/status/', async (req, res) => {
-            exec('sensors', (err, stdout, stderr) => {
-                if (err) {
-                    // node couldn't execute the command
-                    console.log(err);
-                    return;
-                }
+        app.post('/status/', async (req, res) => {
+            let auth = await Utils.checkAuthorization(req);
+            if (!auth) {
+                res.send("Not authorized");
+                return;
+            }
 
-                let result = {};
-                let words = stdout
-                    .split('\n')
-                    .filter(c => c.includes('°C'))
-                    .map(l => l.replace(/\((.*?)\)/gi, '')
-                        .split('  ')
-                        .filter(w => w.length > 0)
-                        .map(w => w
-                            .trim()
-                            .replace(/°C/gi, '')
-                            .replace(/:/gi, '')
-                        )
-                    );
-                for (let [key, value] of words)
-                    result[key] = +value;
-
-                console.log('stderr', stderr);
-                res.send(result);
-            });
+            // noinspection ES6MissingAwait
+            let promises = [si.cpuTemperature(), si.currentLoad(), si.mem(), si.fsSize(), si.networkStats()];
+            let [temperature, load, memory, storage, network] = await Promise.all(promises);
+            res.send({temperature, load, memory, storage, network});
         });
     }
 }

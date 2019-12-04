@@ -2,6 +2,7 @@ import ApiController from "./Controller";
 import Commander from 'commander';
 import pJson from '../package.json';
 import {exec} from 'child_process';
+import Log from "./Log";
 
 Commander
     .version(pJson.version)
@@ -13,6 +14,8 @@ Commander
 const port = Commander.port ? Commander.port : 3000;
 const key = Commander.key ? Commander.key : '/etc/letsencrypt/live/ruurd.dev/privkey.pem';
 const cert = Commander.cert ? Commander.cert : '/etc/letsencrypt/live/ruurd.dev/fullchain.pem';
+
+Log.init();
 
 ApiController.start(port, key, cert);
 

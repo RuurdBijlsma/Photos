@@ -10,12 +10,14 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "bcrypt": "^3.0.7",
     "body-parser": "^1.19.0",
     "commander": "^4.0.1",
     "cors": "^2.8.5",
     "express": "^4.17.1",
     "gmail-send": "^1.8.10",
     "socket.io": "^2.3.0",
+    "systeminformation": "^4.16.0",
     "youtube-search": "^1.1.4",
     "ytdl-core": "^1.0.3"
   }
