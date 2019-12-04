@@ -10,6 +10,8 @@ import BerberModule from "./berber-api/BerberModule";
 import Log from "./Log";
 import SignalModule from "./signal-server/SignalModule";
 import StatusModule from "./status/StatusModule";
+import Utils from "./Utils";
+import si from "systeminformation";
 
 
 class Controller {
@@ -27,6 +29,11 @@ class Controller {
     }
 
     setRoutes() {
+        this.app.post('/auth/', async (req, res) => {
+            let auth = await Utils.checkAuthorization(req);
+            res.send(auth);
+        });
+
         for (let module of this.modules) {
             Log.l("Controller", 'Initialized ' + module.constructor.name);
             module.setRoutes(this.app, this.io);
