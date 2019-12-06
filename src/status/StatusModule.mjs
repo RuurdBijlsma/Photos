@@ -11,7 +11,7 @@ export default class StatusModule extends ApiModule {
         app.post('/status/', async (req, res) => {
             let auth = await Utils.checkAuthorization(req);
             if (!auth) {
-                res.send("Not authorized");
+                res.send(false);
                 return;
             }
 
