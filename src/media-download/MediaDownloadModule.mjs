@@ -12,6 +12,7 @@ export default class SignalModule extends ApiModule {
     }
 
     setRoutes(app, io) {
+        //this.fakeDir is route
         app.post(/\/media/, async (req, res) => {
             let auth = await Utils.checkAuthorization(req);
             if(!auth){
