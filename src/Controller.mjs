@@ -12,6 +12,7 @@ import SignalModule from "./signal-server/SignalModule";
 import StatusModule from "./status/StatusModule";
 import Utils from "./Utils";
 import si from "systeminformation";
+import MediaDownloadModule from "./media-download/MediaDownloadModule";
 
 
 class Controller {
@@ -25,6 +26,7 @@ class Controller {
             new BerberModule(),
             new SignalModule(),
             new StatusModule(),
+            new MediaDownloadModule(),
         ];
     }
 
