@@ -8,6 +8,7 @@ export default class SignalModule extends ApiModule {
     constructor() {
         super();
         this.baseDir = '/media/complete/';
+        this.baseDir = 'res/'; //For testing
         this.fakeDir = /media/;
     }
 
@@ -39,6 +40,7 @@ export default class SignalModule extends ApiModule {
     }
 
     validatePath(dir, req) {
+        dir = decodeURIComponent(dir);
         if (!(dir.startsWith('/media/') &&
             (dir.includes('/tv') || dir.includes('/movies')))
         ) {
