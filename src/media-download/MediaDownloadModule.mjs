@@ -9,7 +9,7 @@ export default class SignalModule extends ApiModule {
     constructor() {
         super();
         this.baseDir = '/media/complete/';
-        this.baseDir = 'res/'; //For testing
+        // this.baseDir = 'res/'; //For testing
         this.fakeDir = /media/;
         this.tokens = {};
     }
