@@ -35,8 +35,8 @@ export default class SignalModule extends ApiModule {
 
                     res.send(await Promise.all(items.map(item => this.parseItem(item))));
                 });
-            } else{
-                res.send({error:"Get this file using the token and the /file GET endpoint"})
+            } else {
+                res.send({error: "Get this file using the token and the /file GET endpoint"})
             }
         });
 
@@ -46,7 +46,7 @@ export default class SignalModule extends ApiModule {
             let token = req.query.token;
             if (this.tokens.hasOwnProperty(token)) {
                 let filePath = path.resolve(this.tokens[token]);
-                res.sendFile(filePath);
+                await res.download(filePath, path.basename(filePath));
             } else {
                 res.send(false);
             }
