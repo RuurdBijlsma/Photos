@@ -3,26 +3,28 @@ import Log from "../Log";
 import path from 'path';
 import fs from 'fs';
 import Utils from "../Utils";
+import crypto from 'crypto';
 
 export default class SignalModule extends ApiModule {
     constructor() {
         super();
         this.baseDir = '/media/complete/';
-        // this.baseDir = 'res/'; //For testing
+        this.baseDir = 'res/'; //For testing
         this.fakeDir = /media/;
+        this.tokens = {};
     }
 
     setRoutes(app, io) {
         //this.fakeDir is route
         app.post(/\/media/, async (req, res) => {
             let auth = await Utils.checkAuthorization(req);
-            if(!auth){
+            if (!auth) {
                 res.send(false);
             }
             let dir = this.validatePath(req.url, req);
 
             let itemType = await this.getItemType(dir);
-            if(!itemType)
+            if (!itemType)
                 res.send([]);
             if (itemType.directory) {
                 fs.readdir(dir, async (err, items) => {
@@ -31,11 +33,49 @@ export default class SignalModule extends ApiModule {
 
                     items = items.map(i => dir + '/' + i);
 
-                    res.send(await Promise.all(items.map(item => this.getItemType(item))));
+                    res.send(await Promise.all(items.map(item => this.parseItem(item))));
                 });
-            } else {
-                res.sendFile(path.resolve(dir));
+            } else{
+                res.send({error:"Get this file using the token and the /file GET endpoint"})
             }
+        });
+
+        app.get(/file/, async (req, res) => {
+            if (!req.query.hasOwnProperty('token'))
+                return;
+            let token = req.query.token;
+            if (this.tokens.hasOwnProperty(token)) {
+                let filePath = path.resolve(this.tokens[token]);
+                res.sendFile(filePath);
+            } else {
+                res.send(false);
+            }
+        });
+    }
+
+    async parseItem(item) {
+        let itemInfo = await this.getItemType(item);
+        if (!itemInfo.directory) {
+            let token = await this.getToken();
+            this.tokens[token] = item;
+            itemInfo.token = token;
+            setTimeout(() => {
+                delete this.tokens[token];
+            }, 5 * 60 * 1000);//5 minutes
+        }
+        return itemInfo;
+    }
+
+    getToken() {
+        return new Promise((resolve, reject) => {
+            crypto.randomBytes(48, (err, buffer) => {
+                if (err) {
+                    reject(err);
+                    return;
+                }
+
+                resolve(buffer.toString('hex'));
+            });
         });
     }
 
