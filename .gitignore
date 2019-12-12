@@ -8,6 +8,7 @@ yarn-error.log*
 .idea
 files
 secrets.json
+secret.json
 credentials.json
 authorization.json
 
