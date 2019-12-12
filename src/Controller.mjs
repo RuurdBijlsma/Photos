@@ -11,8 +11,8 @@ import Log from "./Log";
 import SignalModule from "./signal-server/SignalModule";
 import StatusModule from "./status/StatusModule";
 import Utils from "./Utils";
-import si from "systeminformation";
 import MediaDownloadModule from "./media-download/MediaDownloadModule";
+import SpotifyModule from "./spotify/SpotifyModule";
 
 
 class Controller {
@@ -27,6 +27,7 @@ class Controller {
             new SignalModule(),
             new StatusModule(),
             new MediaDownloadModule(),
+            new SpotifyModule(),
         ];
     }
 
