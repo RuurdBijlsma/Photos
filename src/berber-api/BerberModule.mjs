@@ -1,7 +1,7 @@
 import sendMail from 'gmail-send';
 import credentials from "../../res/berber-api/credentials.json";
-import ApiModule from "../ApiModule";
-import Log from "../Log";
+import ApiModule from "../ApiModule.mjs";
+import Log from "../Log.mjs";
 
 export default class BerberModule extends ApiModule {
     setRoutes(app) {

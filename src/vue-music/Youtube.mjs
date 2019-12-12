@@ -2,7 +2,7 @@ import ytdl from "ytdl-core";
 import fs from "fs";
 import secrets from "../../res/vue-music/secrets.json";
 import youtubeSearch from "youtube-search";
-import Log from "../Log";
+import Log from "../Log.mjs";
 
 class Youtube {
     constructor() {
@@ -22,8 +22,13 @@ class Youtube {
         return new Promise(resolve => {
             let stream = ytdl(this.urlById(id), this.ytdlOptions);
 
+            let loggedPercentages = [];
             stream.on('progress', (chunkLength, downloaded, totalLength) => {
-                Log.l('Youtube','downloading', id, Math.round(downloaded / totalLength * 1000) / 10 + '%');
+                let percentage = Math.floor(downloaded / totalLength * 10) * 10;
+                if (!loggedPercentages.includes(percentage)) {
+                    Log.l('Youtube', 'downloading', destinationFile, Math.round(downloaded / totalLength * 100) + '%');
+                    loggedPercentages.push(percentage);
+                }
                 if (downloaded === totalLength)
                     resolve(downloaded);
             });
@@ -58,7 +63,7 @@ class Youtube {
     }
 
     async stream(req, res, id) {
-        Log.l('Youtube','stream request', id);
+        Log.l('Youtube', 'stream request', id);
         let fileSize;
         try {
             fileSize = await this.timeout(5000,
@@ -74,7 +79,7 @@ class Youtube {
             let [start, end] = range.substr(6).split('-');
             end = end ? end : fileSize - 1;
 
-            Log.l('Youtube',start, end);
+            Log.l('Youtube', start, end);
 
             let stream = ytdl(this.urlById(id), {
                 quality: 'highestaudio',
@@ -137,7 +142,7 @@ class Youtube {
 
     async searchYt(query, maxResults = 5, category) {
         const key = secrets.ytKey;
-        Log.l('Youtube',"Search:", query);
+        Log.l('Youtube', "Search:", query);
 
         return new Promise((resolve, error) => {
             const opts = {

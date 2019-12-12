@@ -5,14 +5,14 @@ import socketIo from "socket.io";
 import bodyParser from "body-parser";
 import cors from "cors";
 import fs from 'fs';
-import VmModule from "./vue-music/VmModule";
-import BerberModule from "./berber-api/BerberModule";
-import Log from "./Log";
-import SignalModule from "./signal-server/SignalModule";
-import StatusModule from "./status/StatusModule";
-import Utils from "./Utils";
-import MediaDownloadModule from "./media-download/MediaDownloadModule";
-import SpotifyModule from "./spotify/SpotifyModule";
+import VmModule from "./vue-music/VmModule.mjs";
+import BerberModule from "./berber-api/BerberModule.mjs";
+import Log from "./Log.mjs";
+import SignalModule from "./signal-server/SignalModule.mjs";
+import StatusModule from "./status/StatusModule.mjs";
+import Utils from "./Utils.mjs";
+import MediaDownloadModule from "./media-download/MediaDownloadModule.mjs";
+import SpotifyModule from "./spotify/SpotifyModule.mjs";
 
 
 class Controller {

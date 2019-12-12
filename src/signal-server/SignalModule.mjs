@@ -1,5 +1,5 @@
-import ApiModule from "../ApiModule";
-import Log from "../Log";
+import ApiModule from "../ApiModule.mjs";
+import Log from "../Log.mjs";
 
 export default class SignalModule extends ApiModule {
     constructor() {

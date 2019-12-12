@@ -1,8 +1,8 @@
-import ApiModule from "../ApiModule";
-import Log from "../Log";
+import ApiModule from "../ApiModule.mjs";
+import Log from "../Log.mjs";
 import path from 'path';
 import fs from 'fs';
-import Utils from "../Utils";
+import Utils from "../Utils.mjs";
 import crypto from 'crypto';
 
 export default class SignalModule extends ApiModule {

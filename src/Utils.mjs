@@ -1,8 +1,7 @@
 import bcrypt from 'bcrypt';
 import auth from '../res/authorization.json';
-import Log from "./Log";
+import Log from "./Log.mjs";
 
-const saltRounds = 10;
 export default class Utils {
     static checkAuthorization(req) {
         return new Promise((resolve, reject) => {

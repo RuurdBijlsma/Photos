@@ -1,7 +1,7 @@
-import ApiController from "./Controller";
+import ApiController from "./Controller.mjs";
 import Commander from 'commander';
 import pJson from '../package.json';
-import Log from "./Log";
+import Log from "./Log.mjs";
 
 Commander
     .version(pJson.version)

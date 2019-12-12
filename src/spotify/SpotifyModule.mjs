@@ -1,5 +1,5 @@
 import pgp from 'pg-promise';
-import ApiModule from "../ApiModule";
+import ApiModule from "../ApiModule.mjs";
 import fetch from 'node-fetch';
 import secret from '../../res/spotify/secret.json';
 

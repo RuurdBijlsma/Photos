@@ -1,7 +1,7 @@
-import youtube from './Youtube';
+import youtube from './Youtube.mjs';
 import fs from 'fs';
 import path from 'path';
-import Log from "../Log";
+import Log from "../Log.mjs";
 import {Worker, isMainThread, parentPort, workerData} from 'worker_threads';
 
 class Cacher {
@@ -34,25 +34,34 @@ class Cacher {
     }
 
     async cache(query) {
-        if (this.cachingSongs.includes(query))
-            return new Promise(resolve => {
+        return new Promise(async (resolve, reject) => {
+            if (this.cachingSongs.includes(query)) {
                 this.on('query' + query, () => resolve());
+                return;
+            }
+
+            this.cachingSongs.push(query);
+
+            let results = await youtube.search(query, 1);
+            let id = results[0].id;
+            let destinationPath = this.toPath(query);
+            const worker = new Worker('./src/vue-music/DownloadThread.mjs', {
+                workerData: {destinationPath, id},
+            });
+            worker.on('message', m => {
+                if (m === 'Completed') {
+                    //Download complete
+                    resolve();
+                    this.cachingSongs.splice(this.cachingSongs.indexOf(query), 1);
+                    this.fire('query' + query);
+                }
+            });
+            worker.on('exit', code => {
+                if (code !== 0)
+                    Log.e('Cacher', 'worker bad exit, code:', code);
             });
 
-        const worker = new Worker('DownloadThread.mjs', {
-            workerData: query,
         });
-        worker.on('message', m => console.log(m));
-        worker.on('exit', code=>console.log(code));//code 0 is good
-
-        this.cachingSongs.push(query);
-
-        let results = await youtube.search(query, 1);
-        let id = results[0].id;
-        await youtube.download(id, this.toPath(query));
-
-        this.cachingSongs.splice(this.cachingSongs.indexOf(query), 1);
-        this.fire('query' + query);
     }
 
     fire(event) {
