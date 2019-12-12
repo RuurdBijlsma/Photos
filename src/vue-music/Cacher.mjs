@@ -2,6 +2,7 @@ import youtube from './Youtube';
 import fs from 'fs';
 import path from 'path';
 import Log from "../Log";
+import {Worker, isMainThread, parentPort, workerData} from 'worker_threads';
 
 class Cacher {
     constructor() {
@@ -38,6 +39,12 @@ class Cacher {
                 this.on('query' + query, () => resolve());
             });
 
+        const worker = new Worker('DownloadThread.mjs', {
+            workerData: query,
+        });
+        worker.on('message', m => console.log(m));
+        worker.on('exit', code=>console.log(code));//code 0 is good
+
         this.cachingSongs.push(query);
 
         let results = await youtube.search(query, 1);
@@ -65,7 +72,7 @@ class Cacher {
         if (event in this.events)
             this.events[event].splice(this.events[event].indexOf(callback), 1);
         else
-            Log.w('Cacher',`Trying to remove ${event} event, but it does not exist`);
+            Log.w('Cacher', `Trying to remove ${event} event, but it does not exist`);
 
     }
 }

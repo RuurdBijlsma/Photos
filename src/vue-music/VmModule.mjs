@@ -3,12 +3,9 @@ import cacher from './Cacher';
 import youtube from './Youtube'
 import path from "path";
 
-export default class VmModule extends ApiModule{
-    setRoutes(app){
-        // app.get('/search', async (req, res) => {
-        //     Log.l("GET SEARCH");
-        //     res.send(await youtube.search(req.query.query));
-        // });
+export default class VmModule extends ApiModule {
+    setRoutes(app, _, params) {
+        cacher.songDirectory = params.directory;
 
         app.get('/stream', async (req, res) => {
             let results = await youtube.search(req.query.query, 1);

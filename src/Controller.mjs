@@ -39,7 +39,7 @@ class Controller {
 
         for (let module of this.modules) {
             Log.l("Controller", 'Initialized ' + module.constructor.name);
-            module.setRoutes(this.app, this.io);
+            module.setRoutes(this.app, this.io, this.params);
         }
     }
 
@@ -54,7 +54,8 @@ class Controller {
         }
     }
 
-    start(port = 3000, key, cert) {
+    start(port = 3000, key, cert, params) {
+        this.params = params;
         let credentials = Controller.getHttpsCredentials(key, cert);
         let server;
         if (credentials) {
