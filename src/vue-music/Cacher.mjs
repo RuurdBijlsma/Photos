@@ -35,10 +35,8 @@ class Cacher {
 
     async cache(query) {
         return new Promise(async (resolve, reject) => {
-            if (this.cachingSongs.includes(query)) {
-                this.on('query' + query, () => resolve());
-                return;
-            }
+            if (this.cachingSongs.includes(query))
+                resolve(await this.once('query' + query));
 
             this.cachingSongs.push(query);
 
@@ -68,6 +66,14 @@ class Cacher {
         if (this.events[event])
             for (let i = this.events[event].length - 1; i >= 0; i--)
                 this.events[event][i]();
+    }
+
+    once(event) {
+        return new Promise(resolve => {
+            let callback = () => resolve();
+            this.on(event, callback);
+            this.off(event, callback);
+        });
     }
 
     on(event, callback) {
