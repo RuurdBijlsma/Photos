@@ -21,19 +21,19 @@ class Youtube {
     async download(id, destinationFile) {
         return new Promise(resolve => {
             let stream = ytdl(this.urlById(id), this.ytdlOptions);
+            Log.l("Youtube", "Download STARTED ", destinationFile);
 
-            let loggedPercentages = [];
             stream.on('progress', (chunkLength, downloaded, totalLength) => {
-                let percentage = Math.floor(downloaded / totalLength * 10) * 10;
-                if (!loggedPercentages.includes(percentage)) {
-                    Log.l('Youtube', 'downloading', destinationFile, Math.round(downloaded / totalLength * 100) + '%');
-                    loggedPercentages.push(percentage);
+                if (downloaded === totalLength) {
+                    Log.l("Youtube", "Download FINISHED ", destinationFile);
+                    fs.rename(destinationFile + '.temp', destinationFile, err => {
+                        if (err) Log.w("Youtube", "Could not rename destination file", destinationFile);
+                        resolve(downloaded);
+                    });
                 }
-                if (downloaded === totalLength)
-                    resolve(downloaded);
             });
 
-            stream.pipe(fs.createWriteStream(destinationFile));
+            stream.pipe(fs.createWriteStream(destinationFile + '.temp'));
         })
     }
 
@@ -63,7 +63,6 @@ class Youtube {
     }
 
     async stream(req, res, id) {
-        Log.l('Youtube', 'stream request', id);
         let fileSize;
         try {
             fileSize = await this.timeout(5000,
@@ -79,7 +78,7 @@ class Youtube {
             let [start, end] = range.substr(6).split('-');
             end = end ? end : fileSize - 1;
 
-            Log.l('Youtube', start, end);
+            Log.l('Youtube', 'Stream', id, 'byte range: ', start, end);
 
             let stream = ytdl(this.urlById(id), {
                 quality: 'highestaudio',

@@ -9,6 +9,7 @@ class Cacher {
         this.songDirectory = 'res/vue-music/files/';
         this.cachingSongs = [];
         this.events = {};
+        this.maxConcurrentDownload = 2;
     }
 
     fileExists(file) {
@@ -40,6 +41,15 @@ class Cacher {
 
             this.cachingSongs.push(query);
 
+            while (this.cachingSongs.length > this.maxConcurrentDownload) {
+                //Wait
+                Log.l('Cacher',"There are already " + this.maxConcurrentDownload + " concurrent downloads, waiting for one to finish before starting",query);
+                console.log(this.cachingSongs);
+                let promises = this.cachingSongs.map(query => this.once('query' + query));
+                await Promise.race(promises);
+                Log.l('Cacher',"Done waiting for one, checking if it's my turn", query);
+            }
+
             let results = await youtube.search(query, 1);
             let id = results[0].id;
             let destinationPath = this.toPath(query);
@@ -49,8 +59,8 @@ class Cacher {
             worker.on('message', m => {
                 if (m === 'Completed') {
                     //Download complete
-                    resolve();
                     this.cachingSongs.splice(this.cachingSongs.indexOf(query), 1);
+                    resolve();
                     this.fire('query' + query);
                 }
             });
@@ -70,9 +80,12 @@ class Cacher {
 
     once(event) {
         return new Promise(resolve => {
-            let callback = () => resolve();
+            let callback;
+            callback = () => {
+                this.off(event, callback);
+                resolve();
+            };
             this.on(event, callback);
-            this.off(event, callback);
         });
     }
 
