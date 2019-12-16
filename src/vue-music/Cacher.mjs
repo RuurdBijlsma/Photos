@@ -9,7 +9,7 @@ class Cacher {
         this.songDirectory = 'res/vue-music/files/';
         this.cachingSongs = [];
         this.events = {};
-        this.maxConcurrentDownload = 2;
+        this.maxConcurrentDownload = 1;
     }
 
     fileExists(file) {
@@ -44,7 +44,6 @@ class Cacher {
             while (this.cachingSongs.length > this.maxConcurrentDownload) {
                 //Wait
                 Log.l('Cacher',"There are already " + this.maxConcurrentDownload + " concurrent downloads, waiting for one to finish before starting",query);
-                console.log(this.cachingSongs);
                 let promises = this.cachingSongs.map(query => this.once('query' + query));
                 await Promise.race(promises);
                 Log.l('Cacher',"Done waiting for one, checking if it's my turn", query);
