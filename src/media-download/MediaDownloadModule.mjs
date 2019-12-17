@@ -8,7 +8,7 @@ import crypto from 'crypto';
 export default class SignalModule extends ApiModule {
     constructor() {
         super();
-        this.baseDir = '/media/complete/';
+        this.baseDir = '/mnt/hdd/media/complete/';
         // this.baseDir = 'res/'; //For testing
         this.fakeDir = /media/;
         this.tokens = {};
