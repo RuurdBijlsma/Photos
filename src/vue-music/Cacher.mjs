@@ -34,20 +34,18 @@ class Cacher {
         return path.join(this.songDirectory, query);
     }
 
+    timeout(ms) {
+        return new Promise(resolve => {
+            setTimeout(() => resolve(), ms);
+        });
+    }
+
     async cache(query) {
         return new Promise(async (resolve, reject) => {
             if (this.cachingSongs.includes(query))
                 resolve(await this.once('query' + query));
 
             this.cachingSongs.push(query);
-
-            while (this.cachingSongs.length > this.maxConcurrentDownload) {
-                //Wait
-                Log.l('Cacher',"There are already " + this.maxConcurrentDownload + " concurrent downloads, waiting for one to finish before starting",query);
-                let promises = this.cachingSongs.map(query => this.once('query' + query));
-                await Promise.race(promises);
-                Log.l('Cacher',"Done waiting for one, checking if it's my turn", query);
-            }
 
             let results = await youtube.search(query, 1);
             let id = results[0].id;
