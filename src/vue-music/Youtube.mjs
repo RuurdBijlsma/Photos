@@ -21,7 +21,6 @@ class Youtube {
     async download(id, destinationFile) {
         return new Promise(resolve => {
             let stream = ytdl(this.urlById(id), this.ytdlOptions);
-            Log.l("Youtube", "Download STARTED ", destinationFile);
 
             stream.on('progress', (chunkLength, downloaded, totalLength) => {
                 if (downloaded === totalLength) {
@@ -77,8 +76,6 @@ class Youtube {
         if (range) {
             let [start, end] = range.substr(6).split('-');
             end = end ? end : fileSize - 1;
-
-            Log.l('Youtube', 'Stream', id, 'byte range: ', start, end);
 
             let stream = ytdl(this.urlById(id), {
                 quality: 'highestaudio',

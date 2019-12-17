@@ -42,8 +42,10 @@ class Cacher {
 
     async cache(query) {
         return new Promise(async (resolve, reject) => {
-            if (this.cachingSongs.includes(query))
-                resolve(await this.once('query' + query));
+            if (this.cachingSongs.includes(query)){
+                resolve(false);
+                return;
+            }
 
             this.cachingSongs.push(query);
 
