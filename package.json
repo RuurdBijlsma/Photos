@@ -5,7 +5,7 @@
   "main": "src/index.mjs",
   "scripts": {
     "start-dev": "node --experimental-modules src/index.mjs --directory res/",
-    "start": "node --experimental-modules src/index.mjs"
+    "start": "node --experimental-modules src/index.mjs --directory /mnt/hdd/music/"
   },
   "keywords": [],
   "author": "",
