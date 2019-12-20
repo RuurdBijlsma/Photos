@@ -3,7 +3,7 @@ import cacher from './Cacher.mjs';
 import youtube from './Youtube.mjs'
 import path from "path";
 import fs from 'fs';
-import Log from "../Log";
+import Log from "../Log.mjs";
 
 export default class VmModule extends ApiModule {
     setRoutes(app, _, params) {
