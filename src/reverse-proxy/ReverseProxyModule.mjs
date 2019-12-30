@@ -4,13 +4,12 @@ import fetch from 'node-fetch';
 export default class ReverseProxyModule extends ApiModule {
     setRoutes(app, _, params) {
         app.all('/proxy', async (req, res, next) => {
-            if (!req.headers.hasOwnProperty('x-proxy-url')) {
-                res.send("Error: 'x-proxy-url header not set");
+            if (!req.query.hasOwnProperty('url')) {
+                res.send("Error: 'url' query param not set");
                 return;
             }
 
-            let proxyUrl = req.headers['x-proxy-url'];
-            delete req.headers['x-proxy-url'];
+            let proxyUrl = req.query['url'];
             let options = {
                 method: req.method,
                 headers: req.headers,
