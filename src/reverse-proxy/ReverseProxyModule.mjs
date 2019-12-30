@@ -1,5 +1,7 @@
 import ApiModule from "../ApiModule.mjs";
 import fetch from 'node-fetch';
+import https from 'https';
+import requestProxy from "express-request-proxy";
 
 export default class ReverseProxyModule extends ApiModule {
     setRoutes(app, _, params) {
@@ -14,8 +16,12 @@ export default class ReverseProxyModule extends ApiModule {
                 method: req.method,
                 headers: req.headers,
                 body: req.body,
-                rejectUnauthorized: false,
             };
+
+            for (let header in options.headers)
+                if (options.headers.hasOwnProperty(header) &&
+                    (header.toLowerCase().includes('host') || header.toLowerCase().includes('content-length')))
+                    delete options.headers[header];
 
             if (options.method === 'GET' || options.method === 'HEAD')
                 delete options.body;
@@ -23,11 +29,12 @@ export default class ReverseProxyModule extends ApiModule {
             try {
                 let response = await fetch(proxyUrl, options);
                 response.headers.forEach((val, key) => {
-                    res.set(key, val);
+                    if (!key.toLowerCase().includes('encoding'))
+                        res.append(key, val);
                 });
                 res.send(await response.buffer());
             } catch (e) {
-                res.send({error: e.message});
+                res.send({error:e.message});
             }
         });
     }

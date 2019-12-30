@@ -18,6 +18,7 @@
     "cors": "^2.8.5",
     "express": "^4.17.1",
     "express-http-proxy": "^1.6.0",
+    "express-request-proxy": "^2.2.2",
     "gmail-send": "^1.8.10",
     "node-fetch": "^2.6.0",
     "pg-promise": "^10.3.1",
