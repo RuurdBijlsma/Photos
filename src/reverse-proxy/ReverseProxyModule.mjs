@@ -1,5 +1,5 @@
 import ApiModule from "../ApiModule.mjs";
-import request from 'request';
+import fetch from 'node-fetch';
 
 export default class ReverseProxyModule extends ApiModule {
     setRoutes(app, _, params) {
