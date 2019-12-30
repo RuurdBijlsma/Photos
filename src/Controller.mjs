@@ -13,6 +13,7 @@ import StatusModule from "./status/StatusModule.mjs";
 import Utils from "./Utils.mjs";
 import MediaDownloadModule from "./media-download/MediaDownloadModule.mjs";
 import SpotifyModule from "./spotify/SpotifyModule.mjs";
+import ReverseProxyModule from "./reverse-proxy/ReverseProxyModule.mjs";
 
 
 class Controller {
@@ -28,6 +29,7 @@ class Controller {
             new StatusModule(),
             new MediaDownloadModule(),
             new SpotifyModule(),
+            new ReverseProxyModule(),
         ];
     }
 
