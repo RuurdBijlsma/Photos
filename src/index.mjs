@@ -18,9 +18,6 @@ const cert = Commander.cert ? Commander.cert : '/etc/letsencrypt/live/ruurd.dev/
 const directory = Commander.directory ? Commander.directory : '/home/ruurd/music';
 const params = {directory};
 
-
-Log.init();
-
 ApiController.start(port, key, cert, params);
 
 
