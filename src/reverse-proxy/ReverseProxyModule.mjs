@@ -22,7 +22,10 @@ export default class ReverseProxyModule extends ApiModule {
 
             try {
                 let response = await fetch(proxyUrl, options);
-                res.send(response);
+                response.headers.forEach((val, key) => {
+                    res.set(key, val);
+                });
+                res.send(await response.buffer());
             } catch (e) {
                 res.send({error: e.message});
             }
