@@ -12,12 +12,10 @@ Commander
     .parse(process.argv);
 
 const port = Commander.port ? Commander.port : 3000;
-const key = Commander.key ? Commander.key : '/etc/letsencrypt/live/ruurd.dev/privkey.pem';
-const cert = Commander.cert ? Commander.cert : '/etc/letsencrypt/live/ruurd.dev/fullchain.pem';
 
 const directory = Commander.directory ? Commander.directory : '/home/ruurd/music';
 const params = {directory};
 
-ApiController.start(port, key, cert, params);
+ApiController.start(port, Commander.key, Commander.cert, params);
 
 
