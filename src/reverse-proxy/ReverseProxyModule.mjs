@@ -1,7 +1,5 @@
 import ApiModule from "../ApiModule.mjs";
 import fetch from 'node-fetch';
-import https from 'https';
-import requestProxy from "express-request-proxy";
 
 export default class ReverseProxyModule extends ApiModule {
     setRoutes(app, _, params) {
