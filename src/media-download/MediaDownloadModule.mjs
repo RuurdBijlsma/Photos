@@ -45,6 +45,7 @@ export default class SignalModule extends ApiModule {
                 return;
             let token = req.query.token;
             if (this.tokens.hasOwnProperty(token)) {
+                delete this.tokens[token];
                 let filePath = path.resolve(this.tokens[token]);
                 await res.download(filePath, path.basename(filePath));
             } else {
@@ -60,7 +61,8 @@ export default class SignalModule extends ApiModule {
             this.tokens[token] = item;
             itemInfo.token = token;
             setTimeout(() => {
-                delete this.tokens[token];
+                if (this.tokens.hasOwnProperty(token))
+                    delete this.tokens[token];
             }, 5 * 60 * 1000);//5 minutes
         }
         return itemInfo;
