@@ -1,7 +1,15 @@
 import ApiController from "./Controller.mjs";
 import Commander from 'commander';
 import pJson from '../package.json';
-import Log from "./Log.mjs";
+import bcrypt from 'bcrypt';
+
+//If password needs to be changed
+// bcrypt.hash('Xbv5qCdMpb5jNSz', 10, (err, hash) => {
+//     if (err)
+//         console.err("No hash :(");
+//     else
+//         console.log("HASHED PW: " + hash);
+// });
 
 Commander
     .version(pJson.version)
