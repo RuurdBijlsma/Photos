@@ -1,15 +1,22 @@
 import ApiModule from "../ApiModule.mjs";
 import fetch from 'node-fetch';
+import whiteList from '../../res/reverse-proxy/whitelist.json';
 
 export default class ReverseProxyModule extends ApiModule {
     setRoutes(app, _, params) {
         app.all('/proxy', async (req, res, next) => {
+
+
             if (!req.query.hasOwnProperty('url')) {
                 res.send("Error: 'url' query param not set");
                 return;
             }
 
             let proxyUrl = req.query['url'];
+            if (!whiteList.some(url => proxyUrl.includes(url))) {
+                res.send("Error: url not in whitelist");
+                return;
+            }
             let options = {
                 method: req.method,
                 headers: req.headers,
@@ -32,7 +39,7 @@ export default class ReverseProxyModule extends ApiModule {
                 });
                 res.send(await response.buffer());
             } catch (e) {
-                res.send({error:e.message});
+                res.send({error: e.message});
             }
         });
     }
