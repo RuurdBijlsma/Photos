@@ -1,71 +1,104 @@
 import ApiModule from "../ApiModule.mjs";
-import Log from "../Log.mjs";
 import path from 'path';
-import fs from 'fs';
 import Utils from "../Utils.mjs";
 import crypto from 'crypto';
+import plexCredentials from '../../res/download/credentials.json';
+import PlexAPI from "plex-api";
 
-export default class SignalModule extends ApiModule {
+const plexToken = plexCredentials.plexToken;
+const client = new PlexAPI({hostname: '192.168.0.133', token: plexToken});
+
+
+export default class MediaDownloadModule extends ApiModule {
     constructor() {
         super();
         this.baseDir = '/mnt/hdd/media/complete/';
         // this.baseDir = 'res/'; //For testing
-        this.fakeDir = /media/;
         this.tokens = {};
     }
 
     setRoutes(app, io) {
-        //this.fakeDir is route
-        app.post(/\/media/, async (req, res) => {
-            let auth = await Utils.checkAuthorization(req);
-            if (!auth) {
+        app.post('/library/shows/', async (req, res) => {
+            if (!await Utils.checkAuthorization(req)) {
                 res.send(false);
-            }
-            let dir = this.validatePath(req.url, req);
-
-            let itemType = await this.getItemType(dir);
-            if (!itemType)
-                res.send([]);
-            if (itemType.directory) {
-                fs.readdir(dir, async (err, items) => {
-                    if (err)
-                        return;
-
-                    items = items.map(i => dir + '/' + i);
-
-                    res.send(await Promise.all(items.map(item => this.parseItem(item))));
-                });
-            } else {
-                res.send({error: "Get this file using the token and the /file GET endpoint"})
-            }
-        });
-
-        app.get(/file/, async (req, res) => {
-            if (!req.query.hasOwnProperty('token'))
                 return;
-            let token = req.query.token;
-            if (this.tokens.hasOwnProperty(token)) {
-                delete this.tokens[token];
-                let filePath = path.resolve(this.tokens[token]);
-                await res.download(filePath, path.basename(filePath));
+            }
+
+            if (req.query.hasOwnProperty('show')) {
+
+                let showQuery = req.query.show;
+                let seasons = (await client.query(showQuery)).MediaContainer.Metadata;
+                await Promise.all(seasons.map(async season => {
+                    let episodes = (await client.query(season.key)).MediaContainer.Metadata;
+                    let metaKey = episodes[0].parentKey;
+                    season.info = (await client.query(metaKey)).MediaContainer.Metadata;
+                }));
+
+                res.send(seasons);
+
+            } else if (req.query.hasOwnProperty('season')) {
+
+                let seasonQuery = req.query.season;
+                let episodes = (await client.query(seasonQuery)).MediaContainer.Metadata;
+                res.send(episodes);
+
             } else {
-                res.send(false);
+
+                let result = await client.query('/library/sections/1/folder/');
+                let shows = result.MediaContainer.Metadata;
+                await Promise.all(shows.map(async show => {
+                    let seasons = (await client.query(show.key)).MediaContainer.Metadata;
+                    let episodes = (await client.query(seasons[0].key)).MediaContainer.Metadata;
+                    let metaKey = episodes[0].grandparentKey;
+                    show.info = (await client.query(metaKey)).MediaContainer.Metadata;
+                }));
+                res.send(shows);
+
             }
         });
-    }
+        app.post('/library/movies/', async (req, res) => {
+            if (!await Utils.checkAuthorization(req)) {
+                res.send(false);
+                return;
+            }
 
-    async parseItem(item) {
-        let itemInfo = await this.getItemType(item);
-        if (!itemInfo.directory) {
+            let result = await client.query('/library/sections/2/folder/');
+            let movies = result.MediaContainer.Metadata;
+            await Promise.all(movies.map(async movie => {
+                movie.info = (await client.query(movie.key)).MediaContainer.Metadata;
+            }));
+            res.send(movies);
+        });
+
+        app.post('/filetoken/', async (req, res) => {
+            if (!await Utils.checkAuthorization(req)) {
+                res.send(false);
+                return;
+            }
+            let file = req.query.file.replace(/\/data\//, '');
             let token = await this.getToken();
-            this.tokens[token] = item;
-            itemInfo.token = token;
+            this.tokens[token] = file;
             setTimeout(() => {
                 if (this.tokens.hasOwnProperty(token))
                     delete this.tokens[token];
-            }, 5 * 60 * 1000);//5 minutes
-        }
-        return itemInfo;
+            }, 10000);
+            res.send(token);
+        });
+
+        app.get(/file/, async (req, res) => {
+            if (!req.query.hasOwnProperty('token')){
+                res.send("No token provided");
+                return;
+            }
+            let token = req.query.token;
+            if (this.tokens.hasOwnProperty(token)) {
+                let filePath = path.resolve(this.tokens[token]);
+                delete this.tokens[token];
+                await res.download(filePath, path.basename(filePath));
+            } else {
+                res.send('Token incorrect');
+            }
+        });
     }
 
     getToken() {
@@ -77,36 +110,6 @@ export default class SignalModule extends ApiModule {
                 }
 
                 resolve(buffer.toString('hex'));
-            });
-        });
-    }
-
-    validatePath(dir, req) {
-        dir = decodeURIComponent(dir);
-        if (!(dir.startsWith('/media/') &&
-            (dir.includes('/tv') || dir.includes('/movies')))
-        ) {
-            Log.w("Download", 'Non media directory requested! req url:', req.url, 'directing to: ', this.baseDir);
-            return this.baseDir;
-        }
-        dir = this.baseDir + dir.replace(/\/media\//gi, '');
-        return dir;
-    }
-
-    async getItemType(path) {
-        return new Promise((resolve, reject) => {
-            fs.lstat(path, (err, result) => {
-                if (err) {
-                    Log.e("Download", err);
-                    resolve(false);
-                    return;
-                }
-
-                resolve({
-                    directory: !result.isFile() && result.isDirectory(),
-                    size: result.size,
-                    path: path.replace(this.baseDir, this.fakeDir).replace(/\/\//gi, '/'),
-                });
             });
         });
     }
