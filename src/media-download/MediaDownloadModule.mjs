@@ -31,7 +31,7 @@ export default class MediaDownloadModule extends ApiModule {
                 await Promise.all(seasons.map(async season => {
                     let episodes = (await client.query(season.key)).MediaContainer.Metadata;
                     let metaKey = episodes[0].parentKey;
-                    season.info = (await client.query(metaKey)).MediaContainer.Metadata;
+                    season.info = (await client.query(metaKey)).MediaContainer.Metadata[0];
                 }));
 
                 res.send(seasons);
@@ -50,7 +50,7 @@ export default class MediaDownloadModule extends ApiModule {
                     let seasons = (await client.query(show.key)).MediaContainer.Metadata;
                     let episodes = (await client.query(seasons[0].key)).MediaContainer.Metadata;
                     let metaKey = episodes[0].grandparentKey;
-                    show.info = (await client.query(metaKey)).MediaContainer.Metadata;
+                    show.info = (await client.query(metaKey)).MediaContainer.Metadata[0];
                 }));
                 res.send(shows);
 
@@ -65,7 +65,7 @@ export default class MediaDownloadModule extends ApiModule {
             let result = await client.query('/library/sections/2/folder/');
             let movies = result.MediaContainer.Metadata;
             await Promise.all(movies.map(async movie => {
-                movie.info = (await client.query(movie.key)).MediaContainer.Metadata;
+                movie.info = (await client.query(movie.key)).MediaContainer.Metadata[0];
             }));
             res.send(movies);
         });
