@@ -56,6 +56,7 @@ export default class MediaDownloadModule extends ApiModule {
 
             }
         });
+
         app.post('/library/movies/', async (req, res) => {
             if (!await Utils.checkAuthorization(req)) {
                 res.send(false);
@@ -68,6 +69,36 @@ export default class MediaDownloadModule extends ApiModule {
                 movie.info = (await client.query(movie.key)).MediaContainer.Metadata[0];
             }));
             res.send(movies);
+        });
+
+        app.get('/library/image', async (req, res) => {
+            let image = req.query.image;
+            if (isNaN(+image.substr(0, 1))) {
+                res.send(false);
+                return;
+            }
+
+            let blackListParts = ['#', '$', '&', '?'];
+            for (let part of blackListParts)
+                if (image.includes(part)) {
+                    console.warn("In blacklist");
+                    res.send(false);
+                    return;
+                }
+            let whiteListParts = ['/thumb/'];
+            for (let part of whiteListParts)
+                if (!image.includes(part)) {
+                    console.warn("Not in whitelist");
+                    res.send(false);
+                    return;
+                }
+
+            let result = await client.query('/library/metadata/' + image);
+            if (!(result instanceof Buffer)) {
+                res.send(false);
+                return;
+            }
+            res.send(result);
         });
 
         app.post('/filetoken/', async (req, res) => {
@@ -86,7 +117,7 @@ export default class MediaDownloadModule extends ApiModule {
         });
 
         app.get(/file/, async (req, res) => {
-            if (!req.query.hasOwnProperty('token')){
+            if (!req.query.hasOwnProperty('token')) {
                 res.send("No token provided");
                 return;
             }
