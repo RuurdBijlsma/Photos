@@ -113,7 +113,7 @@ export default class MediaDownloadModule extends ApiModule {
                 if (this.tokens.hasOwnProperty(token))
                     delete this.tokens[token];
             }, 10000);
-            res.send(token);
+            res.send({token});
         });
 
         app.get(/file/, async (req, res) => {
