@@ -4,12 +4,10 @@ import pJson from '../package.json';
 import bcrypt from 'bcrypt';
 
 //If password needs to be changed
-// bcrypt.hash('Xbv5qCdMpb5jNSz', 10, (err, hash) => {
-//     if (err)
-//         console.err("No hash :(");
-//     else
-//         console.log("HASHED PW: " + hash);
-// });
+(async () => {
+    // let hash = await bcrypt.hash('pupernoot', 10);
+    // console.log(hash);
+})();
 
 Commander
     .version(pJson.version)

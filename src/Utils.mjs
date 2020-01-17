@@ -20,10 +20,11 @@ export default class Utils {
     }
 
     static checkAuthorization(req) {
-        return new Promise((resolve, reject) => {
+        return new Promise(async (resolve, reject) => {
 
             if (!req.body.hasOwnProperty('password') ||
                 !req.body.hasOwnProperty('user')) {
+                console.log("Auth body incomplete", req.body);
                 resolve(false);
                 return;
             }
@@ -38,19 +39,16 @@ export default class Utils {
                 return;
             }
 
-            let userHash = auth[user];
-            bcrypt.compare(password, userHash, (err, result) => {
-                if (err) {
-                    reject(err);
-                    failed();
-                    return;
-                }
+            let userHashesPassword = auth[user];
 
-                if (!result)
-                    failed();
+            console.log("Attempted login to user", user, "using password:", password, "user hashed pw is", userHashesPassword);
 
-                resolve(result);
-            });
+            let result = await bcrypt.compare(password, userHashesPassword);
+            console.log("login result", result);
+            if (!result)
+                failed();
+
+            resolve(result);
 
         });
     }

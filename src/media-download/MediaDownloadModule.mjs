@@ -6,7 +6,7 @@ import plexCredentials from '../../res/download/credentials.json';
 import PlexAPI from "plex-api";
 
 const plexToken = plexCredentials.plexToken;
-const client = new PlexAPI({hostname: '192.168.0.133', token: plexToken});
+const client = new PlexAPI({hostname: 'ruurdbijlsma.com', token: plexToken});
 
 
 export default class MediaDownloadModule extends ApiModule {
@@ -30,8 +30,10 @@ export default class MediaDownloadModule extends ApiModule {
                 let seasons = (await client.query(showQuery)).MediaContainer.Metadata;
                 await Promise.all(seasons.map(async season => {
                     let episodes = (await client.query(season.key)).MediaContainer.Metadata;
-                    let metaKey = episodes[0].parentKey;
-                    season.info = (await client.query(metaKey)).MediaContainer.Metadata[0];
+                    if (episodes !== undefined)
+                        season.info = (await client.query(episodes[0].parentKey)).MediaContainer.Metadata[0];
+                    else
+                        season.info = {thumb: undefined, art: undefined}
                 }));
 
                 res.send(seasons);
@@ -49,8 +51,11 @@ export default class MediaDownloadModule extends ApiModule {
                 await Promise.all(shows.map(async show => {
                     let seasons = (await client.query(show.key)).MediaContainer.Metadata;
                     let episodes = (await client.query(seasons[0].key)).MediaContainer.Metadata;
-                    let metaKey = episodes[0].grandparentKey;
-                    show.info = (await client.query(metaKey)).MediaContainer.Metadata[0];
+
+                    if (episodes !== undefined)
+                        show.info = (await client.query(episodes[0].grandparentKey)).MediaContainer.Metadata[0];
+                    else
+                        show.info = {thumb: undefined, art: undefined};
                 }));
                 res.send(shows);
 
