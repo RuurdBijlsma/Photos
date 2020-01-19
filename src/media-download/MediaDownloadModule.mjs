@@ -18,6 +18,17 @@ export default class MediaDownloadModule extends ApiModule {
     }
 
     setRoutes(app, io) {
+        app.post('/library/deck', async (req,res)=>{
+            if (!await Utils.checkAuthorization(req)) {
+                res.send(false);
+                return;
+            }
+
+            let seasons = (await client.query('/library/sections/1/onDeck')).MediaContainer.Metadata;
+
+            res.send(seasons);
+
+        });
         app.post('/library/shows/', async (req, res) => {
             if (!await Utils.checkAuthorization(req)) {
                 res.send(false);
