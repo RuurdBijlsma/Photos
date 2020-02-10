@@ -12,7 +12,7 @@ class Youtube {
             filter: 'audioonly',
         };
 
-        setInterval(()=>{
+        setInterval(() => {
             this.searchCache = {};
         }, 1000 * 60 * 60 * 24 * 29);
     }
