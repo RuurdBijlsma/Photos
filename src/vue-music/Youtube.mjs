@@ -11,7 +11,10 @@ class Youtube {
             quality: 'highestaudio',
             filter: 'audioonly',
         };
-        this.searchCache = {};
+
+        setInterval(()=>{
+            this.searchCache = {};
+        }, 1000 * 60 * 60 * 24 * 29);
     }
 
     urlById(id) {
