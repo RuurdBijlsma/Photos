@@ -19,5 +19,5 @@ export default class BerberModule extends ApiModule {
             Log.l("Sending mail from " + params.from);
             res.send({status: 'success'});
         });
-}
+    }
 }

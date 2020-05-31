@@ -2,6 +2,8 @@ import ApiController from "./Controller.mjs";
 import Commander from 'commander';
 import pJson from '../package.json';
 import bcrypt from 'bcrypt';
+import sendMail from "gmail-send";
+import Log from "./Log.mjs";
 
 //If password needs to be changed
 (async () => {

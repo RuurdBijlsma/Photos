@@ -5,19 +5,39 @@ export default class SignalModule extends ApiModule {
     constructor() {
         super();
         this.io = {};
-        this.socketRooms = {};
+        this.rooms = [];
     }
 
     setRoutes(app, io) {
         this.io = io;
         app.get('/rooms', (req, res) => {
-            let roomInfo = this.getAllRoomsInfo();
-            if (!roomInfo.find(r => r.name === 'default'))
-                roomInfo.push({
-                    name: 'default',
-                    userCount: 0
-                });
-            res.send(roomInfo.sort((a, b) => b.userCount - a.userCount));
+            const nonHiddenApps = ['peercord'];
+
+            let rooms = this.rooms.filter(room => !room.hidden).map(room => ({
+                id: room.id,
+                appName: room.appName,
+                userCount: room.sockets.length,
+            }));
+
+            for (let app of nonHiddenApps) {
+                if (rooms.filter(room => room.appName === app).length === 0) {
+                    rooms.push({
+                        id: 'default',
+                        appName: app,
+                        userCount: 0,
+                    })
+                }
+            }
+
+            res.send(rooms);
+            // return;
+            // let roomInfo = this.getAllRoomsInfo();
+            // if (!roomInfo.find(r => r.name === 'default'))
+            //     roomInfo.push({
+            //         name: 'default',
+            //         userCount: 0
+            //     });
+            // res.send(roomInfo.sort((a, b) => b.userCount - a.userCount));
         });
         io.on('connection', socket => {
             socket.emit('socketId', socket.id);
@@ -30,14 +50,15 @@ export default class SignalModule extends ApiModule {
                 Log.l('Signal', `${socket.id} requested roomCount ${roomCount}`);
                 socket.emit('roomCount', roomCount);
             });
-            socket.on('join', room => {
+            socket.on('join', (roomId, appName, hidden = false) => {
                 for (let room in this.getRooms(socket))
                     socket.leave(room);
-                Log.l('Signal', `${socket.id} joined room ${room}`);
-                socket.join(room);
-                this.socketRooms[socket.id] = room;
+                Log.l('Signal', `${socket.id} joined room ${roomId}`);
+                socket.join(roomId);
+                let roomInfo = this.getRoomInfo(appName, roomId, hidden);
+                roomInfo.sockets.push(socket);
                 this.socketBroadcast(socket, 'initialize', socket.id);
-                this.io.in(room).emit('roomCount', this.getRoomCount(room));
+                this.io.in(roomId).emit('roomCount', this.getRoomCount(roomId));
             });
             socket.on('leave', room => {
                 Log.l('Signal', `${socket.id} left room ${room}`);
@@ -48,12 +69,21 @@ export default class SignalModule extends ApiModule {
                 this.socketBroadcast(socket, event, message);
             });
             socket.on('message', ([socketId, event, message]) => {
-                Log.l('Signal', `${socket.id} send message to ${socketId}:this.io.to(socketId).emit('signal', 'test2');`);
+                Log.l('Signal', `${socket.id} send message to ${socketId}`);
                 this.io.to(`${socketId}`).emit(event, [socket.id, message]);
                 // this.io.to(`${socketId}`).emit('hey', 'I just met you');
             });
             Log.l('Signal', `${socket.id} connected`);
         });
+    }
+
+    getRoomInfo(appName, roomId, hidden) {
+        let roomIndex = this.rooms.findIndex(room => room.appName === appName && room.id === roomId);
+        if (roomIndex === -1) {
+            this.rooms.push({id: roomId, appName, sockets: [], hidden});
+            roomIndex = this.rooms.length - 1;
+        }
+        return this.rooms[roomIndex];
     }
 
     getAllRoomsInfo() {
@@ -74,12 +104,16 @@ export default class SignalModule extends ApiModule {
     }
 
     onDisconnect(socket) {
-        let room = this.socketRooms[socket.id];
+        let room = this.rooms.find(room => room.sockets.includes(socket));
         if (room) {
-            this.io.in(room).emit('roomCount', this.getRoomCount(room));
-            socket.to(room).emit('destroy', socket.id);
+            let newRoomCount = this.getRoomCount(room.id);
+            this.io.in(room.id).emit('roomCount', newRoomCount);
+            // Destroy refers to the peer that should now be destroyed
+            socket.to(room.id).emit('destroy', socket.id);
+            room.sockets.splice(room.sockets.indexOf(socket), 1);
+            if (newRoomCount === 0)
+                this.rooms.splice(this.rooms.indexOf(room), 1);
         }
-        delete this.socketRooms[socket.id];
     }
 
     getRooms(socket) {
