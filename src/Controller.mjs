@@ -8,7 +8,7 @@ import fs from 'fs';
 import VmModule from "./vue-music/VmModule.mjs";
 import BerberModule from "./berber-api/BerberModule.mjs";
 import Log from "./Log.mjs";
-import SignalModule from "./signal-server/SignalModule.mjs";
+import SignalModule2 from "./signal-server/SignalModule2.mjs";
 import StatusModule from "./status/StatusModule.mjs";
 import Utils from "./Utils.mjs";
 import MediaDownloadModule from "./media-download/MediaDownloadModule.mjs";
@@ -25,7 +25,7 @@ class Controller {
         this.modules = [
             new VmModule(),
             new BerberModule(),
-            new SignalModule(),
+            new SignalModule2(),
             new StatusModule(),
             new MediaDownloadModule(),
             new SpotifyModule(),
