@@ -18,6 +18,7 @@
     "cors": "^2.8.5",
     "express": "^4.17.1",
     "gmail-send": "^1.8.10",
+    "multi-signal-server": "git+https://git@github.com/ruurdbijlsma/multi-signal-server.git",
     "node-fetch": "^2.6.0",
     "pg-promise": "^10.3.1",
     "plex-api": "^5.3.1",
