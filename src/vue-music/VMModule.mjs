@@ -5,7 +5,7 @@ import path from "path";
 import fs from 'fs';
 import Log from "../Log.mjs";
 
-export default class VmModule extends ApiModule {
+export default class VMModule extends ApiModule {
     setRoutes(app, _, params) {
         cacher.songDirectory = params.directory;
 

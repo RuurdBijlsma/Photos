@@ -5,15 +5,14 @@ import socketIo from "socket.io";
 import bodyParser from "body-parser";
 import cors from "cors";
 import fs from 'fs';
-import VmModule from "./vue-music/VmModule.mjs";
 import BerberModule from "./berber-api/BerberModule.mjs";
 import Log from "./Log.mjs";
 import StatusModule from "./status/StatusModule.mjs";
 import Utils from "./Utils.mjs";
 import MediaDownloadModule from "./media-download/MediaDownloadModule.mjs";
-import SpotifyModule from "./spotify/SpotifyModule.mjs";
 import ReverseProxyModule from "./reverse-proxy/ReverseProxyModule.mjs";
 import SignalModule from 'multi-signal-server'
+import VM5Module from "./vue-music-5/VM5Module.mjs";
 
 
 class Controller {
@@ -23,12 +22,10 @@ class Controller {
         this.app.use(bodyParser.json());
 
         this.modules = [
-            new VmModule(),
             new BerberModule(),
             new SignalModule(['peercord']),
             new StatusModule(),
             new MediaDownloadModule(),
-            new SpotifyModule(),
             new ReverseProxyModule(),
         ];
     }

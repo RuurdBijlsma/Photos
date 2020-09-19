@@ -6,7 +6,6 @@ export default class ReverseProxyModule extends ApiModule {
     setRoutes(app, _, params) {
         app.all('/proxy', async (req, res, next) => {
 
-
             if (!req.query.hasOwnProperty('url')) {
                 res.send("Error: 'url' query param not set");
                 return;
