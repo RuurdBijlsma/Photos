@@ -1,5 +1,15 @@
 [
-    "https://torrentapi.org",
-    "https://www.youtube.com",
-    "https://manifest.googlevideo.com"
+  {
+    "start": "https://torrentapi.org"
+  },
+  {
+    "start": "https://www.youtube.com"
+  },
+  {
+    "start": "https://manifest.googlevideo.com"
+  },
+  {
+    "start": "https://r",
+    "include": ".googlevideo.com/videoplayback?"
+  }
 ]

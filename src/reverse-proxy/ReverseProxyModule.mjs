@@ -13,7 +13,15 @@ export default class ReverseProxyModule extends ApiModule {
 
             let proxyUrl = req.query['url'];
             // noinspection JSUnresolvedFunction
-            if (!whiteList.some(url => proxyUrl.startsWith(url))) {
+            if (!whiteList.some(wlItem => {
+                let includes = true;
+                if (wlItem.hasOwnProperty('include'))
+                    includes = proxyUrl.includes(wlItem.include);
+                let startsWith = true;
+                if (wlItem.hasOwnProperty('start'))
+                    startsWith = proxyUrl.includes(wlItem.start);
+                return startsWith && includes;
+            })) {
                 res.send("Error: url not in whitelist");
                 return;
             }
