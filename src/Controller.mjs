@@ -23,6 +23,7 @@ class Controller {
 
         this.modules = [
             new BerberModule(),
+            new VM5Module(),
             new SignalModule(['peercord']),
             new StatusModule(),
             new MediaDownloadModule(),
