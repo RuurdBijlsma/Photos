@@ -1,6 +1,6 @@
 import bcrypt from 'bcrypt';
 import auth from '../res/authorization.json';
-import Log from "./Log.mjs";
+import Log from "./Log.js";
 
 export default class Utils {
     static bytesToReadable(bytes) {

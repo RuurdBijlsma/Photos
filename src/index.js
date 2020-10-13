@@ -1,15 +1,6 @@
-import ApiController from "./Controller.mjs";
+import ApiController from "./Controller.js";
 import Commander from 'commander';
 import pJson from '../package.json';
-import bcrypt from 'bcrypt';
-import sendMail from "gmail-send";
-import Log from "./Log.mjs";
-
-//If password needs to be changed
-(async () => {
-    // let hash = await bcrypt.hash('pupernoot', 10);
-    // console.log(hash);
-})();
 
 Commander
     .version(pJson.version)
@@ -21,9 +12,6 @@ Commander
 
 const port = Commander.port ? Commander.port : 3000;
 
-const directory = Commander.directory ? Commander.directory : '/home/ruurd/music';
-const params = {directory};
-
-ApiController.start(port, Commander.key, Commander.cert, params);
+ApiController.start(port, Commander.key, Commander.cert);
 
 

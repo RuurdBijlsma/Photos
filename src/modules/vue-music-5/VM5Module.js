@@ -1,4 +1,4 @@
-import ApiModule from "../ApiModule.mjs";
+import ApiModule from "../../ApiModule.js";
 import ytdl from 'ytdl-core';
 
 export default class VM5Module extends ApiModule {
@@ -6,7 +6,7 @@ export default class VM5Module extends ApiModule {
         super();
     }
 
-    setRoutes(app, _, params) {
+    setRoutes(app) {
         app.post('/ytdl', async (req, res) => {
             res.send(await ytdl.getInfo(req.query.id, {
                 quality: 'highestaudio',

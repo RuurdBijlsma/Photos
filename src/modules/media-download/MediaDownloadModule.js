@@ -1,9 +1,10 @@
-import ApiModule from "../ApiModule.mjs";
+import ApiModule from "../../ApiModule.js";
 import path from 'path';
-import Utils from "../Utils.mjs";
+import Utils from "../../Utils.js";
 import crypto from 'crypto';
-import plexCredentials from '../../res/download/credentials.json';
+import plexCredentials from '../../../res/download/credentials.json';
 import PlexAPI from "plex-api";
+import Auth from "../../database/Auth.js";
 
 const plexToken = plexCredentials.plexToken;
 const client = new PlexAPI({hostname: 'ruurdbijlsma.com', token: plexToken});
@@ -12,17 +13,13 @@ const client = new PlexAPI({hostname: 'ruurdbijlsma.com', token: plexToken});
 export default class MediaDownloadModule extends ApiModule {
     constructor() {
         super();
-        this.baseDir = '/mnt/hdd/media/complete/';
-        // this.baseDir = 'res/'; //For testing
         this.tokens = {};
     }
 
     setRoutes(app, io) {
-        app.post('/library/deck', async (req,res)=>{
-            if (!await Utils.checkAuthorization(req)) {
-                res.send(false);
-                return;
-            }
+        app.post('/library/deck', async (req, res) => {
+            if (!await Auth.checkRequest(req))
+                return res.sendStatus(401);
 
             let seasons = (await client.query('/library/sections/1/onDeck')).MediaContainer.Metadata;
 
@@ -30,10 +27,8 @@ export default class MediaDownloadModule extends ApiModule {
 
         });
         app.post('/library/shows/', async (req, res) => {
-            if (!await Utils.checkAuthorization(req)) {
-                res.send(false);
-                return;
-            }
+            if (!await Auth.checkRequest(req))
+                return res.sendStatus(401);
 
             if (req.query.hasOwnProperty('show')) {
 
@@ -74,10 +69,8 @@ export default class MediaDownloadModule extends ApiModule {
         });
 
         app.post('/library/movies/', async (req, res) => {
-            if (!await Utils.checkAuthorization(req)) {
-                res.send(false);
-                return;
-            }
+            if (!await Auth.checkRequest(req))
+                return res.sendStatus(401);
 
             let result = await client.query('/library/sections/2/folder/');
             let movies = result.MediaContainer.Metadata;
@@ -118,10 +111,9 @@ export default class MediaDownloadModule extends ApiModule {
         });
 
         app.post('/filetoken/', async (req, res) => {
-            if (!await Utils.checkAuthorization(req)) {
-                res.send(false);
-                return;
-            }
+            if (!await Auth.checkRequest(req))
+                return res.sendStatus(401);
+
             let file = req.query.file.replace(/\/data\//, '/mnt/hdd/media/complete/');
             let token = await this.getToken();
             this.tokens[token] = file;

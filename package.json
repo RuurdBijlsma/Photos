@@ -3,10 +3,9 @@
   "version": "1.0.0",
   "description": "",
   "main": "src/index.mjs",
+  "type": "module",
   "scripts": {
-    "start-dev": "node --experimental-modules --experimental-json-modules src/index.mjs --directory res/music/",
-    "start": "node --experimental-modules --experimental-json-modules src/index.mjs --directory /mnt/hdd/music/",
-    "start-pi": "node --experimental-modules --experimental-json-modules src/index.mjs --directory /home/ruurd/music/"
+    "start": "node --experimental-json-modules src/index.js"
   },
   "keywords": [],
   "author": "",
@@ -18,16 +17,19 @@
     "cors": "^2.8.5",
     "express": "^4.17.1",
     "ffbinaries": "^1.1.4",
-    "filenamify": "^4.1.0",
+    "filenamify": "^4.2.0",
     "gmail-send": "^1.8.10",
     "multi-signal-server": "git+https://git@github.com/ruurdbijlsma/multi-signal-server.git",
     "node-fetch": "^2.6.1",
     "node-localstorage": "^2.1.6",
-    "pg-promise": "^10.6.1",
+    "pg": "^8.4.1",
+    "pg-hstore": "^2.3.3",
+    "pg-promise": "^10.7.0",
     "plex-api": "^5.3.1",
+    "sequelize": "^6.3.5",
     "socket.io": "^2.3.0",
-    "systeminformation": "^4.27.5",
+    "systeminformation": "^4.27.9",
     "youtube-search": "^1.1.4",
-    "ytdl-core": "^3.2.2"
+    "ytdl-core": "^3.3.0"
   }
 }

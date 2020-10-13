@@ -1,9 +1,9 @@
-import ApiModule from "../ApiModule.mjs";
+import ApiModule from "../../ApiModule.js";
 import fetch from 'node-fetch';
-import whiteList from '../../res/reverse-proxy/whitelist.json';
+import whiteList from '../../../res/reverse-proxy/whitelist.json';
 
 export default class ReverseProxyModule extends ApiModule {
-    setRoutes(app, _, params) {
+    setRoutes(app, _) {
         app.all('/proxy', async (req, res, next) => {
 
             if (!req.query.hasOwnProperty('url')) {

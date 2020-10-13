@@ -5,14 +5,21 @@ import socketIo from "socket.io";
 import bodyParser from "body-parser";
 import cors from "cors";
 import fs from 'fs';
-import BerberModule from "./berber-api/BerberModule.mjs";
-import Log from "./Log.mjs";
-import StatusModule from "./status/StatusModule.mjs";
-import Utils from "./Utils.mjs";
-import MediaDownloadModule from "./media-download/MediaDownloadModule.mjs";
-import ReverseProxyModule from "./reverse-proxy/ReverseProxyModule.mjs";
+import BerberModule from "./modules/berber-api/BerberModule.js";
+import Log from "./Log.js";
+import StatusModule from "./modules/status/StatusModule.js";
+import MediaDownloadModule from "./modules/media-download/MediaDownloadModule.js";
+import ReverseProxyModule from "./modules/reverse-proxy/ReverseProxyModule.js";
 import SignalModule from 'multi-signal-server'
-import VM5Module from "./vue-music-5/VM5Module.mjs";
+import VM5Module from "./modules/vue-music-5/VM5Module.js";
+import AuthModule from './modules/auth/AuthModule.js';
+import seq from "sequelize";
+import cred from "../res/auth/credentials.json"
+import SudokuModule from "./modules/sudoku/SudokuModule.js";
+import Database from "./database/Database.js";
+
+const {Sequelize} = seq;
+const {dbUser, dbPass, dbName} = cred;
 
 
 class Controller {
@@ -28,18 +35,15 @@ class Controller {
             new StatusModule(),
             new MediaDownloadModule(),
             new ReverseProxyModule(),
+            new AuthModule(),
+            new SudokuModule(),
         ];
     }
 
     setRoutes() {
-        this.app.post('/auth/', async (req, res) => {
-            let auth = await Utils.checkAuthorization(req);
-            res.send(auth);
-        });
-
         for (let module of this.modules) {
+            module.setRoutes(this.app, this.io, this.db);
             Log.l("Controller", 'Initialized ' + module.constructor.name);
-            module.setRoutes(this.app, this.io, this.params);
         }
     }
 
@@ -54,7 +58,7 @@ class Controller {
         }
     }
 
-    start(port = 3000, key, cert, params) {
+    async start(port = 3000, key, cert, params) {
         this.params = params;
         let credentials = Controller.getHttpsCredentials(key, cert);
         let server;
@@ -65,6 +69,11 @@ class Controller {
             Log.w('Controller', "Could not get HTTPS credentials, switching to HTTP");
         }
         this.io = socketIo(server);
+        this.db = new Sequelize(dbName, dbUser, dbPass, {
+            host: 'localhost',
+            dialect: 'postgres',
+        });
+        await Database.setDb(this.db);
         this.setRoutes();
         server.listen(port, () => Log.l('Controller', `${credentials ? 'HTTPS' : 'HTTP'} server listening on port ${port}!`));
     }
