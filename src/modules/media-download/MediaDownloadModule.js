@@ -124,7 +124,7 @@ export default class MediaDownloadModule extends ApiModule {
             res.send({token});
         });
 
-        app.get(/file/, async (req, res) => {
+        app.get('/file/', async (req, res) => {
             if (!req.query.hasOwnProperty('token')) {
                 res.send("No token provided");
                 return;
