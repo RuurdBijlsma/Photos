@@ -67,6 +67,7 @@ class Controller {
             console.warn("Could not get HTTPS credentials, switching to HTTP");
         }
         this.io = socketIo(server);
+        console.log("Initializing DB connection with ", {dbName, dbUser});
         this.db = new Sequelize(dbName, dbUser, dbPass, {
             host: 'localhost',
             dialect: 'postgres',
