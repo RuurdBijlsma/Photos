@@ -1,6 +1,7 @@
 import {User} from "./models/UserModel.js";
 import bcrypt from "bcrypt";
 import Log from "../Log.js";
+
 const console = new Log("Auth");
 
 class Auth {
@@ -34,7 +35,8 @@ class Auth {
     async changePassword(email, password, newPassword) {
         let user = await this.check(email, password);
         if (user !== false) {
-            user.password = newPassword;
+            let salt = await bcrypt.genSalt(10);
+            user.password = await bcrypt.hash(newPassword, salt);
             await user.save();
             return true;
         }
