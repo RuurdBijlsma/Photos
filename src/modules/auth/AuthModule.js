@@ -25,8 +25,8 @@ export default class AuthModule extends ApiModule {
 
         app.post('/auth/changePassword', async (req, res) => {
             try {
-                let {password, newPassword, email} = req.body;
-                res.send(await Auth.changePassword(email, password, newPassword));
+                let {auth, newPassword} = req.body;
+                res.send(await Auth.changePassword(auth.email, auth.password, newPassword));
             } catch (e) {
                 res.send(false);
             }
