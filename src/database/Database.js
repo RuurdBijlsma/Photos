@@ -1,6 +1,7 @@
 import Log from "../Log.js";
 import {initUser} from "./models/UserModel.js";
 import {initSudoku} from "./models/SudokuModel.js";
+const console = new Log("Database");
 
 class Database {
     constructor() {
@@ -15,14 +16,14 @@ class Database {
     async init() {
         try {
             await this.db.authenticate();
-            Log.l('Auth', "Postgres connection started successfully");
+            console.log("Postgres connection started successfully");
 
             initUser(this.db);
             initSudoku(this.db);
 
             await this.db.sync();
         } catch (e) {
-            Log.w('Auth', "Postgres connection started successfully");
+            console.warn("Postgres connection failed");
         }
     }
 }

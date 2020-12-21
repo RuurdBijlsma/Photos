@@ -1,6 +1,7 @@
 import {User} from "./models/UserModel.js";
 import bcrypt from "bcrypt";
 import Log from "../Log.js";
+const console = new Log("Auth");
 
 class Auth {
     constructor() {
@@ -25,7 +26,7 @@ class Auth {
                     return false;
                 }
         } catch (e) {
-            Log.e('Auth', 'Error in /auth', e.message);
+            console.error('Error in /auth', e.message);
         }
         return false;
     }
@@ -35,6 +36,7 @@ class Auth {
         if (user !== false) {
             user.password = newPassword;
             await user.save();
+            return true;
         }
         return false;
     }
@@ -46,7 +48,7 @@ class Auth {
             await User.create({name: user, email, password: hashed});
             return true;
         } catch (e) {
-            Log.e('Auth', 'Error in /createUser', e.message);
+            console.error('Error in /createUser', e.message);
             return false;
         }
     }

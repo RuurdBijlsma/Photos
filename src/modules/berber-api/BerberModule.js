@@ -2,6 +2,7 @@ import sendMail from 'gmail-send';
 import credentials from "../../../res/berber-api/credentials.json";
 import ApiModule from "../../ApiModule.js";
 import Log from "../../Log.js";
+const console = new Log("BerberModule");
 
 export default class BerberModule extends ApiModule {
     setRoutes(app) {
@@ -16,7 +17,7 @@ export default class BerberModule extends ApiModule {
                 subject: `Berber's Bakery - ${params.subject}`,
                 text: params.body,
             })({});
-            Log.l("Sending mail from " + params.from);
+            console.log("Sending mail from " + params.from);
             res.send({status: 'success'});
         });
     }

@@ -15,12 +15,11 @@ import VM5Module from "./modules/vue-music-5/VM5Module.js";
 import AuthModule from './modules/auth/AuthModule.js';
 import seq from "sequelize";
 import cred from "../res/auth/credentials.json"
-import SudokuModule from "./modules/sudoku/SudokuModule.js";
 import Database from "./database/Database.js";
 
 const {Sequelize} = seq;
 const {dbUser, dbPass, dbName} = cred;
-
+const console = new Log("Controller");
 
 class Controller {
     constructor() {
@@ -36,14 +35,13 @@ class Controller {
             new MediaDownloadModule(),
             new ReverseProxyModule(),
             new AuthModule(),
-            new SudokuModule(),
         ];
     }
 
     setRoutes() {
         for (let module of this.modules) {
             module.setRoutes(this.app, this.io, this.db);
-            Log.l("Controller", 'Initialized ' + module.constructor.name);
+            console.log('Initialized ' + module.constructor.name);
         }
     }
 
@@ -66,7 +64,7 @@ class Controller {
             server = https.createServer(credentials, this.app);
         } else {
             server = http.createServer(this.app);
-            Log.w('Controller', "Could not get HTTPS credentials, switching to HTTP");
+            console.warn("Could not get HTTPS credentials, switching to HTTP");
         }
         this.io = socketIo(server);
         this.db = new Sequelize(dbName, dbUser, dbPass, {
@@ -75,7 +73,7 @@ class Controller {
         });
         await Database.setDb(this.db);
         this.setRoutes();
-        server.listen(port, () => Log.l('Controller', `${credentials ? 'HTTPS' : 'HTTP'} server listening on port ${port}!`));
+        server.listen(port, () => console.log(`${credentials ? 'HTTPS' : 'HTTP'} server listening on port ${port}!`));
     }
 }
 

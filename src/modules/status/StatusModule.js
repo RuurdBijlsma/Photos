@@ -1,6 +1,5 @@
 import ApiModule from "../../ApiModule.js";
 import si from 'systeminformation';
-import Utils from "../../Utils.js";
 import Auth from "../../database/Auth.js";
 
 export default class StatusModule extends ApiModule {
