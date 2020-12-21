@@ -1,6 +1,7 @@
 import Log from "../Log.js";
 import {initUser} from "./models/UserModel.js";
 import {initSudoku} from "./models/SudokuModel.js";
+
 const console = new Log("Database");
 
 class Database {
@@ -26,7 +27,7 @@ class Database {
             console.log("Syncing db");
             await this.db.sync();
         } catch (e) {
-            console.warn("Postgres connection failed");
+            console.warn("Postgres connection failed", e);
         }
     }
 }
