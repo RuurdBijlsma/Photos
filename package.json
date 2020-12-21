@@ -11,7 +11,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "bcrypt": "^3.0.8",
+    "bcrypt": "^5.0.0",
     "body-parser": "^1.19.0",
     "commander": "^4.1.1",
     "cors": "^2.8.5",
@@ -28,7 +28,7 @@
     "plex-api": "^5.3.1",
     "sequelize": "^6.3.5",
     "socket.io": "^2.3.0",
-    "systeminformation": "^4.27.9",
+    "systeminformation": "^4.32.0",
     "youtube-search": "^1.1.4",
     "ytdl-core": "latest"
   }
