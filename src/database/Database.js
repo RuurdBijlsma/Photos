@@ -18,9 +18,12 @@ class Database {
             await this.db.authenticate();
             console.log("Postgres connection started successfully");
 
+            console.log("Init user");
             initUser(this.db);
+            console.log("Init sudoku");
             initSudoku(this.db);
 
+            console.log("Syncing db");
             await this.db.sync();
         } catch (e) {
             console.warn("Postgres connection failed");

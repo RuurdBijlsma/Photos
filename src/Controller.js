@@ -73,7 +73,9 @@ class Controller {
         });
         await Database.setDb(this.db);
         this.setRoutes();
-        server.listen(port, () => console.log(`${credentials ? 'HTTPS' : 'HTTP'} server listening on port ${port}!`));
+        server.listen(port, () =>
+            console.log(`${credentials ? 'HTTPS' : 'HTTP'} server listening on port ${port}!`)
+        );
     }
 }
 
