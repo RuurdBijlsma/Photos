@@ -57,15 +57,19 @@ export default class MediaDownloadModule extends ApiModule {
                 let shows = result.MediaContainer.Metadata;
                 await Promise.all(shows.map(async show => {
                     let seasons = (await client.query(show.key)).MediaContainer.Metadata;
-                    let episodes = (await client.query(seasons[0].key)).MediaContainer.Metadata;
-
-                    if (episodes !== undefined)
-                        show.info = (await client.query(episodes[0].grandparentKey)).MediaContainer.Metadata[0];
-                    else
+                    if (!seasons) {
                         show.info = {thumb: undefined, art: undefined};
+                        return
+                    }
+                    let episodes = (await client.query(seasons[0].key)).MediaContainer.Metadata;
+                    if (!episodes) {
+                        show.info = {thumb: undefined, art: undefined};
+                        return
+                    }
+
+                    show.info = (await client.query(episodes[0].grandparentKey)).MediaContainer.Metadata[0];
                 }));
                 res.send(shows);
-
             }
         });
 
@@ -73,10 +77,15 @@ export default class MediaDownloadModule extends ApiModule {
             if (!await Auth.checkRequest(req))
                 return res.sendStatus(401);
 
-            let result = await client.query('/library/sections/2/folder/');
+            let result = await client.query('/library/sections/3/folder/');
             let movies = result.MediaContainer.Metadata;
             await Promise.all(movies.map(async movie => {
-                movie.info = (await client.query(movie.key)).MediaContainer.Metadata[0];
+                let movieResult = await client.query(movie.key)
+                if (!movieResult.MediaContainer.Metadata) {
+                    movie.info = {thumb: undefined, art: undefined};
+                    return
+                }
+                movie.info = movieResult.MediaContainer.Metadata[0];
             }));
             res.send(movies);
         });
