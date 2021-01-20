@@ -124,7 +124,7 @@ export default class MediaDownloadModule extends ApiModule {
             if (!await Auth.checkRequest(req))
                 return res.sendStatus(401);
 
-            let file = req.query.file.replace(/\/data\//, '/mnt/hdd/media/complete/');
+            let file = req.query.file.replace(/\/media\/data\//, '/mnt/hdd/media/complete/');
             let token = await this.getToken();
             this.tokens[token] = file;
             setTimeout(() => {
