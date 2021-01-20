@@ -1,12 +1,13 @@
 {
   "name": "server",
   "version": "1.0.0",
-  "description": "",
+  "description": "My server",
   "main": "src/index.mjs",
   "type": "module",
   "scripts": {
     "start": "node --experimental-json-modules src/index.js"
   },
+  "repository": "https://github.com/RuurdBijlsma/ServerApi",
   "keywords": [],
   "author": "",
   "license": "ISC",
@@ -29,7 +30,6 @@
     "sequelize": "^6.3.5",
     "socket.io": "^2.3.0",
     "systeminformation": "^4.32.0",
-    "youtube-search": "^1.1.4",
     "ytdl-core": "latest"
   }
 }

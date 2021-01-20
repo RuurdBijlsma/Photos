@@ -1,14 +1,15 @@
 import ApiModule from "../../ApiModule.js";
 import path from 'path';
-import Utils from "../../Utils.js";
 import crypto from 'crypto';
 import plexCredentials from '../../../res/download/credentials.json';
 import PlexAPI from "plex-api";
 import Auth from "../../database/Auth.js";
 
-const plexToken = plexCredentials.plexToken;
-const client = new PlexAPI({hostname: 'ruurdbijlsma.com', token: plexToken});
-
+const client = new PlexAPI({
+    hostname: 'ruurdbijlsma.com',
+    port: 32400,
+    ...plexCredentials,
+});
 
 export default class MediaDownloadModule extends ApiModule {
     constructor() {
@@ -21,10 +22,10 @@ export default class MediaDownloadModule extends ApiModule {
             if (!await Auth.checkRequest(req))
                 return res.sendStatus(401);
 
-            let seasons = (await client.query('/library/sections/1/onDeck')).MediaContainer.Metadata;
+            let deck = await client.query('/library/sections/1/onDeck')
+            let seasons = deck.MediaContainer.Metadata;
 
             res.send(seasons);
-
         });
         app.post('/library/shows/', async (req, res) => {
             if (!await Auth.checkRequest(req))
