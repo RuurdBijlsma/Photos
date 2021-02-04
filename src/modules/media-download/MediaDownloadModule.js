@@ -4,6 +4,11 @@ import crypto from 'crypto';
 import plexCredentials from '../../../res/download/credentials.json';
 import PlexAPI from "plex-api";
 import Auth from "../../database/Auth.js";
+import ffmpeg from 'fluent-ffmpeg'
+import fs from 'fs'
+import {SubtitleParser} from "matroska-subtitles";
+
+const parser = new SubtitleParser()
 
 const client = new PlexAPI({
     hostname: 'ruurdbijlsma.com',
@@ -15,6 +20,8 @@ export default class MediaDownloadModule extends ApiModule {
     constructor() {
         super();
         this.tokens = {};
+        this.mediaPath = process.platform !== 'win32' ?
+            '/mnt/hdd/media/complete' : path.resolve('res/media')
     }
 
     setRoutes(app, io) {
@@ -124,7 +131,7 @@ export default class MediaDownloadModule extends ApiModule {
             if (!await Auth.checkRequest(req))
                 return res.sendStatus(401);
 
-            let file = req.query.file.replace(/\/media\/data\//, '/mnt/hdd/media/complete/');
+            let file = req.query.file.replace(/\/media\/data\//, this.mediaPath);
             let token = await this.getToken();
             this.tokens[token] = file;
             setTimeout(() => {
@@ -147,6 +154,71 @@ export default class MediaDownloadModule extends ApiModule {
             } else {
                 res.send('Token incorrect');
             }
+        });
+
+        app.get('/subs/', async (req, res) => {
+            if (process.platform !== 'win32')
+                return res.sendStatus(401);
+
+            let filePath = '/media/data/one/1.mkv'
+            filePath = path.join(this.mediaPath, filePath.replace(/\/media\/data\//, ''));
+
+
+            // first an array of subtitle track information is emitted
+            parser.once('tracks', (tracks) => console.log(tracks))
+
+            // afterwards each subtitle is emitted
+            parser.on('subtitle', (subtitle, trackNumber) =>
+                console.log('Track ' + trackNumber + ':', subtitle))
+
+            fs.createReadStream(filePath).pipe(parser)
+        })
+
+        app.get('/filetest/', async (req, res) => {
+            if (process.platform !== 'win32')
+                return res.sendStatus(401);
+
+            let filePath = '/media/data/one/1.mkv'
+            filePath = path.join(this.mediaPath, filePath.replace(/\/media\/data\//, ''));
+
+            fs.stat(filePath, (err, stat) => {
+
+                // Handle file not found
+                if (err !== null && err.code === 'ENOENT') {
+                    res.sendStatus(404);
+                }
+
+                const fileSize = stat.size
+                const range = req.headers.range
+
+                if (range) {
+
+                    const parts = range.replace(/bytes=/, "").split("-");
+
+                    const start = parseInt(parts[0], 10);
+                    const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+
+                    const chunkSize = (end - start) + 1;
+                    const file = fs.createReadStream(filePath, {start, end});
+                    const head = {
+                        'Content-Range': `bytes ${start}-${end}/${fileSize}`,
+                        'Accept-Ranges': 'bytes',
+                        'Content-Length': chunkSize,
+                        'Content-Type': 'video/x-matroska',
+                    }
+
+                    res.writeHead(206, head);
+                    file.pipe(res);
+                } else {
+                    const head = {
+                        'Content-Length': fileSize,
+                        'Content-Type': 'video/mp4',
+                    }
+
+                    res.writeHead(200, head);
+                    fs.createReadStream(filePath).pipe(res);
+                }
+            });
         });
     }
 
