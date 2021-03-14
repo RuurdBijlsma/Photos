@@ -77,17 +77,17 @@ export default class TwimoteModule extends ApiModule {
 
     setRoutes(app, io, db) {
         app.get('/twimote/:text', async (req, res) => {
-            let token = this.tokens[req.query.token];
-            if (
-                req.query.token === undefined ||
-                !token ||
-                token.expiryDate === undefined ||
-                isNaN(token.expiryDate) ||
-                +token.expiryDate < +new Date
-            ) {
-                res.sendStatus(401);
-                return;
-            }
+            // let token = this.tokens[req.query.token];
+            // if (
+            //     req.query.token === undefined ||
+            //     !token ||
+            //     token.expiryDate === undefined ||
+            //     isNaN(token.expiryDate) ||
+            //     +token.expiryDate < +new Date
+            // ) {
+            //     res.sendStatus(401);
+            //     return;
+            // }
             let filePath = await text2media(req.params.text, res).then();
             if (filePath.endsWith('mp4')) {
                 fs.stat(filePath, (err, stat) => {
