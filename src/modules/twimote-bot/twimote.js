@@ -27,8 +27,8 @@ export async function text2media(text) {
     if (await checkFileExists(fileName))
         return fileName;
 
-    if (process.platform !== 'win32' && fileName.endsWith('mp4'))
-        return await text2media('YEP animated emotes not supported yet');
+    // if (process.platform !== 'win32' && fileName.endsWith('mp4'))
+    //     return await text2media('YEP animated emotes not supported yet');
 
     let segments = await getSegments(text);
     if (segments.some(s => s.type === 'gif')) {
