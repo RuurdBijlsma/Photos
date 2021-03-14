@@ -35,10 +35,9 @@ export default class TwimoteModule extends ApiModule {
                         message_text: suggestion,
                     },
                 })));
-                console.log('message', message);
+                console.log('empty message', message);
                 return;
             }
-            console.log(id);
             // let token = await Utils.getToken();
             // this.tokens[token] = {expiryDate: (new Date) + 10000};
             // setTimeout(() => {
@@ -46,29 +45,23 @@ export default class TwimoteModule extends ApiModule {
             //         delete this.tokens[token];
             // }, 10000);
 
-            // let message = await bot.answerInlineQuery(id, [{
-            //     type: 'article',
-            //     id: Math.floor(Math.random() * 10000000),
-            //     title: query,
-            //     input_message_content: {
-            //         message_text: query,
-            //     },
-            // }]);
-            let url = 'https://api.ruurd.dev/twimote?text=' + encodeURIComponent('PepePls hello');
-            console.log('sending url', url);
+            let url = 'https://api.ruurd.dev/twimote?text=' + encodeURIComponent(query.substr(0, 2000));
             let message = await bot.answerInlineQuery(id, [{
-                type: 'mpeg4_gif',
+                type: 'article',
                 id: Math.floor(Math.random() * 10000000),
-                mpeg4_url: url,
-                thumb_url: url,
+                title: query,
+                input_message_content: {
+                    message_text: url,
+                },
             }]);
-            console.log('message', message);
-        });
-
-        bot.on('chosen_inline_result', async chosenResult => {
-            console.log(chosenResult);
-            let edited = await bot.editMessageText('asdf', {inline_message_id: chosenResult.result_id});
-            console.log('edited', edited);
+            // console.log('sending url', url);
+            // let message = await bot.answerInlineQuery(id, [{
+            //     type: 'mpeg4_gif',
+            //     id: Math.floor(Math.random() * 10000000),
+            //     mpeg4_url: url,
+            //     thumb_url: url,
+            // }]);
+            console.log('message', query, message);
         });
 
         bot.onText(/\/echo (.+)/, async (msg, match) => {
