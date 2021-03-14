@@ -4,6 +4,7 @@ import fs from "fs";
 import TelegramBot from "node-telegram-bot-api";
 import tokens from "../../../res/twimote/tokens.json";
 import Utils from "../../Utils.js";
+import path from 'path';
 
 export default class TwimoteModule extends ApiModule {
     constructor() {
@@ -54,27 +55,36 @@ export default class TwimoteModule extends ApiModule {
             // }])
         });
 
-        bot.onText(/\/echo (.+)/, (msg, match) => {
+        bot.onText(/\/echo (.+)/, async (msg, match) => {
             // 'msg' is the received Message from Telegram
             // 'match' is the result of executing the regexp above on the text content
             // of the message
-            console.log("echo", msg, match);
+            console.log("echo", match);
 
             const chatId = msg.chat.id;
             const resp = match[1]; // the captured "whatever"
 
             // send back the matched "whatever" to the chat
             // bot.sendMessage(chatId, `${chatId} ${resp}`);
-            let video = fs.createReadStream('./res/bonk.gif');
-            bot.sendAnimation(chatId, video);
+            let filePath = await text2media(resp);
+            let file = fs.createReadStream(filePath);
+            if (filePath.endsWith('mp4')) {
+                await bot.sendAnimation(chatId, file);
+            } else if (filePath.endsWith('webp')) {
+                await bot.sendSticker(chatId, file);
+            }else{
+                await bot.sendPhoto(chatId, file);
+            }
+
+            // bot.sendMessage(chatId, "ASDFDF");
         });
 
         bot.on('message', (msg) => {
-            console.log("message", msg);
-            const chatId = msg.chat.id;
+            // console.log("message", msg);
+            // const chatId = msg.chat.id;
 
             // send a message to the chat acknowledging receipt of their message
-            bot.sendMessage(chatId, 'Received your message');
+            // bot.sendMessage(chatId, 'Received your message');
         });
     }
 
@@ -91,7 +101,7 @@ export default class TwimoteModule extends ApiModule {
             //     res.sendStatus(401);
             //     return;
             // }
-            let filePath = await text2media(req.query.text === undefined ? 'YEP' : req.query.text, res).then();
+            let filePath = await text2media(req.query.text === undefined ? 'YEP' : req.query.text);
             if (filePath.endsWith('mp4')) {
                 fs.stat(filePath, (err, stat) => {
 

@@ -7,11 +7,7 @@ yarn-error.log*
 res/music
 ls
 
-res/twimote/*.jpg
-res/twimote/*.png
-res/twimote/*.gif
-res/twimote/*.mp4
-res/twimote/*.webp
+res/twimote/cache
 .idea
 files
 secrets.json

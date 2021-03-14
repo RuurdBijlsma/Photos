@@ -8,14 +8,13 @@ import ffmpeg from 'fluent-ffmpeg';
 import filenamify from 'filenamify';
 
 const telegramBackground = '#0e1621';
-// const telegramStickerMaxWidth = 600;
-const telegramStickerMaxWidth = 1;
 const telegramMinHeight = 100;
 const photoMaxAspectRatio = 430 / 100;
 const videoMaxAspectRatio = 310 / 100;
 const minAspectRatio = 1;
-
 const emoteHeight = 100;
+
+const telegramStickerMaxWidth = emoteHeight * 10;
 const mediaHeight = Math.max(emoteHeight, telegramMinHeight);
 const fontSize = emoteHeight * 0.6;
 const maxGifDuration = 20000; // Milliseconds
@@ -23,12 +22,12 @@ const horizontalPad = Math.round(emoteHeight / 5);
 
 export async function text2media(text) {
     text = filenamify(text);
-    let fileName = path.resolve(path.join('res', 'twimote', text)) + '.' + getFileType(text);
+    let fileName = path.resolve(path.join('res', 'twimote','cache', text)) + '.' + getFileType(text);
 
     if (await checkFileExists(fileName))
         return fileName;
 
-    if(fileName.endsWith('mp4'))
+    if (process.platform !== 'win32' && fileName.endsWith('mp4'))
         return await text2media('YEP animated emotes not supported yet');
 
     let segments = await getSegments(text);
@@ -47,7 +46,7 @@ export function getFileType(text) {
     }
     let width = getTextWidth(text);
     let isSticker = width <= telegramStickerMaxWidth;
-    return isSticker ? 'webp' : 'jpg';
+    return isSticker ? 'webp' : 'png';
 }
 
 async function segments2png(segments, fileName) {
@@ -63,7 +62,7 @@ async function segments2png(segments, fileName) {
         let aspectRatio = totalWidth / mediaHeight;
         if (aspectRatio > photoMaxAspectRatio)
             height = Math.ceil(totalWidth / photoMaxAspectRatio);
-        else if(aspectRatio < minAspectRatio)
+        else if (aspectRatio < minAspectRatio)
             height = Math.floor(totalWidth / minAspectRatio);
     }
     const yOffset = Math.round((height - emoteHeight) / 2);
@@ -87,7 +86,7 @@ async function segments2png(segments, fileName) {
         }
     }
 
-    const stream = canvas.createJPEGStream()
+    const stream = canvas.createPNGStream()
     return new Promise((resolve, reject) => {
         if (totalWidth <= telegramStickerMaxWidth) {
             ffmpeg(stream)
@@ -120,7 +119,7 @@ async function segments2gif(segments, outputPath) {
     let aspectRatio = totalWidth / mediaHeight;
     if (aspectRatio > videoMaxAspectRatio)
         height = Math.ceil(totalWidth / videoMaxAspectRatio);
-    else if(aspectRatio < minAspectRatio)
+    else if (aspectRatio < minAspectRatio)
         height = Math.floor(totalWidth / minAspectRatio);
     const yOffset = Math.round((height - emoteHeight) / 2);
 
@@ -285,7 +284,7 @@ function getTextSegment(text) {
 }
 
 async function getEmote(name, emote) {
-    let fileName = path.resolve(path.join('res', 'twimote', name + (emote.animated ? '.gif' : '.png')));
+    let fileName = path.resolve(path.join('res', 'twimote','cache', name + (emote.animated ? '.gif' : '.png')));
     if (await checkFileExists(fileName))
         return fileName;
 
