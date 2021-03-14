@@ -5,7 +5,8 @@
   "main": "src/index.mjs",
   "type": "module",
   "scripts": {
-    "start": "node --experimental-json-modules src/index.js"
+    "start": "node --experimental-json-modules src/index.js",
+    "twimote": "node --experimental-json-modules src/modules/twimote-bot/test-twimote.js"
   },
   "repository": "https://github.com/RuurdBijlsma/ServerApi",
   "keywords": [],
