@@ -1,12 +1,11 @@
 import ApiModule from "../../ApiModule.js";
 import path from 'path';
-import crypto from 'crypto';
 import plexCredentials from '../../../res/download/credentials.json';
 import PlexAPI from "plex-api";
 import Auth from "../../database/Auth.js";
-import ffmpeg from 'fluent-ffmpeg'
 import fs from 'fs'
 import {SubtitleParser} from "matroska-subtitles";
+import Utils from "../../Utils.js";
 
 const parser = new SubtitleParser()
 
@@ -132,7 +131,7 @@ export default class MediaDownloadModule extends ApiModule {
                 return res.sendStatus(401);
 
             let file = req.query.file.replace(/\/media\/data\//, this.mediaPath);
-            let token = await this.getToken();
+            let token = await Utils.getToken();
             this.tokens[token] = file;
             setTimeout(() => {
                 if (this.tokens.hasOwnProperty(token))
@@ -172,66 +171,6 @@ export default class MediaDownloadModule extends ApiModule {
                 console.log('Track ' + trackNumber + ':', subtitle))
 
             fs.createReadStream(filePath).pipe(parser)
-        })
-
-        app.get('/filetest/', async (req, res) => {
-            if (process.platform !== 'win32')
-                return res.sendStatus(401);
-
-            let filePath = '/media/data/one/1.mkv'
-            filePath = path.join(this.mediaPath, filePath.replace(/\/media\/data\//, ''));
-
-            fs.stat(filePath, (err, stat) => {
-
-                // Handle file not found
-                if (err !== null && err.code === 'ENOENT') {
-                    res.sendStatus(404);
-                }
-
-                const fileSize = stat.size
-                const range = req.headers.range
-
-                if (range) {
-
-                    const parts = range.replace(/bytes=/, "").split("-");
-
-                    const start = parseInt(parts[0], 10);
-                    const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
-
-                    const chunkSize = (end - start) + 1;
-                    const file = fs.createReadStream(filePath, {start, end});
-                    const head = {
-                        'Content-Range': `bytes ${start}-${end}/${fileSize}`,
-                        'Accept-Ranges': 'bytes',
-                        'Content-Length': chunkSize,
-                        'Content-Type': 'video/x-matroska',
-                    }
-
-                    res.writeHead(206, head);
-                    file.pipe(res);
-                } else {
-                    const head = {
-                        'Content-Length': fileSize,
-                        'Content-Type': 'video/mp4',
-                    }
-
-                    res.writeHead(200, head);
-                    fs.createReadStream(filePath).pipe(res);
-                }
-            });
-        });
-    }
-
-    getToken() {
-        return new Promise((resolve, reject) => {
-            crypto.randomBytes(48, (err, buffer) => {
-                if (err) {
-                    reject(err);
-                    return;
-                }
-
-                resolve(buffer.toString('hex'));
-            });
         });
     }
 }

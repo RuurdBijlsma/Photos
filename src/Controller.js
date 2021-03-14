@@ -16,6 +16,7 @@ import AuthModule from './modules/auth/AuthModule.js';
 import seq from "sequelize";
 import cred from "../res/auth/credentials.json"
 import Database from "./database/Database.js";
+import TwimoteModule from "./modules/twimote-bot/TwimoteModule.js";
 
 const {Sequelize} = seq;
 const {dbUser, dbPass, dbName} = cred;
@@ -35,6 +36,7 @@ class Controller {
             new MediaDownloadModule(),
             new ReverseProxyModule(),
             new AuthModule(),
+            new TwimoteModule(),
         ];
     }
 

@@ -7,10 +7,15 @@ yarn-error.log*
 res/music
 ls
 
+res/twimote/*.png
+res/twimote/*.gif
+res/twimote/*.mp4
+res/twimote/*.webp
 .idea
 files
 secrets.json
 secret.json
+tokens.json
 credentials.json
 authorization.json
 

@@ -1,7 +1,21 @@
 import Log from "./Log.js";
+import crypto from "crypto";
 const console = new Log("Utils");
 
 export default class Utils {
+    static getToken() {
+        return new Promise((resolve, reject) => {
+            crypto.randomBytes(48, (err, buffer) => {
+                if (err) {
+                    reject(err);
+                    return;
+                }
+
+                resolve(buffer.toString('hex'));
+            });
+        });
+    }
+
     static bytesToReadable(bytes) {
         let length = Math.log10(bytes);
         if (length < 2) {
