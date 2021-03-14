@@ -4,10 +4,7 @@ import plexCredentials from '../../../res/download/credentials.json';
 import PlexAPI from "plex-api";
 import Auth from "../../database/Auth.js";
 import fs from 'fs'
-import {SubtitleParser} from "matroska-subtitles";
 import Utils from "../../Utils.js";
-
-const parser = new SubtitleParser()
 
 const client = new PlexAPI({
     hostname: 'ruurdbijlsma.com',
@@ -153,24 +150,6 @@ export default class MediaDownloadModule extends ApiModule {
             } else {
                 res.send('Token incorrect');
             }
-        });
-
-        app.get('/subs/', async (req, res) => {
-            if (process.platform !== 'win32')
-                return res.sendStatus(401);
-
-            let filePath = '/media/data/one/1.mkv'
-            filePath = path.join(this.mediaPath, filePath.replace(/\/media\/data\//, ''));
-
-
-            // first an array of subtitle track information is emitted
-            parser.once('tracks', (tracks) => console.log(tracks))
-
-            // afterwards each subtitle is emitted
-            parser.on('subtitle', (subtitle, trackNumber) =>
-                console.log('Track ' + trackNumber + ':', subtitle))
-
-            fs.createReadStream(filePath).pipe(parser)
         });
     }
 }

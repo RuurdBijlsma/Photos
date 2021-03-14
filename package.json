@@ -23,7 +23,6 @@
     "fluent-ffmpeg": "^2.1.2",
     "gify-parse": "^1.0.7",
     "gmail-send": "^1.8.10",
-    "matroska-subtitles": "^3.3.1",
     "multi-signal-server": "git+https://git@github.com/ruurdbijlsma/multi-signal-server.git",
     "node-fetch": "^2.6.1",
     "node-localstorage": "^2.1.6",
