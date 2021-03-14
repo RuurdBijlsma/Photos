@@ -1,7 +1,7 @@
 export default [
-    {name: "D:", url: "https://cdn.betterttv.net/emote/55028cd2135896936880fdd7/3x"},
+    {name: "D!", url: "https://cdn.betterttv.net/emote/55028cd2135896936880fdd7/3x"},
     {name: "LUL", url: "https://cdn.frankerfacez.com/emoticon/143984/4"},
-    {name: ":)", url: "https://static-cdn.jtvnw.net/emoticons/v1/1/5.0"},
+    {name: "!)", url: "https://static-cdn.jtvnw.net/emoticons/v1/1/5.0"},
     {name: "Kappa", url: "https://cdn.frankerfacez.com/emoticon/460894/4"},
     {name: "BibleThump", url: "https://cdn.frankerfacez.com/emoticon/269642/4"},
     {name: "4Head", url: "https://static-cdn.jtvnw.net/emoticons/v1/354/1.0"},
