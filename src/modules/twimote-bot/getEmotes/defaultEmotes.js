@@ -18,4 +18,5 @@ export default [
     {name: "Hmm", url: "https://cdn.frankerfacez.com/emoticon/405602/4"},
     {name: "CHOKE", url: "https://cdn.frankerfacez.com/emoticon/365883/4"},
     {name: "Jebaited", url: "https://cdn.frankerfacez.com/emoticon/380518/4"},
+    {name: "PepegaDriving", url: "https://cdn.betterttv.net/emote/5e6fa08bd112fc3725746dd4/3x"},
 ]
