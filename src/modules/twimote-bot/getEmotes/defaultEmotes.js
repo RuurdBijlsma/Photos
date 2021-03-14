@@ -15,4 +15,5 @@ export default [
     {name: "WeirdChamping", url: "https://cdn.betterttv.net/emote/5e9e0eb47e090362f8b0d9a4/3x"},
     {name: "peepoClown", url: "https://cdn.frankerfacez.com/emoticon/318914/4"},
     {name: "Prayge", url: "https://cdn.frankerfacez.com/emoticon/507766/4"},
+    {name: "Hmm", url: "https://cdn.frankerfacez.com/emoticon/405602/4"},
 ]
