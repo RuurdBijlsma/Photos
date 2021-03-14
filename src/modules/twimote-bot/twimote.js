@@ -10,9 +10,11 @@ import filenamify from 'filenamify';
 const telegramBackground = '#0e1621';
 const telegramStickerMaxWidth = 600;
 const telegramMinHeight = 100;
-const telegramMaxAspectRatio = 430 / 100;
+const photoMaxAspectRatio = 430 / 100;
+const videoMaxAspectRatio = 310 / 100;
+const minAspectRatio = 1;
 
-const emoteHeight = 50;
+const emoteHeight = 100;
 const mediaHeight = Math.max(emoteHeight, telegramMinHeight);
 const fontSize = emoteHeight * 0.6;
 const maxGifDuration = 20000; // Milliseconds
@@ -55,8 +57,10 @@ async function segments2png(segments, fileName) {
         height = emoteHeight;
     } else {
         let aspectRatio = totalWidth / mediaHeight;
-        if (aspectRatio > telegramMaxAspectRatio)
-            height = Math.ceil(totalWidth / telegramMaxAspectRatio);
+        if (aspectRatio > photoMaxAspectRatio)
+            height = Math.ceil(totalWidth / photoMaxAspectRatio);
+        else if(aspectRatio < minAspectRatio)
+            height = Math.floor(totalWidth / minAspectRatio);
     }
     const yOffset = Math.round((height - emoteHeight) / 2);
 
@@ -110,8 +114,10 @@ async function segments2gif(segments, outputPath) {
     let totalWidth = segments.map(s => s.width).reduce((a, b) => a + b) + (segments.length - 1) * horizontalPad;
     let height = mediaHeight;
     let aspectRatio = totalWidth / mediaHeight;
-    if (aspectRatio > telegramMaxAspectRatio)
-        height = Math.ceil(totalWidth / telegramMaxAspectRatio);
+    if (aspectRatio > videoMaxAspectRatio)
+        height = Math.ceil(totalWidth / videoMaxAspectRatio);
+    else if(aspectRatio < minAspectRatio)
+        height = Math.floor(totalWidth / minAspectRatio);
     const yOffset = Math.round((height - emoteHeight) / 2);
 
     console.log('max duration', maxDuration);
@@ -213,7 +219,7 @@ function getTextWidth(text) {
         } else
             segmentWords.push(word);
     }
-    if (segmentWords.length > 0) widths.push(getTextSegments(segmentWords).map(s => s.width));
+    if (segmentWords.length > 0) widths.push(...getTextSegments(segmentWords).map(s => s.width));
     return widths.reduce((a, b) => a + b, 0) + (widths.length - 1) * horizontalPad;
 }
 

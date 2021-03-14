@@ -30,7 +30,7 @@ export default class TwimoteModule extends ApiModule {
                 bot.answerInlineQuery(id, [{
                     type: 'mpeg4_gif',
                     id: Math.floor(Math.random() * 10000000),
-                    mpeg4_url: 'https://api.ruurd.dev/twimote/' + encodeURIComponent(query),
+                    mpeg4_url: 'https://api.ruurd.dev/twimote?text=' + encodeURIComponent(query),
                     thumb_url: 'https://i.picsum.photos/id/167/200/300.jpg?hmac=ZAuGlRPlSv0i_JnJr4FFW-OPsVz5bTx8mAI_qUYP_bM',
                 }]);
             } else {
@@ -76,7 +76,7 @@ export default class TwimoteModule extends ApiModule {
     }
 
     setRoutes(app, io, db) {
-        app.get('/twimote/:text', async (req, res) => {
+        app.get('/twimote/', async (req, res) => {
             // let token = this.tokens[req.query.token];
             // if (
             //     req.query.token === undefined ||
@@ -88,7 +88,7 @@ export default class TwimoteModule extends ApiModule {
             //     res.sendStatus(401);
             //     return;
             // }
-            let filePath = await text2media(req.params.text, res).then();
+            let filePath = await text2media(req.query.text ?? 'YEP', res).then();
             if (filePath.endsWith('mp4')) {
                 fs.stat(filePath, (err, stat) => {
 
