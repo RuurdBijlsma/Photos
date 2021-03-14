@@ -16,5 +16,5 @@ export default [
     {name: "peepoClown", url: "https://cdn.frankerfacez.com/emoticon/318914/4"},
     {name: "Prayge", url: "https://cdn.frankerfacez.com/emoticon/507766/4"},
     {name: "Hmm", url: "https://cdn.frankerfacez.com/emoticon/405602/4"},
-    {name: "Choke", url: "https://cdn.frankerfacez.com/emoticon/365883/4"},
+    {name: "CHOKE", url: "https://cdn.frankerfacez.com/emoticon/365883/4"},
 ]
