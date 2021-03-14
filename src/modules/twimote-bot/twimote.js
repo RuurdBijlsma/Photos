@@ -55,7 +55,6 @@ async function segments2png(segments, fileName) {
     let totalWidth = segments.map(s => s.width).reduce((a, b) => a + b) + (segments.length - 1) * horizontalPad;
     let isSticker = totalWidth <= telegramStickerMaxWidth;
     let color = isSticker ? 'transparent' : telegramBackground;
-    color = 'transparent';
     let height = mediaHeight;
     if (isSticker) {
         height = emoteHeight;
