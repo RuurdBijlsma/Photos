@@ -88,7 +88,7 @@ export default class TwimoteModule extends ApiModule {
             //     res.sendStatus(401);
             //     return;
             // }
-            let filePath = await text2media(req.query.text ?? 'YEP', res).then();
+            let filePath = await text2media(req.query.text === undefined ? 'YEP' : req.query.text, res).then();
             if (filePath.endsWith('mp4')) {
                 fs.stat(filePath, (err, stat) => {
 
