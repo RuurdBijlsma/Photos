@@ -8,7 +8,8 @@ import ffmpeg from 'fluent-ffmpeg';
 import filenamify from 'filenamify';
 
 const telegramBackground = '#0e1621';
-const telegramStickerMaxWidth = 600;
+// const telegramStickerMaxWidth = 600;
+const telegramStickerMaxWidth = 1;
 const telegramMinHeight = 100;
 const photoMaxAspectRatio = 430 / 100;
 const videoMaxAspectRatio = 310 / 100;
@@ -46,7 +47,7 @@ export function getFileType(text) {
     }
     let width = getTextWidth(text);
     let isSticker = width <= telegramStickerMaxWidth;
-    return isSticker ? 'webp' : 'png';
+    return isSticker ? 'webp' : 'jpg';
 }
 
 async function segments2png(segments, fileName) {
@@ -86,7 +87,7 @@ async function segments2png(segments, fileName) {
         }
     }
 
-    const stream = canvas.createPNGStream()
+    const stream = canvas.createJPEGStream()
     return new Promise((resolve, reject) => {
         if (totalWidth <= telegramStickerMaxWidth) {
             ffmpeg(stream)

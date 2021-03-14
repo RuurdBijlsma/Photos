@@ -9,7 +9,7 @@ export default class TwimoteModule extends ApiModule {
     constructor() {
         super();
         this.tokens = {};
-        // this.botSetup();
+        this.botSetup();
     }
 
     botSetup() {
@@ -34,10 +34,12 @@ export default class TwimoteModule extends ApiModule {
                     thumb_url: 'https://i.picsum.photos/id/167/200/300.jpg?hmac=ZAuGlRPlSv0i_JnJr4FFW-OPsVz5bTx8mAI_qUYP_bM',
                 }]);
             } else {
+                let url = 'https://api.ruurd.dev/twimote?text=' + encodeURIComponent(query);
+                console.log(`photo url: ${url}`);
                 bot.answerInlineQuery(id, [{
                     type: 'photo',
                     id: Math.floor(Math.random() * 10000000),
-                    photo_url: 'https://api.ruurd.dev/twimote/' + encodeURIComponent(query),
+                    photo_url: url,
                     thumb_url: 'https://i.picsum.photos/id/167/200/300.jpg?hmac=ZAuGlRPlSv0i_JnJr4FFW-OPsVz5bTx8mAI_qUYP_bM',
                 }]);
             }
