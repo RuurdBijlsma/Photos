@@ -22,7 +22,7 @@ const horizontalPad = Math.round(emoteHeight / 5);
 
 export async function text2media(text) {
     text = filenamify(text);
-    let fileName = path.resolve(path.join('res', 'twimote','cache', text)) + '.' + getFileType(text);
+    let fileName = path.resolve(path.join('res', 'twimote', 'cache', text)) + '.' + getFileType(text);
 
     if (await checkFileExists(fileName))
         return fileName;
@@ -206,7 +206,8 @@ async function segments2gif(segments, outputPath) {
                 resolve({type: 'gif', filePath: gifOutput});
             });
         console.log(segments);
-        command.saveToFile(outputPath);
+        command.addOptions('-an')
+            .saveToFile(outputPath);
     });
 }
 
@@ -284,7 +285,7 @@ function getTextSegment(text) {
 }
 
 async function getEmote(name, emote) {
-    let fileName = path.resolve(path.join('res', 'twimote','cache', name + (emote.animated ? '.gif' : '.png')));
+    let fileName = path.resolve(path.join('res', 'twimote', 'cache', name + (emote.animated ? '.gif' : '.png')));
     if (await checkFileExists(fileName))
         return fileName;
 

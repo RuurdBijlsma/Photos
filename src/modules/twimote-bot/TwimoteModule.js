@@ -10,6 +10,7 @@ import path from 'path';
 // Inline bot (create dummy inline answer, then edit the message with the actual photo/animation/sticker)
 // Enable tokens for security
 // Fix animated emotes on server
+// Webhooks
 
 export default class TwimoteModule extends ApiModule {
     constructor() {
@@ -24,40 +25,50 @@ export default class TwimoteModule extends ApiModule {
         console.log("Telegram bot is running")
 
         bot.on('inline_query', async ({id, from, query, offset}) => {
-            console.log(id);
-            let token = await Utils.getToken();
-            this.tokens[token] = {expiryDate: (new Date) + 10000};
-            setTimeout(() => {
-                if (this.tokens.hasOwnProperty(token))
-                    delete this.tokens[token];
-            }, 10000);
-
-            let fileType = getFileType(query);
-            if (fileType === 'mp4') {
-                bot.answerInlineQuery(id, [{
-                    type: 'mpeg4_gif',
+            if (query === '') {
+                let suggestions = ['YEP'];
+                let message = await bot.answerInlineQuery(id, suggestions.map(suggestion => ({
+                    type: 'article',
                     id: Math.floor(Math.random() * 10000000),
-                    mpeg4_url: 'https://api.ruurd.dev/twimote?text=' + encodeURIComponent(query),
-                    thumb_url: 'https://i.picsum.photos/id/167/200/300.jpg?hmac=ZAuGlRPlSv0i_JnJr4FFW-OPsVz5bTx8mAI_qUYP_bM',
-                }]);
-            } else {
-                let url = 'https://api.ruurd.dev/twimote?text=' + encodeURIComponent(query);
-                console.log(`photo url: ${url}`);
-                bot.answerInlineQuery(id, [{
-                    type: 'photo',
-                    id: Math.floor(Math.random() * 10000000),
-                    photo_url: url,
-                    thumb_url: 'https://i.picsum.photos/id/167/200/300.jpg?hmac=ZAuGlRPlSv0i_JnJr4FFW-OPsVz5bTx8mAI_qUYP_bM',
-                }]);
+                    title: suggestion,
+                    input_message_content: {
+                        message_text: suggestion,
+                    },
+                })));
+                console.log('message', message);
+                return;
             }
-            // bot.answerInlineQuery(id, [{
+            console.log(id);
+            // let token = await Utils.getToken();
+            // this.tokens[token] = {expiryDate: (new Date) + 10000};
+            // setTimeout(() => {
+            //     if (this.tokens.hasOwnProperty(token))
+            //         delete this.tokens[token];
+            // }, 10000);
+
+            // let message = await bot.answerInlineQuery(id, [{
             //     type: 'article',
             //     id: Math.floor(Math.random() * 10000000),
-            //     title: 'hello',
+            //     title: query,
             //     input_message_content: {
-            //         message_text: 'https://example.com',
+            //         message_text: query,
             //     },
-            // }])
+            // }]);
+            let url = 'https://api.ruurd.dev/twimote?text=' + encodeURIComponent('PepePls hello');
+            console.log('sending url', url);
+            let message = await bot.answerInlineQuery(id, [{
+                type: 'mpeg4_gif',
+                id: Math.floor(Math.random() * 10000000),
+                mpeg4_url: url,
+                thumb_url: url,
+            }]);
+            console.log('message', message);
+        });
+
+        bot.on('chosen_inline_result', async chosenResult => {
+            console.log(chosenResult);
+            let edited = await bot.editMessageText('asdf', {inline_message_id: chosenResult.result_id});
+            console.log('edited', edited);
         });
 
         bot.onText(/\/echo (.+)/, async (msg, match) => {
@@ -77,7 +88,7 @@ export default class TwimoteModule extends ApiModule {
                 await bot.sendAnimation(chatId, file);
             } else if (filePath.endsWith('webp')) {
                 await bot.sendSticker(chatId, file);
-            }else{
+            } else {
                 await bot.sendPhoto(chatId, file);
             }
 
@@ -85,7 +96,7 @@ export default class TwimoteModule extends ApiModule {
         });
 
         bot.on('message', (msg) => {
-            // console.log("message", msg);
+            console.log("message", msg);
             // const chatId = msg.chat.id;
 
             // send a message to the chat acknowledging receipt of their message
