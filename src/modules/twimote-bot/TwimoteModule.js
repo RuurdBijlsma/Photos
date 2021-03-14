@@ -6,6 +6,11 @@ import tokens from "../../../res/twimote/tokens.json";
 import Utils from "../../Utils.js";
 import path from 'path';
 
+// TODO
+// Inline bot (create dummy inline answer, then edit the message with the actual photo/animation/sticker)
+// Enable tokens for security
+// Fix animated emotes on server
+
 export default class TwimoteModule extends ApiModule {
     constructor() {
         super();
