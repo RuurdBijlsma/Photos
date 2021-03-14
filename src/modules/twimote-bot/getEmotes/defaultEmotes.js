@@ -13,4 +13,5 @@ export default [
     {name: "NotLikeThis", url: "https://cdn.frankerfacez.com/emoticon/481082/4"},
     {name: "PogChamp", url: "https://static-cdn.jtvnw.net/emoticons/v1/305954156/5.0"},
     {name: "WeirdChamping", url: "https://cdn.betterttv.net/emote/5e9e0eb47e090362f8b0d9a4/3x"},
+    {name: "peepoClown", url: "https://cdn.frankerfacez.com/emoticon/318914/4"},
 ]
