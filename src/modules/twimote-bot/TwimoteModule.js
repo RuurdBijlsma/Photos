@@ -64,36 +64,19 @@ export default class TwimoteModule extends ApiModule {
             console.log('message', query, message);
         });
 
-        bot.onText(/\/echo (.+)/, async (msg, match) => {
-            // 'msg' is the received Message from Telegram
-            // 'match' is the result of executing the regexp above on the text content
-            // of the message
-            console.log("echo", match);
+        bot.on('message', async (msg) => {
+            // console.log("message", msg);
 
-            const chatId = msg.chat.id;
-            const resp = match[1]; // the captured "whatever"
-
-            // send back the matched "whatever" to the chat
-            // bot.sendMessage(chatId, `${chatId} ${resp}`);
-            let filePath = await text2media(resp);
+            let filePath = await text2media(msg.text.substr(0, 2000));
             let file = fs.createReadStream(filePath);
+
             if (filePath.endsWith('mp4')) {
-                await bot.sendAnimation(chatId, file);
+                await bot.sendAnimation(msg.chat.id, file);
             } else if (filePath.endsWith('webp')) {
-                await bot.sendSticker(chatId, file);
+                await bot.sendSticker(msg.chat.id, file);
             } else {
-                await bot.sendPhoto(chatId, file);
+                await bot.sendPhoto(msg.chat.id, file);
             }
-
-            // bot.sendMessage(chatId, "ASDFDF");
-        });
-
-        bot.on('message', (msg) => {
-            console.log("message", msg);
-            // const chatId = msg.chat.id;
-
-            // send a message to the chat acknowledging receipt of their message
-            // bot.sendMessage(chatId, 'Received your message');
         });
     }
 
