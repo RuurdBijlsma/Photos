@@ -12,7 +12,7 @@ import filenamify from 'filenamify';
 // const photoMaxAspectRatio = 430 / 100;
 // const videoMaxAspectRatio = 310 / 100;
 const telegramBackground = '#182533';
-const telegramMinHeight = 50;
+const telegramMinHeight = 100;
 const photoMaxAspectRatio = 1000 / 100;
 const videoMaxAspectRatio = 1000 / 100;
 const minAspectRatio = 1;
