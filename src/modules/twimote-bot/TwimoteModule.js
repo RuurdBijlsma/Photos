@@ -1,5 +1,5 @@
 import ApiModule from "../../ApiModule.js";
-import {text2media, getFileType} from './twimote.js';
+import {text2media, getTextSize} from './twimote.js';
 import fs from "fs";
 import TelegramBot from "node-telegram-bot-api";
 import tokens from "../../../res/twimote/tokens.json";
@@ -45,15 +45,27 @@ export default class TwimoteModule extends ApiModule {
             //         delete this.tokens[token];
             // }, 10000);
 
-            let url = 'https://api.ruurd.dev/twimote?text=' + encodeURIComponent(query.substr(0, 2000));
-            let message = await bot.answerInlineQuery(id, [{
-                type: 'article',
+            let text = query.substr(0, 2000);
+            let url = 'https://api.ruurd.dev/twimote?text=' + encodeURIComponent();
+            // let message = await bot.answerInlineQuery(id, [{
+            //     type: 'article',
+            //     id: Math.floor(Math.random() * 10000000),
+            //     title: query,
+            //     input_message_content: {
+            //         message_text: url,
+            //     },
+            // }]);
+            let {width,height} = getTextSize(text);
+            await bot.answerInlineQuery(id, [{
+                type: 'photo',
                 id: Math.floor(Math.random() * 10000000),
-                title: query,
-                input_message_content: {
-                    message_text: url,
-                },
-            }]);
+                photo_url: 'https://www.gstatic.com/webp/gallery/1.jpg',
+                photo_width: 550,
+                photo_height: 368,
+                thumb_url: 'https://www.gstatic.com/webp/gallery/1.jpg',
+                title: "foto :)",
+                description: "beschrijving",
+            }])
             // console.log('sending url', url);
             // let message = await bot.answerInlineQuery(id, [{
             //     type: 'mpeg4_gif',
