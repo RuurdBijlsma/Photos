@@ -1,5 +1,5 @@
 import ApiModule from "../../ApiModule.js";
-import {text2media, getTextSize} from './twimote.js';
+import {text2media, getTextSize, getFileType} from './twimote.js';
 import fs from "fs";
 import TelegramBot from "node-telegram-bot-api";
 import tokens from "../../../res/twimote/tokens.json";
@@ -46,34 +46,32 @@ export default class TwimoteModule extends ApiModule {
             // }, 10000);
 
             let text = query.substr(0, 2000);
-            let url = 'https://api.ruurd.dev/twimote?text=' + encodeURIComponent();
-            // let message = await bot.answerInlineQuery(id, [{
-            //     type: 'article',
-            //     id: Math.floor(Math.random() * 10000000),
-            //     title: query,
-            //     input_message_content: {
-            //         message_text: url,
-            //     },
-            // }]);
-            let {width,height} = getTextSize(text);
-            await bot.answerInlineQuery(id, [{
-                type: 'photo',
-                id: Math.floor(Math.random() * 10000000),
-                photo_url: 'https://www.gstatic.com/webp/gallery/1.jpg',
-                photo_width: 550,
-                photo_height: 368,
-                thumb_url: 'https://www.gstatic.com/webp/gallery/1.jpg',
-                title: "foto :)",
-                description: "beschrijving",
-            }])
-            // console.log('sending url', url);
-            // let message = await bot.answerInlineQuery(id, [{
-            //     type: 'mpeg4_gif',
-            //     id: Math.floor(Math.random() * 10000000),
-            //     mpeg4_url: url,
-            //     thumb_url: url,
-            // }]);
-            console.log('message', query, message);
+            let randomID = Math.round(Math.random() * 1000000);
+            let type = getFileType(text);
+            let url = `https://api.ruurd.dev/twimote?text=${encodeURIComponent(text)}&r=${randomID}&type=${type}`;
+            console.log(url);
+            let {width, height, duration, animated} = getTextSize(text);
+            if (type === 'mp4') {
+                await bot.answerInlineQuery(id, [{
+                    type: 'mpeg4_gif',
+                    id: randomID,
+                    mpeg4_url: url,
+                    mpeg4_width: width,
+                    mpeg4_height: height,
+                    thumb_url: url,
+                    mpeg4_duration: duration,
+                    thumb_mime_type: 'video/mp4',
+                }]);
+            } else {
+                await bot.answerInlineQuery(id, [{
+                    type: 'photo',
+                    id: randomID,
+                    photo_url: url,
+                    photo_width: width,
+                    photo_height: height,
+                    thumb_url: url,
+                }])
+            }
         });
 
         bot.on('message', async (msg) => {

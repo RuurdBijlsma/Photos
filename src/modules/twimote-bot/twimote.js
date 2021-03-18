@@ -7,12 +7,16 @@ import gifyParse from "gify-parse";
 import ffmpeg from 'fluent-ffmpeg';
 import filenamify from 'filenamify';
 
-const telegramBackground = '#0e1621';
-const telegramMinHeight = 100;
-const photoMaxAspectRatio = 430 / 100;
-const videoMaxAspectRatio = 310 / 100;
+// const telegramBackground = '#0e1621';
+// const telegramMinHeight = 100;
+// const photoMaxAspectRatio = 430 / 100;
+// const videoMaxAspectRatio = 310 / 100;
+const telegramBackground = '#182533';
+const telegramMinHeight = 50;
+const photoMaxAspectRatio = 1000 / 100;
+const videoMaxAspectRatio = 1000 / 100;
 const minAspectRatio = 1;
-const emoteHeight = 100;
+const emoteHeight = 80;
 
 const telegramStickerMaxWidth = emoteHeight * 10;
 const mediaHeight = Math.max(emoteHeight, telegramMinHeight);
@@ -48,7 +52,7 @@ export function getFileType(text) {
     }
     if (forceJPG)
         return 'jpg';
-    let width = getTextSize(text);
+    let {width} = getTextSize(text);
     let isSticker = width <= telegramStickerMaxWidth;
     return isSticker ? 'webp' : 'png';
 }
@@ -227,22 +231,26 @@ async function segments2gif(segments, outputPath) {
 export function getTextSize(text) {
     let words = text.split(' ');
     let widths = [];
+    let durations = [];
     let segmentWords = [];
-    let gif = false;
+    let animated = false;
     for (let word of words) {
         if (emotes.hasOwnProperty(word)) {
             if (segmentWords.length > 0) widths.push(...getTextSegments(segmentWords).map(s => s.width));
             widths.push(emotes[word].ratio * emoteHeight);
-            if (emotes[word].animated)
-                gif = true;
+            if (emotes[word].animated) {
+                animated = true;
+                durations.push(emotes[word].duration);
+            }
             segmentWords = [];
         } else
             segmentWords.push(word);
     }
     if (segmentWords.length > 0) widths.push(...getTextSegments(segmentWords).map(s => s.width));
-    let width = widths.reduce((a, b) => a + b, 0) + (widths.length - 1) * horizontalPad;
-    let height = gif ? getGifHeight(width) : getImageHeight(width);
-    return {width, height};
+    let width = Math.round(widths.reduce((a, b) => a + b, 0) + (widths.length - 1) * horizontalPad);
+    let height = Math.round(animated ? getGifHeight(width) : getImageHeight(width));
+    let duration = Math.min(maxGifDuration, Math.max(...durations, 0));
+    return {width, height, duration, animated};
 }
 
 async function getSegments(text) {
