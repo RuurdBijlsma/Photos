@@ -189,7 +189,6 @@ async function segments2gif(segments, outputPath) {
     });
 
     return new Promise((resolve, reject) => {
-        let gifOutput = path.resolve('test.mp4');
         command = command.complexFilter(filters, ['out'])
             .outputFormat('mp4')
             .on('start', commandLine => {
@@ -203,11 +202,10 @@ async function segments2gif(segments, outputPath) {
             })
             .on('end', () => {
                 console.log("ffmpeg end");
-                resolve({type: 'gif', filePath: gifOutput});
+                resolve({type: 'gif'});
             });
         console.log(segments);
-        command.addOptions('-an')
-            .saveToFile(outputPath);
+        command.saveToFile(outputPath);
     });
 }
 
@@ -252,7 +250,7 @@ async function getEmoteSegment(emoteName) {
         value: emotePath,
     };
     if (emote.animated) {
-        const buffer = fs.readFileSync(emotePath);
+        const buffer = await fs.promises.readFile(emotePath);
         const gifInfo = gifyParse.getInfo(buffer);
         segment.duration = gifInfo.duration;
         segment.frames = gifInfo.images.length;

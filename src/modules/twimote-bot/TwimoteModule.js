@@ -16,8 +16,8 @@ export default class TwimoteModule extends ApiModule {
     constructor() {
         super();
         this.tokens = {};
-        // if (process.platform === 'win32')
-        this.botSetup();
+        if (process.platform === 'win32')
+            this.botSetup();
     }
 
     botSetup() {
