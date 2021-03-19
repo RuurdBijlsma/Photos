@@ -16,8 +16,8 @@ import {EmoteSticker} from "../../database/models/EmoteStickerModel.js";
 export default class TwimoteModule extends ApiModule {
     constructor() {
         super();
-        if (process.platform === 'win32')
-            this.botSetup();
+        // if (process.platform === 'win32')
+        this.botSetup();
     }
 
     botSetup() {
