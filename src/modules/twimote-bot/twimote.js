@@ -16,7 +16,7 @@ const telegramMinHeight = 100;
 const photoMaxAspectRatio = 430 / 100;
 const videoMaxAspectRatio = 310 / 100;
 const minAspectRatio = 1;
-const emoteHeight = 70;
+const emoteHeight = 90;
 
 const telegramStickerMaxWidth = emoteHeight * 10;
 const mediaHeight = Math.max(emoteHeight, telegramMinHeight);
