@@ -3,16 +3,19 @@ import {text2media, getTextSize, getFileType} from './twimote.js';
 import fs from "fs";
 import TelegramBot from "node-telegram-bot-api";
 import tokens from "../../../res/twimote/tokens.json";
+import {EmoteSticker} from "../../database/models/EmoteStickerModel.js";
+import Utils from "../../Utils.js";
 
 // TODO
 // Enable tokens for security
 // Webhooks
+// suggesties
 // perma cache text to sticker file id
+// add emote with bot command
 
 export default class TwimoteModule extends ApiModule {
     constructor() {
         super();
-        this.tokens = {};
         if (process.platform === 'win32')
             this.botSetup();
     }
@@ -21,33 +24,16 @@ export default class TwimoteModule extends ApiModule {
         const bot = new TelegramBot(tokens.telegram, {polling: true});
         console.log("Telegram bot is running")
 
-        bot.on('inline_query', async ({id, from, query, offset}) => {
-            if (query === '') {
-                let suggestions = ['YEP'];
-                let message = await bot.answerInlineQuery(id, suggestions.map(suggestion => ({
-                    type: 'article',
-                    id: Math.floor(Math.random() * 10000000),
-                    title: suggestion,
-                    input_message_content: {
-                        message_text: suggestion,
-                    },
-                })));
-                console.log('empty message', message);
-                return;
-            }
-            // let token = await Utils.getToken();
-            // this.tokens[token] = {expiryDate: (new Date) + 10000};
-            // setTimeout(() => {
-            //     if (this.tokens.hasOwnProperty(token))
-            //         delete this.tokens[token];
-            // }, 10000);
+        bot.on('inline_query', async ({id, query}) => {
+            if (query === '')
+                query = 'YEP';
 
             let text = query.substr(0, 2000);
             let randomID = Math.round(Math.random() * 1000000);
-            let type = getFileType(text);
+            let type = await getFileType(text);
             let url = `https://api.ruurd.dev/twimote?text=${encodeURIComponent(text)}&r=${randomID}&type=${type}`;
             console.log(url);
-            let {width, height, duration, animated} = getTextSize(text);
+            let {width, height, duration} = await getTextSize(text);
             if (type === 'mp4') {
                 await bot.answerInlineQuery(id, [{
                     type: 'mpeg4_gif',
@@ -69,12 +55,21 @@ export default class TwimoteModule extends ApiModule {
                     thumb_url: url,
                 }])
             } else if (type === 'webp') {
-                let file = await text2media(text);
-                let msg = await bot.sendSticker(tokens.stickerDump, file);
+                let emote = await EmoteSticker.findOne({where: {text}});
+                let stickerId;
+                if (emote === null) {
+                    let file = await text2media(text);
+                    let msg = await bot.sendSticker(tokens.stickerDump, file);
+                    stickerId = msg.sticker.file_id;
+                    EmoteSticker.create({
+                        text,
+                        sticker: stickerId,
+                    }).then(() => console.log('emote added to db'));
+                } else stickerId = emote.sticker;
                 await bot.answerInlineQuery(id, [{
                     type: 'sticker',
                     id: randomID,
-                    sticker_file_id: msg.sticker.file_id,
+                    sticker_file_id: stickerId,
                 }]);
             }
         });
@@ -90,17 +85,6 @@ export default class TwimoteModule extends ApiModule {
 
     setRoutes(app, io, db) {
         app.get('/twimote/', async (req, res) => {
-            // let token = this.tokens[req.query.token];
-            // if (
-            //     req.query.token === undefined ||
-            //     !token ||
-            //     token.expiryDate === undefined ||
-            //     isNaN(token.expiryDate) ||
-            //     +token.expiryDate < +new Date
-            // ) {
-            //     res.sendStatus(401);
-            //     return;
-            // }
             let filePath = await text2media(req.query.text === undefined ? 'YEP' : req.query.text);
             if (filePath.endsWith('mp4')) {
                 fs.stat(filePath, (err, stat) => {

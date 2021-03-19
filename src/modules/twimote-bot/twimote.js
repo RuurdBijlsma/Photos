@@ -1,4 +1,3 @@
-import emotes from './emotes.js';
 import https from "https";
 import fs from "fs";
 import c from "canvas";
@@ -6,17 +5,15 @@ import path from 'path';
 import gifyParse from "gify-parse";
 import ffmpeg from 'fluent-ffmpeg';
 import filenamify from 'filenamify';
+import {Emote} from "../../database/models/EmoteModel.js";
 
-// const telegramBackground = '#0e1621';
-// const telegramMinHeight = 100;
-// const photoMaxAspectRatio = 430 / 100;
-// const videoMaxAspectRatio = 310 / 100;
-const telegramBackground = '#182533';
+const photoBackground = '#0e1621';
+const videoBackground = '#182533';
 const telegramMinHeight = 100;
 const photoMaxAspectRatio = 430 / 100;
 const videoMaxAspectRatio = 310 / 100;
 const minAspectRatio = 1;
-const emoteHeight = 100;
+const emoteHeight = 80;
 
 const telegramStickerMaxWidth = emoteHeight * 10;
 const mediaHeight = Math.max(emoteHeight, telegramMinHeight);
@@ -24,11 +21,9 @@ const fontSize = emoteHeight * 0.6;
 const maxGifDuration = 20000; // Milliseconds
 const horizontalPad = Math.round(emoteHeight / 5);
 
-const forceJPG = true;
-
 export async function text2media(text) {
     text = filenamify(text);
-    let fileName = path.resolve(path.join('res', 'twimote', 'cache', text)) + '.' + getFileType(text);
+    let fileName = path.resolve(path.join('res', 'twimote', 'cache', text)) + '.' + await getFileType(text);
 
     // if (await checkFileExists(fileName))
     //     return fileName;
@@ -45,12 +40,13 @@ export async function text2media(text) {
     return fileName;
 }
 
-export function getFileType(text) {
+export async function getFileType(text) {
     for (let word of text.split(' ')) {
-        if (emotes.hasOwnProperty(word) && emotes[word].animated)
+        let emote = await Emote.findOne({where: {name: word}});
+        if (emote !== null && emote.animated)
             return 'mp4';
     }
-    let {width} = getTextSize(text);
+    let {width} = await getTextSize(text);
     let isSticker = width <= telegramStickerMaxWidth;
     return isSticker ? 'webp' : 'jpg';
 }
@@ -99,7 +95,7 @@ async function segments2image(segments, fileName) {
 
     let totalWidth = segments.map(s => s.width).reduce((a, b) => a + b) + (segments.length - 1) * horizontalPad;
     let isSticker = totalWidth <= telegramStickerMaxWidth;
-    let color = isSticker ? 'transparent' : telegramBackground;
+    let color = isSticker ? 'transparent' : photoBackground;
     let height = getImageHeight(totalWidth);
     const yOffset = Math.round((height - emoteHeight) / 2);
 
@@ -197,7 +193,7 @@ async function segments2mp4(segments, outputPath) {
     filters.push({
         filter: 'color',
         options: {
-            color: telegramBackground,
+            color: videoBackground,
             duration: maxDuration,
             size: `${totalWidth}x${height}`,
         },
@@ -272,19 +268,20 @@ async function segments2mp4(segments, outputPath) {
     });
 }
 
-export function getTextSize(text) {
+export async function getTextSize(text) {
     let words = text.split(' ');
     let widths = [];
     let durations = [];
     let segmentWords = [];
     let animated = false;
     for (let word of words) {
-        if (emotes.hasOwnProperty(word)) {
+        let emote = await Emote.findOne({where: {name: word}});
+        if (emote !== null) {
             if (segmentWords.length > 0) widths.push(...getTextSegments(segmentWords).map(s => s.width));
-            widths.push(emotes[word].ratio * emoteHeight);
-            if (emotes[word].animated) {
+            widths.push(emote.ratio * emoteHeight);
+            if (emote.animated) {
                 animated = true;
-                durations.push(emotes[word].duration);
+                durations.push(emote.duration);
             }
             segmentWords = [];
         } else
@@ -292,12 +289,7 @@ export function getTextSize(text) {
     }
     if (segmentWords.length > 0) widths.push(...getTextSegments(segmentWords).map(s => s.width));
     let width = Math.round(widths.reduce((a, b) => a + b, 0) + (widths.length - 1) * horizontalPad);
-    let height;
-    if (animated) {
-        height = Math.round(getGifHeight(width));
-    } else {
-        height = Math.round(getImageHeight(width));
-    }
+    let height = animated ? Math.round(getGifHeight(width)) : Math.round(getImageHeight(width));
     let duration = Math.min(maxGifDuration, Math.max(...durations, 0));
     return {width, height, duration, animated};
 }
@@ -307,7 +299,8 @@ async function getSegments(text) {
     let segments = [];
     let segmentWords = [];
     for (let word of words) {
-        if (emotes.hasOwnProperty(word)) {
+        let emote = await Emote.findOne({where: {name: word}});
+        if (emote !== null) {
             if (segmentWords.length > 0) segments.push(...getTextSegments(segmentWords));
             segments.push(await getEmoteSegment(word));
             segmentWords = [];
@@ -319,7 +312,7 @@ async function getSegments(text) {
 }
 
 async function getEmoteSegment(emoteName) {
-    let emote = emotes[emoteName];
+    let emote = await Emote.findOne({where: {name: emoteName}});
     let emotePath = await getEmote(emoteName, emote);
     let segment = {
         width: Math.round(emoteHeight * emote.ratio),
@@ -360,7 +353,7 @@ function getTextSegment(text) {
 }
 
 async function getEmote(name, emote) {
-    let fileName = path.resolve(path.join('res', 'twimote', 'cache', 'emotes', name + (emote.animated ? '.gif' : '.png')));
+    let fileName = path.resolve(path.join('res', 'twimote', 'emotes', name + (emote.animated ? '.gif' : '.png')));
     if (await checkFileExists(fileName))
         return fileName;
 

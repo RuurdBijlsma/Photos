@@ -1,24 +1,42 @@
 import rawEmotes from "./rawEmotes.js";
+import defaultEmotes from "./defaultEmotes.js";
 import probe from "probe-image-size";
 import fs from "fs";
 import fetch from 'node-fetch';
 import path from "path";
-import defaultEmotes from "./defaultEmotes.js";
 import gifyParse from "gify-parse";
-import emotes from "../emotes.js";
+import {Emote} from "../../../database/models/EmoteModel.js";
+import Database from "../../../database/Database.js";
+import cred from "../../../../res/auth/credentials.json"
+import {Sequelize} from "sequelize";
+
+const {dbUser, dbPass, dbName} = cred;
 
 let allEmotes = defaultEmotes.concat(rawEmotes);
 let fast = process.argv[process.argv.length - 1] === 'fast';
-let result = fast ? {...emotes} : {}, i = 0;
+let i = 0;
+
+const db = new Sequelize(dbName, dbUser, dbPass, {
+    host: 'localhost',
+    dialect: 'postgres',
+});
+await Database.setDb(db);
+
+if (!fast) {
+    console.log("DROPPING EMOTE TABLE");
+    try {
+        await Emote.drop();
+        await Emote.sync();
+    } catch (e) {
+        console.log("EMOTE drop error", e);
+    }
+}
 
 for (let {name, url} of allEmotes) {
     i++;
-    if (result.hasOwnProperty(name)) {
+    let isIn = await Emote.findOne({where: {name}});
+    if (isIn !== null) {
         console.log(`[${i}/${allEmotes.length}] Skipping ${name}, already included`);
-        continue;
-    }
-    if (fast && emotes.hasOwnProperty(name)) {
-        console.log(`[${i}/${allEmotes.length}] Skipping ${name}, is already in emotes.js and FAST mode is enabled`);
         continue;
     }
     let data = await probe(url);
@@ -31,16 +49,13 @@ for (let {name, url} of allEmotes) {
         duration = gifInfo.duration;
         frames = gifInfo.images.length;
     }
-    result[name] = {
+    await Emote.create({
+        name,
         ratio: data.width / data.height,
         animated,
         duration,
         frames,
-        url: url,
-    }
+        url,
+    });
     console.log(`[${i}/${allEmotes.length}] Processed ${name}`);
 }
-
-let emotesFile = path.resolve('src/modules/twimote-bot/emotes.js');
-console.log(`Writing to ${emotesFile}`)
-fs.writeFileSync(emotesFile, 'export default ' + JSON.stringify(result));

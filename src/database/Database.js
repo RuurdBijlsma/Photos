@@ -1,6 +1,8 @@
 import Log from "../Log.js";
 import {initUser} from "./models/UserModel.js";
 import {initSudoku} from "./models/SudokuModel.js";
+import {initEmoteSticker} from "./models/EmoteStickerModel.js";
+import {initEmote} from "./models/EmoteModel.js";
 
 const console = new Log("Database");
 
@@ -23,6 +25,10 @@ class Database {
             initUser(this.db);
             console.log("Init sudoku");
             initSudoku(this.db);
+            console.log("Init emote sticker");
+            initEmoteSticker(this.db);
+            console.log("Init emote");
+            initEmote(this.db);
 
             console.log("Syncing db");
             await this.db.sync();
