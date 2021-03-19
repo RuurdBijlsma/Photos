@@ -1,12 +1,10 @@
 import rawEmotes from "./rawEmotes.js";
 import defaultEmotes from "./defaultEmotes.js";
-import probe from "probe-image-size";
-import fetch from 'node-fetch';
-import gifyParse from "gify-parse";
 import {Emote} from "../../../database/models/EmoteModel.js";
 import Database from "../../../database/Database.js";
 import cred from "../../../../res/auth/credentials.json"
 import {Sequelize} from "sequelize";
+import addEmote from "./addEmote.js";
 
 (async () => {
     const {dbUser, dbPass, dbName} = cred;
@@ -33,29 +31,10 @@ import {Sequelize} from "sequelize";
 
     for (let {name, url} of allEmotes) {
         i++;
-        let isIn = await Emote.findOne({where: {name}});
-        if (isIn !== null) {
+        if (await addEmote(name, url)) {
+            console.log(`[${i}/${allEmotes.length}] Processed ${name}`);
+        } else {
             console.log(`[${i}/${allEmotes.length}] Skipping ${name}, already included`);
-            continue;
         }
-        let data = await probe(url);
-        let animated = data.type.toLowerCase().includes('gif');
-        let duration = 0;
-        let frames = 1;
-        if (animated) {
-            const buffer = await fetch(url).then(f => f.buffer());
-            const gifInfo = gifyParse.getInfo(buffer);
-            duration = gifInfo.duration;
-            frames = gifInfo.images.length;
-        }
-        await Emote.create({
-            name,
-            ratio: data.width / data.height,
-            animated,
-            duration,
-            frames,
-            url,
-        });
-        console.log(`[${i}/${allEmotes.length}] Processed ${name}`);
     }
 })();

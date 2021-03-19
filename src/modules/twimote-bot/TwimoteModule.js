@@ -4,6 +4,8 @@ import fs from "fs";
 import TelegramBot from "node-telegram-bot-api";
 import tokens from "../../../res/twimote/tokens.json";
 import {EmoteSticker} from "../../database/models/EmoteStickerModel.js";
+import addEmote from "./getEmotes/addEmote.js";
+import {Emote} from "../../database/models/EmoteModel.js";
 
 // TODO
 // Enable tokens for security
@@ -91,17 +93,49 @@ export default class TwimoteModule extends ApiModule {
         });
 
         bot.onText(/\/search (.+)/, async (msg, match) => {
-            // 'msg' is the received Message from Telegram
-            // 'match' is the result of executing the regexp above on the text content
-            // of the message
-
             const chatId = msg.chat.id;
-            const query = match[1]; // the captured "whatever"
+            const query = match[1];
             let results = await search(query);
             for (let result of results)
                 bot.sendMessage(chatId, `[${result.name}](${result.url})`, {
                     parse_mode: 'MarkdownV2',
                 });
+        });
+
+        bot.onText(/\/add (.+) (.+)/, async (msg, match) => {
+            const chatId = msg.chat.id;
+            if (!tokens.canAddEmotes.includes(msg.from.id)) {
+                return bot.sendMessage(chatId, "(unauthorized) You can't add emotes >:(");
+            }
+            const emote = match[1];
+            const url = match[2];
+            if (emote.includes(' ') || url.includes(' ')) {
+                return bot.sendMessage(
+                    chatId,
+                    "Add command must be followed by emote name then emote url, example: `/add monkaS https://cdn.frankerfacez.com/emoticon/130762/4`",
+                    {parse_mode: 'MarkdownV2'},
+                );
+            }
+            bot.sendMessage(chatId, `Trying to add ${emote}...`);
+            if (await addEmote(emote, url)) {
+                await bot.sendMessage(chatId, `Added ${emote} ${url} ✅`);
+            } else {
+                await bot.sendMessage(chatId, `Failed to add ${emote} ${url}!`);
+            }
+        });
+
+        bot.onText(/\/remove (.+)/, async (msg, match) => {
+            const chatId = msg.chat.id;
+            if (!tokens.canAddEmotes.includes(msg.from.id)) {
+                return bot.sendMessage(chatId, "(unauthorized) You can't remove emotes >:(");
+            }
+            const emoteName = match[1];
+            let emote = await Emote.findOne({where: {name: emoteName}});
+            if (emote === null) {
+                return bot.sendMessage(chatId, `${emoteName} doesn't exist (remove command is case sensitive)`);
+            }
+            await emote.destroy();
+            await bot.sendMessage(chatId, `${emoteName} has been removed`);
         });
 
         bot.on('message', async (msg) => {
