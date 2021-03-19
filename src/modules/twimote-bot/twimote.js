@@ -106,6 +106,7 @@ async function segments2image(segments, fileName) {
     let images = await Promise.all(imageSegments.map(s => c.loadImage(s.value)));
     let canvas = c.createCanvas(totalWidth, height);
     let context = canvas.getContext('2d');
+    context.clearRect(0, 0, canvas.width, canvas.height)
     context.fillStyle = color;
     context.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -385,7 +386,7 @@ export async function getSuggestions(text) {
         where: {
             name: {[Op.startsWith]: lastWord}
         },
-        limit: lastWord.length > 4 ? 10 : lastWord.length < 3 ? 2 : 5,
+        limit: lastWord.length > 3 ? 3 : 1,
     });
     let sentenceStart = words.slice(0, words.length - 1).join(' ');
     let suggestions = nextEmotes.map(emote => `${sentenceStart} ${emote.name}`);

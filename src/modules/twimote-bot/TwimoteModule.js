@@ -29,8 +29,7 @@ export default class TwimoteModule extends ApiModule {
                 query = 'YEP';
 
             let queryText = query.substr(0, 2000);
-            let suggestions = getSuggestions(queryText);
-            await bot.answerInlineQuery(id, await Promise.all(suggestions.map(async text => {
+            let queryAnswers = await Promise.all((await getSuggestions(queryText)).map(async text => {
                 let randomID = Math.round(Math.random() * 10000000);
                 let type = await getFileType(text);
                 let {width, height, duration} = await getTextSize(text);
@@ -82,7 +81,8 @@ export default class TwimoteModule extends ApiModule {
                         sticker_file_id: stickerId,
                     };
                 }
-            })));
+            }));
+            await bot.answerInlineQuery(id, queryAnswers);
         });
 
         bot.on('message', async (msg) => {
