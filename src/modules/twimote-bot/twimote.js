@@ -389,7 +389,9 @@ export async function getSuggestions(text) {
         limit: lastWord.length > 3 ? 3 : 1,
     });
     let sentenceStart = words.slice(0, words.length - 1).join(' ');
-    let suggestions = nextEmotes.map(emote => `${sentenceStart} ${emote.name}`);
+    let suggestions = nextEmotes
+        .filter(emote => emote.name !== lastWord)
+        .map(emote => `${sentenceStart} ${emote.name}`);
     return [text, ...suggestions];
 }
 
