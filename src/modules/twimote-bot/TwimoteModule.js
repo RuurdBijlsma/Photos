@@ -97,12 +97,11 @@ export default class TwimoteModule extends ApiModule {
 
             const chatId = msg.chat.id;
             const query = match[1]; // the captured "whatever"
-            let suggestions = await search(query);
-
-            // send back the matched "whatever" to the chat
-            for (let suggestion of suggestions) {
-                bot.sendMessage(chatId, `${suggestion.name} ${suggestion.url}`);
-            }
+            let results = await search(query);
+            for (let result of results)
+                bot.sendMessage(chatId, `[${result.name}](${result.url})`, {
+                    parse_mode: 'MarkdownV2',
+                });
         });
 
         bot.on('message', async (msg) => {

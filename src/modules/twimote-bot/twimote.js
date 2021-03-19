@@ -398,8 +398,9 @@ export async function getSuggestions(text) {
 export async function search(query) {
     return await Emote.findAll({
         where: {
-            name: {[Op.iLike]: `%${query}%`}
+            name: {[Op.iLike]: `%${query}%`},
         },
+        limit: 20,
     });
 }
 
