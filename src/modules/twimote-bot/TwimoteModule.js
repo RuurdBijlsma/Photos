@@ -1,10 +1,9 @@
 import ApiModule from "../../ApiModule.js";
-import {text2media, getTextSize, getFileType} from './twimote.js';
+import {text2media, getTextSize, getFileType, getSuggestions} from './twimote.js';
 import fs from "fs";
 import TelegramBot from "node-telegram-bot-api";
 import tokens from "../../../res/twimote/tokens.json";
 import {EmoteSticker} from "../../database/models/EmoteStickerModel.js";
-import Utils from "../../Utils.js";
 
 // TODO
 // Enable tokens for security
@@ -17,8 +16,8 @@ import Utils from "../../Utils.js";
 export default class TwimoteModule extends ApiModule {
     constructor() {
         super();
-        // if (process.platform === 'win32')
-        this.botSetup();
+        if (process.platform === 'win32')
+            this.botSetup();
     }
 
     botSetup() {
@@ -29,66 +28,61 @@ export default class TwimoteModule extends ApiModule {
             if (query === '')
                 query = 'YEP';
 
-            let text = query.substr(0, 2000);
-            let randomID = Math.round(Math.random() * 1000000);
-            let type = await getFileType(text);
-            let url = `https://api.ruurd.dev/twimote?text=${encodeURIComponent(text)}&r=${randomID}&type=${type}`;
-            console.log(url);
-            let {width, height, duration} = await getTextSize(text);
-            if (type === 'mp4') {
-                await bot.answerInlineQuery(id, [{
-                    type: 'mpeg4_gif',
-                    id: randomID,
-                    mpeg4_url: url,
-                    mpeg4_width: width,
-                    mpeg4_height: height,
-                    thumb_url: url,
-                    mpeg4_duration: duration,
-                    thumb_mime_type: 'video/mp4',
-                }]);
-            } else if (type === 'png') {
-                let emote = await EmoteSticker.findOne({where: {text}});
-                let stickerId;
-                if (emote === null) {
-                    let file = await text2media(text);
-                    let msg = await bot.sendPhoto(tokens.stickerDump, file);
-                    stickerId = msg.photo[msg.photo.length - 1].file_id;
-                    EmoteSticker.create({
-                        text,
-                        sticker: stickerId,
-                    }).then(() => console.log('emote added to db'));
-                } else stickerId = emote.sticker;
-                await bot.answerInlineQuery(id, [{
-                    type: 'photo',
-                    id: randomID,
-                    photo_file_id: stickerId,
-                }]);
-                // await bot.answerInlineQuery(id, [{
-                //     type: 'photo',
-                //     id: randomID,
-                //     photo_url: url,
-                //     photo_width: width,
-                //     photo_height: height,
-                //     thumb_url: url,
-                // }])
-            } else if (type === 'webp') {
-                let emote = await EmoteSticker.findOne({where: {text}});
-                let stickerId;
-                if (emote === null) {
-                    let file = await text2media(text);
-                    let msg = await bot.sendSticker(tokens.stickerDump, file);
-                    stickerId = msg.sticker.file_id;
-                    EmoteSticker.create({
-                        text,
-                        sticker: stickerId,
-                    }).then(() => console.log('emote added to db'));
-                } else stickerId = emote.sticker;
-                await bot.answerInlineQuery(id, [{
-                    type: 'sticker',
-                    id: randomID,
-                    sticker_file_id: stickerId,
-                }]);
-            }
+            let queryText = query.substr(0, 2000);
+            let suggestions = getSuggestions(queryText);
+            await bot.answerInlineQuery(id, await Promise.all(suggestions.map(async text => {
+                let randomID = Math.round(Math.random() * 10000000);
+                let type = await getFileType(text);
+                let {width, height, duration} = await getTextSize(text);
+                if (type === 'mp4') {
+                    let url = `https://api.ruurd.dev/twimote?text=${encodeURIComponent(text)}&r=${randomID}&type=${type}`;
+                    console.log(url);
+                    return {
+                        type: 'mpeg4_gif',
+                        id: randomID,
+                        mpeg4_url: url,
+                        mpeg4_width: width,
+                        mpeg4_height: height,
+                        thumb_url: url,
+                        mpeg4_duration: duration,
+                        thumb_mime_type: 'video/mp4',
+                    };
+                } else if (type === 'png') {
+                    let emote = await EmoteSticker.findOne({where: {text}});
+                    let stickerId;
+                    if (emote === null) {
+                        let file = await text2media(text);
+                        let msg = await bot.sendPhoto(tokens.stickerDump, file);
+                        stickerId = msg.photo[msg.photo.length - 1].file_id;
+                        EmoteSticker.create({
+                            text,
+                            sticker: stickerId,
+                        }).then(() => console.log('emote added to db'));
+                    } else stickerId = emote.sticker;
+                    return {
+                        type: 'photo',
+                        id: randomID,
+                        photo_file_id: stickerId,
+                    };
+                } else if (type === 'webp') {
+                    let emote = await EmoteSticker.findOne({where: {text}});
+                    let stickerId;
+                    if (emote === null) {
+                        let file = await text2media(text);
+                        let msg = await bot.sendSticker(tokens.stickerDump, file);
+                        stickerId = msg.sticker.file_id;
+                        EmoteSticker.create({
+                            text,
+                            sticker: stickerId,
+                        }).then(() => console.log('emote added to db'));
+                    } else stickerId = emote.sticker;
+                    return {
+                        type: 'sticker',
+                        id: randomID,
+                        sticker_file_id: stickerId,
+                    };
+                }
+            })));
         });
 
         bot.on('message', async (msg) => {

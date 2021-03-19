@@ -6,6 +6,9 @@ import gifyParse from "gify-parse";
 import ffmpeg from 'fluent-ffmpeg';
 import filenamify from 'filenamify';
 import {Emote} from "../../database/models/EmoteModel.js";
+import seq from "sequelize";
+
+const {Op} = seq;
 
 const photoBackground = '#0e1621';
 const videoBackground = '#182533';
@@ -373,6 +376,20 @@ async function getEmote(name, emote) {
             reject(err.message);
         });
     });
+}
+
+export async function getSuggestions(text) {
+    let words = text.split(' ');
+    let lastWord = words[words.length - 1];
+    let nextEmotes = await Emote.findAll({
+        where: {
+            name: {[Op.startsWith]: lastWord}
+        },
+        limit: lastWord.length > 4 ? 10 : lastWord.length < 3 ? 2 : 5,
+    });
+    let sentenceStart = words.slice(0, words.length - 1).join(' ');
+    let suggestions = nextEmotes.map(emote => `${sentenceStart} ${emote.name}`);
+    return [text, ...suggestions];
 }
 
 async function checkFileExists(file) {
