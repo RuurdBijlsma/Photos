@@ -13,7 +13,7 @@ const telegramMinHeight = 100;
 const photoMaxAspectRatio = 430 / 100;
 const videoMaxAspectRatio = 310 / 100;
 const minAspectRatio = 1;
-const emoteHeight = 80;
+const emoteHeight = 100;
 
 const telegramStickerMaxWidth = emoteHeight * 10;
 const mediaHeight = Math.max(emoteHeight, telegramMinHeight);
@@ -25,8 +25,8 @@ export async function text2media(text) {
     text = filenamify(text);
     let fileName = path.resolve(path.join('res', 'twimote', 'cache', text)) + '.' + await getFileType(text);
 
-    // if (await checkFileExists(fileName))
-    //     return fileName;
+    if (await checkFileExists(fileName))
+        return fileName;
 
     // if (process.platform !== 'win32' && fileName.endsWith('mp4'))
     //     return await text2media('YEP animated emotes not supported yet');
