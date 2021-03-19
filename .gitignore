@@ -8,6 +8,7 @@ res/music
 ls
 
 res/twimote/cache
+!res/twimote/cache/emotes/OMEGALUL.png
 .idea
 files
 secrets.json

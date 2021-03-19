@@ -7,7 +7,8 @@
   "scripts": {
     "start": "node --experimental-json-modules src/index.js",
     "twimote": "node --experimental-json-modules src/modules/twimote-bot/test-twimote.js",
-    "processEmotes": "node --experimental-json-modules src/modules/twimote-bot/getEmotes/processEmotes.js"
+    "processEmotes": "node --experimental-json-modules src/modules/twimote-bot/getEmotes/processEmotes.js",
+    "fastProcessEmotes": "node --experimental-json-modules src/modules/twimote-bot/getEmotes/processEmotes.js fast"
   },
   "repository": "https://github.com/RuurdBijlsma/ServerApi",
   "keywords": [],

@@ -1,4 +1,158 @@
 export default {
+    "D!": {
+        "ratio": 1,
+        "animated": false,
+        "duration": 0,
+        "frames": 1,
+        "url": "https://cdn.betterttv.net/emote/55028cd2135896936880fdd7/3x"
+    },
+    "LUL": {
+        "ratio": 0.90625,
+        "animated": false,
+        "duration": 0,
+        "frames": 1,
+        "url": "https://cdn.frankerfacez.com/emoticon/143984/4"
+    },
+    "!)": {
+        "ratio": 1.3333333333333333,
+        "animated": false,
+        "duration": 0,
+        "frames": 1,
+        "url": "https://static-cdn.jtvnw.net/emoticons/v1/1/5.0"
+    },
+    "Kappa": {
+        "ratio": 0.7734375,
+        "animated": false,
+        "duration": 0,
+        "frames": 1,
+        "url": "https://cdn.frankerfacez.com/emoticon/460894/4"
+    },
+    "BibleThump": {
+        "ratio": 1.0940170940170941,
+        "animated": false,
+        "duration": 0,
+        "frames": 1,
+        "url": "https://cdn.frankerfacez.com/emoticon/269642/4"
+    },
+    "4Head": {
+        "ratio": 0.6666666666666666,
+        "animated": false,
+        "duration": 0,
+        "frames": 1,
+        "url": "https://static-cdn.jtvnw.net/emoticons/v1/354/1.0"
+    },
+    "KreyGasm": {
+        "ratio": 0.7037037037037037,
+        "animated": false,
+        "duration": 0,
+        "frames": 1,
+        "url": "https://cdn.frankerfacez.com/emoticon/419523/4"
+    },
+    "ResidentSleeper": {
+        "ratio": 0.7734375,
+        "animated": false,
+        "duration": 0,
+        "frames": 1,
+        "url": "https://cdn.frankerfacez.com/emoticon/428014/4"
+    },
+    "WutFace": {
+        "ratio": 0.8148148148148148,
+        "animated": false,
+        "duration": 0,
+        "frames": 1,
+        "url": "https://cdn.frankerfacez.com/emoticon/434628/1"
+    },
+    "HeyGuys": {
+        "ratio": 1,
+        "animated": false,
+        "duration": 0,
+        "frames": 1,
+        "url": "https://cdn.frankerfacez.com/avatar/twitch/61772429"
+    },
+    "KappaPride": {
+        "ratio": 0.7857142857142857,
+        "animated": false,
+        "duration": 0,
+        "frames": 1,
+        "url": "https://cdn.frankerfacez.com/emoticon/434617/1"
+    },
+    "NotLikeThis": {
+        "ratio": 0.828125,
+        "animated": false,
+        "duration": 0,
+        "frames": 1,
+        "url": "https://cdn.frankerfacez.com/emoticon/481082/4"
+    },
+    "PogChamp": {
+        "ratio": 1,
+        "animated": false,
+        "duration": 0,
+        "frames": 1,
+        "url": "https://static-cdn.jtvnw.net/emoticons/v1/305954156/5.0"
+    },
+    "WeirdChamping": {
+        "ratio": 1,
+        "animated": true,
+        "duration": 3720,
+        "frames": 124,
+        "url": "https://cdn.betterttv.net/emote/5e9e0eb47e090362f8b0d9a4/3x"
+    },
+    "peepoClown": {
+        "ratio": 1.0078740157480315,
+        "animated": false,
+        "duration": 0,
+        "frames": 1,
+        "url": "https://cdn.frankerfacez.com/emoticon/318914/4"
+    },
+    "Prayge": {
+        "ratio": 1.4,
+        "animated": false,
+        "duration": 0,
+        "frames": 1,
+        "url": "https://cdn.frankerfacez.com/emoticon/507766/4"
+    },
+    "Hmm": {
+        "ratio": 1.0578512396694215,
+        "animated": false,
+        "duration": 0,
+        "frames": 1,
+        "url": "https://cdn.frankerfacez.com/emoticon/405602/4"
+    },
+    "CHOKE": {
+        "ratio": 1.9125,
+        "animated": false,
+        "duration": 0,
+        "frames": 1,
+        "url": "https://cdn.frankerfacez.com/emoticon/365883/4"
+    },
+    "Jebaited": {
+        "ratio": 0.921875,
+        "animated": false,
+        "duration": 0,
+        "frames": 1,
+        "url": "https://cdn.frankerfacez.com/emoticon/380518/4"
+    },
+    "PepegaDriving": {
+        "ratio": 1,
+        "animated": true,
+        "duration": 0,
+        "frames": 4,
+        "url": "https://cdn.betterttv.net/emote/5e6fa08bd112fc3725746dd4/3x"
+    },
+    "Madge": {
+        "ratio": 1.302325581395349,
+        "animated": false,
+        "duration": 0,
+        "frames": 1,
+        "url": "https://cdn.frankerfacez.com/emoticon/510861/4"
+    },
+    "widepeepoHappy": {
+        "ratio": 4.266666666666667,
+        "animated": false,
+        "duration": 0,
+        "frames": 1,
+        "url": "https://cdn.frankerfacez.com/emoticon/270930/4"
+    },
     "catJAM": {
         "ratio": 1,
         "animated": true,
@@ -649,13 +803,6 @@ export default {
         "duration": 0,
         "frames": 1,
         "url": "https://cdn.betterttv.net/emote/55cbeb8f8b9c49ef325bf738/3x"
-    },
-    "widepeepoHappy": {
-        "ratio": 1,
-        "animated": false,
-        "duration": 0,
-        "frames": 1,
-        "url": "https://cdn.betterttv.net/emote/5e1a76dd8af14b5f1b438c04/3x"
     },
     "Kissahomie": {
         "ratio": 1,
@@ -1559,152 +1706,5 @@ export default {
         "duration": 0,
         "frames": 1,
         "url": "https://cdn.frankerfacez.com/emoticon/309114/4"
-    },
-    "D!": {
-        "ratio": 1,
-        "animated": false,
-        "duration": 0,
-        "frames": 1,
-        "url": "https://cdn.betterttv.net/emote/55028cd2135896936880fdd7/3x"
-    },
-    "LUL": {
-        "ratio": 0.90625,
-        "animated": false,
-        "duration": 0,
-        "frames": 1,
-        "url": "https://cdn.frankerfacez.com/emoticon/143984/4"
-    },
-    "!)": {
-        "ratio": 1.3333333333333333,
-        "animated": false,
-        "duration": 0,
-        "frames": 1,
-        "url": "https://static-cdn.jtvnw.net/emoticons/v1/1/5.0"
-    },
-    "Kappa": {
-        "ratio": 0.7734375,
-        "animated": false,
-        "duration": 0,
-        "frames": 1,
-        "url": "https://cdn.frankerfacez.com/emoticon/460894/4"
-    },
-    "BibleThump": {
-        "ratio": 1.0940170940170941,
-        "animated": false,
-        "duration": 0,
-        "frames": 1,
-        "url": "https://cdn.frankerfacez.com/emoticon/269642/4"
-    },
-    "4Head": {
-        "ratio": 0.6666666666666666,
-        "animated": false,
-        "duration": 0,
-        "frames": 1,
-        "url": "https://static-cdn.jtvnw.net/emoticons/v1/354/1.0"
-    },
-    "KreyGasm": {
-        "ratio": 0.7037037037037037,
-        "animated": false,
-        "duration": 0,
-        "frames": 1,
-        "url": "https://cdn.frankerfacez.com/emoticon/419523/4"
-    },
-    "ResidentSleeper": {
-        "ratio": 0.7734375,
-        "animated": false,
-        "duration": 0,
-        "frames": 1,
-        "url": "https://cdn.frankerfacez.com/emoticon/428014/4"
-    },
-    "WutFace": {
-        "ratio": 0.8148148148148148,
-        "animated": false,
-        "duration": 0,
-        "frames": 1,
-        "url": "https://cdn.frankerfacez.com/emoticon/434628/1"
-    },
-    "HeyGuys": {
-        "ratio": 1,
-        "animated": false,
-        "duration": 0,
-        "frames": 1,
-        "url": "https://cdn.frankerfacez.com/avatar/twitch/61772429"
-    },
-    "KappaPride": {
-        "ratio": 0.7857142857142857,
-        "animated": false,
-        "duration": 0,
-        "frames": 1,
-        "url": "https://cdn.frankerfacez.com/emoticon/434617/1"
-    },
-    "NotLikeThis": {
-        "ratio": 0.828125,
-        "animated": false,
-        "duration": 0,
-        "frames": 1,
-        "url": "https://cdn.frankerfacez.com/emoticon/481082/4"
-    },
-    "PogChamp": {
-        "ratio": 1,
-        "animated": false,
-        "duration": 0,
-        "frames": 1,
-        "url": "https://static-cdn.jtvnw.net/emoticons/v1/305954156/5.0"
-    },
-    "WeirdChamping": {
-        "ratio": 1,
-        "animated": true,
-        "duration": 3720,
-        "frames": 124,
-        "url": "https://cdn.betterttv.net/emote/5e9e0eb47e090362f8b0d9a4/3x"
-    },
-    "peepoClown": {
-        "ratio": 1.0078740157480315,
-        "animated": false,
-        "duration": 0,
-        "frames": 1,
-        "url": "https://cdn.frankerfacez.com/emoticon/318914/4"
-    },
-    "Prayge": {
-        "ratio": 1.4,
-        "animated": false,
-        "duration": 0,
-        "frames": 1,
-        "url": "https://cdn.frankerfacez.com/emoticon/507766/4"
-    },
-    "Hmm": {
-        "ratio": 1.0578512396694215,
-        "animated": false,
-        "duration": 0,
-        "frames": 1,
-        "url": "https://cdn.frankerfacez.com/emoticon/405602/4"
-    },
-    "CHOKE": {
-        "ratio": 1.9125,
-        "animated": false,
-        "duration": 0,
-        "frames": 1,
-        "url": "https://cdn.frankerfacez.com/emoticon/365883/4"
-    },
-    "Jebaited": {
-        "ratio": 0.921875,
-        "animated": false,
-        "duration": 0,
-        "frames": 1,
-        "url": "https://cdn.frankerfacez.com/emoticon/380518/4"
-    },
-    "PepegaDriving": {
-        "ratio": 1,
-        "animated": true,
-        "duration": 0,
-        "frames": 4,
-        "url": "https://cdn.betterttv.net/emote/5e6fa08bd112fc3725746dd4/3x"
-    },
-    "Madge": {
-        "ratio": 1.302325581395349,
-        "animated": false,
-        "duration": 0,
-        "frames": 1,
-        "url": "https://cdn.frankerfacez.com/emoticon/510861/4"
     }
 }

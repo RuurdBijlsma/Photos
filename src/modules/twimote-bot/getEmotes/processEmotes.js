@@ -5,13 +5,20 @@ import fetch from 'node-fetch';
 import path from "path";
 import defaultEmotes from "./defaultEmotes.js";
 import gifyParse from "gify-parse";
+import emotes from "../emotes.js";
 
-let emotes = rawEmotes.concat(defaultEmotes);
-let result = {}, i = 0;
-for (let {name, url} of emotes) {
+let allEmotes = defaultEmotes.concat(rawEmotes);
+let fast = process.argv[process.argv.length - 1] === 'fast';
+let result = fast ? {...emotes} : {}, i = 0;
+
+for (let {name, url} of allEmotes) {
     i++;
     if (result.hasOwnProperty(name)) {
-        console.log(`[${i}/${emotes.length}] Skipping ${name}, already included`);
+        console.log(`[${i}/${allEmotes.length}] Skipping ${name}, already included`);
+        continue;
+    }
+    if (fast && emotes.hasOwnProperty(name)) {
+        console.log(`[${i}/${allEmotes.length}] Skipping ${name}, is already in emotes.js and FAST mode is enabled`);
         continue;
     }
     let data = await probe(url);
@@ -31,7 +38,7 @@ for (let {name, url} of emotes) {
         frames,
         url: url,
     }
-    console.log(`[${i}/${emotes.length}] Processed ${name}`);
+    console.log(`[${i}/${allEmotes.length}] Processed ${name}`);
 }
 
 let emotesFile = path.resolve('src/modules/twimote-bot/emotes.js');

@@ -3,14 +3,11 @@ import {text2media, getTextSize, getFileType} from './twimote.js';
 import fs from "fs";
 import TelegramBot from "node-telegram-bot-api";
 import tokens from "../../../res/twimote/tokens.json";
-import Utils from "../../Utils.js";
-import path from 'path';
 
 // TODO
-// Inline bot (create dummy inline answer, then edit the message with the actual photo/animation/sticker)
 // Enable tokens for security
-// Fix animated emotes on server
 // Webhooks
+// perma cache text to sticker file id
 
 export default class TwimoteModule extends ApiModule {
     constructor() {
@@ -62,7 +59,7 @@ export default class TwimoteModule extends ApiModule {
                     mpeg4_duration: duration,
                     thumb_mime_type: 'video/mp4',
                 }]);
-            } else {
+            } else if (type === 'jpg') {
                 await bot.answerInlineQuery(id, [{
                     type: 'photo',
                     id: randomID,
@@ -71,22 +68,23 @@ export default class TwimoteModule extends ApiModule {
                     photo_height: height,
                     thumb_url: url,
                 }])
+            } else if (type === 'webp') {
+                let file = await text2media(text);
+                let msg = await bot.sendSticker(tokens.stickerDump, file);
+                await bot.answerInlineQuery(id, [{
+                    type: 'sticker',
+                    id: randomID,
+                    sticker_file_id: msg.sticker.file_id,
+                }]);
             }
         });
 
         bot.on('message', async (msg) => {
             // console.log("message", msg);
+            if (!msg.text)
+                return;
 
-            let filePath = await text2media(msg.text.substr(0, 2000));
-            let file = fs.createReadStream(filePath);
-
-            if (filePath.endsWith('mp4')) {
-                await bot.sendAnimation(msg.chat.id, file);
-            } else if (filePath.endsWith('webp')) {
-                await bot.sendSticker(msg.chat.id, file);
-            } else {
-                await bot.sendPhoto(msg.chat.id, file);
-            }
+            await bot.sendMessage(msg.chat.id, "This bot should only be used inline (i.e. @twimotebot YEP)");
         });
     }
 
