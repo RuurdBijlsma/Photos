@@ -22,4 +22,5 @@ export default [
     {name: "Madge", url: "https://cdn.frankerfacez.com/emoticon/510861/4"},
     {name: "widepeepoHappy", url: "https://cdn.frankerfacez.com/emoticon/270930/4"},
     {name: "widepeepoSad", url: "https://cdn.frankerfacez.com/emoticon/303899/4"},
+    {name: "widepepOMEGAKEKHappyChampHands", url: "https://cdn.frankerfacez.com/emoticon/395608/4"},
 ]
