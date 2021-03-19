@@ -17,8 +17,8 @@ import Utils from "../../Utils.js";
 export default class TwimoteModule extends ApiModule {
     constructor() {
         super();
-        if (process.platform === 'win32')
-            this.botSetup();
+        // if (process.platform === 'win32')
+        this.botSetup();
     }
 
     botSetup() {
@@ -52,7 +52,7 @@ export default class TwimoteModule extends ApiModule {
                 if (emote === null) {
                     let file = await text2media(text);
                     let msg = await bot.sendPhoto(tokens.stickerDump, file);
-                    stickerId = msg.photo[msg.photo.length-1].file_id;
+                    stickerId = msg.photo[msg.photo.length - 1].file_id;
                     EmoteSticker.create({
                         text,
                         sticker: stickerId,
