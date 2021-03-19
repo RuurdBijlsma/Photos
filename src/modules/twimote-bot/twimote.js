@@ -319,7 +319,7 @@ async function getSegments(text) {
 }
 
 async function getEmoteSegment(emoteName) {
-    let emote = await Emote.findOne({where: {name: emoteName}});
+    let emote = await Emote.findOne({where: {name: {[Op.iLike]: `${emoteName}`}}});
     let emotePath = await getEmote(emoteName, emote);
     let segment = {
         width: Math.round(emoteHeight * emote.ratio),
@@ -383,9 +383,7 @@ export async function getSuggestions(text) {
     let words = text.split(' ');
     let lastWord = words[words.length - 1];
     let nextEmotes = await Emote.findAll({
-        where: {
-            name: {[Op.iLike]: `${lastWord}%`}
-        },
+        where: {name: {[Op.iLike]: `${lastWord}%`}},
         limit: lastWord.length > 3 ? 3 : 1,
     });
     let sentenceStart = words.slice(0, words.length - 1).join(' ');
@@ -397,9 +395,7 @@ export async function getSuggestions(text) {
 
 export async function search(query) {
     return await Emote.findAll({
-        where: {
-            name: {[Op.iLike]: `%${query}%`},
-        },
+        where: {name: {[Op.iLike]: `%${query}%`},},
         limit: 20,
     });
 }
