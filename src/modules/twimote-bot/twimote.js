@@ -13,7 +13,7 @@ const telegramMinHeight = 100;
 const photoMaxAspectRatio = 430 / 100;
 const videoMaxAspectRatio = 310 / 100;
 const minAspectRatio = 1;
-const emoteHeight = 100;
+const emoteHeight = 70;
 
 const telegramStickerMaxWidth = emoteHeight * 10;
 const mediaHeight = Math.max(emoteHeight, telegramMinHeight);
@@ -22,8 +22,8 @@ const maxGifDuration = 20000; // Milliseconds
 const horizontalPad = Math.round(emoteHeight / 5);
 
 export async function text2media(text) {
-    text = filenamify(text);
-    let fileName = path.resolve(path.join('res', 'twimote', 'cache', text)) + '.' + await getFileType(text);
+    let textFile = filenamify(text);
+    let fileName = path.resolve(path.join('res', 'twimote', 'cache', textFile)) + '.' + await getFileType(text);
 
     if (await checkFileExists(fileName))
         return fileName;
@@ -48,7 +48,7 @@ export async function getFileType(text) {
     }
     let {width} = await getTextSize(text);
     let isSticker = width <= telegramStickerMaxWidth;
-    return isSticker ? 'webp' : 'jpg';
+    return isSticker ? 'webp' : 'png';
 }
 
 function getImageHeight(width) {
@@ -62,6 +62,7 @@ function getImageHeight(width) {
             height = Math.ceil(width / photoMaxAspectRatio);
         else if (aspectRatio < minAspectRatio)
             height = Math.floor(width / minAspectRatio);
+        console.log("PNG height", height);
     }
     return height;
 }
@@ -154,7 +155,7 @@ async function segments2image(segments, fileName) {
                 });
 
         } else {
-            const stream = canvas.createJPEGStream();
+            const stream = canvas.createPNGStream();
             const out = fs.createWriteStream(fileName);
             stream.pipe(out)
             out.on('finish', () => {
@@ -171,7 +172,7 @@ function getGifHeight(width) {
         height = Math.ceil(width / videoMaxAspectRatio);
     else if (aspectRatio < minAspectRatio)
         height = Math.floor(width / minAspectRatio);
-    return height;
+    return Math.max(telegramMinHeight, height);
 }
 
 async function segments2mp4(segments, outputPath) {
@@ -179,6 +180,8 @@ async function segments2mp4(segments, outputPath) {
     let maxDuration = gifSegments.length === 0 ? 5 : Math.min(maxGifDuration, Math.max(...gifSegments.map(s => s.duration))) / 1000;
 
     let totalWidth = segments.map(s => s.width).reduce((a, b) => a + b) + (segments.length - 1) * horizontalPad;
+    let xOffset = Math.max((telegramMinHeight - totalWidth) / 2, 0);
+    totalWidth = Math.max(telegramMinHeight, totalWidth);
     let height = getGifHeight(totalWidth);
     const yOffset = Math.round((height - emoteHeight) / 2);
 
@@ -202,7 +205,7 @@ async function segments2mp4(segments, outputPath) {
 
     for (let segment of segments) {
         let beforeSegments = segments.slice(0, segments.indexOf(segment));
-        let leftPixels = beforeSegments.map(s => s.width).reduce((a, b) => a + b, 0) + horizontalPad * beforeSegments.length;
+        let leftPixels = xOffset + beforeSegments.map(s => s.width).reduce((a, b) => a + b, 0) + horizontalPad * beforeSegments.length;
         if (segment.type === 'text') {
             filters.push({
                 inputs: 'out',
@@ -353,7 +356,7 @@ function getTextSegment(text) {
 }
 
 async function getEmote(name, emote) {
-    let fileName = path.resolve(path.join('res', 'twimote', 'emotes', name + (emote.animated ? '.gif' : '.png')));
+    let fileName = path.resolve(path.join('res', 'twimote', 'emotes', filenamify(name) + (emote.animated ? '.gif' : '.png')));
     if (await checkFileExists(fileName))
         return fileName;
 

@@ -12,6 +12,7 @@ import Utils from "../../Utils.js";
 // suggesties
 // perma cache text to sticker file id
 // add emote with bot command
+// fix telegram min height (mainly for single video emotes when height < 100)
 
 export default class TwimoteModule extends ApiModule {
     constructor() {
@@ -45,15 +46,31 @@ export default class TwimoteModule extends ApiModule {
                     mpeg4_duration: duration,
                     thumb_mime_type: 'video/mp4',
                 }]);
-            } else if (type === 'jpg') {
+            } else if (type === 'png') {
+                let emote = await EmoteSticker.findOne({where: {text}});
+                let stickerId;
+                if (emote === null) {
+                    let file = await text2media(text);
+                    let msg = await bot.sendPhoto(tokens.stickerDump, file);
+                    stickerId = msg.photo[msg.photo.length-1].file_id;
+                    EmoteSticker.create({
+                        text,
+                        sticker: stickerId,
+                    }).then(() => console.log('emote added to db'));
+                } else stickerId = emote.sticker;
                 await bot.answerInlineQuery(id, [{
                     type: 'photo',
                     id: randomID,
-                    photo_url: url,
-                    photo_width: width,
-                    photo_height: height,
-                    thumb_url: url,
-                }])
+                    photo_file_id: stickerId,
+                }]);
+                // await bot.answerInlineQuery(id, [{
+                //     type: 'photo',
+                //     id: randomID,
+                //     photo_url: url,
+                //     photo_width: width,
+                //     photo_height: height,
+                //     thumb_url: url,
+                // }])
             } else if (type === 'webp') {
                 let emote = await EmoteSticker.findOne({where: {text}});
                 let stickerId;
