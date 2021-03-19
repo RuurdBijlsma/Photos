@@ -39,6 +39,7 @@ export default class TwimoteModule extends ApiModule {
                     return {
                         type: 'mpeg4_gif',
                         id: randomID,
+                        title: text,
                         mpeg4_url: url,
                         mpeg4_width: width,
                         mpeg4_height: height,
@@ -61,6 +62,7 @@ export default class TwimoteModule extends ApiModule {
                     return {
                         type: 'photo',
                         id: randomID,
+                        title: text,
                         photo_file_id: stickerId,
                     };
                 } else if (type === 'webp') {
@@ -78,6 +80,7 @@ export default class TwimoteModule extends ApiModule {
                     return {
                         type: 'sticker',
                         id: randomID,
+                        title: text,
                         sticker_file_id: stickerId,
                     };
                 }
