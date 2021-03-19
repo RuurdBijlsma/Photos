@@ -45,7 +45,7 @@ export async function text2media(text) {
 
 export async function getFileType(text) {
     for (let word of text.split(' ')) {
-        let emote = await Emote.findOne({where: {name: word}});
+        let emote = await Emote.findOne({where: {name: {[Op.iLike]: `${word}`}}});
         if (emote !== null && emote.animated)
             return 'mp4';
     }
@@ -282,7 +282,7 @@ export async function getTextSize(text) {
     let segmentWords = [];
     let animated = false;
     for (let word of words) {
-        let emote = await Emote.findOne({where: {name: word}});
+        let emote = await Emote.findOne({where: {name: {[Op.iLike]: `${word}`}}});
         if (emote !== null) {
             if (segmentWords.length > 0) widths.push(...getTextSegments(segmentWords).map(s => s.width));
             widths.push(emote.ratio * emoteHeight);
@@ -306,7 +306,7 @@ async function getSegments(text) {
     let segments = [];
     let segmentWords = [];
     for (let word of words) {
-        let emote = await Emote.findOne({where: {name: word}});
+        let emote = await Emote.findOne({where: {name: {[Op.iLike]: `${word}`}}});
         if (emote !== null) {
             if (segmentWords.length > 0) segments.push(...getTextSegments(segmentWords));
             segments.push(await getEmoteSegment(word));
@@ -384,7 +384,7 @@ export async function getSuggestions(text) {
     let lastWord = words[words.length - 1];
     let nextEmotes = await Emote.findAll({
         where: {
-            name: {[Op.startsWith]: lastWord}
+            name: {[Op.iLike]: `${lastWord}%`}
         },
         limit: lastWord.length > 3 ? 3 : 1,
     });
@@ -393,6 +393,14 @@ export async function getSuggestions(text) {
         .filter(emote => emote.name !== lastWord)
         .map(emote => `${sentenceStart} ${emote.name}`);
     return [text, ...suggestions];
+}
+
+export async function search(query) {
+    return await Emote.findAll({
+        where: {
+            name: {[Op.iLike]: `%${query}%`}
+        },
+    });
 }
 
 async function checkFileExists(file) {

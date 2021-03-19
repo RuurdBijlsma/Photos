@@ -1,5 +1,5 @@
 import ApiModule from "../../ApiModule.js";
-import {text2media, getTextSize, getFileType, getSuggestions} from './twimote.js';
+import {text2media, getTextSize, getFileType, getSuggestions, search} from './twimote.js';
 import fs from "fs";
 import TelegramBot from "node-telegram-bot-api";
 import tokens from "../../../res/twimote/tokens.json";
@@ -12,6 +12,7 @@ import {EmoteSticker} from "../../database/models/EmoteStickerModel.js";
 // perma cache text to sticker file id
 // add emote with bot command
 // fix telegram min height (mainly for single video emotes when height < 100)
+// some emotes not centered?
 
 export default class TwimoteModule extends ApiModule {
     constructor() {
@@ -34,7 +35,8 @@ export default class TwimoteModule extends ApiModule {
                 let type = await getFileType(text);
                 let {width, height, duration} = await getTextSize(text);
                 if (type === 'mp4') {
-                    let url = `https://api.ruurd.dev/twimote?text=${encodeURIComponent(text)}&r=${randomID}&type=${type}`;
+                    // let url = `https://api.ruurd.dev/twimote?text=${encodeURIComponent(text)}&r=${randomID}&type=${type}`;
+                    let url = `https://api.ruurd.dev/twimote?text=${encodeURIComponent(text)}&type=${type}`;
                     console.log(url);
                     return {
                         type: 'mpeg4_gif',
@@ -88,12 +90,27 @@ export default class TwimoteModule extends ApiModule {
             await bot.answerInlineQuery(id, queryAnswers);
         });
 
+        bot.onText(/\/search (.+)/, async (msg, match) => {
+            // 'msg' is the received Message from Telegram
+            // 'match' is the result of executing the regexp above on the text content
+            // of the message
+
+            const chatId = msg.chat.id;
+            const query = match[1]; // the captured "whatever"
+            let suggestions = await search(query);
+
+            // send back the matched "whatever" to the chat
+            for (let suggestion of suggestions) {
+                bot.sendMessage(chatId, `${suggestion.name} ${suggestion.url}`);
+            }
+        });
+
         bot.on('message', async (msg) => {
             // console.log("message", msg);
-            if (!msg.text)
-                return;
-
-            await bot.sendMessage(msg.chat.id, "This bot should only be used inline (i.e. @twimotebot YEP)");
+            // if (!msg.text)
+            //     return;
+            //
+            // await bot.sendMessage(msg.chat.id, "This bot should only be used inline (i.e. @twimotebot YEP)");
         });
     }
 
