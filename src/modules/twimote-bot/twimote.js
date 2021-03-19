@@ -388,7 +388,7 @@ export async function getSuggestions(text) {
     });
     let sentenceStart = words.slice(0, words.length - 1).join(' ');
     let suggestions = nextEmotes
-        .filter(emote => emote.name !== lastWord)
+        .filter(emote => emote.name.toLowerCase() !== lastWord.toLowerCase())
         .map(emote => `${sentenceStart} ${emote.name}`);
     return [text, ...suggestions];
 }
