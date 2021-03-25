@@ -101,6 +101,13 @@ export default class TwimoteModule extends ApiModule {
                     parse_mode: 'MarkdownV2',
                 });
         });
+        bot.onText(/\/search/, async (msg) => {
+            if (msg.text.split(' ').length > 1)
+                return;
+            await bot.sendMessage(msg.chat.id, `Use \`/search query\` search for emotes containing the string 'query'`, {
+                parse_mode: 'MarkdownV2',
+            });
+        });
 
         bot.onText(/\/add (.+) (.+)/, async (msg, match) => {
             const chatId = msg.chat.id;
@@ -123,6 +130,13 @@ export default class TwimoteModule extends ApiModule {
                 await bot.sendMessage(chatId, `Failed to add ${emote} ${url}!`);
             }
         });
+        bot.onText(/\/add/, async (msg) => {
+            if (msg.text.split(' ').length > 2)
+                return;
+            await bot.sendMessage(msg.chat.id, `Use \`/add emoteName https://ffz.com/emote.png\` to add existing emotes`, {
+                parse_mode: 'MarkdownV2',
+            });
+        });
 
         bot.onText(/\/remove (.+)/, async (msg, match) => {
             const chatId = msg.chat.id;
@@ -136,6 +150,47 @@ export default class TwimoteModule extends ApiModule {
             }
             await emote.destroy();
             await bot.sendMessage(chatId, `${emoteName} has been removed`);
+        });
+        bot.onText(/\/remove/, async (msg) => {
+            if (msg.text !== '/remove')
+                return;
+            await bot.sendMessage(msg.chat.id, `Use \`/remove emoteName\` to remove existing emotes`, {
+                parse_mode: 'MarkdownV2',
+            });
+        });
+
+        bot.onText(/\/edit (.+) (.+)/, async (msg, match) => {
+            const chatId = msg.chat.id;
+            if (!tokens.canAddEmotes.includes(msg.from.id)) {
+                return bot.sendMessage(chatId, "(unauthorized) You can't edit emotes >:(");
+            }
+            const emoteName = match[1];
+            const url = match[2];
+            if (emoteName.includes(' ') || url.includes(' ')) {
+                return bot.sendMessage(
+                    chatId,
+                    "Edit command must be followed by emote name then emote url, example: `/add monkaS https://cdn.frankerfacez.com/emoticon/130762/4`",
+                    {parse_mode: 'MarkdownV2'},
+                );
+            }
+            let emote = await Emote.findOne({where: {name: emoteName}});
+            if (emote === null) {
+                return bot.sendMessage(chatId, `${emoteName} doesn't exist (edit command is case sensitive)`);
+            }
+            await emote.destroy();
+            bot.sendMessage(chatId, `Trying to add ${emoteName}...`);
+            if (await addEmote(emoteName, url)) {
+                await bot.sendMessage(chatId, `Added ${emoteName} ${url} ✅`);
+            } else {
+                await bot.sendMessage(chatId, `Failed to add ${emoteName} ${url}!`);
+            }
+        });
+        bot.onText(/\/edit/, async (msg) => {
+            if (msg.text.split(' ').length > 2)
+                return;
+            await bot.sendMessage(msg.chat.id, `Use \`/edit emoteName https://ffz.com/emote.png\` to edit existing emotes`, {
+                parse_mode: 'MarkdownV2',
+            });
         });
 
         bot.on('message', async (msg) => {
