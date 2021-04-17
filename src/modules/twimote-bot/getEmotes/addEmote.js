@@ -2,6 +2,7 @@ import {Emote} from "../../../database/models/EmoteModel.js";
 import probe from "probe-image-size";
 import fetch from "node-fetch";
 import gifyParse from "gify-parse";
+import {EmoteSticker} from "../../../database/models/EmoteStickerModel.js";
 
 export default async function addEmote(name, url) {
     let isIn = await Emote.findOne({where: {name}});
@@ -9,9 +10,9 @@ export default async function addEmote(name, url) {
         return false;
     }
     let data;
-    try{
+    try {
         data = await probe(url);
-    }catch(e){
+    } catch (e) {
         return false;
     }
     let animated = data.type.toLowerCase().includes('gif');
@@ -23,6 +24,10 @@ export default async function addEmote(name, url) {
         duration = gifInfo.duration;
         frames = gifInfo.images.length;
     }
+
+    let sticker = await EmoteSticker.findOne({where: {text: name}});
+    if (sticker !== null)
+        await sticker.destroy();
     await Emote.create({
         name,
         ratio: data.width / data.height,
