@@ -1,4 +1,8 @@
 {
   "telegram": "5128308123:JDFjDfSODf8d9JDfP8dfDFnm9SdbSD9f7d9",
-  "stickerDump": 0
+  "stickerDump": 0,
+  "canAddEmotes": [
+    12341234,
+    54123234
+  ]
 }

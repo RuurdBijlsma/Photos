@@ -360,7 +360,7 @@ function getTextSegment(text) {
 }
 
 async function getEmote(name, emote) {
-    let fileName = path.resolve(path.join('res', 'twimote', 'emotes', filenamify(name) + (emote.animated ? '.gif' : '.png')));
+    let fileName = path.resolve(path.join('res', 'twimote', 'emotes', filenamify(name.toLowerCase()) + (emote.animated ? '.gif' : '.png')));
     if (await checkFileExists(fileName))
         return fileName;
 

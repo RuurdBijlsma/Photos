@@ -73,6 +73,7 @@ class Controller {
         this.db = new Sequelize(dbName, dbUser, dbPass, {
             host: 'localhost',
             dialect: 'postgres',
+            logging: false,
         });
         await Database.setDb(this.db);
         this.setRoutes();

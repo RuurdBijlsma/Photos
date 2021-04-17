@@ -16,6 +16,7 @@ import addEmote from "./addEmote.js";
     const db = new Sequelize(dbName, dbUser, dbPass, {
         host: 'localhost',
         dialect: 'postgres',
+        logging: false,
     });
     await Database.setDb(db);
 

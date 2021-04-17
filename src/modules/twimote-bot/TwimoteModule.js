@@ -62,7 +62,9 @@ export default class TwimoteModule extends ApiModule {
                             text,
                             sticker: stickerId,
                         }).then(() => console.log('emote added to db'));
-                    } else stickerId = emote.sticker;
+                    } else {
+                        stickerId = emote.sticker;
+                    }
                     return {
                         type: 'photo',
                         id: randomID,
@@ -89,7 +91,7 @@ export default class TwimoteModule extends ApiModule {
                     };
                 }
             }));
-            await bot.answerInlineQuery(id, queryAnswers);
+            await bot.answerInlineQuery(id, queryAnswers, {cache_time: 10});
         });
 
         bot.onText(/\/search (.+)/, async (msg, match) => {
