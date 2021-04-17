@@ -329,7 +329,7 @@ async function getEmoteSegment(emoteName) {
     if (emote.animated) {
         const buffer = await fs.promises.readFile(emotePath);
         const gifInfo = gifyParse.getInfo(buffer);
-        segment.duration = gifInfo.duration;
+        segment.duration = gifInfo.duration || gifInfo.durationIE || gifInfo.durationSafari || gifInfo.durationFirefox || gifInfo.durationChrome || gifInfo.durationOpera;
         segment.frames = gifInfo.images.length;
     }
     return segment;

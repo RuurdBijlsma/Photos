@@ -13,15 +13,17 @@ async function test() {
     });
     await Database.setDb(db);
 
-    await text2media("R I OMEGALUL L U xD 😂");
-    await text2media("PepePls hello peepoClap xD");
+    let out1 = await text2media("R I OMEGALUL L U xD 😂");
+    let out2 = await text2media("sadgeCry");
+    console.log("Outputted riolu text to ", out1);
+    console.log('outputet sadegcry to ', out2);
 
-    let suggs = await getSuggestions("R I OMEG");
-    console.log(suggs);
-    let suggs2 = await getSuggestions("owow monka");
-    console.log(suggs2);
-    let res = await search("STE");
-    console.log(res);
+    // let suggs = await getSuggestions("R I OMEG");
+    // console.log(suggs);
+    // let suggs2 = await getSuggestions("owow monka");
+    // console.log(suggs2);
+    // let res = await search("STE");
+    // console.log(res);
 }
 
 test().then(() => console.log('test complete'));

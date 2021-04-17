@@ -238,7 +238,7 @@ export default class TwimoteModule extends ApiModule {
                         res.writeHead(206, head);
                         file.pipe(res);
                     } else {
-                        console.log("DID NO RANGE");
+                        console.log("DID NO RANGE, sending file", filePath);
                         const head = {
                             'Content-Length': fileSize,
                             'Content-Type': 'video/mp4',
