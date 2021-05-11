@@ -7,6 +7,15 @@ yarn-error.log*
 res/music
 ls
 
+res/photos/photos
+res/photos/thumbnails
+res/photos/classifier/model1/*
+!res/photos/classifier/model1/model_location
+res/photos/classifier/inceptionresnet/*
+!res/photos/classifier/inceptionresnet/model_location
+res/photos/geonames/*
+!res/photos/geonames/geocode_files_will_dump_here
+
 res/twimote/cache
 res/twimote/emotes
 !res/twimote/emotes/OMEGALUL.png

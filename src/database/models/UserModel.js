@@ -1,5 +1,4 @@
 import seq from "sequelize";
-import Sequelize from "sequelize";
 
 const {DataTypes, Model} = seq;
 export class User extends Model {
