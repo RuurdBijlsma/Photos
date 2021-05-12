@@ -73,6 +73,13 @@ export function initMediaItem(sequelize) {
         indexes: [
             {unique: false, fields: ['type']},
             {unique: false, fields: ['subType']},
+            {unique: false, fields: ['createDate']},
+            {unique: false, fields: ['bytes']},
+            {unique: false, fields: ['durationMs']},
+            {unique: false, fields: ['width']},
+            {unique: false, fields: ['height']},
+            {unique: true, fields: ['filename']},
+            {unique: true, fields: ['filePath']},
         ],
     });
 

@@ -15,6 +15,7 @@ const {Op} = seq;
 // add interval for sync files (set interval in config.json
 // If syncing during a processMedia, make sure it doesn't get double added (dont allow double processmedia on same file)
 // If some failure happens, retry after timeout, then post to telegram
+// Check if createDate exif data is correct timezone wise
 
 const bigPic = await useDir(path.join(config.thumbnails, 'bigPic'));
 const smallPic = await useDir(path.join(config.thumbnails, 'smallPic'));
