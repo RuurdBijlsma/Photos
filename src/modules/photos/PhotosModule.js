@@ -4,6 +4,7 @@ import Log from "../../Log.js";
 import {MediaItem} from "../../database/models/photos/MediaItemModel.js";
 import config from "../../../res/photos/config.json";
 import path from "path";
+import mime from 'mime-types'
 
 const console = new Log("PhotosModule");
 
@@ -31,6 +32,12 @@ export default class PhotosModule extends ApiModule {
             if (filePath === null)
                 return res.sendStatus(404);
             let file = path.resolve(path.join(basePath, filePath));
+            if (req.params.size === 'webm')
+                res.contentType('video/webm');
+            if (req.params.size === 'full' && item.type === 'video') {
+                let mimeType = mime.lookup(path.extname(item.filename));
+                res.contentType(mimeType);
+            }
             res.sendFile(file, {acceptRanges: true});
         });
     }
