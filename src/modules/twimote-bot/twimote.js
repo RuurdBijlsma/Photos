@@ -26,21 +26,21 @@ const horizontalPad = Math.round(emoteHeight / 5);
 
 export async function text2media(text) {
     let textFile = filenamify(text);
-    let fileName = path.resolve(path.join('res', 'twimote', 'cache', textFile)) + '.' + await getFileType(text);
+    let filename = path.resolve(path.join('res', 'twimote', 'cache', textFile)) + '.' + await getFileType(text);
 
-    if (await checkFileExists(fileName))
-        return fileName;
+    if (await checkFileExists(filename))
+        return filename;
 
-    // if (process.platform !== 'win32' && fileName.endsWith('mp4'))
+    // if (process.platform !== 'win32' && filename.endsWith('mp4'))
     //     return await text2media('YEP animated emotes not supported yet');
 
     let segments = await getSegments(text);
     if (segments.some(s => s.type === 'gif')) {
-        await segments2mp4(segments, fileName);
+        await segments2mp4(segments, filename);
     } else {
-        await segments2image(segments, fileName);
+        await segments2image(segments, filename);
     }
-    return fileName;
+    return filename;
 }
 
 export async function getFileType(text) {
@@ -94,7 +94,7 @@ function fit(contains) {
 
 const contain = fit(true);
 
-async function segments2image(segments, fileName) {
+async function segments2image(segments, filename) {
     let imageSegments = segments.filter(s => s.type === 'image');
 
     let totalWidth = segments.map(s => s.width).reduce((a, b) => a + b) + (segments.length - 1) * horizontalPad;
@@ -148,7 +148,7 @@ async function segments2image(segments, fileName) {
             }
             ffmpeg(stickerCanvas.createPNGStream())
                 .format('webp')
-                .saveToFile(fileName)
+                .saveToFile(filename)
                 .on('error', (err, stdout, stderr) => {
                     console.log("ffmpeg error", err, stdout, stderr);
                     reject(err);
@@ -160,7 +160,7 @@ async function segments2image(segments, fileName) {
 
         } else {
             const stream = canvas.createPNGStream();
-            const out = fs.createWriteStream(fileName);
+            const out = fs.createWriteStream(filename);
             stream.pipe(out)
             out.on('finish', () => {
                 resolve()
@@ -360,20 +360,20 @@ function getTextSegment(text) {
 }
 
 async function getEmote(name, emote) {
-    let fileName = path.resolve(path.join('res', 'twimote', 'emotes', filenamify(name.toLowerCase()) + (emote.animated ? '.gif' : '.png')));
-    if (await checkFileExists(fileName))
-        return fileName;
+    let filename = path.resolve(path.join('res', 'twimote', 'emotes', filenamify(name.toLowerCase()) + (emote.animated ? '.gif' : '.png')));
+    if (await checkFileExists(filename))
+        return filename;
 
     return new Promise((resolve, reject) => {
-        const file = fs.createWriteStream(fileName);
+        const file = fs.createWriteStream(filename);
         https.get(emote.url, response => {
             response.pipe(file);
             file.on('finish', () => {
                 file.close();
-                resolve(fileName);
+                resolve(filename);
             });
         }).on('error', err => { // Handle errors
-            fs.unlink(fileName, () => 0);
+            fs.unlink(filename, () => 0);
             reject(err.message);
         });
     });

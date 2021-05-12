@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "start": "node --experimental-json-modules src/index.js",
+    "testResize": "node --experimental-json-modules src/modules/photos/testResize.js",
     "twimote": "node --experimental-json-modules src/modules/twimote-bot/test-twimote.js",
     "processEmotes": "node --experimental-json-modules src/modules/twimote-bot/getEmotes/processEmotes.js",
     "fastProcessEmotes": "node --experimental-json-modules src/modules/twimote-bot/getEmotes/processEmotes.js fast",
@@ -29,6 +30,7 @@
     "filenamify": "^4.2.0",
     "fluent-ffmpeg": "^2.1.2",
     "gify-parse": "^1.0.7",
+    "gm": "^1.23.1",
     "gmail-send": "^1.8.10",
     "image-size": "^1.0.0",
     "local-reverse-geocoder": "^0.10.0",
@@ -39,6 +41,7 @@
     "node-wordnet": "^0.1.12",
     "parse-dms": "0.0.5",
     "pg": "^8.6.0",
+    "pg-promise": "^10.10.2",
     "plex-api": "^5.3.1",
     "probe-image-size": "^7.0.0",
     "sequelize": "^6.6.2",

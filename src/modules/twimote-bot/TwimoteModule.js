@@ -24,7 +24,7 @@ export default class TwimoteModule extends ApiModule {
         this.botSetup();
     }
 
-    botSetup() {
+    async botSetup() {
         const bot = new TelegramBot(tokens.telegram, {polling: true});
         console.log("Telegram bot is running")
 

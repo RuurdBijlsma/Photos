@@ -3,9 +3,9 @@ import crypto from "crypto";
 const console = new Log("Utils");
 
 export default class Utils {
-    static getToken() {
+    static getToken(nBytes=48) {
         return new Promise((resolve, reject) => {
-            crypto.randomBytes(48, (err, buffer) => {
+            crypto.randomBytes(nBytes, (err, buffer) => {
                 if (err) {
                     reject(err);
                     return;

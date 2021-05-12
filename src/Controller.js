@@ -5,19 +5,22 @@ import socketIo from "socket.io";
 import bodyParser from "body-parser";
 import cors from "cors";
 import fs from 'fs';
-import BerberModule from "./modules/berber-api/BerberModule.js";
 import Log from "./Log.js";
+import BerberModule from "./modules/berber-api/BerberModule.js";
 import StatusModule from "./modules/status/StatusModule.js";
 import MediaDownloadModule from "./modules/media-download/MediaDownloadModule.js";
 import ReverseProxyModule from "./modules/reverse-proxy/ReverseProxyModule.js";
 import SignalModule from 'multi-signal-server'
 import VM5Module from "./modules/vue-music-5/VM5Module.js";
+
 import AuthModule from './modules/auth/AuthModule.js';
+import TwimoteModule from "./modules/twimote-bot/TwimoteModule.js";
+import PhotosModule from "./modules/photos/PhotosModule.js";
+
 import seq from "sequelize";
 import cred from "../res/auth/credentials.json"
 import Database from "./database/Database.js";
-import TwimoteModule from "./modules/twimote-bot/TwimoteModule.js";
-import PhotosModule from "./modules/photos/PhotosModule.js";
+import {resizeImage} from "./modules/photos/transcode.js";
 
 const {Sequelize} = seq;
 const {dbUser, dbPass, dbName} = cred;
@@ -78,6 +81,7 @@ class Controller {
             logging: false,
         });
         await Database.setDb(this.db);
+
         this.setRoutes();
         server.listen(port, () =>
             console.log(`${credentials ? 'HTTPS' : 'HTTP'} server listening on port ${port}!`)

@@ -9,8 +9,7 @@ export function initMediaItem(sequelize) {
     MediaItem.init({
         // Model attributes are defined here
         id: {
-            type: DataTypes.INTEGER,
-            autoIncrement: true,
+            type: DataTypes.STRING,
             primaryKey: true,
         },
         type: {
@@ -21,10 +20,29 @@ export function initMediaItem(sequelize) {
             type: DataTypes.STRING,
             allowNull: false,
         },
-        fileName: {
+        filename: {
             type: DataTypes.STRING,
             allowNull: false,
             unique: true,
+        },
+        filePath: {
+            type: DataTypes.STRING,
+            allowNull: false,
+            unique: true,
+        },
+        smallThumbPath: {
+            type: DataTypes.STRING,
+            allowNull: false,
+            unique: true,
+        },
+        bigThumbPath: {
+            type: DataTypes.STRING,
+            allowNull: false,
+            unique: true,
+        },
+        webmPath: {
+            type: DataTypes.STRING,
+            allowNull: true,
         },
         width: {
             type: DataTypes.INTEGER,

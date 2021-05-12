@@ -1,16 +1,56 @@
 import ffmpeg from "./promise-ffmpeg.js";
-import sharp from "sharp";
 
-export async function resize({input, output, width = null, height = null}) {
-    console.log(2);
-    return await sharp(input)
-        .rotate()
-        .resize(width, height)
-        .webp({
-            quality: 85,
-            smartSubsample: true,
-        })
-        .toFile(output);
+//Exif orientation
+//1 = 0 degrees: the correct orientation, no adjustment is required.
+//2 = 0 degrees, mirrored: image has been flipped back-to-front.
+//3 = 180 degrees: image is upside down.
+//4 = 180 degrees, mirrored: image has been flipped back-to-front and is upside down.
+//5 = 90 degrees: image has been flipped back-to-front and is on its side.
+//6 = 90 degrees, mirrored: image is on its side.
+//7 = 270 degrees: image has been flipped back-to-front and is on its far side.
+//8 = 270 degrees, mirrored: image is on its far side.
+
+//FFMPEG orientation
+// 0 = 90CounterCLockwise and Vertical Flip (default)
+// 1 = 90Clockwise
+// 2 = 90CounterClockwise
+// 3 = 90Clockwise and Vertical Flip
+
+export async function resizeImage({input, orientation = 1, output, width = null, height = null}) {
+    return new Promise((resolve, reject) => {
+        let flip = orientation === 6;
+        let size = flip ?
+            width === null && height === null ? '100%' : `${width ?? '?'}x${height ?? '?'}` :
+            width === null && height === null ? '100%' : `${height ?? '?'}x${width ?? '?'}`;
+        let command = ffmpeg(input).size(size);
+        if (orientation === 2)
+            command.videoFilter([`hflip`]);
+        if (orientation === 3)
+            command.videoFilter([`vflip`, `hflip`]);
+        if (orientation === 4)
+            command.videoFilter([`vflip`]);
+        if (orientation === 5)
+            command.videoFilter([`transpose=${3}`]);
+        if (orientation === 6)
+            command.videoFilter([`transpose=${1}`]);
+        if (orientation === 7)
+            command.videoFilter([`transpose=${0}`]);
+        if (orientation === 8)
+            command.videoFilter([`transpose=${2}`]);
+        command.format('webp')
+            .outputOptions('-map_metadata 0')
+            // .on('start', line => {
+            //     console.log(line);
+            // })
+            .on('error', e => {
+                console.warn('ffmpeg photo resize error', e);
+                reject(e);
+            })
+            .on('end', () => {
+                resolve();
+            })
+            .saveToFile(output);
+    })
 }
 
 // resize({input: './photos/IMG_20200731_203422.jpg', output: 'test.webp', height: 500})

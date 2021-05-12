@@ -20,7 +20,7 @@ async function init() {
 let ready = init();
 
 export default async function geocode(point = {latitude: 48.45349, longitude: 9.09582}) {
-    return {place: 'Temp', country: 'Templand', admin: ['Temp-west', 'TempoTown']}; // to speed up testing
+    return {place: 'Temp', country: 'Templand', admin1: 'Tempo Town', admin2: 'Temp Region'}; // to speed up testing
 
     await ready;
 
@@ -34,12 +34,11 @@ export default async function geocode(point = {latitude: 48.45349, longitude: 9.
                 let geocodeData = {
                     place,
                     country: lookup.byIso(country).country,
-                    admin: [admin1Code, admin2Code, admin3Code, admin4Code]
+                    admin1: admin1Code,
+                    admin2: admin2Code,
+                    admin3: admin3Code,
+                    admin4: admin4Code,
                 };
-                geocodeData.admin = geocodeData.admin
-                    .filter(a => a)
-                    .map(a => a.name)
-                    .reverse();
                 resolve(geocodeData);
             });
     })

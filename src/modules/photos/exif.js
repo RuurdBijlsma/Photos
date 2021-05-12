@@ -20,14 +20,16 @@ export async function probeVideo(videoPath) {
     let audio = streams.find(s => s.codec_type === 'audio');
     let width = video.width;
     let height = video.height;
-    let duration = format.duration;
-    let createDate = new Date(format.tags.creation_time);
+    let duration = Math.round(1000 * format.duration);
+    let createDate = null;
+    if (format.tags.creation_time)
+        createDate = new Date(format.tags.creation_time);
     let gps = null;
     if (format.tags.location !== undefined) {
-        let [[lat], [lon]] = format.tags.location.matchAll(/[+-]\d+\.\d+/g)
-        lat = +lat;
-        lon = +lon;
-        gps = {lat, lon, altitude: null};
+        let [[latitude], [longitude]] = format.tags.location.matchAll(/[+-]\d+\.\d+/g)
+        latitude = +latitude;
+        longitude = +longitude;
+        gps = {latitude, longitude, altitude: null};
         let geocodeData = await geocode({
             latitude: gps.lat,
             longitude: gps.lon
@@ -50,16 +52,19 @@ export async function probeVideo(videoPath) {
     delete exifData.filename;
     delete exifData.tags;
 
-    let slowmotion = false;
+    let slowMotion = false;
     if (exifData.video.avg_frame_rate &&
         exifData.video.avg_frame_rate.includes('/') &&
         exifData.hasOwnProperty('com.android.capture.fps')) {
         let captureFps = +exifData['com.android.capture.fps'];
         let [fps1, fps2] = exifData.video.avg_frame_rate.split('/').map(n => +n);
-        slowmotion = captureFps > (fps1 / fps2);
+        slowMotion = captureFps > (fps1 / fps2);
     }
-    let subType = slowmotion ? 'slomo' : 'none';
-    return {type: 'video', subType, width, height, duration, size, createDate, gps, exif: exifData};
+    let subType = slowMotion ? 'slomo' : 'none';
+    return {
+        type: 'video', subType, width, height,
+        duration, size, createDate, gps, exif: exifData
+    };
 }
 
 // probeVideo('./photos/home.mp4');
@@ -77,7 +82,8 @@ export async function getExif(image) {
                 let latString = `${lad[0]}°${lad.slice(1).join(`'`)}"${data.gps.GPSLatitudeRef}`;
                 let lod = data.gps.GPSLongitude;
                 let lonString = `${lod[0]}°${lod.slice(1).join(`'`)}"${data.gps.GPSLongitudeRef}`;
-                gps = parseDMS(`${latString} ${lonString}`);
+                let {lat, lon} = parseDMS(`${latString} ${lonString}`);
+                gps = {latitude: lat, longitude: lon};
                 gps.altitude = data.gps.GPSAltitude;
                 let geocodeData = await geocode({
                     latitude: gps.lat,
@@ -115,18 +121,17 @@ export async function getExif(image) {
                 exifData.FlashpixVersion = decoder.write(exifData.FlashpixVersion);
             if (exifData.ComponentsConfiguration)
                 exifData.ComponentsConfiguration = Array.from(exifData.ComponentsConfiguration);
-            if (exifData.UserComment)
-                exifData.UserComment = decoder.write(exifData.UserComment);
-            if (exifData.MakerNote)
-                exifData.MakerNote = decoder.write(exifData.MakerNote);
 
-            let fileName = path.basename(image);
+            let filename = path.basename(image);
             let subType = 'none';
-            if (fileName.includes("PORTRAIT" && fileName.includes("COVER")))
+            if (filename.includes("PORTRAIT" && filename.includes("COVER")))
                 subType = 'Portrait';
-            else if (fileName.startsWith('PANO'))
+            else if (filename.startsWith('PANO'))
                 subType = 'VR';
-            resolve({type: 'image', subType, width, height, size, createDate, gps, exif: exifData});
+            resolve({
+                type: 'image', subType, width, height, duration: null,
+                size, createDate, gps, exif: exifData
+            });
         });
     });
 }

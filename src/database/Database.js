@@ -3,7 +3,7 @@ import {initUser} from "./models/UserModel.js";
 import {initSudoku} from "./models/SudokuModel.js";
 import {initEmoteSticker} from "./models/EmoteStickerModel.js";
 import {initEmote} from "./models/EmoteModel.js";
-import {initMedia, insertTestMediaItem} from "./models/photos/initMedia.js";
+import {initMedia, insertTestMediaItem, removeTestMediaItem} from "./models/photos/mediaUtils.js";
 
 const console = new Log("Database");
 
@@ -38,6 +38,7 @@ class Database {
             await this.db.sync();
 
             // await insertTestMediaItem();
+            // await removeTestMediaItem();
         } catch (e) {
             console.warn("Postgres connection failed", e);
         }
