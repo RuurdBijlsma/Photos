@@ -1,0 +1,7 @@
+{
+  "media": "./res/photos/photos",
+  "thumbnails": "./res/photos/thumbnails",
+  "syncInterval": 3600000,
+  "telegramToken": "89a9asd89fa9708sdf9asd7f9as7df98sf",
+  "chatId": 626213452
+}

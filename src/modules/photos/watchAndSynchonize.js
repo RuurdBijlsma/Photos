@@ -9,28 +9,31 @@ import {MediaItem} from "../../database/models/photos/MediaItemModel.js";
 import {insertMediaItem} from "../../database/models/photos/mediaUtils.js";
 import seq from "sequelize";
 
+import TelegramBot from "node-telegram-bot-api";
+
 const {Op} = seq;
 
 // Todo
-// add interval for sync files (set interval in config.json
-// If syncing during a processMedia, make sure it doesn't get double added (dont allow double processmedia on same file)
-// If some failure happens, retry after timeout, then post to telegram
-// Check if createDate exif data is correct timezone wise
+// clean up $(filename) from every thumbnail dir when that file doesn't exist anymore
+// maybe check periodically / after error if a file was only half added (mediaitem yes but location/classification no)
 
+
+
+const bot = new TelegramBot(config.telegramToken, {polling: false});
 const bigPic = await useDir(path.join(config.thumbnails, 'bigPic'));
 const smallPic = await useDir(path.join(config.thumbnails, 'smallPic'));
 const streamVid = await useDir(path.join(config.thumbnails, 'streamVid'));
 const vidPoster = await useDir(path.join(config.thumbnails, 'vidPoster'));
 const smallVidPoster = await useDir(path.join(config.thumbnails, 'smallVidPoster'));
 const temp = await useDir(path.join(config.thumbnails, 'temp'));
+const processJobs = new Set();
 
-//test:
-// await processMedia('./photos/IMG_20210510_230607.jpg');
-
-// await processMedia('./photos/VID_20210510_224246.mp4');
 
 export async function watchAndSynchronize() {
-    await syncFiles();
+    await singleInstance(syncFiles);
+    setInterval(async () => {
+        await singleInstance(syncFiles);
+    }, config.syncInterval);
 
     console.log("Watching", config.media);
     fs.watch(config.media, async (eventType, filename) => {
@@ -40,16 +43,20 @@ export async function watchAndSynchronize() {
                 await waitSleep(600);
                 let files = await getFilesRecursive(changedFile);
                 for (let file of files)
-                    await processMedia(file);
+                    await singleInstance(processMedia, file);
             } else {
-                let success = await removeMedia(changedFile);
-                console.log("Remove file processed", filename, "success?", success);
+                let files = await getFilesRecursive(changedFile);
+                for (let file of files) {
+                    let success = await singleInstance(removeMedia, file);
+                    console.log("Remove file processed", file, "success?", success);
+                }
             }
         }
     });
 }
 
 async function syncFiles() {
+    console.log("Syncing...");
     // Sync files
     let files = await getFilesRecursive(config.media);
     await Promise.all(files.map(processIfNeeded));
@@ -71,9 +78,8 @@ async function syncFiles() {
 
 async function processIfNeeded(filePath) {
     let processed = await isProcessed(filePath);
-    if (!processed) {
-        await processMedia(filePath);
-    }
+    if (!processed)
+        await singleInstance(processMedia, filePath);
 }
 
 async function isProcessed(filePath) {
@@ -103,75 +109,101 @@ async function isProcessed(filePath) {
     return true;
 }
 
-async function processMedia(filePath) {
+async function singleInstance(fun, param) {
+    let id = JSON.stringify({fun: fun.toString(), param});
+    if (processJobs.hasOwnProperty(id)) {
+        console.log("this function is already running with these args!", fun, {param});
+        return processJobs[id];
+    }
+    processJobs[id] = fun(param);
+    let result = await processJobs[id];
+    delete processJobs[id];
+    return result;
+}
+
+async function processMedia(filePath, triesLeft = 3) {
     console.log("Processing media", filePath);
-    let type = getFileType(filePath);
+    try {
+        let type = getFileType(filePath);
+        let filename = path.basename(filePath);
 
-    let filename = path.basename(filePath);
-    let alreadyInDb = await MediaItem.findOne({where: {filename}});
-    if (alreadyInDb)
-        await alreadyInDb.destroy();
+        let alreadyInDb = await MediaItem.findOne({where: {filename}});
+        if (alreadyInDb)
+            await alreadyInDb.destroy();
 
-    let dbData, thumbSmallRel, thumbBigRel, webmRel;
-    if (type === 'image') {
-        let labels = await classify(filePath);
-        let metadata = await getExif(filePath);
-        let height = Math.min(metadata.height, 1440);
-        let smallHeight = Math.min(metadata.height, 500);
-        let {big, small} = getPaths(filePath);
-        thumbSmallRel = path.relative(config.thumbnails, small);
-        thumbBigRel = path.relative(config.thumbnails, big);
-        webmRel = null;
-        await resizeImage({input: filePath, output: big, height,});
-        await resizeImage({input: filePath, output: small, height: smallHeight,});
-        dbData = {
-            filename,
-            labels,
-            ...metadata,
+        let dbData, thumbSmallRel, thumbBigRel, webmRel;
+        if (type === 'image') {
+            let labels = await classify(filePath);
+            let metadata = await getExif(filePath);
+            let height = Math.min(metadata.height, 1440);
+            let smallHeight = Math.min(metadata.height, 500);
+            let {big, small} = getPaths(filePath);
+            thumbSmallRel = path.relative(config.thumbnails, small);
+            thumbBigRel = path.relative(config.thumbnails, big);
+            webmRel = null;
+            await resizeImage({input: filePath, output: big, height,});
+            await resizeImage({input: filePath, output: small, height: smallHeight,});
+            dbData = {
+                filename,
+                labels,
+                ...metadata,
+            }
+        } else if (type === 'video') {
+            let metadata = await probeVideo(filePath);
+            let height = Math.min(metadata.height, 1080);
+            let smallHeight = Math.min(metadata.height, 500);
+            let {webm, poster, smallPoster, classifyPoster} = getPaths(filePath);
+            thumbSmallRel = path.relative(config.thumbnails, smallPoster);
+            thumbBigRel = path.relative(config.thumbnails, poster);
+            webmRel = path.relative(config.thumbnails, webm);
+            await transcode({input: filePath, output: webm, height});
+            await videoScreenshot({input: webm, output: classifyPoster, height});
+            await resizeImage({input: classifyPoster, output: poster, height: height,});
+            await resizeImage({input: classifyPoster, output: smallPoster, height: smallHeight,});
+            let labels = await classify(classifyPoster);
+            dbData = {
+                filename,
+                labels,
+                ...metadata,
+            }
         }
-    } else if (type === 'video') {
-        let metadata = await probeVideo(filePath);
-        let height = Math.min(metadata.height, 1080);
-        let smallHeight = Math.min(metadata.height, 500);
-        let {webm, poster, smallPoster, classifyPoster} = getPaths(filePath);
-        thumbSmallRel = path.relative(config.thumbnails, smallPoster);
-        thumbBigRel = path.relative(config.thumbnails, poster);
-        webmRel = path.relative(config.thumbnails, webm);
-        await transcode({input: filePath, output: webm, height});
-        await videoScreenshot({input: webm, output: classifyPoster, height});
-        await resizeImage({input: classifyPoster, output: poster, height: height,});
-        await resizeImage({input: classifyPoster, output: smallPoster, height: smallHeight,});
-        let labels = await classify(classifyPoster);
-        dbData = {
+        let fullRel = path.relative(config.media, filePath);
+        await insertMediaItem({
+            type: dbData.type,
+            subType: dbData.subType,
             filename,
-            labels,
-            ...metadata,
+            filePath: fullRel,
+            smallThumbPath: thumbSmallRel,
+            bigThumbPath: thumbBigRel,
+            webmPath: webmRel,
+            width: dbData.width,
+            height: dbData.height,
+            durationMs: dbData.duration,
+            bytes: dbData.size,
+            createDate: dbData.createDate,
+            exif: dbData.exif,
+            classifications: dbData.labels,
+            location: dbData.gps,
+        })
+    } catch (e) {
+        if (triesLeft === 0) {
+            await bot.sendMessage(config.chatId, `[Photos] Failed to process media, file path: "${filePath}"`);
+            await bot.sendMessage(config.chatId, JSON.stringify(e));
+            return false;
+        } else {
+            const waitTime = (4 - triesLeft) ** 2 * 5000;
+            console.warn("Process media failed for", filePath, `RETRYING AFTER ${waitTime}ms...`);
+            console.warn(e);
+            await waitSleep(waitTime);
+            return processMedia(filePath, triesLeft - 1);
         }
     }
-    let fullRel = path.relative(config.media, filePath);
-    await insertMediaItem({
-        type: dbData.type,
-        subType: dbData.subType,
-        filename,
-        filePath: fullRel,
-        smallThumbPath: thumbSmallRel,
-        bigThumbPath: thumbBigRel,
-        webmPath: webmRel,
-        width: dbData.width,
-        height: dbData.height,
-        durationMs: dbData.duration,
-        bytes: dbData.size,
-        createDate: dbData.createDate,
-        exif: dbData.exif,
-        classifications: dbData.labels,
-        location: dbData.gps,
-    })
     return true;
 }
 
-async function removeMedia(filePath) {
-    let type = getFileType(filePath);
+async function removeMedia(filePath, triesLeft = 3) {
     try {
+        let type = getFileType(filePath);
         let filename = path.basename(filePath);
         let item = await MediaItem.findOne({where: {filename}});
         await item.destroy();
@@ -190,8 +222,17 @@ async function removeMedia(filePath) {
         }
         return true;
     } catch (e) {
-        console.warn("Remove error", e);
-        return false;
+        if (triesLeft === 0) {
+            await bot.sendMessage(config.chatId, `[Photos] Failed to remove media, file path: "${filePath}"`);
+            await bot.sendMessage(config.chatId, JSON.stringify(e));
+            return false;
+        } else {
+            const waitTime = (4 - triesLeft) ** 2 * 5000;
+            console.warn("Remove media failed for", filePath, `RETRYING AFTER ${waitTime}ms...`);
+            console.warn(e);
+            await waitSleep(waitTime);
+            return removeMedia(filePath, triesLeft - 1);
+        }
     }
 }
 

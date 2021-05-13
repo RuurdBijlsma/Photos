@@ -5,6 +5,9 @@ import {initMediaLabel, MediaLabel} from "./MediaLabelModel.js";
 import {initMediaGlossary, MediaGlossary} from "./MediaGlossaryModel.js";
 import Utils from "../../../Utils.js";
 import path from "path";
+import sequelize from 'sequelize';
+
+const {Op} = sequelize;
 
 export async function initMedia(db) {
     initMediaLabel(db);
@@ -24,6 +27,29 @@ export async function initMedia(db) {
 
     MediaClassification.hasMany(MediaGlossary, {onDelete: 'CASCADE'});
     MediaGlossary.belongsTo(MediaClassification);
+}
+
+export async function searchMedia({
+                                      query,
+                                      limit = false,
+                                      include = false,
+                                      attributes = false,
+                                  }) {
+    let options = {
+        where: {
+            vector: {[Op.match]: sequelize.fn('to_tsquery', query)}
+        },
+    }
+    if (attributes)
+        options.attributes = attributes;
+    if (limit)
+        options.limit = limit;
+    if (include)
+        options.include = [
+            {model: MediaClassification, include: [MediaLabel, MediaGlossary]},
+            {model: MediaLocation}
+        ]
+    return await MediaItem.findAll(options);
 }
 
 export async function getMediaByFilename(filename) {
@@ -61,7 +87,38 @@ export async function insertMediaItem(data) {
         id = await Utils.getToken(16);
     } while (await MediaItem.findOne({where: {id}}));
 
-    let item = await MediaItem.create({id, ...data});
+    const toVector = (weight, ...items) =>
+        sequelize.fn('setweight',
+            sequelize.fn('to_tsvector', 'english',
+                items.filter(n => n !== null && n !== undefined).join(' ')
+            ),
+            weight
+        );
+    let [classA, classB, classC] = data.classifications.sort((a, b) => b.confidence - a.confidence);
+    let item = await MediaItem.create({
+        id,
+        vectorA: toVector('A',
+            ...classA.labels,
+            data.location?.place,
+            data.location?.country,
+        ),
+        vectorB: toVector('B',
+            data.filename, ...classB.labels,
+            data.location?.admin1,
+            data.location?.admin2,
+            data.location?.admin3,
+            data.location?.admin4,
+        ),
+        vectorC: toVector('C',
+            ...classC.labels, ...classB.glossaries, ...classA.glossaries, classC.glossaries
+        ),
+        ...data
+    });
+    await MediaItem.sequelize.query(
+        `update "MediaItems"
+         set vector = setweight("vectorA", 'A') || setweight("vectorB", 'B') || setweight("vectorC", 'C')
+         where id = '${id}'`
+    );
     if (data.location)
         await MediaLocation.create({
             ...data.location,

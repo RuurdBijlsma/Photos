@@ -7,6 +7,8 @@ yarn-error.log*
 res/music
 ls
 
+res/photos/config.json
+res/photos/cert.pem
 res/photos/photos
 res/photos/thumbnails
 res/photos/classifier/model1/*

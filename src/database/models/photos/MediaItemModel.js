@@ -68,6 +68,22 @@ export function initMediaItem(sequelize) {
             type: DataTypes.JSONB,
             allowNull: false,
         },
+        vectorA: {
+            type: DataTypes.TSVECTOR,
+            allowNull: false,
+        },
+        vectorB: {
+            type: DataTypes.TSVECTOR,
+            allowNull: false,
+        },
+        vectorC: {
+            type: DataTypes.TSVECTOR,
+            allowNull: false,
+        },
+        vector: {
+            type: DataTypes.TSVECTOR,
+            allowNull: true,
+        },
     }, {
         sequelize,
         indexes: [
@@ -80,6 +96,26 @@ export function initMediaItem(sequelize) {
             {unique: false, fields: ['height']},
             {unique: true, fields: ['filename']},
             {unique: true, fields: ['filePath']},
+            {
+                fields: ['vectorA'],
+                using: 'gin',
+                operator: 'tsvector_ops',
+            },
+            {
+                fields: ['vectorB'],
+                using: 'gin',
+                operator: 'tsvector_ops',
+            },
+            {
+                fields: ['vectorC'],
+                using: 'gin',
+                operator: 'tsvector_ops',
+            },
+            {
+                fields: ['vector'],
+                using: 'gin',
+                operator: 'tsvector_ops',
+            },
         ],
     });
 

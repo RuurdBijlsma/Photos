@@ -18,9 +18,9 @@ export function initMediaGlossary(sequelize) {
             allowNull: false,
         },
     }, {
-        timestamps:false,
-        createdAt:false,
-        updatedAt:false,
+        timestamps: false,
+        createdAt: false,
+        updatedAt: false,
         sequelize,
         indexes: [
             {unique: false, fields: ['text']},
