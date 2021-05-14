@@ -5,7 +5,7 @@ import {MediaItem} from "../../database/models/photos/MediaItemModel.js";
 import config from "../../../res/photos/config.template.json";
 import path from "path";
 import mime from 'mime-types'
-import {searchMedia, searchMediaRanked} from "../../database/models/photos/mediaUtils.js";
+import {searchMediaRanked} from "../../database/models/photos/mediaUtils.js";
 
 const console = new Log("PhotosModule");
 

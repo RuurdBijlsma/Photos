@@ -16,6 +16,7 @@ const {Op} = seq;
 // Todo
 // rename all thumbnails to ${id}.webp ${id}.webm etc...,then static serve the files instead of requiring a database query
 // Fix memory usage (maybe just reduce batch size, maybe try fix something with tensorflow)
+// Prepare for huge number of files in media dir (try to have support for ~100k items)
 
 
 const bot = new TelegramBot(config.telegramToken, {polling: false});
