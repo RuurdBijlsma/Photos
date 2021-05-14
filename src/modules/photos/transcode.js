@@ -11,7 +11,7 @@ import ffmpeg from "./promise-ffmpeg.js";
 //8 = 270 degrees, mirrored: image is on its far side.
 
 //FFMPEG orientation
-// 0 = 90CounterCLockwise and Vertical Flip (default)
+// 0 = 90CounterClockwise and Vertical Flip (default)
 // 1 = 90Clockwise
 // 2 = 90CounterClockwise
 // 3 = 90Clockwise and Vertical Flip
@@ -20,8 +20,8 @@ export async function resizeImage({input, orientation = 1, output, width = null,
     return new Promise((resolve, reject) => {
         let flip = orientation === 6;
         let size = flip ?
-            width === null && height === null ? '100%' : `${width ?? '?'}x${height ?? '?'}` :
-            width === null && height === null ? '100%' : `${height ?? '?'}x${width ?? '?'}`;
+            width === null && height === null ? '100%' : `${height ?? '?'}x${width ?? '?'}` :
+            width === null && height === null ? '100%' : `${width ?? '?'}x${height ?? '?'}`;
         let command = ffmpeg(input).size(size);
         if (orientation === 2)
             command.videoFilter([`hflip`]);
@@ -94,7 +94,7 @@ export async function transcode({input, output, height = null, width = null, bit
                 reject(e);
             })
             .on('end', () => {
-                console.log("Ffmpeg done");
+                console.log("Ffmpeg video transcode done");
                 resolve();
             })
             .saveToFile(output);

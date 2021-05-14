@@ -9,7 +9,6 @@ let file = path.resolve('./res/photos/photos/IMG_20210512_033016.jpg');
 
 
 let {exif} = await getExif(file);
-console.log("orientation", exif.Orientation);
 console.log(file);
 await resizeImage({
     input: file,

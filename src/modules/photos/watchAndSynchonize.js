@@ -14,9 +14,8 @@ import TelegramBot from "node-telegram-bot-api";
 const {Op} = seq;
 
 // Todo
-// clean up $(filename) from every thumbnail dir when that file doesn't exist anymore
-// maybe check periodically / after error if a file was only half added (mediaitem yes but location/classification no)
-
+// rename all thumbnails to ${id}.webp ${id}.webm etc...,then static serve the files instead of requiring a database query
+// Fix memory usage (maybe just reduce batch size, maybe try fix something with tensorflow)
 
 
 const bot = new TelegramBot(config.telegramToken, {polling: false});
@@ -45,11 +44,12 @@ export async function watchAndSynchronize() {
                 for (let file of files)
                     await singleInstance(processMedia, file);
             } else {
-                let files = await getFilesRecursive(changedFile);
-                for (let file of files) {
-                    let success = await singleInstance(removeMedia, file);
-                    console.log("Remove file processed", file, "success?", success);
-                }
+                let ext = path.extname(changedFile)
+                if (ext === '.jpeg' || ext === '.jpg' || ext === '.mp4')
+                    await singleInstance(removeMedia, changedFile);
+                else
+                    // Deleted item might be a folder, sync to make sure the files get removed
+                    await singleInstance(syncFiles);
             }
         }
     });
@@ -57,15 +57,20 @@ export async function watchAndSynchronize() {
 
 async function syncFiles() {
     console.log("Syncing...");
-    // Sync files
+    // Sync files: add thumbnails and database entries for files in media directory
     let files = await getFilesRecursive(config.media);
-    await Promise.all(files.map(processIfNeeded));
+    let batchSize = 50;
+    for (let i = 0; i < files.length; i += batchSize) {
+        let slice = files.slice(i, i + batchSize);
+        await Promise.all(slice.map(processIfNeeded));
+        console.log(`Processed [${i + batchSize} / ${files.length}] photos in sync job`);
+    }
 
+    // Find and remove all database entries that don't have an associated file
     files = await getFilesRecursive(config.media);
     let count = await MediaItem.count();
     if (files.length !== count) {
         let names = files.map(f => path.basename(f));
-        // Find and remove all database entries that don't have an associated file
         let mismatch = await MediaItem.findAll({
             where: {filename: {[Op.notIn]: names,}}
         });
@@ -73,6 +78,26 @@ async function syncFiles() {
             console.log(`Deleting ${item.filename} from DB`)
             await item.destroy();
         }
+    }
+
+    const cleanThumbDir = async dir => {
+        let dirFiles = await fs.promises.readdir(dir);
+        await Promise.all(dirFiles.map(f => deleteThumbIfAllowed(
+            path.join(dir, f),
+            files.map(f => path.basename(f))
+        )));
+    }
+    // Delete all thumbnail files when the original file doesn't exist anymore
+    await Promise.all([bigPic, smallPic, smallVidPoster, streamVid, vidPoster, temp].map(cleanThumbDir));
+}
+
+// Delete is allowed when the original photo isn't in the database anymore
+async function deleteThumbIfAllowed(thumbPath, files) {
+    let thumbFile = path.basename(thumbPath);
+    let filename = thumbFile.substr(0, thumbFile.length - path.extname(thumbFile).length);
+    if (!files.includes(filename)) {
+        await fs.promises.unlink(thumbPath);
+        console.log("Deleted", thumbPath, "original file", filename, "isn't available anymore")
     }
 }
 
@@ -84,13 +109,14 @@ async function processIfNeeded(filePath) {
 
 async function isProcessed(filePath) {
     let filename = path.basename(filePath);
+    let type = getFileType(filePath);
+    if (type === false) return true;
+
     let item = await MediaItem.findOne({where: {filename}});
     if (!item)
         return false;
 
-    let type = getFileType(filePath);
     let files = [];
-
     if (type === 'image') {
         let {big, small} = getPaths(filePath);
         files.push(big, small);
@@ -122,9 +148,10 @@ async function singleInstance(fun, param) {
 }
 
 async function processMedia(filePath, triesLeft = 3) {
-    console.log("Processing media", filePath);
+    // console.log("Processing media", filePath);
     try {
         let type = getFileType(filePath);
+        if (type === false) return;
         let filename = path.basename(filePath);
 
         let alreadyInDb = await MediaItem.findOne({where: {filename}});
@@ -141,8 +168,9 @@ async function processMedia(filePath, triesLeft = 3) {
             thumbSmallRel = path.relative(config.thumbnails, small);
             thumbBigRel = path.relative(config.thumbnails, big);
             webmRel = null;
-            await resizeImage({input: filePath, output: big, height,});
-            await resizeImage({input: filePath, output: small, height: smallHeight,});
+            let orientation = metadata.exif.Orientation ?? 1;
+            await resizeImage({input: filePath, orientation, output: big, height,});
+            await resizeImage({input: filePath, orientation, output: small, height: smallHeight,});
             dbData = {
                 filename,
                 labels,
@@ -161,6 +189,7 @@ async function processMedia(filePath, triesLeft = 3) {
             await resizeImage({input: classifyPoster, output: poster, height: height,});
             await resizeImage({input: classifyPoster, output: smallPoster, height: smallHeight,});
             let labels = await classify(classifyPoster);
+            await fs.promises.unlink(classifyPoster);
             dbData = {
                 filename,
                 labels,
@@ -204,9 +233,10 @@ async function processMedia(filePath, triesLeft = 3) {
 async function removeMedia(filePath, triesLeft = 3) {
     try {
         let type = getFileType(filePath);
+        if (type === false) return;
         let filename = path.basename(filePath);
         let item = await MediaItem.findOne({where: {filename}});
-        await item.destroy();
+        await item?.destroy?.();
 
         if (type === 'image') {
             let {big, small} = getPaths(filePath);
@@ -251,7 +281,7 @@ async function getFilesRecursive(filePath) {
 function getFileType(filePath) {
     let fileExt = path.extname(filePath);
     let mimeType = mime.lookup(fileExt);
-    return mimeType.split('/')[0];
+    return mimeType === false ? mimeType : mimeType.split('/')[0];
 }
 
 function getPaths(filePath) {

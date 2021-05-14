@@ -25,7 +25,13 @@ export default async function classify(imagePath, nLabels = 3) {
     await ready;
 
     let imageBuffer = await fs.promises.readFile(imagePath);
-    let image = tf.node.decodeImage(imageBuffer);
+    let image;
+    try {
+        image = tf.node.decodeImage(imageBuffer);
+    } catch (e) {
+        console.warn("Can't decode image: ", imagePath);
+        throw new Error(e);
+    }
     const targetSize = [299, 299];
     let resizedImage = tf.image.resizeBilinear(image, targetSize);
     let reshapedImage = tf.reshape(resizedImage, [-1, ...targetSize, 3]);

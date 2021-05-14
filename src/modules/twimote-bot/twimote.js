@@ -65,7 +65,6 @@ function getImageHeight(width) {
             height = Math.ceil(width / photoMaxAspectRatio);
         else if (aspectRatio < minAspectRatio)
             height = Math.floor(width / minAspectRatio);
-        console.log("PNG height", height);
     }
     return height;
 }
@@ -189,8 +188,6 @@ async function segments2mp4(segments, outputPath) {
     let height = getGifHeight(totalWidth);
     const yOffset = Math.round((height - emoteHeight) / 2);
 
-    console.log('max duration', maxDuration);
-
     let command = ffmpeg();
     let inputSegments = segments.filter(s => s.type !== 'text');
     for (let segment of inputSegments)
@@ -258,7 +255,7 @@ async function segments2mp4(segments, outputPath) {
         command = command.complexFilter(filters, ['out'])
             .outputFormat('mp4')
             .on('start', commandLine => {
-                console.log("Spawned ffmepg with command", commandLine)
+                // console.log("Spawned ffmepg with command", commandLine)
             })
             .on('stderr', line => console.log('output', line))
             .on('progress', progress => console.log("Progress", progress))
@@ -267,10 +264,9 @@ async function segments2mp4(segments, outputPath) {
                 reject(err);
             })
             .on('end', () => {
-                console.log("ffmpeg end");
+                console.log("ffmpeg gif end");
                 resolve({type: 'gif'});
             });
-        console.log(segments);
         command.saveToFile(outputPath);
     });
 }

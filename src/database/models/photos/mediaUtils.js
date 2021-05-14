@@ -29,6 +29,26 @@ export async function initMedia(db) {
     MediaGlossary.belongsTo(MediaClassification);
 }
 
+export async function searchMediaRanked({query, limit = false, includedFields}) {
+    const sequelizeInstance = MediaItem.sequelize;
+    let bind = [query];
+    if (limit)
+        bind.push(limit);
+    return await sequelizeInstance.query(
+        `select ${includedFields.join(', ')}, ts_rank_cd(vector, query) as rank
+             from "MediaItems", to_tsquery('english', $1) query
+             where query @@ vector
+             order by rank desc
+             ${limit ? `limit = $2` : ''}`,
+        {
+            model: MediaItem,
+            mapToModel: true,
+            bind,
+            type: sequelize.QueryTypes.SELECT,
+        }
+    );
+}
+
 export async function searchMedia({
                                       query,
                                       limit = false,
@@ -37,7 +57,7 @@ export async function searchMedia({
                                   }) {
     let options = {
         where: {
-            vector: {[Op.match]: sequelize.fn('to_tsquery', query)}
+            vector: {[Op.match]: sequelize.fn('to_tsquery','english', query)}
         },
     }
     if (attributes)
@@ -82,6 +102,7 @@ export async function getMediaById(id) {
  * @returns {Promise<void>}
  */
 export async function insertMediaItem(data) {
+    const seqInstance = MediaItem.sequelize;
     let id;
     do {
         id = await Utils.getToken(16);
@@ -95,52 +116,63 @@ export async function insertMediaItem(data) {
             weight
         );
     let [classA, classB, classC] = data.classifications.sort((a, b) => b.confidence - a.confidence);
-    let item = await MediaItem.create({
-        id,
-        vectorA: toVector('A',
-            ...classA.labels,
-            data.location?.place,
-            data.location?.country,
-        ),
-        vectorB: toVector('B',
-            data.filename, ...classB.labels,
-            data.location?.admin1,
-            data.location?.admin2,
-            data.location?.admin3,
-            data.location?.admin4,
-        ),
-        vectorC: toVector('C',
-            ...classC.labels, ...classB.glossaries, ...classA.glossaries, classC.glossaries
-        ),
-        ...data
-    });
-    await MediaItem.sequelize.query(
-        `update "MediaItems"
-         set vector = setweight("vectorA", 'A') || setweight("vectorB", 'B') || setweight("vectorC", 'C')
-         where id = '${id}'`
-    );
-    if (data.location)
-        await MediaLocation.create({
-            ...data.location,
-            MediaItemId: item.id,
+
+    try {
+        await seqInstance.transaction({}, async transaction => {
+            let item = await MediaItem.create({
+                id,
+                vectorA: toVector('A',
+                    ...classA.labels,
+                    data.location?.place,
+                    data.location?.country,
+                ),
+                vectorB: toVector('B',
+                    data.filename, ...classB.labels,
+                    data.location?.admin1,
+                    data.location?.admin2,
+                    data.location?.admin3,
+                    data.location?.admin4,
+                ),
+                vectorC: toVector('C',
+                    ...classC.labels, ...classB.glossaries, ...classA.glossaries, classC.glossaries
+                ),
+                ...data,
+            }, {transaction});
+            await seqInstance.query(
+                `update "MediaItems"
+                     set vector = setweight("vectorA", 'A') || setweight("vectorB", 'B') || setweight("vectorC", 'C')
+                     where id = '${id}'`
+                , {transaction});
+            if (data.location)
+                await MediaLocation.create({
+                    ...data.location,
+                    MediaItemId: item.id,
+                }, {transaction});
+            if (data.classifications)
+                for (let {confidence, labels, glossaries} of data.classifications) {
+                    let classification = await MediaClassification.create({
+                        confidence,
+                        MediaItemId: item.id,
+                    }, {transaction});
+                    for (let text of labels)
+                        await MediaLabel.create({
+                            text,
+                            MediaClassificationId: classification.id
+                        }, {transaction});
+                    for (let text of glossaries)
+                        await MediaGlossary.create({
+                            text,
+                            MediaClassificationId: classification.id
+                        }, {transaction});
+                }
         });
-    if (data.classifications)
-        for (let {confidence, labels, glossaries} of data.classifications) {
-            let classification = await MediaClassification.create({
-                confidence,
-                MediaItemId: item.id,
-            });
-            for (let text of labels)
-                await MediaLabel.create({
-                    text,
-                    MediaClassificationId: classification.id
-                });
-            for (let text of glossaries)
-                await MediaGlossary.create({
-                    text,
-                    MediaClassificationId: classification.id
-                });
-        }
+        console.log(`inserted ${data.filename}`);
+        // transaction has been committed. Do something after the commit if required.
+    } catch (err) {
+        console.warn("MediaItem insert ERROR", data);
+        throw new Error(err);
+        // do something with the err.
+    }
 }
 
 export async function removeTestMediaItem() {

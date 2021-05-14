@@ -5,7 +5,7 @@ import {MediaItem} from "../../database/models/photos/MediaItemModel.js";
 import config from "../../../res/photos/config.template.json";
 import path from "path";
 import mime from 'mime-types'
-import {searchMedia} from "../../database/models/photos/mediaUtils.js";
+import {searchMedia, searchMediaRanked} from "../../database/models/photos/mediaUtils.js";
 
 const console = new Log("PhotosModule");
 
@@ -20,10 +20,10 @@ export default class PhotosModule extends ApiModule {
 
         app.get('/photo/search/', async (req, res) => {
             let query = req.query.q;
-            let result = await searchMedia({
+            let result = await searchMediaRanked({
                 query,
-                attributes: {exclude: ['vector', 'vectorA', 'vectorB', 'vectorC', 'exif']}
-            });
+                includedFields: ['id', 'filename'],
+            })
             res.send(result);
         })
 
@@ -39,7 +39,7 @@ export default class PhotosModule extends ApiModule {
                 big: item.bigThumbPath,
                 webm: item.webmPath,
             }[req.params.size];
-            if (filePath === null)
+            if (filePath === null || filePath === undefined)
                 return res.sendStatus(404);
             let file = path.resolve(path.join(basePath, filePath));
             if (req.params.size === 'webm')

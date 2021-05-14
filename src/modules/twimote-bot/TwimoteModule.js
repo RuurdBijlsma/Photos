@@ -220,8 +220,6 @@ export default class TwimoteModule extends ApiModule {
                     const range = req.headers.range
 
                     if (range) {
-                        console.log("RECEIVED RANGE");
-
                         const parts = range.replace(/bytes=/, "").split("-");
 
                         const start = parseInt(parts[0], 10);
@@ -239,7 +237,6 @@ export default class TwimoteModule extends ApiModule {
                         res.writeHead(206, head);
                         file.pipe(res);
                     } else {
-                        console.log("DID NO RANGE, sending file", filePath);
                         const head = {
                             'Content-Length': fileSize,
                             'Content-Type': 'video/mp4',
