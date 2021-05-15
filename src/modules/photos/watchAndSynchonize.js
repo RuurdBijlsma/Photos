@@ -6,7 +6,7 @@ import path from "path";
 import mime from "mime-types";
 import config from "../../../res/photos/config.json";
 import {MediaItem} from "../../database/models/photos/MediaItemModel.js";
-import {insertMediaItem} from "../../database/models/photos/mediaUtils.js";
+import {getUniqueId, insertMediaItem} from "../../database/models/photos/mediaUtils.js";
 import seq from "sequelize";
 
 import TelegramBot from "node-telegram-bot-api";
@@ -14,29 +14,22 @@ import TelegramBot from "node-telegram-bot-api";
 const {Op} = seq;
 
 // Todo
-// rename all thumbnails to ${id}.webp ${id}.webm etc...,then static serve the files instead of requiring a database query
-// Fix memory usage (maybe just reduce batch size, maybe try fix something with tensorflow)
 // Prepare for huge number of files in media dir (try to have support for ~100k items)
 // mainly look for stuff that happens regularly but gets slower when n items in folder is larger
 // such as sync items
 
 
 const bot = new TelegramBot(config.telegramToken, {polling: false});
-const bigPic = await useDir(path.join(config.thumbnails, 'bigPic'));
-const smallPic = await useDir(path.join(config.thumbnails, 'smallPic'));
-const streamVid = await useDir(path.join(config.thumbnails, 'streamVid'));
-const vidPoster = await useDir(path.join(config.thumbnails, 'vidPoster'));
-const smallVidPoster = await useDir(path.join(config.thumbnails, 'smallVidPoster'));
+const bigPic = await useDir(path.join(config.thumbnails, 'big'));
+const smallPic = await useDir(path.join(config.thumbnails, 'small'));
+const streamVid = await useDir(path.join(config.thumbnails, 'webm'));
+const vidPoster = await useDir(path.join(config.thumbnails, 'poster'));
+const smallVidPoster = await useDir(path.join(config.thumbnails, 'smallposter'));
 const temp = await useDir(path.join(config.thumbnails, 'temp'));
 const processJobs = new Set();
 
 
 export async function watchAndSynchronize() {
-    await singleInstance(syncFiles);
-    setInterval(async () => {
-        await singleInstance(syncFiles);
-    }, config.syncInterval);
-
     console.log("Watching", config.media);
     fs.watch(config.media, async (eventType, filename) => {
         if (eventType === 'rename') {
@@ -56,6 +49,11 @@ export async function watchAndSynchronize() {
             }
         }
     });
+
+    await singleInstance(syncFiles);
+    setInterval(async () => {
+        await singleInstance(syncFiles);
+    }, config.syncInterval);
 }
 
 async function syncFiles() {
@@ -63,51 +61,58 @@ async function syncFiles() {
     // Sync files: add thumbnails and database entries for files in media directory
     let files = await getFilesRecursive(config.media);
     let batchSize = 50;
+    let newFiles = [];
+    console.log(`Checking ${files.length} files to see if they need to get processed`);
     for (let i = 0; i < files.length; i += batchSize) {
         let slice = files.slice(i, i + batchSize);
-        await Promise.all(slice.map(processIfNeeded));
+        newFiles.push(...await Promise.all(slice.map(processIfNeeded)));
         console.log(`Processed [${i + batchSize} / ${files.length}] photos in sync job`);
     }
+    newFiles = newFiles.filter(n => n !== false);
+    console.log(`Sync has processed ${newFiles.length} new files`);
+    files.push(...newFiles);
 
     // Find and remove all database entries that don't have an associated file
-    files = await getFilesRecursive(config.media);
     let count = await MediaItem.count();
     if (files.length !== count) {
         let names = files.map(f => path.basename(f));
-        let mismatch = await MediaItem.findAll({
+        await MediaItem.destroy({
             where: {filename: {[Op.notIn]: names,}}
         });
-        for (let item of mismatch) {
-            console.log(`Deleting ${item.filename} from DB`)
-            await item.destroy();
-        }
     }
 
+    // Delete all thumbnail files when there is no database entry for them
+    const idToFile = {};
     const cleanThumbDir = async dir => {
         let dirFiles = await fs.promises.readdir(dir);
         await Promise.all(dirFiles.map(f => deleteThumbIfAllowed(
             path.join(dir, f),
-            files.map(f => path.basename(f))
+            idToFile,
         )));
     }
-    // Delete all thumbnail files when the original file doesn't exist anymore
     await Promise.all([bigPic, smallPic, smallVidPoster, streamVid, vidPoster, temp].map(cleanThumbDir));
 }
 
-// Delete is allowed when the original photo isn't in the database anymore
-async function deleteThumbIfAllowed(thumbPath, files) {
+// Delete is allowed when the original photo doesn't exist anymore
+async function deleteThumbIfAllowed(thumbPath, idToFile = {}) {
     let thumbFile = path.basename(thumbPath);
-    let filename = thumbFile.substr(0, thumbFile.length - path.extname(thumbFile).length);
-    if (!files.includes(filename)) {
+    let id = thumbFile.substr(0, thumbFile.length - path.extname(thumbFile).length);
+    if (!idToFile.hasOwnProperty(id))
+        idToFile[id] = MediaItem.findOne({where: {id}, attributes: ['filename']});
+    let item = await idToFile[id];
+    if (item === null) {
         await fs.promises.unlink(thumbPath);
-        console.log("Deleted", thumbPath, "original file", filename, "isn't available anymore")
+        console.log("Deleted", thumbPath, "original file isn't available anymore")
     }
 }
 
 async function processIfNeeded(filePath) {
     let processed = await isProcessed(filePath);
-    if (!processed)
+    if (!processed) {
         await singleInstance(processMedia, filePath);
+        return filePath;
+    }
+    return false;
 }
 
 async function isProcessed(filePath) {
@@ -118,13 +123,14 @@ async function isProcessed(filePath) {
     let item = await MediaItem.findOne({where: {filename}});
     if (!item)
         return false;
+    const id = item.id;
 
     let files = [];
     if (type === 'image') {
-        let {big, small} = getPaths(filePath);
+        let {big, small} = getPaths(id);
         files.push(big, small);
     } else if (type === 'video') {
-        let {webm, poster, smallPoster} = getPaths(filePath);
+        let {webm, poster, smallPoster} = getPaths(id);
         files.push(webm, poster, smallPoster);
     }
     for (let file of files) {
@@ -153,6 +159,7 @@ async function singleInstance(fun, param) {
 async function processMedia(filePath, triesLeft = 3) {
     // console.log("Processing media", filePath);
     try {
+        const id = await getUniqueId();
         let type = getFileType(filePath);
         if (type === false) return;
         let filename = path.basename(filePath);
@@ -161,29 +168,24 @@ async function processMedia(filePath, triesLeft = 3) {
         if (alreadyInDb)
             await alreadyInDb.destroy();
 
-        let dbData, thumbSmallRel, thumbBigRel, webmRel;
+        let metadata, labels, thumbSmallRel, thumbBigRel, webmRel;
         if (type === 'image') {
-            let labels = await classify(filePath);
-            let metadata = await getExif(filePath);
+            labels = await classify(filePath);
+            metadata = await getExif(filePath);
             let height = Math.min(metadata.height, 1440);
             let smallHeight = Math.min(metadata.height, 500);
-            let {big, small} = getPaths(filePath);
+            let {big, small} = getPaths(id);
             thumbSmallRel = path.relative(config.thumbnails, small);
             thumbBigRel = path.relative(config.thumbnails, big);
             webmRel = null;
             let orientation = metadata.exif.Orientation ?? 1;
             await resizeImage({input: filePath, orientation, output: big, height,});
             await resizeImage({input: filePath, orientation, output: small, height: smallHeight,});
-            dbData = {
-                filename,
-                labels,
-                ...metadata,
-            }
         } else if (type === 'video') {
-            let metadata = await probeVideo(filePath);
+            metadata = await probeVideo(filePath);
             let height = Math.min(metadata.height, 1080);
             let smallHeight = Math.min(metadata.height, 500);
-            let {webm, poster, smallPoster, classifyPoster} = getPaths(filePath);
+            let {webm, poster, smallPoster, classifyPoster} = getPaths(id);
             thumbSmallRel = path.relative(config.thumbnails, smallPoster);
             thumbBigRel = path.relative(config.thumbnails, poster);
             webmRel = path.relative(config.thumbnails, webm);
@@ -191,31 +193,27 @@ async function processMedia(filePath, triesLeft = 3) {
             await videoScreenshot({input: webm, output: classifyPoster, height});
             await resizeImage({input: classifyPoster, output: poster, height: height,});
             await resizeImage({input: classifyPoster, output: smallPoster, height: smallHeight,});
-            let labels = await classify(classifyPoster);
+            labels = await classify(classifyPoster);
             await fs.promises.unlink(classifyPoster);
-            dbData = {
-                filename,
-                labels,
-                ...metadata,
-            }
         }
         let fullRel = path.relative(config.media, filePath);
         await insertMediaItem({
-            type: dbData.type,
-            subType: dbData.subType,
+            id,
+            type,
+            subType: metadata.subType,
             filename,
             filePath: fullRel,
             smallThumbPath: thumbSmallRel,
             bigThumbPath: thumbBigRel,
             webmPath: webmRel,
-            width: dbData.width,
-            height: dbData.height,
-            durationMs: dbData.duration,
-            bytes: dbData.size,
-            createDate: dbData.createDate,
-            exif: dbData.exif,
-            classifications: dbData.labels,
-            location: dbData.gps,
+            width: metadata.width,
+            height: metadata.height,
+            durationMs: metadata.duration,
+            bytes: metadata.size,
+            createDate: metadata.createDate,
+            exif: metadata.exif,
+            classifications: labels,
+            location: metadata.gps,
         })
     } catch (e) {
         if (triesLeft === 0) {
@@ -239,15 +237,16 @@ async function removeMedia(filePath, triesLeft = 3) {
         if (type === false) return;
         let filename = path.basename(filePath);
         let item = await MediaItem.findOne({where: {filename}});
+        const id = item.id;
         await item?.destroy?.();
 
         if (type === 'image') {
-            let {big, small} = getPaths(filePath);
+            let {big, small} = getPaths(id);
             console.log("Removing media", {big, small});
             await fs.promises.unlink(big);
             await fs.promises.unlink(small);
         } else if (type === 'video') {
-            let {webm, poster, smallPoster} = getPaths(filePath);
+            let {webm, poster, smallPoster} = getPaths(id);
             console.log("Removing media", {webm, poster, smallPoster});
             await fs.promises.unlink(webm);
             await fs.promises.unlink(poster);
@@ -287,14 +286,13 @@ function getFileType(filePath) {
     return mimeType === false ? mimeType : mimeType.split('/')[0];
 }
 
-function getPaths(filePath) {
-    let filename = path.basename(filePath);
-    let big = path.join(bigPic, filename + '.webp');
-    let small = path.join(smallPic, filename + '.webp');
-    let webm = path.join(streamVid, filename + '.webm');
-    let poster = path.join(vidPoster, filename + '.webp');
-    let smallPoster = path.join(smallVidPoster, filename + '.webp');
-    let classifyPoster = path.join(temp, filename + '.jpeg');
+function getPaths(id) {
+    let big = path.join(bigPic, id + '.webp');
+    let small = path.join(smallPic, id + '.webp');
+    let webm = path.join(streamVid, id + '.webm');
+    let poster = path.join(vidPoster, id + '.webp');
+    let smallPoster = path.join(smallVidPoster, id + '.webp');
+    let classifyPoster = path.join(temp, id + '.jpeg');
     return {big, small, webm, poster, smallPoster, classifyPoster}
 }
 

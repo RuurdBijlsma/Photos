@@ -92,9 +92,17 @@ export async function getMediaById(id) {
     });
 }
 
+export async function getUniqueId(){
+    let id;
+    do {
+        id = await Utils.getToken(16);
+    } while (await MediaItem.findOne({where: {id}}));
+    return id;
+}
+
 /**
  * @param {{
- *     type,subType,filename,filePath,smallThumbPath,bigThumbPath,webmPath,
+ *     id,type,subType,filename,filePath,smallThumbPath,bigThumbPath,webmPath,
  *     width,height,durationMs?,bytes,createDate?,exif,
  *     location?: {latitude,longitude,altitude?,place?,country?,admin1?,admin2?,admin3?,admin4?},
  *     classifications?: {confidence: number, labels: string[], glossaries: string[]}[],
@@ -103,10 +111,6 @@ export async function getMediaById(id) {
  */
 export async function insertMediaItem(data) {
     const seqInstance = MediaItem.sequelize;
-    let id;
-    do {
-        id = await Utils.getToken(16);
-    } while (await MediaItem.findOne({where: {id}}));
 
     const toVector = (weight, ...items) =>
         sequelize.fn('setweight',
@@ -120,7 +124,6 @@ export async function insertMediaItem(data) {
     try {
         await seqInstance.transaction({}, async transaction => {
             let item = await MediaItem.create({
-                id,
                 vectorA: toVector('A',
                     ...classA.labels,
                     data.location?.place,
@@ -141,7 +144,7 @@ export async function insertMediaItem(data) {
             await seqInstance.query(
                 `update "MediaItems"
                      set vector = setweight("vectorA", 'A') || setweight("vectorB", 'B') || setweight("vectorC", 'C')
-                     where id = '${id}'`
+                     where id = '${data.id}'`
                 , {transaction});
             if (data.location)
                 await MediaLocation.create({

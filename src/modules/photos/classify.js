@@ -34,11 +34,16 @@ export default async function classify(imagePath, nLabels = 3) {
     }
     const targetSize = [299, 299];
     let resizedImage = tf.image.resizeBilinear(image, targetSize);
+    image.dispose();
     let reshapedImage = tf.reshape(resizedImage, [-1, ...targetSize, 3]);
+    resizedImage.dispose();
     let normalizedImage = reshapedImage.div(tf.scalar(255));
+    reshapedImage.dispose();
 
     let result = model.predict(normalizedImage, {batchSize: 1});
+    normalizedImage.dispose();
     let predicted = await result.array().then(d => d[0]);
+    result.dispose();
     let maxIndices = iMaxN(predicted, nLabels);
 
     let resultArr = [];
