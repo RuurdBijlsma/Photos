@@ -60,11 +60,12 @@ async function syncFiles() {
     console.log("Syncing...");
     // Sync files: add thumbnails and database entries for files in media directory
     let files = await getFilesRecursive(config.media);
-    let batchSize = 50;
     let newFiles = [];
+    let batchSize = 1;
     console.log(`Checking ${files.length} files to see if they need to get processed`);
     for (let i = 0; i < files.length; i += batchSize) {
         let slice = files.slice(i, i + batchSize);
+        console.log("Processing ", ...slice);
         newFiles.push(...await Promise.all(slice.map(processIfNeeded)));
         console.log(`Processed [${i + batchSize} / ${files.length}] photos in sync job`);
     }
