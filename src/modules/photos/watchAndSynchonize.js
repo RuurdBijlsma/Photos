@@ -8,7 +8,6 @@ import config from "../../../res/photos/config.json";
 import {MediaItem} from "../../database/models/photos/MediaItemModel.js";
 import {getUniqueId, insertMediaItem} from "../../database/models/photos/mediaUtils.js";
 import seq from "sequelize";
-
 import TelegramBot from "node-telegram-bot-api";
 
 const {Op} = seq;
