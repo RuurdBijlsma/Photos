@@ -13,9 +13,7 @@ import TelegramBot from "node-telegram-bot-api";
 const {Op} = seq;
 
 // Todo
-// Prepare for huge number of files in media dir (try to have support for ~100k items)
-// mainly look for stuff that happens regularly but gets slower when n items in folder is larger
-// such as sync items
+// Add postgres backups
 
 
 const bot = new TelegramBot(config.telegramToken, {polling: false});
@@ -35,7 +33,7 @@ export async function watchAndSynchronize() {
             let changedFile = path.join(config.media, filename);
             if (await checkFileExists(changedFile)) {
                 await waitSleep(600);
-                let files = await getFilesRecursive(changedFile);
+                let {files} = await getFilesRecursive(changedFile);
                 for (let file of files)
                     await singleInstance(processMedia, file);
             } else {
@@ -58,15 +56,18 @@ export async function watchAndSynchronize() {
 async function syncFiles() {
     console.log("Syncing...");
     // Sync files: add thumbnails and database entries for files in media directory
-    let files = await getFilesRecursive(config.media);
+    let {files, videos, images} = await getFilesRecursive(config.media);
     let newFiles = [];
-    let batchSize = 30;
+    let batchSize = 10;
     console.log(`Checking ${files.length} files to see if they need to get processed`);
-    for (let i = 0; i < files.length; i += batchSize) {
-        let slice = files.slice(i, i + batchSize);
-        console.log(`Processing [${i}-${Math.min(files.length, i + batchSize)} / ${files.length}]`);
+    for (let i = 0; i < images.length; i += batchSize) {
+        let slice = images.slice(i, i + batchSize);
+        console.log(`Processing images [${i}-${Math.min(images.length, i + batchSize)} / ${images.length}]`);
         newFiles.push(...await Promise.all(slice.map(processIfNeeded)));
     }
+    console.log(`Processing ${videos.length} videos`)
+    for (let file of videos)
+        newFiles.push(await processIfNeeded(file));
     newFiles = newFiles.filter(n => n !== false);
     console.log(`Sync has processed ${newFiles.length} new files`);
     files.push(...newFiles);
@@ -268,15 +269,26 @@ async function removeMedia(filePath, triesLeft = 3) {
 }
 
 async function getFilesRecursive(filePath) {
-    let files = [];
+    let files = [],
+        videos = [],
+        images = [];
     let fileStat = await fs.promises.stat(filePath);
     if (fileStat.isDirectory()) {
-        for (let file of await fs.promises.readdir(filePath))
-            files.push(...await getFilesRecursive(path.join(filePath, file)));
+        for (let file of await fs.promises.readdir(filePath)) {
+            let res = await getFilesRecursive(path.join(filePath, file));
+            files.push(...res.files);
+            videos.push(...res.videos);
+            images.push(...res.images);
+        }
     } else {
         files.push(filePath);
+        let type = getFileType(filePath);
+        if (type === 'image')
+            images.push(filePath);
+        else if (type === 'video')
+            videos.push(filePath);
     }
-    return files;
+    return {files, images, videos};
 }
 
 function getFileType(filePath) {
