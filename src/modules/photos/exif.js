@@ -5,10 +5,7 @@ import fs from "fs";
 import geocode from "./reverse-geocode.js";
 import {StringDecoder} from "string_decoder";
 import path from "path";
-import {promisify} from 'util'
-import sizeOfSync from "image-size";
-
-const sizeOf = promisify(sizeOfSync);
+import probeSize from 'probe-image-size';
 
 const decoder = new StringDecoder('latin1');
 
@@ -73,8 +70,9 @@ export async function probeVideo(videoPath) {
 export async function getExif(image) {
     return new Promise((resolve, reject) => {
         new ExifImage({image}, async (error, data) => {
-            if (error)
-                return reject(error);
+            if (error) {
+                return reject(`Exif retrieval error for ${image}`, error);
+            }
 
             let gps = null;
             if (data.gps.GPSLatitude && data.gps.GPSLongitude) {
@@ -93,8 +91,20 @@ export async function getExif(image) {
             }
 
             let {size} = await fs.promises.stat(image);
+            let width = data.image.ImageWidth
+            let height = data.image.ImageHeight;
+            if (!isFinite(width) || !isFinite(height)) {
+                try {
+                    let imgSize = await probeSize(fs.createReadStream(image));
+                    width = imgSize.width;
+                    height = imgSize.height;
+                } catch (e) {
+                    return reject(`Couldn't get image size for ${
+                        image
+                    }`, e);
+                }
+            }
 
-            let {width, height} = await sizeOf(image);
 
             let createDate = null;
             if (data.exif.CreateDate && data.exif.CreateDate.includes(' ')) {

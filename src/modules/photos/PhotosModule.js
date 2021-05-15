@@ -25,7 +25,7 @@ export default class PhotosModule extends ApiModule {
             let query = req.query.q;
             let result = await searchMediaRanked({
                 query,
-                includedFields: ['id', 'filename'],
+                includedFields: ['id', 'filename', 'type'],
             })
             res.send(result);
         })

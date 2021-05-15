@@ -41,7 +41,7 @@ export async function watchAndSynchronize() {
                     await singleInstance(processMedia, file);
             } else {
                 let ext = path.extname(changedFile)
-                if (ext === '.jpeg' || ext === '.jpg' || ext === '.mp4')
+                if (ext !== '')
                     await singleInstance(removeMedia, changedFile);
                 else
                     // Deleted item might be a folder, sync to make sure the files get removed
@@ -61,13 +61,12 @@ async function syncFiles() {
     // Sync files: add thumbnails and database entries for files in media directory
     let files = await getFilesRecursive(config.media);
     let newFiles = [];
-    let batchSize = 1;
+    let batchSize = 30;
     console.log(`Checking ${files.length} files to see if they need to get processed`);
     for (let i = 0; i < files.length; i += batchSize) {
         let slice = files.slice(i, i + batchSize);
-        console.log("Processing ", ...slice);
+        console.log(`Processing [${i}-${Math.min(files.length, i + batchSize)} / ${files.length}]`);
         newFiles.push(...await Promise.all(slice.map(processIfNeeded)));
-        console.log(`Processed [${i + batchSize} / ${files.length}] photos in sync job`);
     }
     newFiles = newFiles.filter(n => n !== false);
     console.log(`Sync has processed ${newFiles.length} new files`);
@@ -171,8 +170,8 @@ async function processMedia(filePath, triesLeft = 3) {
 
         let metadata, labels, thumbSmallRel, thumbBigRel, webmRel;
         if (type === 'image') {
-            labels = await classify(filePath);
             metadata = await getExif(filePath);
+            labels = await classify(filePath);
             let height = Math.min(metadata.height, 1440);
             let smallHeight = Math.min(metadata.height, 500);
             let {big, small} = getPaths(id);
