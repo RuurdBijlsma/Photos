@@ -10,6 +10,8 @@ async function init() {
         return;
 
     return new Promise(resolve => {
+        console.time("Init geocoder");
+        console.log("Initializing geocoder")
         geocoder.init({
             load: {
                 admin1: true,
@@ -18,7 +20,10 @@ async function init() {
                 alternateNames: false,
             },
             dumpDirectory: './res/photos/geonames'
-        }, resolve);
+        }, () => {
+            console.timeEnd("Init geocoder");
+            resolve();
+        });
     })
 }
 

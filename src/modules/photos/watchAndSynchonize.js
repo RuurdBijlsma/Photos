@@ -74,8 +74,10 @@ async function syncFiles() {
         newFiles.push(...await Promise.all(slice.map(processIfNeeded)));
     }
     console.log(`Processing ${videos.length} videos`)
-    for (let file of videos)
-        newFiles.push(await processIfNeeded(file));
+    for (let i = 0; i < videos.length; i++) {
+        console.log(`Processing video [${i} / ${videos.length}]`)
+        newFiles.push(await processIfNeeded(videos[i]));
+    }
     newFiles = newFiles.filter(n => n !== false);
     console.log(`Sync has processed ${newFiles.length} new files`);
     files.push(...newFiles);

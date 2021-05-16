@@ -70,6 +70,7 @@ export async function transcode({input, output, height = null, width = null, bit
             return reject("Width and height can't both be null");
 
         let duration = '';
+        let time = '';
         let command = ffmpeg(input, {
             niceness: -10,
         })
@@ -78,10 +79,14 @@ export async function transcode({input, output, height = null, width = null, bit
             .videoCodec('libvpx-vp9')
             .format('webm')
             .on('start', commandLine => {
-                console.log('Spawned Ffmpeg with command: ' + commandLine);
+                // console.log('Spawned Ffmpeg with command: ' + commandLine);
             })
             .on('progress', progress => {
-                console.log(`Processing: ${progress.timemark} / ${duration}`);
+                let newTime = progress.timemark.substring(0, 8);
+                if (newTime !== time) {
+                    time = newTime;
+                    console.log(`Processing: ${progress.timemark} / ${duration}`);
+                }
             })
             .on('stderr', line => {
                 if (line.includes('Duration: ')) {
