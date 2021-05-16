@@ -79,9 +79,9 @@ async function getLabelWord(idx) {
                 break;
             parents.push(parent);
         }
-        let hierarchy = [word, ...parents].map(parseWord);
-        let labels = hierarchy.flatMap(w => w.names);
-        let glossaries = hierarchy.map(w => w.glossary);
+        let hierarchy = [word, ...parents].map((word, index)=>({...parseWord(word), index}));
+        let labels = hierarchy.flatMap(w => w.names.map(text=>({text, level: w.index})));
+        let glossaries = hierarchy.map(w => ({text: w.glossary, level: w.index}));
         return {labels, glossaries};
     } catch (e) {
         return {labels: [labels[idx]], glossaries: []};
@@ -96,6 +96,6 @@ function parseWord(word) {
     };
 }
 
-// classify('./photos/IMG_20200731_203422.jpg').then(c => {
+// classify('./res/photos/photos/20170727_204153.jpg').then(c => {
 //     console.log(c);
 // })

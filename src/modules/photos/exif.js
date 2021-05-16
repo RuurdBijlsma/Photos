@@ -27,10 +27,7 @@ export async function probeVideo(videoPath) {
         latitude = +latitude;
         longitude = +longitude;
         gps = {latitude, longitude, altitude: null};
-        let geocodeData = await geocode({
-            latitude: gps.lat,
-            longitude: gps.lon
-        });
+        let geocodeData = await geocode(gps);
         gps = {...gps, ...geocodeData};
     }
     let size = format.size;
@@ -83,10 +80,7 @@ export async function getExif(image) {
                 let {lat, lon} = parseDMS(`${latString} ${lonString}`);
                 gps = {latitude: lat, longitude: lon};
                 gps.altitude = data.gps.GPSAltitude;
-                let geocodeData = await geocode({
-                    latitude: gps.lat,
-                    longitude: gps.lon
-                });
+                let geocodeData = await geocode(gps);
                 gps = {...gps, ...geocodeData};
             }
 

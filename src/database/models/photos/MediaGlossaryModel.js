@@ -17,6 +17,10 @@ export function initMediaGlossary(sequelize) {
             type: DataTypes.TEXT,
             allowNull: false,
         },
+        level: {
+            type: DataTypes.INTEGER,
+            allowNull: false,
+        },
     }, {
         timestamps: false,
         createdAt: false,
@@ -24,6 +28,7 @@ export function initMediaGlossary(sequelize) {
         sequelize,
         indexes: [
             {unique: false, fields: ['text']},
+            {unique: false, fields: ['level']},
         ],
     });
 

@@ -1,8 +1,13 @@
 import geocoder from "local-reverse-geocoder";
 import lookup from "country-code-lookup";
+import config from '../../../res/photos/config.json'
+
+if (config.skipGeocode)
+    console.warn("SKIPPING GEOCODING");
 
 async function init() {
-    return; // To speed up testing
+    if (config.skipGeocode)
+        return;
 
     return new Promise(resolve => {
         geocoder.init({
@@ -19,8 +24,12 @@ async function init() {
 
 let ready = init();
 
-export default async function geocode(point = {latitude: 48.45349, longitude: 9.09582}) {
-    return {place: 'Temp', country: 'Templand', admin1: 'Tempo Town', admin2: 'Temp Region'}; // to speed up testing
+export default async function geocode({latitude, longitude}) {
+    if (config.skipGeocode)
+        return {place: 'Temp', country: 'Templand', admin: ['temi', 'temp2', 'ajsmdp8']}; // to speed up testing
+
+    const point = {latitude, longitude};
+    // console.time("GEOCODE " + JSON.stringify(point));
 
     await ready;
 
@@ -29,21 +38,22 @@ export default async function geocode(point = {latitude: 48.45349, longitude: 9.
         geocoder.lookUp(point, maxResults,
             (err, res) => {
                 if (err)
-                    return reject();
+                    return reject("Geocode error for", point);
                 let [[{name: place, countryCode: country, admin1Code, admin2Code, admin3Code, admin4Code}]] = res;
                 let geocodeData = {
                     place,
                     country: lookup.byIso(country).country,
-                    admin1: admin1Code,
-                    admin2: admin2Code,
-                    admin3: admin3Code,
-                    admin4: admin4Code,
+                    admin: [admin1Code, admin2Code, admin3Code, admin4Code]
                 };
+                geocodeData.admin = geocodeData.admin
+                    .filter(a => a)
+                    .map(a => a.hasOwnProperty('name') ? a.name : a)
+                    .reverse();
                 resolve(geocodeData);
             });
     })
 }
 
-// geocode({latitude: 41.219915, longitude: 19.696557}).then(c => {
+// geocode({latitude: 36.14745277777778, longitude: -5.355142777777777}).then(c => {
 //     console.log(c)
 // })

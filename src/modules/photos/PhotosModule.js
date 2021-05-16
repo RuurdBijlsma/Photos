@@ -5,7 +5,7 @@ import {MediaItem} from "../../database/models/photos/MediaItemModel.js";
 import config from "../../../res/photos/config.template.json";
 import path from "path";
 import mime from 'mime-types'
-import {searchMediaRanked} from "../../database/models/photos/mediaUtils.js";
+import {getRandomLabels, getRandomLocations, searchMediaRanked} from "../../database/models/photos/mediaUtils.js";
 import express from "express";
 
 const console = new Log("PhotosModule");
@@ -13,13 +13,32 @@ const console = new Log("PhotosModule");
 export default class PhotosModule extends ApiModule {
     constructor() {
         super();
+        this.randomLabels = null;
+        this.randomLocations = null;
     }
 
     async setRoutes(app, io, db) {
         app.use('/photo', express.static(config.thumbnails));
 
-        await watchAndSynchronize()
-        console.log("Watching, synchronizing, and starting api");
+        app.get('/photos/locations/', async (req, res) => {
+            let now = +new Date();
+            const refreshEvery = 1000 * 60 * 15;// 15 minutes
+            if (!this.randomLocations || this.randomLocations.date + refreshEvery < now) {
+                this.randomLocations = {date: now, locations: getRandomLocations(15)};
+            }
+            let locations = await this.randomLocations.locations;
+            res.send(locations);
+        });
+
+        app.get('/photos/labels/', async (req, res) => {
+            let now = +new Date();
+            const refreshEvery = 1000 * 60 * 15;// 15 minutes
+            if (!this.randomLabels || this.randomLabels.date + refreshEvery < now) {
+                this.randomLabels = {date: now, labels: getRandomLabels(15)};
+            }
+            let labels = await this.randomLabels.labels;
+            res.send(labels);
+        });
 
         app.get('/photos/search/', async (req, res) => {
             let query = req.query.q;
@@ -28,7 +47,7 @@ export default class PhotosModule extends ApiModule {
                 includedFields: ['id', 'filename', 'type'],
             })
             res.send(result);
-        })
+        });
 
         app.get('/photo/full/:id', async (req, res) => {
             const id = req.params.id;
@@ -42,5 +61,8 @@ export default class PhotosModule extends ApiModule {
             }
             res.sendFile(file, {acceptRanges: true});
         });
+
+        await watchAndSynchronize()
+        console.log("Watching and synchronizing Photos");
     }
 }

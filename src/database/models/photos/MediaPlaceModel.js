@@ -2,11 +2,11 @@ import seq from "sequelize";
 
 const {DataTypes, Model} = seq;
 
-export class MediaLabel extends Model {
+export class MediaPlace extends Model {
 }
 
-export function initMediaLabel(sequelize) {
-    MediaLabel.init({
+export function initMediaPlace(sequelize) {
+    MediaPlace.init({
         // Model attributes are defined here
         id: {
             type: DataTypes.INTEGER,
@@ -14,11 +14,15 @@ export function initMediaLabel(sequelize) {
             primaryKey: true,
         },
         text: {
-            type: DataTypes.TEXT,
+            type: DataTypes.STRING,
             allowNull: false,
         },
-        level: {
-            type: DataTypes.INTEGER,
+        type: {
+            type: DataTypes.STRING,
+            allowNull: false,
+        },
+        isCode: {
+            type: DataTypes.BOOLEAN,
             allowNull: false,
         },
     }, {
@@ -28,9 +32,10 @@ export function initMediaLabel(sequelize) {
         sequelize,
         indexes: [
             {unique: false, fields: ['text']},
-            {unique: false, fields: ['level']},
+            {unique: false, fields: ['type']},
+            {unique: false, fields: ['isCode']},
         ],
     });
 
-    return MediaLabel;
+    return MediaPlace;
 }

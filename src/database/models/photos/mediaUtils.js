@@ -6,6 +6,7 @@ import {initMediaGlossary, MediaGlossary} from "./MediaGlossaryModel.js";
 import Utils from "../../../Utils.js";
 import path from "path";
 import sequelize from 'sequelize';
+import {initMediaPlace, MediaPlace} from "./MediaPlaceModel.js";
 
 const {Op} = sequelize;
 
@@ -15,12 +16,16 @@ export async function initMedia(db) {
     initMediaClassification(db);
     initMediaLocation(db);
     initMediaItem(db);
+    initMediaPlace(db);
 
     MediaItem.hasMany(MediaClassification, {onDelete: 'CASCADE'});
     MediaClassification.belongsTo(MediaItem);
 
     MediaItem.hasOne(MediaLocation, {onDelete: 'CASCADE'});
     MediaLocation.belongsTo(MediaItem);
+
+    MediaLocation.hasMany(MediaPlace, {onDelete: 'CASCADE'});
+    MediaPlace.belongsTo(MediaLocation);
 
     MediaClassification.hasMany(MediaLabel, {onDelete: 'CASCADE'});
     MediaLabel.belongsTo(MediaClassification);
@@ -29,8 +34,52 @@ export async function initMedia(db) {
     MediaGlossary.belongsTo(MediaClassification);
 }
 
+export async function getRandomLocations(limit = 50) {
+    const sequelizeInstance = MediaItem.sequelize;
+    return await sequelizeInstance.query(`
+        select distinct on (text) text, "MediaItemId"
+        from "MediaLocations"
+                 inner join "MediaPlaces" MP on "MediaLocations".id = MP."MediaLocationId"
+        where text in (select text
+                       from (select text, count(text)::FLOAT / (select count(*) from "MediaPlaces") * 10 + random() as count
+                             from "MediaPlaces"
+                             where not "isCode"
+                             group by text
+                             order by count desc
+                             limit $1) as counttable)
+        `, {
+            bind: [limit],
+            type: sequelize.QueryTypes.SELECT,
+        }
+    );
+}
+
+export async function getRandomLabels(limit = 50) {
+    const sequelizeInstance = MediaItem.sequelize;
+    return await sequelizeInstance.query(`
+        select distinct on (text) text, "MediaItemId"
+        from "MediaClassifications"
+                 inner join "MediaLabels" ML on "MediaClassifications".id = ML."MediaClassificationId"
+        where text in (
+            select text
+            from (
+                     select text, count(text)::FLOAT / (select count(*) from "MediaLabels") * 25 + random() as count
+                     from "MediaLabels"
+                     where level <= 2
+                     group by text
+                     order by count desc
+                     limit $1
+                 ) as counttable)
+        `, {
+            bind: [limit],
+            type: sequelize.QueryTypes.SELECT,
+        }
+    );
+}
+
 export async function searchMediaRanked({query, limit = false, includedFields}) {
     const sequelizeInstance = MediaItem.sequelize;
+    query = query.replace(/ /g, '&');
     let bind = [query];
     if (limit)
         bind.push(limit);
@@ -57,7 +106,7 @@ export async function searchMedia({
                                   }) {
     let options = {
         where: {
-            vector: {[Op.match]: sequelize.fn('to_tsquery','english', query)}
+            vector: {[Op.match]: sequelize.fn('to_tsquery', 'english', query)}
         },
     }
     if (attributes)
@@ -92,7 +141,7 @@ export async function getMediaById(id) {
     });
 }
 
-export async function getUniqueId(){
+export async function getUniqueId() {
     let id;
     do {
         id = await Utils.getToken(16);
@@ -119,25 +168,27 @@ export async function insertMediaItem(data) {
             ),
             weight
         );
+    const toText = a => a.map(b => b.text);
     let [classA, classB, classC] = data.classifications.sort((a, b) => b.confidence - a.confidence);
 
     try {
         await seqInstance.transaction({}, async transaction => {
             let item = await MediaItem.create({
                 vectorA: toVector('A',
-                    ...classA.labels,
+                    ...toText(classA.labels),
                     data.location?.place,
                     data.location?.country,
                 ),
                 vectorB: toVector('B',
-                    data.filename, ...classB.labels,
+                    data.filename, ...toText(classB.labels),
                     data.location?.admin1,
                     data.location?.admin2,
                     data.location?.admin3,
                     data.location?.admin4,
                 ),
                 vectorC: toVector('C',
-                    ...classC.labels, ...classB.glossaries, ...classA.glossaries, classC.glossaries
+                    ...toText(classC.labels), ...toText(classA.glossaries),
+                    ...toText(classB.glossaries), ...toText(classC.glossaries)
                 ),
                 ...data,
             }, {transaction});
@@ -146,27 +197,40 @@ export async function insertMediaItem(data) {
                      set vector = setweight("vectorA", 'A') || setweight("vectorB", 'B') || setweight("vectorC", 'C')
                      where id = '${data.id}'`
                 , {transaction});
-            if (data.location)
-                await MediaLocation.create({
-                    ...data.location,
+            if (data.location) {
+                let locItem = await MediaLocation.create({
+                    latitude: data.location.latitude,
+                    longitude: data.location.longitude,
+                    altitude: data.location.altitude,
                     MediaItemId: item.id,
                 }, {transaction});
+                let places = [
+                    {type: 'place', text: data.location.place},
+                    {type: 'country', text: data.location.country},
+                    ...data.location.admin.map((a, i) => ({type: `admin${i + 1}`, text: a})),
+                ];
+                await MediaPlace.bulkCreate(places.map(({text, type}) => ({
+                        text,
+                        type,
+                        isCode: text.match(/[0-9]+/g) !== null,
+                        MediaLocationId: locItem.id,
+                    })), {transaction}
+                )
+            }
             if (data.classifications)
                 for (let {confidence, labels, glossaries} of data.classifications) {
                     let classification = await MediaClassification.create({
                         confidence,
                         MediaItemId: item.id,
                     }, {transaction});
-                    for (let text of labels)
-                        await MediaLabel.create({
-                            text,
-                            MediaClassificationId: classification.id
-                        }, {transaction});
-                    for (let text of glossaries)
-                        await MediaGlossary.create({
-                            text,
-                            MediaClassificationId: classification.id
-                        }, {transaction});
+                    await MediaLabel.bulkCreate(labels.map(label => ({
+                        ...label,
+                        MediaClassificationId: classification.id
+                    })), {transaction});
+                    await MediaGlossary.bulkCreate(glossaries.map(glossary => ({
+                        ...glossary,
+                        MediaClassificationId: classification.id
+                    })), {transaction});
                 }
         });
         console.log(`inserted ${data.filename}`);
@@ -182,7 +246,6 @@ export async function removeTestMediaItem() {
     let filename = 'IMG_20200722_203422.jpg';
     let item = await MediaItem.findOne({where: {filename}});
     await item.destroy();
-    console.log();
 }
 
 export async function insertTestMediaItem() {

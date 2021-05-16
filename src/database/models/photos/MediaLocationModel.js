@@ -25,30 +25,6 @@ export function initMediaLocation(sequelize) {
             type: DataTypes.FLOAT,
             allowNull: true,
         },
-        place: {
-            type: DataTypes.TEXT,
-            allowNull: true,
-        },
-        country: {
-            type: DataTypes.TEXT,
-            allowNull: true,
-        },
-        admin1: {
-            type: DataTypes.TEXT,
-            allowNull:true,
-        },
-        admin2: {
-            type: DataTypes.TEXT,
-            allowNull:true,
-        },
-        admin3: {
-            type: DataTypes.TEXT,
-            allowNull:true,
-        },
-        admin4: {
-            type: DataTypes.TEXT,
-            allowNull:true,
-        },
     }, {
         timestamps:false,
         createdAt:false,
@@ -57,12 +33,7 @@ export function initMediaLocation(sequelize) {
         indexes: [
             {unique: false, fields: ['latitude']},
             {unique: false, fields: ['longitude']},
-            {unique: false, fields: ['place']},
-            {unique: false, fields: ['country']},
-            {unique: false, fields: ['admin1']},
-            {unique: false, fields: ['admin2']},
-            {unique: false, fields: ['admin3']},
-            {unique: false, fields: ['admin4']},
+            {unique: false, fields: ['altitude']},
         ],
     });
 

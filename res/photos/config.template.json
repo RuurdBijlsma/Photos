@@ -2,6 +2,8 @@
   "media": "./res/photos/photos",
   "thumbnails": "./res/photos/thumbnails",
   "syncInterval": 86400000,
+  "backupInterval": 172800000,
   "telegramToken": "1823771308:89a9asd89fa9708sdf9asd7f9as7df98sf",
-  "chatId": 626213452
+  "chatId": 626213452,
+  "skipGeocode": false
 }

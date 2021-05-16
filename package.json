@@ -6,6 +6,8 @@
   "type": "module",
   "scripts": {
     "start": "node --experimental-json-modules src/index.js",
+    "testGeocode": "node --experimental-json-modules src/modules/photos/reverse-geocode.js",
+    "testClassify": "node --experimental-json-modules src/modules/photos/classify.js",
     "testResize": "node --experimental-json-modules src/modules/photos/testResize.js",
     "twimote": "node --experimental-json-modules src/modules/twimote-bot/test-twimote.js",
     "processEmotes": "node --experimental-json-modules src/modules/twimote-bot/getEmotes/processEmotes.js",

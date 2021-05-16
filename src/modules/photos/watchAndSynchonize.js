@@ -9,24 +9,36 @@ import {MediaItem} from "../../database/models/photos/MediaItemModel.js";
 import {getUniqueId, insertMediaItem} from "../../database/models/photos/mediaUtils.js";
 import seq from "sequelize";
 import TelegramBot from "node-telegram-bot-api";
+import os from "os";
+import {exec} from 'child_process'
 
 const {Op} = seq;
+import dbConfig from '../../../res/auth/credentials.json'
 
 // Todo
-// Add postgres backups
 
 
 const bot = new TelegramBot(config.telegramToken, {polling: false});
 const bigPic = await useDir(path.join(config.thumbnails, 'big'));
 const smallPic = await useDir(path.join(config.thumbnails, 'small'));
 const streamVid = await useDir(path.join(config.thumbnails, 'webm'));
-const vidPoster = await useDir(path.join(config.thumbnails, 'poster'));
-const smallVidPoster = await useDir(path.join(config.thumbnails, 'smallposter'));
 const temp = await useDir(path.join(config.thumbnails, 'temp'));
 const processJobs = new Set();
 
 
 export async function watchAndSynchronize() {
+    if (process.platform !== 'win32')
+        setInterval(() => {
+            console.log("Backing up database!");
+            exec(`pg_dump ${dbConfig.dbName} | gzip > ./res/photos/rsdb_${new Date().toLocaleDateString()}.gz`,
+                (error) => {
+                    if (error) {
+                        console.warn('db backup error', error);
+                        return bot.sendMessage(config.chatId, `Couldn't backup database!\n\n${JSON.stringify(error)}`);
+                    }
+                });
+        }, config.syncInterval * 2);
+
     console.log("Watching", config.media);
     fs.watch(config.media, async (eventType, filename) => {
         if (eventType === 'rename') {
@@ -58,8 +70,9 @@ async function syncFiles() {
     // Sync files: add thumbnails and database entries for files in media directory
     let {files, videos, images} = await getFilesRecursive(config.media);
     let newFiles = [];
-    let batchSize = 10;
-    console.log(`Checking ${files.length} files to see if they need to get processed`);
+    let freeGb = os.freemem() / 1000000000;
+    let batchSize = Math.ceil(freeGb * 5);
+    console.log(`Checking ${files.length} files to see if they need to get processed. [BatchSize: ${batchSize}]`);
     for (let i = 0; i < images.length; i += batchSize) {
         let slice = images.slice(i, i + batchSize);
         console.log(`Processing images [${i}-${Math.min(images.length, i + batchSize)} / ${images.length}]`);
@@ -90,7 +103,7 @@ async function syncFiles() {
             idToFile,
         )));
     }
-    await Promise.all([bigPic, smallPic, smallVidPoster, streamVid, vidPoster, temp].map(cleanThumbDir));
+    await Promise.all([bigPic, smallPic, streamVid, temp].map(cleanThumbDir));
 }
 
 // Delete is allowed when the original photo doesn't exist anymore
@@ -130,8 +143,8 @@ async function isProcessed(filePath) {
         let {big, small} = getPaths(id);
         files.push(big, small);
     } else if (type === 'video') {
-        let {webm, poster, smallPoster} = getPaths(id);
-        files.push(webm, poster, smallPoster);
+        let {webm, big, small} = getPaths(id);
+        files.push(webm, big, small);
     }
     for (let file of files) {
         if (!await checkFileExists(file))
@@ -185,14 +198,14 @@ async function processMedia(filePath, triesLeft = 3) {
             metadata = await probeVideo(filePath);
             let height = Math.min(metadata.height, 1080);
             let smallHeight = Math.min(metadata.height, 500);
-            let {webm, poster, smallPoster, classifyPoster} = getPaths(id);
-            thumbSmallRel = path.relative(config.thumbnails, smallPoster);
-            thumbBigRel = path.relative(config.thumbnails, poster);
+            let {webm, big, small, classifyPoster} = getPaths(id);
+            thumbSmallRel = path.relative(config.thumbnails, small);
+            thumbBigRel = path.relative(config.thumbnails, big);
             webmRel = path.relative(config.thumbnails, webm);
             await transcode({input: filePath, output: webm, height});
             await videoScreenshot({input: webm, output: classifyPoster, height});
-            await resizeImage({input: classifyPoster, output: poster, height: height,});
-            await resizeImage({input: classifyPoster, output: smallPoster, height: smallHeight,});
+            await resizeImage({input: classifyPoster, output: big, height: height,});
+            await resizeImage({input: classifyPoster, output: small, height: smallHeight,});
             labels = await classify(classifyPoster);
             await fs.promises.unlink(classifyPoster);
         }
@@ -217,8 +230,9 @@ async function processMedia(filePath, triesLeft = 3) {
         })
     } catch (e) {
         if (triesLeft === 0) {
-            await bot.sendMessage(config.chatId, `[Photos] Failed to process media, file path: "${filePath}"`);
-            await bot.sendMessage(config.chatId, JSON.stringify(e));
+            await bot.sendMessage(config.chatId, `[Photos] Failed to process "${
+                filePath
+            }"\n\n${JSON.stringify(e)}`);
             return false;
         } else {
             const waitTime = (4 - triesLeft) ** 2 * 5000;
@@ -255,8 +269,9 @@ async function removeMedia(filePath, triesLeft = 3) {
         return true;
     } catch (e) {
         if (triesLeft === 0) {
-            await bot.sendMessage(config.chatId, `[Photos] Failed to remove media, file path: "${filePath}"`);
-            await bot.sendMessage(config.chatId, JSON.stringify(e));
+            await bot.sendMessage(config.chatId, `[Photos] Failed to remove media, file path: "${
+                filePath
+            }"\n\n${JSON.stringify(e)}`);
             return false;
         } else {
             const waitTime = (4 - triesLeft) ** 2 * 5000;
@@ -274,21 +289,21 @@ async function getFilesRecursive(filePath) {
         images = [];
     let fileStat = await fs.promises.stat(filePath);
     if (fileStat.isDirectory()) {
-        for (let file of await fs.promises.readdir(filePath)) {
-            let res = await getFilesRecursive(path.join(filePath, file));
-            files.push(...res.files);
-            videos.push(...res.videos);
-            images.push(...res.images);
-        }
+        let subFiles = await fs.promises.readdir(filePath);
+        let subResults = await Promise.all(
+            subFiles.map(file => path.join(filePath, file)).map(getFilesRecursive)
+        );
+        files.push(...subResults.flatMap(r => r.files));
+        videos.push(...subResults.flatMap(r => r.videos));
+        images.push(...subResults.flatMap(r => r.images));
     } else {
         files.push(filePath);
-        let type = getFileType(filePath);
-        if (type === 'image')
-            images.push(filePath);
-        else if (type === 'video')
+        let ext = path.extname(filePath).toLowerCase();
+        if (ext === '.mp4' || ext === '.webm' || ext === '.avi')
             videos.push(filePath);
+        else images.push(filePath);
     }
-    return {files, images, videos};
+    return {files, videos, images};
 }
 
 function getFileType(filePath) {
@@ -301,10 +316,8 @@ function getPaths(id) {
     let big = path.join(bigPic, id + '.webp');
     let small = path.join(smallPic, id + '.webp');
     let webm = path.join(streamVid, id + '.webm');
-    let poster = path.join(vidPoster, id + '.webp');
-    let smallPoster = path.join(smallVidPoster, id + '.webp');
     let classifyPoster = path.join(temp, id + '.jpeg');
-    return {big, small, webm, poster, smallPoster, classifyPoster}
+    return {big, small, webm, classifyPoster}
 }
 
 async function checkFileExists(file) {
