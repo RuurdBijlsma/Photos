@@ -10,6 +10,7 @@ import {backupDb, getUniqueId, insertMediaItem} from "../../database/models/phot
 import seq from "sequelize";
 import TelegramBot from "node-telegram-bot-api";
 import os from "os";
+
 const {Op} = seq;
 
 // Todo
@@ -65,7 +66,7 @@ async function syncFiles() {
     let {files, videos, images} = await getFilesRecursive(config.media);
     let newFiles = [];
     let freeGb = os.freemem() / 1000000000;
-    let batchSize = Math.ceil(freeGb * 5);
+    let batchSize = Math.max(1, Math.ceil(freeGb * 10));
     console.log(`Checking ${files.length} files to see if they need to get processed. [BatchSize: ${batchSize}]`);
     for (let i = 0; i < images.length; i += batchSize) {
         let slice = images.slice(i, i + batchSize);
