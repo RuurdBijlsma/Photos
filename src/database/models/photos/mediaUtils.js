@@ -39,7 +39,7 @@ export async function initMedia(db) {
 export async function backupDb() {
     return new Promise((resolve, reject) => {
             let dateTime = new Date().toJSON().replace(/:/g, '_');
-            let backupTo = path.resolve(`./res/photos/rsdb_${dateTime}.dump`);
+            let backupTo = path.resolve(`./res/photos/backups/rsdb_${dateTime}.dump`);
             console.log(`Backing up database! ${backupTo}`);
             exec(`pg_dump --dbname=postgresql://${dbConfig.dbUser}:${
                     dbConfig.dbPass
