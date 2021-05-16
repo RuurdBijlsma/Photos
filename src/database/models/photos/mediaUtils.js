@@ -7,6 +7,8 @@ import Utils from "../../../Utils.js";
 import path from "path";
 import sequelize from 'sequelize';
 import {initMediaPlace, MediaPlace} from "./MediaPlaceModel.js";
+import {exec} from "child_process";
+import dbConfig from "../../../../res/auth/credentials.json";
 
 const {Op} = sequelize;
 
@@ -34,20 +36,41 @@ export async function initMedia(db) {
     MediaGlossary.belongsTo(MediaClassification);
 }
 
+export async function backupDb() {
+    return new Promise((resolve, reject) => {
+            let dateTime = new Date().toJSON().replace(/:/g, '_');
+            let backupTo = path.resolve(`./res/photos/rsdb_${dateTime}.dump`);
+            console.log(`Backing up database! ${backupTo}`);
+            exec(`pg_dump --dbname=postgresql://${dbConfig.dbUser}:${
+                    dbConfig.dbPass
+                }@127.0.0.1:5432/${dbConfig.dbName} -Fc > ${backupTo}`,
+                (error, stderr, stdout) => {
+                    if (error) {
+                        console.warn('db backup error', error);
+                        return reject(error);
+                    }
+                }).on('close', resolve);
+        }
+    )
+}
+
 export async function getRandomLocations(limit = 50) {
     const sequelizeInstance = MediaItem.sequelize;
-    return await sequelizeInstance.query(`
-        select distinct on (text) text, "MediaItemId"
-        from "MediaLocations"
-                 inner join "MediaPlaces" MP on "MediaLocations".id = MP."MediaLocationId"
-        where text in (select text
-                       from (select text, count(text)::FLOAT / (select count(*) from "MediaPlaces") * 10 + random() as count
-                             from "MediaPlaces"
-                             where not "isCode"
-                             group by text
-                             order by count desc
-                             limit $1) as counttable)
-        `, {
+    return await sequelizeInstance.query(
+        `
+    select distinct on (text) text, "MediaItemId"
+    from "MediaLocations"
+    inner join "MediaPlaces" MP on "MediaLocations".id = MP."MediaLocationId"
+    where text in (select text
+    from (select text, count(text)::FLOAT / (select count(*) from "MediaPlaces") * 10 + random() as count
+    from "MediaPlaces"
+    where not "isCode"
+    group by text
+    order by count desc
+    limit $1) as counttable)
+    `
+
+        , {
             bind: [limit],
             type: sequelize.QueryTypes.SELECT,
         }
@@ -56,21 +79,24 @@ export async function getRandomLocations(limit = 50) {
 
 export async function getRandomLabels(limit = 50) {
     const sequelizeInstance = MediaItem.sequelize;
-    return await sequelizeInstance.query(`
-        select distinct on (text) text, "MediaItemId"
-        from "MediaClassifications"
-                 inner join "MediaLabels" ML on "MediaClassifications".id = ML."MediaClassificationId"
-        where text in (
-            select text
-            from (
-                     select text, count(text)::FLOAT / (select count(*) from "MediaLabels") * 25 + random() as count
-                     from "MediaLabels"
-                     where level <= 2
-                     group by text
-                     order by count desc
-                     limit $1
-                 ) as counttable)
-        `, {
+    return await sequelizeInstance.query(
+        `
+    select distinct on (text) text, "MediaItemId"
+    from "MediaClassifications"
+    inner join "MediaLabels" ML on "MediaClassifications".id = ML."MediaClassificationId"
+    where text in (
+    select text
+    from (
+    select text, count(text)::FLOAT / (select count(*) from "MediaLabels") * 25 + random() as count
+    from "MediaLabels"
+    where level <= 2
+    group by text
+    order by count desc
+    limit $1
+    ) as counttable)
+    `
+
+        , {
             bind: [limit],
             type: sequelize.QueryTypes.SELECT,
         }
@@ -85,10 +111,12 @@ export async function searchMediaRanked({query, limit = false, includedFields}) 
         bind.push(limit);
     return await sequelizeInstance.query(
         `select ${includedFields.join(', ')}, ts_rank_cd(vector, query) as rank
-             from "MediaItems", to_tsquery('english', $1) query
-             where query @@ vector
-             order by rank desc
-             ${limit ? `limit = $2` : ''}`,
+    from "MediaItems", to_tsquery('english', $1) query
+    where query @@ vector
+    order by rank desc
+        ${limit ? `limit = $2` : ''}`
+
+        ,
         {
             model: MediaItem,
             mapToModel: true,
@@ -194,8 +222,10 @@ export async function insertMediaItem(data) {
             }, {transaction});
             await seqInstance.query(
                 `update "MediaItems"
-                     set vector = setweight("vectorA", 'A') || setweight("vectorB", 'B') || setweight("vectorC", 'C')
-                     where id = '${data.id}'`
+    set vector = setweight("vectorA", 'A') || setweight("vectorB", 'B') || setweight("vectorC", 'C')
+    where id = '${data.id}'`
+
+
                 , {transaction});
             if (data.location) {
                 let locItem = await MediaLocation.create({
@@ -207,7 +237,13 @@ export async function insertMediaItem(data) {
                 let places = [
                     {type: 'place', text: data.location.place},
                     {type: 'country', text: data.location.country},
-                    ...data.location.admin.map((a, i) => ({type: `admin${i + 1}`, text: a})),
+                    ...data.location.admin.map((a, i) => ({
+                        type:
+
+                            `admin${i + 1}`
+
+                        , text: a
+                    })),
                 ];
                 await MediaPlace.bulkCreate(places.map(({text, type}) => ({
                         text,
@@ -233,7 +269,9 @@ export async function insertMediaItem(data) {
                     })), {transaction});
                 }
         });
-        console.log(`inserted ${data.filename}`);
+        console.log(
+            `inserted ${data.filename}`
+        );
         // transaction has been committed. Do something after the commit if required.
     } catch (err) {
         console.warn("MediaItem insert ERROR", data);

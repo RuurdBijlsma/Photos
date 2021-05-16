@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "start": "node --experimental-json-modules src/index.js",
+    "dropPhotosDb": "node --experimental-json-modules src/modules/photos/dropPhotosDb.js",
     "testGeocode": "node --experimental-json-modules src/modules/photos/reverse-geocode.js",
     "testClassify": "node --experimental-json-modules src/modules/photos/classify.js",
     "testResize": "node --experimental-json-modules src/modules/photos/testResize.js",

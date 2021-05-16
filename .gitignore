@@ -7,6 +7,7 @@ yarn-error.log*
 res/music
 ls
 
+res/photos/rsdb*
 res/photos/config.json
 res/photos/cert.pem
 res/photos/photos

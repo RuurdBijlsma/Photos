@@ -6,14 +6,11 @@ import path from "path";
 import mime from "mime-types";
 import config from "../../../res/photos/config.json";
 import {MediaItem} from "../../database/models/photos/MediaItemModel.js";
-import {getUniqueId, insertMediaItem} from "../../database/models/photos/mediaUtils.js";
+import {backupDb, getUniqueId, insertMediaItem} from "../../database/models/photos/mediaUtils.js";
 import seq from "sequelize";
 import TelegramBot from "node-telegram-bot-api";
 import os from "os";
-import {exec} from 'child_process'
-
 const {Op} = seq;
-import dbConfig from '../../../res/auth/credentials.json'
 
 // Todo
 
@@ -28,16 +25,13 @@ const processJobs = new Set();
 
 export async function watchAndSynchronize() {
     if (process.platform !== 'win32')
-        setInterval(() => {
-            console.log("Backing up database!");
-            exec(`pg_dump ${dbConfig.dbName} | gzip > ./res/photos/rsdb_${new Date().toLocaleDateString()}.gz`,
-                (error) => {
-                    if (error) {
-                        console.warn('db backup error', error);
-                        return bot.sendMessage(config.chatId, `Couldn't backup database!\n\n${JSON.stringify(error)}`);
-                    }
-                });
-        }, config.syncInterval * 2);
+        setInterval(async () => {
+            try {
+                await backupDb();
+            } catch (e) {
+                return bot.sendMessage(config.chatId, `Couldn't backup database!\n\n${JSON.stringify(e)}`);
+            }
+        }, config.backupInterval);
 
     console.log("Watching", config.media);
     fs.watch(config.media, async (eventType, filename) => {
