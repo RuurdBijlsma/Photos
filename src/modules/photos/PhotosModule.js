@@ -5,7 +5,13 @@ import {MediaItem} from "../../database/models/photos/MediaItemModel.js";
 import config from "../../../res/photos/config.template.json";
 import path from "path";
 import mime from 'mime-types'
-import {getRandomLabels, getRandomLocations, searchMediaRanked} from "../../database/models/photos/mediaUtils.js";
+import {
+    getMonthPhotos,
+    getPhotoMonths,
+    getRandomLabels,
+    getRandomLocations,
+    searchMediaRanked
+} from "../../database/models/photos/mediaUtils.js";
 import express from "express";
 
 const console = new Log("PhotosModule");
@@ -19,6 +25,39 @@ export default class PhotosModule extends ApiModule {
 
     async setRoutes(app, io, db) {
         app.use('/photo', express.static(config.thumbnails));
+
+        app.post('/photos/month-photos', async (req, res) => {
+            try {
+                let result = await Promise.all(
+                    req.body.map(date => getMonthPhotos(...date))
+                );
+                res.send(result);
+            } catch (e) {
+                res.sendStatus(401);
+            }
+        });
+
+        app.get('/photos/months', async (req, res) => {
+            res.send(await getPhotoMonths());
+        });
+
+        app.get('/photos/list', async (req, res) => {
+            let limit = +req.query.limit;
+            if (!isFinite(limit))
+                limit = 10;
+            let offset = +req.query.offset;
+            if (!isFinite(offset))
+                offset = 0;
+            limit = Math.min(200, limit);
+            let photos = await MediaItem.findAll({
+                order: [['createDate', 'DESC']],
+
+                limit,
+                offset,
+                attributes: ['id', 'subType', 'type', 'createDate', 'filename', 'width', 'height']
+            });
+            res.send(photos);
+        })
 
         app.get('/photos/locations/', async (req, res) => {
             let now = +new Date();

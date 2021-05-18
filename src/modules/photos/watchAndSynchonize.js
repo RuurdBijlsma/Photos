@@ -75,7 +75,7 @@ async function syncFiles() {
     }
     console.log(`Processing ${videos.length} videos`)
     for (let i = 0; i < videos.length; i++) {
-        console.log(`Processing video [${i} / ${videos.length}]`)
+        console.log(`Processing video [${i + 1} / ${videos.length}]`)
         newFiles.push(await processIfNeeded(videos[i]));
     }
     newFiles = newFiles.filter(n => n !== false);
@@ -189,6 +189,8 @@ async function processMedia(filePath, triesLeft = 3) {
             thumbBigRel = path.relative(config.thumbnails, big);
             webmRel = null;
             let orientation = metadata.exif.Orientation ?? 1;
+            if (orientation >= 5)
+                [metadata.width, metadata.height] = [metadata.height, metadata.width];
             await resizeImage({input: filePath, orientation, output: big, height,});
             await resizeImage({input: filePath, orientation, output: small, height: smallHeight,});
         } else if (type === 'video') {

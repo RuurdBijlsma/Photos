@@ -54,23 +54,50 @@ export async function backupDb() {
     )
 }
 
+export async function getMonthPhotos(year, month) {
+    const sequelizeInstance = MediaItem.sequelize;
+    return await sequelizeInstance.query(`
+        select id, type, width, height, "createDate"
+        from "MediaItems"
+        where extract(month from "createDate") = $1
+          and extract(year from "createDate") = $2
+        order by "createDate" desc;
+    `, {
+        bind: [month, year],
+        type: sequelize.QueryTypes.SELECT,
+    });
+}
+
+export async function getPhotoMonths() {
+    const sequelizeInstance = MediaItem.sequelize;
+    return await sequelizeInstance.query(`
+        select extract(year from "createDate")                       as year,
+               extract(month from "createDate")                      as month,
+               count(*)::FLOAT / (select count(*) from "MediaItems") as part,
+               count(*)::INT                                         as count
+        from "MediaItems"
+        where "createDate" is not null
+        group by year, month
+        order by year desc, month desc;
+    `, {
+        type: sequelize.QueryTypes.SELECT,
+    });
+}
+
 export async function getRandomLocations(limit = 50) {
     const sequelizeInstance = MediaItem.sequelize;
-    return await sequelizeInstance.query(
-        `
-    select distinct on (text) text, "MediaItemId"
-    from "MediaLocations"
-    inner join "MediaPlaces" MP on "MediaLocations".id = MP."MediaLocationId"
-    where text in (select text
-    from (select text, count(text)::FLOAT / (select count(*) from "MediaPlaces") * 10 + random() as count
-    from "MediaPlaces"
-    where not "isCode"
-    group by text
-    order by count desc
-    limit $1) as counttable)
-    `
-
-        , {
+    return await sequelizeInstance.query(`
+        select distinct on (text) text, "MediaItemId"
+        from "MediaLocations"
+        inner join "MediaPlaces" MP on "MediaLocations".id = MP."MediaLocationId"
+        where text in (select text
+        from (select text, count(text)::FLOAT / (select count(*) from "MediaPlaces") * 10 + random() as count
+        from "MediaPlaces"
+        where not "isCode"
+        group by text
+        order by count desc
+        limit $1) as counttable)
+    `, {
             bind: [limit],
             type: sequelize.QueryTypes.SELECT,
         }
@@ -79,8 +106,7 @@ export async function getRandomLocations(limit = 50) {
 
 export async function getRandomLabels(limit = 50) {
     const sequelizeInstance = MediaItem.sequelize;
-    return await sequelizeInstance.query(
-        `
+    return await sequelizeInstance.query(`
     select distinct on (text) text, "MediaItemId"
     from "MediaClassifications"
     inner join "MediaLabels" ML on "MediaClassifications".id = ML."MediaClassificationId"
@@ -94,9 +120,7 @@ export async function getRandomLabels(limit = 50) {
     order by count desc
     limit $1
     ) as counttable)
-    `
-
-        , {
+    `, {
             bind: [limit],
             type: sequelize.QueryTypes.SELECT,
         }
@@ -326,4 +350,18 @@ export async function insertTestMediaItem() {
 
     let freshItem = await getMediaByFilename(filename);
     console.log("Created test media item", freshItem.toJSON());
+}
+
+async function swapWidthAndHeightOnPortraitPhotos() {
+    let sequelizeInstance = MediaItem.sequelize;
+    await sequelizeInstance.query(`
+        update "MediaItems"
+        set width=height,
+            height=width
+        where id in (
+            select id
+            from "MediaItems"
+            where (exif -> 'Orientation')::INT > 4
+        )
+    `, {type: sequelize.QueryTypes.UPDATE});
 }

@@ -16,7 +16,7 @@ async function init() {
             load: {
                 admin1: true,
                 admin2: true,
-                admin3And4: true,
+                admin3And4: config.geocodeAdmin3and4,
                 alternateNames: false,
             },
             dumpDirectory: './res/photos/geonames'
@@ -44,11 +44,11 @@ export default async function geocode({latitude, longitude}) {
             (err, res) => {
                 if (err)
                     return reject("Geocode error for", point);
-                let [[{name: place, countryCode: country, admin1Code, admin2Code, admin3Code, admin4Code}]] = res;
+                let [[{name: place, countryCode: country, admin1Code, admin2Code}]] = res;
                 let geocodeData = {
                     place,
                     country: lookup.byIso(country).country,
-                    admin: [admin1Code, admin2Code, admin3Code, admin4Code]
+                    admin: [admin1Code, admin2Code]
                 };
                 geocodeData.admin = geocodeData.admin
                     .filter(a => a)
