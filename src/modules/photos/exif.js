@@ -61,14 +61,11 @@ export async function probeVideo(videoPath) {
     };
 }
 
-// probeVideo('./photos/home.mp4');
-// getExif('./photos/20150804_192803.jpg')
-
 export async function getExif(image) {
     return new Promise((resolve, reject) => {
         new ExifImage({image}, async (error, data) => {
             if (error) {
-                return reject(`Exif retrieval error for ${image}`, error);
+                return reject(`Exif retrieval error for ${image} ${JSON.stringify(error)}`);
             }
 
             let gps = null;
@@ -139,3 +136,7 @@ export async function getExif(image) {
         });
     });
 }
+
+
+// probeVideo('./photos/home.mp4');
+// getExif('./photos/20150729_211225.jpg')

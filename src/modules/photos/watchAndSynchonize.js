@@ -166,7 +166,7 @@ async function singleInstance(fun, param) {
     return result;
 }
 
-async function processMedia(filePath, triesLeft = 3) {
+async function processMedia(filePath, triesLeft = 2) {
     // console.log("Processing media", filePath);
     try {
         const id = await getUniqueId();
@@ -244,7 +244,7 @@ async function processMedia(filePath, triesLeft = 3) {
     return true;
 }
 
-async function removeMedia(filePath, triesLeft = 3) {
+async function removeMedia(filePath, triesLeft = 2) {
     try {
         let type = getFileType(filePath);
         if (type === false) return;
