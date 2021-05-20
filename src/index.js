@@ -3,9 +3,9 @@ import Commander from 'commander';
 import pJson from '../package.json'
 import geocode from "./modules/photos/reverse-geocode.js";
 
-console.log("Initializing geocoder");
-await geocode({latitude: 50, longitude: 5});
-console.log("Initialized geocoder");
+// console.log("Initializing geocoder");
+// await geocode({latitude: 50, longitude: 5});
+// console.log("Initialized geocoder");
 
 Commander
     .version(pJson.version)
