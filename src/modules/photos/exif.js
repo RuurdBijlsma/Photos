@@ -62,7 +62,12 @@ export async function getExif(image) {
     return new Promise((resolve, reject) => {
         new ExifImage({image}, async (error, data) => {
             if (error) {
-                let imgSize = await probeSize(fs.createReadStream(image));
+                let imgSize;
+                try {
+                    imgSize = await probeSize(fs.createReadStream(image));
+                } catch (e) {
+                    return reject(`img resize error on img with no exif: ${image}, \n ${JSON.stringify(e)}`);
+                }
                 let fileStat = await fs.promises.stat(image);
                 let width = imgSize.width;
                 let height = imgSize.height;
