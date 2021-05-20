@@ -13,6 +13,7 @@ import {
     searchMediaRanked
 } from "../../database/models/photos/mediaUtils.js";
 import express from "express";
+import geocode from "./reverse-geocode";
 
 const console = new Log("PhotosModule");
 
@@ -101,6 +102,9 @@ export default class PhotosModule extends ApiModule {
             res.sendFile(file, {acceptRanges: true});
         });
 
+        console.log("Initializing geocoder");
+        await geocode({latitude: 50, longitude: 5});
+        console.log("Initialized geocoder");
         await watchAndSynchronize()
         console.log("Watching and synchronizing Photos");
     }

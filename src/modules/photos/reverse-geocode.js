@@ -11,7 +11,6 @@ async function init() {
 
     return new Promise(resolve => {
         console.time("Init geocoder");
-        console.log("Initializing geocoder")
         geocoder.init({
             load: {
                 admin1: true,
