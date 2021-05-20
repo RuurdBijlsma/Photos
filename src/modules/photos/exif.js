@@ -3,11 +3,8 @@ import parseDMS from "parse-dms";
 import ffmpeg from './promise-ffmpeg.js'
 import fs from "fs";
 import geocode from "./reverse-geocode.js";
-import {StringDecoder} from "string_decoder";
 import path from "path";
 import probeSize from 'probe-image-size';
-
-const decoder = new StringDecoder('latin1');
 
 const {ExifImage} = exif;
 
@@ -65,7 +62,15 @@ export async function getExif(image) {
     return new Promise((resolve, reject) => {
         new ExifImage({image}, async (error, data) => {
             if (error) {
-                return reject(`Exif retrieval error for ${image} ${JSON.stringify(error)}`);
+                let imgSize = await probeSize(fs.createReadStream(image));
+                let fileStat = await fs.promises.stat(image);
+                let width = imgSize.width;
+                let height = imgSize.height;
+                console.log(`No exif for ${image}`)
+                return resolve({
+                    type: 'image', subType: 'none', width, height, duration: null,
+                    size: fileStat.size, createDate: new Date(fileStat.birthtimeMs), gps: null, exif: {}
+                });
             }
 
             let gps = null;
@@ -113,15 +118,15 @@ export async function getExif(image) {
                 ResolutionUnit: data.image.ResolutionUnit,
                 ...data.exif,
             }
-            for (let field in exifData)
-                if (exifData[field] === undefined)
+            for (let field in exifData) {
+                let value = exifData[field];
+                if (value === undefined)
                     delete exifData[field];
-            if (exifData.ExifVersion)
-                exifData.ExifVersion = decoder.write(exifData.ExifVersion);
-            if (exifData.FlashpixVersion)
-                exifData.FlashpixVersion = decoder.write(exifData.FlashpixVersion);
-            if (exifData.ComponentsConfiguration)
-                exifData.ComponentsConfiguration = Array.from(exifData.ComponentsConfiguration);
+                if (value instanceof Buffer)
+                    delete exifData[field];
+                if (typeof value === "string" && value.includes('\x00'))
+                    delete exifData[field];
+            }
 
             let filename = path.basename(image);
             let subType = 'none';

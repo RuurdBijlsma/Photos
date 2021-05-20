@@ -22,46 +22,51 @@ async function initClassifier() {
 const ready = initClassifier();
 
 export default async function classify(imagePath, nLabels = 3) {
-    await ready;
-
-    let imageBuffer = await fs.promises.readFile(imagePath);
-    let image;
     try {
-        image = tf.node.decodeImage(imageBuffer);
+        await ready;
+
+        let imageBuffer = await fs.promises.readFile(imagePath);
+        let image;
+        try {
+            image = tf.node.decodeImage(imageBuffer);
+        } catch (e) {
+            console.warn("Can't decode image: ", imagePath);
+            throw new Error(e);
+        }
+        const targetSize = [299, 299];
+        let resizedImage = tf.image.resizeBilinear(image, targetSize);
+        image.dispose();
+        let reshapedImage = tf.reshape(resizedImage, [-1, ...targetSize, 3]);
+        resizedImage.dispose();
+        let normalizedImage = reshapedImage.div(tf.scalar(255));
+        reshapedImage.dispose();
+
+        let result = model.predict(normalizedImage, {batchSize: 1});
+        normalizedImage.dispose();
+        let predicted = await result.array().then(d => d[0]);
+        result.dispose();
+        let maxIndices = iMaxN(predicted, nLabels);
+
+        let resultArr = [];
+        for (let i of maxIndices) {
+            let {labels, glossaries} = await getLabelWord(i);
+            resultArr.push({
+                logits: predicted[i],
+                labels, glossaries
+            });
+        }
+        let maxLogits = Math.max(...resultArr.map(r => r.logits));
+        return resultArr
+            .map(r => ({
+                confidence: r.logits / maxLogits,
+                labels: r.labels,
+                glossaries: r.glossaries
+            }))
+            .sort((a, b) => b.confidence - a.confidence)
     } catch (e) {
-        console.warn("Can't decode image: ", imagePath);
-        throw new Error(e);
+        console.warn(`Couldn't classify image ${imagePath} \n ${JSON.stringify(e)}`)
+        return null;
     }
-    const targetSize = [299, 299];
-    let resizedImage = tf.image.resizeBilinear(image, targetSize);
-    image.dispose();
-    let reshapedImage = tf.reshape(resizedImage, [-1, ...targetSize, 3]);
-    resizedImage.dispose();
-    let normalizedImage = reshapedImage.div(tf.scalar(255));
-    reshapedImage.dispose();
-
-    let result = model.predict(normalizedImage, {batchSize: 1});
-    normalizedImage.dispose();
-    let predicted = await result.array().then(d => d[0]);
-    result.dispose();
-    let maxIndices = iMaxN(predicted, nLabels);
-
-    let resultArr = [];
-    for (let i of maxIndices) {
-        let {labels, glossaries} = await getLabelWord(i);
-        resultArr.push({
-            logits: predicted[i],
-            labels, glossaries
-        });
-    }
-    let maxLogits = Math.max(...resultArr.map(r => r.logits));
-    return resultArr
-        .map(r => ({
-            confidence: r.logits / maxLogits,
-            labels: r.labels,
-            glossaries: r.glossaries
-        }))
-        .sort((a, b) => b.confidence - a.confidence)
 }
 
 async function getLabelWord(idx) {
@@ -79,8 +84,8 @@ async function getLabelWord(idx) {
                 break;
             parents.push(parent);
         }
-        let hierarchy = [word, ...parents].map((word, index)=>({...parseWord(word), index}));
-        let labels = hierarchy.flatMap(w => w.names.map(text=>({text, level: w.index})));
+        let hierarchy = [word, ...parents].map((word, index) => ({...parseWord(word), index}));
+        let labels = hierarchy.flatMap(w => w.names.map(text => ({text, level: w.index})));
         let glossaries = hierarchy.map(w => ({text: w.glossary, level: w.index}));
         return {labels, glossaries};
     } catch (e) {

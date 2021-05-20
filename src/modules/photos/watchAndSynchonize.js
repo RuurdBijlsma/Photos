@@ -178,7 +178,7 @@ async function processMedia(filePath, triesLeft = 2) {
         if (alreadyInDb)
             await alreadyInDb.destroy();
 
-        let metadata, labels, thumbSmallRel, thumbBigRel, webmRel;
+        let metadata = {}, labels, thumbSmallRel, thumbBigRel, webmRel;
         if (type === 'image') {
             metadata = await getExif(filePath);
             labels = await classify(filePath);
@@ -188,7 +188,7 @@ async function processMedia(filePath, triesLeft = 2) {
             thumbSmallRel = path.relative(config.thumbnails, small);
             thumbBigRel = path.relative(config.thumbnails, big);
             webmRel = null;
-            let orientation = metadata.exif.Orientation ?? 1;
+            let orientation = metadata.exif?.Orientation ?? 1;
             if (orientation >= 5)
                 [metadata.width, metadata.height] = [metadata.height, metadata.width];
             await resizeImage({input: filePath, orientation, output: big, height,});
@@ -234,7 +234,7 @@ async function processMedia(filePath, triesLeft = 2) {
             }"\n\n${JSON.stringify(e)}`);
             return false;
         } else {
-            const waitTime = (4 - triesLeft) ** 2 * 5000;
+            const waitTime = (3 - triesLeft) ** 2 * 5000;
             console.warn("Process media failed for", filePath, `RETRYING AFTER ${waitTime}ms...`);
             console.warn(e);
             await waitSleep(waitTime);
@@ -273,7 +273,7 @@ async function removeMedia(filePath, triesLeft = 2) {
             }"\n\n${JSON.stringify(e)}`);
             return false;
         } else {
-            const waitTime = (4 - triesLeft) ** 2 * 5000;
+            const waitTime = (3 - triesLeft) ** 2 * 5000;
             console.warn("Remove media failed for", filePath, `RETRYING AFTER ${waitTime}ms...`);
             console.warn(e);
             await waitSleep(waitTime);

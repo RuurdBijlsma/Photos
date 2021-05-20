@@ -134,7 +134,7 @@ export async function searchMediaRanked({query, limit = false, includedFields}) 
     if (limit)
         bind.push(limit);
     return await sequelizeInstance.query(
-        `select ${includedFields.join(', ')}, ts_rank_cd(vector, query) as rank
+        `select ${includedFields.map(f=>`"${f}"`).join(', ')}, ts_rank_cd(vector, query) as rank
     from "MediaItems", to_tsquery('english', $1) query
     where query @@ vector
     order by rank desc
@@ -220,27 +220,31 @@ export async function insertMediaItem(data) {
             ),
             weight
         );
-    const toText = a => a.map(b => b.text);
-    let [classA, classB, classC] = data.classifications.sort((a, b) => b.confidence - a.confidence);
+    const toText = a => Array.isArray(a) ? a.map(b => b.text) : [a];
+    let classA, classB, classC;
+    if (data.classifications)
+        [classA, classB, classC] = data.classifications.sort((a, b) => b.confidence - a.confidence);
+    else
+        [classA, classB, classC] = [null, null, null]
 
     try {
         await seqInstance.transaction({}, async transaction => {
             let item = await MediaItem.create({
                 vectorA: toVector('A',
-                    ...toText(classA.labels),
+                    ...toText(classA?.labels),
                     data.location?.place,
                     data.location?.country,
                 ),
                 vectorB: toVector('B',
-                    data.filename, ...toText(classB.labels),
+                    data.filename, ...toText(classB?.labels),
                     data.location?.admin1,
                     data.location?.admin2,
                     data.location?.admin3,
                     data.location?.admin4,
                 ),
                 vectorC: toVector('C',
-                    ...toText(classC.labels), ...toText(classA.glossaries),
-                    ...toText(classB.glossaries), ...toText(classC.glossaries)
+                    ...toText(classC?.labels), ...toText(classA?.glossaries),
+                    ...toText(classB?.glossaries), ...toText(classC?.glossaries)
                 ),
                 ...data,
             }, {transaction});
