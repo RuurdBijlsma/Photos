@@ -39,8 +39,8 @@ export default class TwimoteModule extends ApiModule {
                 let {width, height, duration} = await getTextSize(text);
                 if (type === 'mp4') {
                     // let url = `https://api.ruurd.dev/twimote?text=${encodeURIComponent(text)}&r=${randomID}&type=${type}`;
-                    // let url = `https://api.ruurd.dev/twimote?text=${encodeURIComponent(text)}&type=${type}`;
-                    let url = `http://82.73.25.96:3000/twimote?text=${encodeURIComponent(text)}&type=${type}`;
+                    let url = `https://api.ruurd.dev/twimote?text=${encodeURIComponent(text)}&type=${type}`;
+                    // let url = `http://82.73.25.96:3000/twimote?text=${encodeURIComponent(text)}&type=${type}`;
                     console.log(url);
                     return {
                         type: 'mpeg4_gif',
