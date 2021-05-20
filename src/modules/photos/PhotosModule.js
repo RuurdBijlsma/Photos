@@ -13,7 +13,7 @@ import {
     searchMediaRanked
 } from "../../database/models/photos/mediaUtils.js";
 import express from "express";
-import geocode from "./reverse-geocode";
+import geocode from "./reverse-geocode.js";
 
 const console = new Log("PhotosModule");
 
