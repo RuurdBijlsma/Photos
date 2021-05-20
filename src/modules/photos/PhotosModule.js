@@ -28,6 +28,7 @@ export default class PhotosModule extends ApiModule {
         app.use('/photo', express.static(config.thumbnails));
 
         app.post('/photos/month-photos', async (req, res) => {
+            if(process.platform!=='win32')return res.sendStatus(403);
             try {
                 let result = await Promise.all(
                     req.body.map(date => getMonthPhotos(...date))
@@ -39,10 +40,12 @@ export default class PhotosModule extends ApiModule {
         });
 
         app.get('/photos/months', async (req, res) => {
+            if(process.platform!=='win32')return res.sendStatus(403);
             res.send(await getPhotoMonths());
         });
 
         app.get('/photos/list', async (req, res) => {
+            if(process.platform!=='win32')return res.sendStatus(403);
             let limit = +req.query.limit;
             if (!isFinite(limit))
                 limit = 10;
@@ -61,6 +64,7 @@ export default class PhotosModule extends ApiModule {
         })
 
         app.get('/photos/locations/', async (req, res) => {
+            if(process.platform!=='win32')return res.sendStatus(403);
             let now = +new Date();
             const refreshEvery = 1000 * 60 * 15;// 15 minutes
             if (!this.randomLocations || this.randomLocations.date + refreshEvery < now) {
@@ -71,6 +75,7 @@ export default class PhotosModule extends ApiModule {
         });
 
         app.get('/photos/labels/', async (req, res) => {
+            if(process.platform!=='win32')return res.sendStatus(403);
             let now = +new Date();
             const refreshEvery = 1000 * 60 * 15;// 15 minutes
             if (!this.randomLabels || this.randomLabels.date + refreshEvery < now) {
@@ -81,6 +86,7 @@ export default class PhotosModule extends ApiModule {
         });
 
         app.get('/photos/search/', async (req, res) => {
+            if(process.platform!=='win32')return res.sendStatus(403);
             let query = req.query.q;
             let result = await searchMediaRanked({
                 query,
@@ -90,6 +96,7 @@ export default class PhotosModule extends ApiModule {
         });
 
         app.get('/photo/full/:id', async (req, res) => {
+            if(process.platform!=='win32')return res.sendStatus(403);
             const id = req.params.id;
             let item = await MediaItem.findOne({where: {id}});
             if (item === null)
