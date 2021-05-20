@@ -40,9 +40,10 @@ class Controller {
             new MediaDownloadModule(),
             new ReverseProxyModule(),
             new AuthModule(),
-            // new TwimoteModule(),
             new PhotosModule(),
         ];
+        if (process.platform !== 'win32')
+            this.modules.push(new TwimoteModule())
     }
 
     setRoutes() {
