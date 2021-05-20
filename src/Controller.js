@@ -20,7 +20,6 @@ import PhotosModule from "./modules/photos/PhotosModule.js";
 import seq from "sequelize";
 import cred from "../res/auth/credentials.json"
 import Database from "./database/Database.js";
-import {resizeImage} from "./modules/photos/transcode.js";
 
 const {Sequelize} = seq;
 const {dbUser, dbPass, dbName} = cred;
@@ -40,10 +39,10 @@ class Controller {
             new MediaDownloadModule(),
             new ReverseProxyModule(),
             new AuthModule(),
-            // new PhotosModule(),
+            new PhotosModule(),
         ];
-        if (process.platform !== 'win32')
-            this.modules.push(new TwimoteModule())
+        // if (process.platform !== 'win32')
+        //     this.modules.push(new TwimoteModule())
     }
 
     setRoutes() {
