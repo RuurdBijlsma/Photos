@@ -53,11 +53,11 @@ export function initMediaItem(sequelize) {
             allowNull: false,
         },
         durationMs: {
-            type: DataTypes.INTEGER,
+            type: DataTypes.BIGINT,
             allowNull: true,
         },
         bytes: {
-            type: DataTypes.INTEGER,
+            type: DataTypes.BIGINT,
             allowNull: false,
         },
         createDate: {
