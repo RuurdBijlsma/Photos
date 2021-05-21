@@ -7,6 +7,7 @@
   "scripts": {
     "start": "node --experimental-json-modules src/index.js",
     "debugStart": "set DEBUG=* & node --experimental-json-modules src/index.js",
+    "fixPhotoDate": "node --experimental-json-modules src/modules/photos/fixPhotoDate.js",
     "dropPhotosDb": "node --experimental-json-modules src/modules/photos/dropPhotosDb.js",
     "testExif": "node --experimental-json-modules src/modules/photos/exif.js",
     "testGeocode": "node --experimental-json-modules src/modules/photos/reverse-geocode.js",

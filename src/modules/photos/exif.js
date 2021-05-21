@@ -106,10 +106,14 @@ export async function getExif(image) {
                 }
             }
 
-
             let createDate = null;
-            if (data.exif.CreateDate && data.exif.CreateDate.includes(' ')) {
-                let [date, time] = data.exif.CreateDate.split(' ');
+            let exifDateField = data.exif.DateTimeOriginal && data.exif.DateTimeOriginal.includes(' ') ?
+                'DateTimeOriginal' :
+                (data.exif.CreateDate && data.exif.CreateDate.includes(' ') ?
+                    'CreateDate' :
+                    null);
+            if (exifDateField !== null) {
+                let [date, time] = data.exif[exifDateField].split(' ');
                 date = date.replace(/:/gi, '/');
                 createDate = new Date(`${date}, ${time}`);
             }

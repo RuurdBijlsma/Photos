@@ -14,6 +14,7 @@ import {
 } from "../../database/models/photos/mediaUtils.js";
 import express from "express";
 import geocode from "./reverse-geocode.js";
+import Auth from "../../database/Auth.js";
 
 const console = new Log("PhotosModule");
 
@@ -28,10 +29,13 @@ export default class PhotosModule extends ApiModule {
         app.use('/photo', express.static(config.thumbnails));
 
         app.post('/photos/month-photos', async (req, res) => {
-            if(process.platform!=='win32')return res.sendStatus(403);
+            let user = await Auth.checkRequest(req);
+            if (!user) return res.sendStatus(401);
+            if (process.platform !== 'win32') return res.sendStatus(403);
             try {
+                let months = req.body.months;
                 let result = await Promise.all(
-                    req.body.map(date => getMonthPhotos(...date))
+                    months.map(date => getMonthPhotos(...date))
                 );
                 res.send(result);
             } catch (e) {
@@ -39,13 +43,15 @@ export default class PhotosModule extends ApiModule {
             }
         });
 
-        app.get('/photos/months', async (req, res) => {
-            if(process.platform!=='win32')return res.sendStatus(403);
+        app.post('/photos/months', async (req, res) => {
+            let user = await Auth.checkRequest(req);
+            if (!user) return res.sendStatus(401);
             res.send(await getPhotoMonths());
         });
 
-        app.get('/photos/list', async (req, res) => {
-            if(process.platform!=='win32')return res.sendStatus(403);
+        app.post('/photos/list', async (req, res) => {
+            let user = await Auth.checkRequest(req);
+            if (!user) return res.sendStatus(401);
             let limit = +req.query.limit;
             if (!isFinite(limit))
                 limit = 10;
@@ -63,8 +69,9 @@ export default class PhotosModule extends ApiModule {
             res.send(photos);
         })
 
-        app.get('/photos/locations/', async (req, res) => {
-            if(process.platform!=='win32')return res.sendStatus(403);
+        app.post('/photos/locations/', async (req, res) => {
+            let user = await Auth.checkRequest(req);
+            if (!user) return res.sendStatus(401);
             let now = +new Date();
             const refreshEvery = 1000 * 60 * 15;// 15 minutes
             if (!this.randomLocations || this.randomLocations.date + refreshEvery < now) {
@@ -74,8 +81,9 @@ export default class PhotosModule extends ApiModule {
             res.send(locations);
         });
 
-        app.get('/photos/labels/', async (req, res) => {
-            if(process.platform!=='win32')return res.sendStatus(403);
+        app.post('/photos/labels/', async (req, res) => {
+            let user = await Auth.checkRequest(req);
+            if (!user) return res.sendStatus(401);
             let now = +new Date();
             const refreshEvery = 1000 * 60 * 15;// 15 minutes
             if (!this.randomLabels || this.randomLabels.date + refreshEvery < now) {
@@ -85,8 +93,9 @@ export default class PhotosModule extends ApiModule {
             res.send(labels);
         });
 
-        app.get('/photos/search/', async (req, res) => {
-            if(process.platform!=='win32')return res.sendStatus(403);
+        app.post('/photos/search/', async (req, res) => {
+            let user = await Auth.checkRequest(req);
+            if (!user) return res.sendStatus(401);
             let query = req.query.q;
             let result = await searchMediaRanked({
                 query,
@@ -96,7 +105,7 @@ export default class PhotosModule extends ApiModule {
         });
 
         app.get('/photo/full/:id', async (req, res) => {
-            if(process.platform!=='win32')return res.sendStatus(403);
+            if (process.platform !== 'win32') return res.sendStatus(403);
             const id = req.params.id;
             let item = await MediaItem.findOne({where: {id}});
             if (item === null)
