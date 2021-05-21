@@ -96,6 +96,7 @@ export default class PhotosModule extends ApiModule {
             let user = await Auth.checkRequest(req);
             if (!user) return res.sendStatus(401);
             let query = req.query.q;
+            query = query.split(' ').filter(n => n.length > 0).join(' ');
             let result = await searchMediaRanked({
                 query,
                 includedFields: ['id', 'subType', 'type', 'createDate', 'filename', 'width', 'height'],
