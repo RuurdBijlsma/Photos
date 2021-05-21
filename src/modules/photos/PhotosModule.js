@@ -31,7 +31,6 @@ export default class PhotosModule extends ApiModule {
         app.post('/photos/month-photos', async (req, res) => {
             let user = await Auth.checkRequest(req);
             if (!user) return res.sendStatus(401);
-            if (process.platform !== 'win32') return res.sendStatus(403);
             try {
                 let months = req.body.months;
                 let result = await Promise.all(
@@ -105,7 +104,6 @@ export default class PhotosModule extends ApiModule {
         });
 
         app.get('/photo/full/:id', async (req, res) => {
-            if (process.platform !== 'win32') return res.sendStatus(403);
             const id = req.params.id;
             let item = await MediaItem.findOne({where: {id}});
             if (item === null)
