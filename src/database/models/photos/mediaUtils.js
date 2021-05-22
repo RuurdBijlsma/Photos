@@ -73,7 +73,6 @@ export async function getPhotoMonths() {
     return await sequelizeInstance.query(`
         select extract(year from "createDate")                       as year,
                extract(month from "createDate")                      as month,
-               count(*)::FLOAT / (select count(*) from "MediaItems") as part,
                count(*)::INT                                         as count
         from "MediaItems"
         where "createDate" is not null
