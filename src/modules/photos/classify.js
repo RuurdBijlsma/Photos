@@ -26,13 +26,7 @@ export default async function classify(imagePath, nLabels = 3) {
         await ready;
 
         let imageBuffer = await fs.promises.readFile(imagePath);
-        let image;
-        try {
-            image = tf.node.decodeImage(imageBuffer);
-        } catch (e) {
-            console.warn("Can't decode image: ", imagePath);
-            throw new Error(e);
-        }
+        let image = tf.node.decodeImage(imageBuffer);
         const targetSize = [299, 299];
         let resizedImage = tf.image.resizeBilinear(image, targetSize);
         image.dispose();
@@ -101,6 +95,6 @@ function parseWord(word) {
     };
 }
 
-// classify('./res/photos/photos/20170727_204153.jpg').then(c => {
+// classify('./res/photos/photos/IMG_20160920_131523.jpg').then(c => {
 //     console.log(c);
 // })

@@ -34,6 +34,7 @@
     "express": "^4.17.1",
     "ffbinaries": "^1.1.4",
     "filenamify": "^4.2.0",
+    "fix-exif-data": "github:ruurdbijlsma/exif-date-fix",
     "fluent-ffmpeg": "^2.1.2",
     "gify-parse": "^1.0.7",
     "gm": "^1.23.1",
