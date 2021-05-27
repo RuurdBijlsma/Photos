@@ -57,7 +57,7 @@ export async function backupDb() {
 export async function getMonthPhotos(year, month) {
     const sequelizeInstance = MediaItem.sequelize;
     return await sequelizeInstance.query(`
-        select id, type, width, height, "createDate"
+        select id, type, "subType", width, height, "createDate", "durationMs"
         from "MediaItems"
         where extract(month from "createDate") = $1
           and extract(year from "createDate") = $2

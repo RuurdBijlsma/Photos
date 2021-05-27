@@ -2,7 +2,7 @@ import ApiModule from "../../ApiModule.js";
 import {watchAndSynchronize} from "./watchAndSynchonize.js";
 import Log from "../../Log.js";
 import {MediaItem} from "../../database/models/photos/MediaItemModel.js";
-import config from "../../../res/photos/config.template.json";
+import config from "../../../res/photos/config.json";
 import path from "path";
 import mime from 'mime-types'
 import {
@@ -38,7 +38,7 @@ export default class PhotosModule extends ApiModule {
                 );
                 res.send(result);
             } catch (e) {
-                res.sendStatus(401);
+                res.sendStatus(500);
             }
         });
 
@@ -63,7 +63,7 @@ export default class PhotosModule extends ApiModule {
 
                 limit,
                 offset,
-                attributes: ['id', 'subType', 'type', 'createDate', 'filename', 'width', 'height']
+                attributes: ['id', 'subType', 'type', 'createDate', 'width', 'height']
             });
             res.send(photos);
         })
@@ -99,7 +99,7 @@ export default class PhotosModule extends ApiModule {
             query = query.split(' ').filter(n => n.length > 0).join(' ');
             let result = await searchMediaRanked({
                 query,
-                includedFields: ['id', 'subType', 'type', 'createDate', 'filename', 'width', 'height'],
+                includedFields: ['id', 'subType', 'type', 'createDate', 'width', 'height'],
             })
             res.send(result);
         });

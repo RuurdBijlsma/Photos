@@ -1,7 +1,7 @@
 import classify from "./classify.js";
 import {resizeImage, transcode, videoScreenshot} from "./transcode.js";
 import {getExif, probeVideo} from "./exif.js";
-import fs from 'fs'
+import fs from 'fs';
 import path from "path";
 import mime from "mime-types";
 import config from "../../../res/photos/config.json";
@@ -12,9 +12,6 @@ import TelegramBot from "node-telegram-bot-api";
 import os from "os";
 
 const {Op} = seq;
-
-// Todo
-
 
 const bot = new TelegramBot(config.telegramToken, {polling: false});
 const bigPic = await useDir(path.join(config.thumbnails, 'big'));
@@ -297,8 +294,7 @@ async function getFilesRecursive(filePath) {
         images.push(...subResults.flatMap(r => r.images));
     } else {
         files.push(filePath);
-        let ext = path.extname(filePath).toLowerCase();
-        if (ext === '.mp4' || ext === '.webm' || ext === '.avi')
+        if (getFileType(filePath)==='video')
             videos.push(filePath);
         else images.push(filePath);
     }
