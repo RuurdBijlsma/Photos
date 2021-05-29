@@ -26,7 +26,7 @@ export default class PhotosModule extends ApiModule {
     }
 
     async setRoutes(app, io, db) {
-        app.use('/photo', express.static(config.thumbnails));
+        app.use('/photos', express.static(config.thumbnails));
 
         app.post('/photos/month-photos', async (req, res) => {
             let user = await Auth.checkRequest(req);
@@ -104,7 +104,7 @@ export default class PhotosModule extends ApiModule {
             res.send(result);
         });
 
-        app.post('/photo/:id', async (req, res) => {
+        app.post('/photos/:id', async (req, res) => {
             let user = await Auth.checkRequest(req);
             if (!user) return res.sendStatus(401);
             const id = req.params.id;
@@ -116,7 +116,7 @@ export default class PhotosModule extends ApiModule {
             res.send(item);
         });
 
-        app.get('/photo/full/:id', async (req, res) => {
+        app.get('/photos/full/:id', async (req, res) => {
             const id = req.params.id;
             let item = await MediaItem.findOne({where: {id}});
             if (item === null)
