@@ -63,7 +63,7 @@ export default class PhotosModule extends ApiModule {
 
                 limit,
                 offset,
-                attributes: ['id', 'subType', 'type', 'createDate', 'width', 'height']
+                attributes: ['id', 'type', 'subType', 'durationMs', 'createDate', 'width', 'height']
             });
             res.send(photos);
         })
@@ -99,7 +99,7 @@ export default class PhotosModule extends ApiModule {
             query = query.split(' ').filter(n => n.length > 0).join(' ');
             let result = await searchMediaRanked({
                 query,
-                includedFields: ['id', 'subType', 'type', 'createDate', 'width', 'height'],
+                includedFields: ['id', 'type', 'subType', 'durationMs', 'createDate', 'width', 'height'],
             })
             res.send(result);
         });

@@ -16,6 +16,12 @@ async function dateFromFile(filePath) {
     return new Date(fileStat.birthtimeMs);
 }
 
+/**
+ * Get image dimensions
+ * @param filePath
+ * @param exifData
+ * @returns {Promise<{width, height}|null>}
+ */
 async function imageSize(filePath, exifData = null) {
     let width = exifData?.image?.ImageWidth
     let height = exifData?.image?.ImageHeight;
@@ -109,7 +115,7 @@ export async function getExif(image) {
 
             let filename = path.basename(image);
             let subType = 'none';
-            if (filename.includes("PORTRAIT" && filename.includes("COVER")))
+            if (filename.includes("PORTRAIT") && filename.includes("COVER"))
                 subType = 'Portrait';
             else if (filename.startsWith('PANO'))
                 subType = 'VR';
