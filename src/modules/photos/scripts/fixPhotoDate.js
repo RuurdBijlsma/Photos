@@ -1,17 +1,7 @@
-import {MediaItem} from "../../database/models/photos/MediaItemModel.js";
-import cred from "../../../res/auth/credentials.json";
-import {Sequelize} from "sequelize";
-import Database from "../../database/Database.js";
+import {MediaItem} from "../../../database/models/photos/MediaItemModel.js";
+import Utils from "../../../Utils.js";
 
-const {Op} = Sequelize;
-const {dbUser, dbPass, dbName} = cred;
-
-const db = new Sequelize(dbName, dbUser, dbPass, {
-    host: 'localhost',
-    dialect: 'postgres',
-    logging: false,
-});
-await Database.setDb(db);
+await Utils.initDb();
 
 let count = await MediaItem.count();
 let batchSize = 50;

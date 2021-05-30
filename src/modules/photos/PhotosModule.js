@@ -15,7 +15,10 @@ import {
 import express from "express";
 import geocode from "./reverse-geocode.js";
 import Auth from "../../database/Auth.js";
+import sequelize from "sequelize";
+import {MediaSuggestion} from "../../database/models/photos/MediaSuggestionModel.js";
 
+const {Op} = sequelize;
 const console = new Log("PhotosModule");
 
 export default class PhotosModule extends ApiModule {
@@ -90,6 +93,25 @@ export default class PhotosModule extends ApiModule {
             }
             let labels = await this.randomLabels.labels;
             res.send(labels);
+        });
+
+        app.post('/photos/suggestions', async (req, res) => {
+            let user = await Auth.checkRequest(req);
+            if (!user) return res.sendStatus(401);
+
+            let query = req.query.q;
+            query = query.split(' ').filter(n => n.length > 0).join(' ');
+
+            res.send(await MediaSuggestion.findAll({
+                where: {
+                    text: {
+                        [Op.iLike]: `%${query}%`,
+                    },
+                },
+                order: [['count', 'DESC']],
+                limit: 10,
+                attributes: ['text', 'count'],
+            }));
         });
 
         app.post('/photos/search/', async (req, res) => {

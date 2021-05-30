@@ -1,9 +1,30 @@
 import Log from "./Log.js";
 import crypto from "crypto";
+import {Sequelize} from "sequelize";
+import cred from "../res/auth/credentials.json";
+import Database from "./database/Database.js";
+
 const console = new Log("Utils");
+const {dbUser, dbPass, dbName} = cred;
+
 
 export default class Utils {
-    static getToken(nBytes=48) {
+    static get months(){
+       return ['January', 'February', 'March', 'April', 'May', 'June',
+            'July', 'August', 'September', 'October', 'November', 'December'];
+    }
+
+    static async initDb() {
+        const db = new Sequelize(dbName, dbUser, dbPass, {
+            host: 'localhost',
+            dialect: 'postgres',
+            logging: false,
+        });
+        await Database.setDb(db);
+        return db;
+    }
+
+    static getToken(nBytes = 48) {
         return new Promise((resolve, reject) => {
             crypto.randomBytes(nBytes, (err, buffer) => {
                 if (err) {

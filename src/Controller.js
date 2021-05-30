@@ -19,7 +19,7 @@ import PhotosModule from "./modules/photos/PhotosModule.js";
 
 import seq from "sequelize";
 import cred from "../res/auth/credentials.json"
-import Database from "./database/Database.js";
+import Utils from "./Utils.js";
 
 const {Sequelize} = seq;
 const {dbUser, dbPass, dbName} = cred;
@@ -75,12 +75,7 @@ class Controller {
         }
         this.io = socketIo(server);
         console.log("Initializing DB connection with ", {dbName, dbUser});
-        this.db = new Sequelize(dbName, dbUser, dbPass, {
-            host: 'localhost',
-            dialect: 'postgres',
-            logging: false,
-        });
-        await Database.setDb(this.db);
+        this.db = await Utils.initDb();
 
         this.setRoutes();
         server.listen(port, () =>

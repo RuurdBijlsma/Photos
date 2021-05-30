@@ -3,7 +3,7 @@ import {initUser} from "./models/UserModel.js";
 import {initSudoku} from "./models/SudokuModel.js";
 import {initEmoteSticker} from "./models/EmoteStickerModel.js";
 import {initEmote} from "./models/EmoteModel.js";
-import {initMedia, insertTestMediaItem, removeTestMediaItem} from "./models/photos/mediaUtils.js";
+import {initMedia} from "./models/photos/mediaUtils.js";
 
 const console = new Log("Database");
 
@@ -32,7 +32,6 @@ class Database {
             initEmote(this.db);
             console.log("Init media tables");
             await initMedia(this.db);
-
 
             console.log("Syncing db");
             await this.db.sync();

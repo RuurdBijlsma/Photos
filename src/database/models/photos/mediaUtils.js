@@ -9,16 +9,21 @@ import sequelize from 'sequelize';
 import {initMediaPlace, MediaPlace} from "./MediaPlaceModel.js";
 import {exec} from "child_process";
 import dbConfig from "../../../../res/auth/credentials.json";
+import {initMediaSuggestion, MediaSuggestion} from "./MediaSuggestionModel.js";
+import Database from "../../Database.js";
 
 const {Op} = sequelize;
 
 export async function initMedia(db) {
+    await db.query(`CREATE EXTENSION IF NOT EXISTS pg_trgm`);
+
     initMediaLabel(db);
     initMediaGlossary(db);
     initMediaClassification(db);
     initMediaLocation(db);
     initMediaItem(db);
     initMediaPlace(db);
+    initMediaSuggestion(db);
 
     MediaItem.hasMany(MediaClassification, {onDelete: 'CASCADE'});
     MediaClassification.belongsTo(MediaItem);
@@ -55,8 +60,7 @@ export async function backupDb() {
 }
 
 export async function getMonthPhotos(year, month) {
-    const sequelizeInstance = MediaItem.sequelize;
-    return await sequelizeInstance.query(`
+    return await Database.db.query(`
         select id, type, "subType", width, height, "createDate", "durationMs"
         from "MediaItems"
         where extract(month from "createDate") = $1
@@ -69,8 +73,7 @@ export async function getMonthPhotos(year, month) {
 }
 
 export async function getPhotoMonths() {
-    const sequelizeInstance = MediaItem.sequelize;
-    return await sequelizeInstance.query(`
+    return await Database.db.query(`
         select extract(year from "createDate")                       as year,
                extract(month from "createDate")                      as month,
                count(*)::INT                                         as count
@@ -84,8 +87,7 @@ export async function getPhotoMonths() {
 }
 
 export async function getRandomLocations(limit = 50) {
-    const sequelizeInstance = MediaItem.sequelize;
-    return await sequelizeInstance.query(`
+    return await Database.db.query(`
         select distinct on (text) text, "MediaItemId"
         from "MediaLocations"
         inner join "MediaPlaces" MP on "MediaLocations".id = MP."MediaLocationId"
@@ -104,8 +106,7 @@ export async function getRandomLocations(limit = 50) {
 }
 
 export async function getRandomLabels(limit = 50) {
-    const sequelizeInstance = MediaItem.sequelize;
-    return await sequelizeInstance.query(`
+    return await Database.db.query(`
     select distinct on (text) text, "MediaItemId"
     from "MediaClassifications"
     inner join "MediaLabels" ML on "MediaClassifications".id = ML."MediaClassificationId"
@@ -127,12 +128,11 @@ export async function getRandomLabels(limit = 50) {
 }
 
 export async function searchMediaRanked({query, limit = false, includedFields}) {
-    const sequelizeInstance = MediaItem.sequelize;
     query = query.replace(/ /g, '&');
     let bind = [query];
     if (limit)
         bind.push(limit);
-    return await sequelizeInstance.query(
+    return await Database.db.query(
         `select ${includedFields.map(f=>`"${f}"`).join(', ')}, ts_rank_cd(vector, query) as rank
     from "MediaItems", to_tsquery('english', $1) query
     where query @@ vector
@@ -200,6 +200,25 @@ export async function getUniqueId() {
     return id;
 }
 
+export async function addSuggestion(obj) {
+    if (typeof obj.type !== 'string' || typeof obj.text !== 'string') {
+        console.warn("Can't add suggestion", obj);
+        return;
+    }
+    const {text, type} = obj;
+    let [item, created] = await MediaSuggestion.findOrCreate({
+        where: {text}, defaults: {
+            type,
+            vector: sequelize.fn('to_tsvector', 'english', text),
+            count: 1,
+        },
+    });
+    if (!created) {
+        item.count++;
+        await item.save();
+    }
+}
+
 /**
  * @param {{
  *     id,type,subType,filename,filePath,smallThumbPath,bigThumbPath,webmPath,
@@ -249,11 +268,30 @@ export async function insertMediaItem(data) {
             }, {transaction});
             await seqInstance.query(
                 `update "MediaItems"
-    set vector = setweight("vectorA", 'A') || setweight("vectorB", 'B') || setweight("vectorC", 'C')
-    where id = '${data.id}'`
-
-
+                    set vector = setweight("vectorA", 'A') || setweight("vectorB", 'B') || setweight("vectorC", 'C')
+                    where id = '${data.id}'`
                 , {transaction});
+
+            // Add suggestions to db
+            const places = [
+                data.location?.place, data.location?.country,
+                data.location?.admin1, data.location?.admin2, data.location?.admin3, data.location?.admin4
+            ].flat().filter(n => n !== null && n !== undefined).map(p => ({text: p, type: 'place'}));
+            const labels = [
+                ...classA?.labels, classB?.labels, classC?.labels
+            ].flat().filter(n => n !== null && n !== undefined).map(p => ({text: p.text, type: 'label'}));
+
+            let dates = [];
+            if (data.createDate !== null) {
+                let date = data.createDate;
+                let month = Utils.months[date.getMonth()];
+                let year = date.getFullYear().toString();
+                dates.push({type: 'date', text: month});
+                dates.push({type: 'date', text: year});
+                dates.push({type: 'date', text: `${month} ${year}`});
+            }
+            await Promise.allSettled([...places, ...labels, ...dates].map(addSuggestion));
+
             if (data.location) {
                 let locItem = await MediaLocation.create({
                     latitude: data.location.latitude,
@@ -265,10 +303,7 @@ export async function insertMediaItem(data) {
                     {type: 'place', text: data.location.place},
                     {type: 'country', text: data.location.country},
                     ...data.location.admin.map((a, i) => ({
-                        type:
-
-                            `admin${i + 1}`
-
+                        type: `admin${i + 1}`
                         , text: a
                     })),
                 ];
@@ -356,8 +391,7 @@ export async function insertTestMediaItem() {
 }
 
 async function swapWidthAndHeightOnPortraitPhotos() {
-    let sequelizeInstance = MediaItem.sequelize;
-    await sequelizeInstance.query(`
+    await Database.db.query(`
         update "MediaItems"
         set width=height,
             height=width

@@ -1,6 +1,6 @@
-import {resizeImage} from "./transcode.js";
+import {resizeImage} from "../transcode.js";
 import path from "path";
-import {getExif} from "./exif.js";
+import {getExif} from "../exif.js";
 
 // let file = path.resolve('./res/photos/photos/IMG_20210512_032949.jpg');
 // let file = path.resolve('./res/photos/photos/IMG_20210512_032955.jpg');
