@@ -6,6 +6,7 @@ import config from "../../../res/photos/config.json";
 import path from "path";
 import mime from 'mime-types'
 import {
+    getMediaById,
     getMonthPhotos,
     getPhotoMonths,
     getRandomLabels,
@@ -132,7 +133,7 @@ export default class PhotosModule extends ApiModule {
             const id = req.params.id;
             if (!id)
                 return res.send(401);
-            let item = await MediaItem.findOne({where: {id}});
+            let item = await getMediaById(id);
             if (item === null)
                 return res.send(404);
             res.send(item);

@@ -177,7 +177,7 @@ export async function getMediaByFilename(filename) {
         where: {filename},
         include: [
             {model: MediaClassification, include: [MediaLabel, MediaGlossary]},
-            {model: MediaLocation}
+            {model: MediaLocation, include: [MediaPlace]},
         ],
     });
 }
@@ -187,7 +187,7 @@ export async function getMediaById(id) {
         where: {id},
         include: [
             {model: MediaClassification, include: [MediaLabel, MediaGlossary]},
-            {model: MediaLocation}
+            {model: MediaLocation, include: [MediaPlace]},
         ],
     });
 }
