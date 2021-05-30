@@ -290,7 +290,10 @@ export async function insertMediaItem(data) {
                 dates.push({type: 'date', text: year});
                 dates.push({type: 'date', text: `${month} ${year}`});
             }
-            await Promise.allSettled([...places, ...labels, ...dates].map(addSuggestion));
+            try {
+                await Promise.all([...places, ...labels, ...dates].map(addSuggestion));
+            } catch (e) {
+            }
 
             if (data.location) {
                 let locItem = await MediaLocation.create({
