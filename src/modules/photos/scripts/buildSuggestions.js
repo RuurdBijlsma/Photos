@@ -39,7 +39,7 @@ for (let i = 0; i < count; i += batchSize) {
         let labels = (item.MediaClassifications?.flatMap?.(c => c?.MediaLabels.map(l => l.text)) ?? [])
             .map(p => ({type: 'label', text: p}));
 
-        await Promise.allSettled([...places, ...labels, ...dates].map(addSuggestion));
+        await Promise.all([...places, ...labels, ...dates].map(addSuggestion));
     }
     await Promise.all(promises);
     console.log(`Progress [${i + 1} / ${count}]`);
