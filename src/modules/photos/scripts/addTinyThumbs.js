@@ -1,7 +1,7 @@
 import {MediaItem} from "../../../database/models/photos/MediaItemModel.js";
 import Utils from "../../../Utils.js";
 import {resizeImage} from "../transcode.js";
-import {getPaths} from '../watchAndSynchonize.js'
+import {checkFileExists, getPaths} from '../watchAndSynchonize.js'
 import path from "path";
 import config from '../../../../res/photos/config.json';
 
@@ -19,11 +19,17 @@ for (let i = 0; i < count; i += batchSize) {
         let tinyHeight = Math.min(item.height, 260);
         let {tiny} = getPaths(item.id);
         let inputImg = path.join(config.thumbnails, 'big', `${item.id}.webp`);
-        promises.push(
-            resizeImage({input: inputImg, output: tiny, height: tinyHeight,})
-        );
+        if (!await checkFileExists(tiny)) {
+            promises.push(
+                resizeImage({input: inputImg, output: tiny, height: tinyHeight,})
+            );
+        }
     }
-    await Promise.all(promises);
+    try {
+        await Promise.all(promises);
+    } catch (e) {
+        console.warn(e);
+    }
     console.log(`Progress [${i + 1} / ${count}]`);
 }
 console.log("Done creating tiny images");

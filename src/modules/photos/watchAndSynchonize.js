@@ -318,7 +318,7 @@ export function getPaths(id) {
     return {big, tiny, small, webm, classifyPoster}
 }
 
-async function checkFileExists(file) {
+export async function checkFileExists(file) {
     return fs.promises.access(file, fs.constants.F_OK)
         .then(() => true)
         .catch(() => false);
