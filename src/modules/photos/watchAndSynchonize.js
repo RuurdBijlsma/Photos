@@ -129,8 +129,10 @@ async function isProcessed(filePath) {
     if (type === false) return true;
 
     let item = await MediaItem.findOne({where: {filename}});
-    if (!item)
+    if (!item) {
+        console.log(`${filePath} not processed, reason: Not in DB`);
         return false;
+    }
     const id = item.id;
 
     let files = [];
@@ -142,11 +144,15 @@ async function isProcessed(filePath) {
         files.push(webm, big, small, tiny);
     }
     for (let file of files) {
-        if (!await checkFileExists(file))
+        if (!await checkFileExists(file)) {
+            console.log(`${filePath} not processed, reason: File don't exist: ${file}`);
             return false;
+        }
         let stat = await fs.promises.stat(file);
-        if (!stat.isFile())
+        if (!stat.isFile()) {
+            console.log(`${filePath} not processed, reason: File is not a file: ${file}`);
             return false;
+        }
     }
 
     return true;
