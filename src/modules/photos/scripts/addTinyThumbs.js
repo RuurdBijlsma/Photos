@@ -13,6 +13,7 @@ for (let i = 0; i < count; i += batchSize) {
     let items = await MediaItem.findAll({
         limit: batchSize,
         offset: i,
+        where: {type: 'video'}
     });
     try {
         let promises = [];
