@@ -339,7 +339,7 @@ export async function insertMediaItem(data) {
         );
         // transaction has been committed. Do something after the commit if required.
     } catch (err) {
-        console.warn("MediaItem insert ERROR", data);
+        console.warn("MediaItem insert ERROR", err);
         throw new Error(err);
         // do something with the err.
     }
