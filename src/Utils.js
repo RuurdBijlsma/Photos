@@ -20,7 +20,7 @@ export default class Utils {
             dialect: 'postgres',
             logging: false,
             pool: {
-                acquire: 30000,
+                acquire: 20000,
             }
         });
         await Database.setDb(db);

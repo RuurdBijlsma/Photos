@@ -200,7 +200,7 @@ export async function getUniqueId() {
     return id;
 }
 
-export async function addSuggestion(obj) {
+export async function addSuggestion(obj, transaction) {
     if (typeof obj.type !== 'string' || typeof obj.text !== 'string') {
         console.warn("Can't add suggestion", obj);
         return;
@@ -212,10 +212,11 @@ export async function addSuggestion(obj) {
             vector: sequelize.fn('to_tsvector', 'english', text),
             count: 1,
         },
+        transaction,
     });
     if (!created) {
         item.count++;
-        await item.save();
+        await item.save({transaction});
     }
 }
 
@@ -229,8 +230,6 @@ export async function addSuggestion(obj) {
  * @returns {Promise<void>}
  */
 export async function insertMediaItem(data) {
-    const seqInstance = MediaItem.sequelize;
-
     const toVector = (weight, ...items) =>
         sequelize.fn('setweight',
             sequelize.fn('to_tsvector', 'english',
@@ -246,7 +245,7 @@ export async function insertMediaItem(data) {
         [classA, classB, classC] = [null, null, null]
 
     try {
-        await seqInstance.transaction({}, async transaction => {
+        await Database.db.transaction({}, async transaction => {
             let item = await MediaItem.create({
                 vectorA: toVector('A',
                     ...toText(classA?.labels),
@@ -266,7 +265,7 @@ export async function insertMediaItem(data) {
                 ),
                 ...data,
             }, {transaction});
-            await seqInstance.query(
+            await Database.db.query(
                 `update "MediaItems"
                     set vector = setweight("vectorA", 'A') || setweight("vectorB", 'B') || setweight("vectorC", 'C')
                     where id = '${data.id}'`
@@ -292,7 +291,7 @@ export async function insertMediaItem(data) {
             }
 
             try {
-                await Promise.all([...places, ...labels, ...dates].map(addSuggestion));
+                await Promise.all([...places, ...labels, ...dates].map(o => addSuggestion(o, transaction)));
             } catch (e) {
             }
 
