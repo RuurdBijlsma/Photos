@@ -18,9 +18,7 @@ for (let i = 0; i < count; i += batchSize) {
     for (let item of items) {
         let tinyHeight = Math.min(item.height, 260);
         let {tiny} = getPaths(item.id);
-        let inputImg = path.resolve(item.type === 'video' ?
-            path.join(config.thumbnails, 'big', `${item.id}.webp`) :
-            path.join(config.media, item.filePath));
+        let inputImg = path.join(config.thumbnails, 'big', `${item.id}.webp`);
         promises.push(
             resizeImage({input: inputImg, output: tiny, height: tinyHeight,})
         );
