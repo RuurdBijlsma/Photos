@@ -175,6 +175,10 @@ async function processMedia(filePath, triesLeft = 2) {
         if (alreadyInDb)
             await alreadyInDb.destroy();
 
+        let fileStat = await fs.promises.stat(filePath);
+        if (fileStat.size === 0)
+            return console.warn(`Skipping ${filePath}, file size is 0 bytes`);
+
         let metadata = {}, labels, thumbSmallRel, thumbBigRel, webmRel;
         if (type === 'image') {
             metadata = await getExif(filePath);
@@ -294,7 +298,7 @@ async function getFilesRecursive(filePath) {
         images.push(...subResults.flatMap(r => r.images));
     } else {
         files.push(filePath);
-        if (getFileType(filePath)==='video')
+        if (getFileType(filePath) === 'video')
             videos.push(filePath);
         else images.push(filePath);
     }

@@ -131,8 +131,17 @@ export async function probeVideo(videoPath) {
     let {streams, format} = await ffmpeg.ffprobe(videoPath);
     let video = streams.find(s => s.codec_type === 'video');
     let audio = streams.find(s => s.codec_type === 'audio');
-    let width = video.width;
-    let height = video.height;
+    let rotation = +video.rotation;
+    let width, height;
+    if (rotation % 90 === 0 && rotation % 180 !== 0) {
+        // noinspection JSSuspiciousNameCombination
+        width = video.height;
+        // noinspection JSSuspiciousNameCombination
+        height = video.width;
+    } else {
+        width = video.width;
+        height = video.height;
+    }
     let duration = Math.round(1000 * format.duration);
     let createDate = null;
     if (format.tags.creation_time)
