@@ -9,8 +9,8 @@ const {dbUser, dbPass, dbName} = cred;
 
 
 export default class Utils {
-    static get months(){
-       return ['January', 'February', 'March', 'April', 'May', 'June',
+    static get months() {
+        return ['January', 'February', 'March', 'April', 'May', 'June',
             'July', 'August', 'September', 'October', 'November', 'December'];
     }
 
@@ -19,6 +19,9 @@ export default class Utils {
             host: 'localhost',
             dialect: 'postgres',
             logging: false,
+            pool: {
+                acquire: 30000,
+            }
         });
         await Database.setDb(db);
         return db;
