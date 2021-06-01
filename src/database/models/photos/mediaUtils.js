@@ -291,12 +291,10 @@ export async function insertMediaItem(data) {
                 dates.push({type: 'date', text: `${month} ${year}`});
             }
 
-            console.time("AddSuggestions");
             try {
                 await Promise.all([...places, ...labels, ...dates].map(addSuggestion));
             } catch (e) {
             }
-            console.timeEnd("AddSuggestions");
 
             if (data.location) {
                 let locItem = await MediaLocation.create({
