@@ -23,6 +23,7 @@ for (let i = 0; i < count; i += batchSize) {
             if (!await checkFileExists(tiny)) {
                 promises.push(
                     resizeImage({input: inputImg, output: tiny, height: tinyHeight,})
+                        .catch(e => console.warn(e))
                 );
             }
         }
