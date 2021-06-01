@@ -30,20 +30,6 @@ export function initMediaItem(sequelize) {
             allowNull: false,
             unique: true,
         },
-        smallThumbPath: {
-            type: DataTypes.STRING,
-            allowNull: false,
-            unique: true,
-        },
-        bigThumbPath: {
-            type: DataTypes.STRING,
-            allowNull: false,
-            unique: true,
-        },
-        webmPath: {
-            type: DataTypes.STRING,
-            allowNull: true,
-        },
         width: {
             type: DataTypes.INTEGER,
             allowNull: false,

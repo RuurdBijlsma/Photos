@@ -221,7 +221,7 @@ export async function addSuggestion(obj) {
 
 /**
  * @param {{
- *     id,type,subType,filename,filePath,smallThumbPath,bigThumbPath,webmPath,
+ *     id,type,subType,filename,filePath,
  *     width,height,durationMs?,bytes,createDate?,exif,
  *     location?: {latitude,longitude,altitude?,place?,country?,admin1?,admin2?,admin3?,admin4?},
  *     classifications?: {confidence: number, labels: string[], glossaries: string[]}[],
@@ -360,9 +360,6 @@ export async function insertTestMediaItem() {
             subType: 'none',
             filename,
             filePath,
-            bigThumbPath: '/bigt.webp',
-            smallThumbPath: 'smallt.webp',
-            webmPath: 'vid.webm',
             width: 1280,
             height: 720,
             bytes: 128038102,

@@ -14,8 +14,9 @@ import os from "os";
 const {Op} = seq;
 
 const bot = new TelegramBot(config.telegramToken, {polling: false});
-const bigPic = await useDir(path.join(config.thumbnails, 'big'));
+const tinyPic = await useDir(path.join(config.thumbnails, 'tiny'));
 const smallPic = await useDir(path.join(config.thumbnails, 'small'));
+const bigPic = await useDir(path.join(config.thumbnails, 'big'));
 const streamVid = await useDir(path.join(config.thumbnails, 'webm'));
 const temp = await useDir(path.join(config.thumbnails, 'temp'));
 const processJobs = new Set();
@@ -97,7 +98,7 @@ async function syncFiles() {
             idToFile,
         )));
     }
-    await Promise.all([bigPic, smallPic, streamVid, temp].map(cleanThumbDir));
+    await Promise.all([bigPic, tinyPic, smallPic, streamVid, temp].map(cleanThumbDir));
 }
 
 // Delete is allowed when the original photo doesn't exist anymore
@@ -134,11 +135,11 @@ async function isProcessed(filePath) {
 
     let files = [];
     if (type === 'image') {
-        let {big, small} = getPaths(id);
-        files.push(big, small);
+        let {big, tiny, small} = getPaths(id);
+        files.push(big, tiny, small);
     } else if (type === 'video') {
-        let {webm, big, small} = getPaths(id);
-        files.push(webm, big, small);
+        let {webm, big, small, tiny} = getPaths(id);
+        files.push(webm, big, small, tiny);
     }
     for (let file of files) {
         if (!await checkFileExists(file))
@@ -179,33 +180,31 @@ async function processMedia(filePath, triesLeft = 2) {
         if (fileStat.size === 0)
             return console.warn(`Skipping ${filePath}, file size is 0 bytes`);
 
-        let metadata = {}, labels, thumbSmallRel, thumbBigRel, webmRel;
+        let metadata = {}, labels;
         if (type === 'image') {
             metadata = await getExif(filePath);
             labels = await classify(filePath);
             let height = Math.min(metadata.height, 1440);
             let smallHeight = Math.min(metadata.height, 500);
-            let {big, small} = getPaths(id);
-            thumbSmallRel = path.relative(config.thumbnails, small);
-            thumbBigRel = path.relative(config.thumbnails, big);
-            webmRel = null;
+            let tinyHeight = Math.min(metadata.height, 260);
+            let {tiny, small, big} = getPaths(id);
             let orientation = metadata.exif?.Orientation ?? 1;
             if (orientation >= 5)
                 [metadata.width, metadata.height] = [metadata.height, metadata.width];
             await resizeImage({input: filePath, orientation, output: big, height,});
             await resizeImage({input: filePath, orientation, output: small, height: smallHeight,});
+            await resizeImage({input: filePath, orientation, output: tiny, height: tinyHeight,});
         } else if (type === 'video') {
             metadata = await probeVideo(filePath);
             let height = Math.min(metadata.height, 1080);
             let smallHeight = Math.min(metadata.height, 500);
-            let {webm, big, small, classifyPoster} = getPaths(id);
-            thumbSmallRel = path.relative(config.thumbnails, small);
-            thumbBigRel = path.relative(config.thumbnails, big);
-            webmRel = path.relative(config.thumbnails, webm);
+            let tinyHeight = Math.min(metadata.height, 260);
+            let {tiny, small, big, classifyPoster, webm} = getPaths(id);
             await transcode({input: filePath, output: webm, height});
             await videoScreenshot({input: webm, output: classifyPoster, height});
             await resizeImage({input: classifyPoster, output: big, height: height,});
             await resizeImage({input: classifyPoster, output: small, height: smallHeight,});
+            await resizeImage({input: classifyPoster, output: tiny, height: tinyHeight,});
             labels = await classify(classifyPoster);
             await fs.promises.unlink(classifyPoster);
         }
@@ -216,9 +215,6 @@ async function processMedia(filePath, triesLeft = 2) {
             subType: metadata.subType,
             filename,
             filePath: fullRel,
-            smallThumbPath: thumbSmallRel,
-            bigThumbPath: thumbBigRel,
-            webmPath: webmRel,
             width: metadata.width,
             height: metadata.height,
             durationMs: metadata.duration,
@@ -255,16 +251,18 @@ async function removeMedia(filePath, triesLeft = 2) {
         await item?.destroy?.();
 
         if (type === 'image') {
-            let {big, small} = getPaths(id);
+            let {tiny, small, big} = getPaths(id);
             console.log("Removing media", {big, small});
-            await fs.promises.unlink(big);
+            await fs.promises.unlink(tiny);
             await fs.promises.unlink(small);
+            await fs.promises.unlink(big);
         } else if (type === 'video') {
-            let {webm, poster, smallPoster} = getPaths(id);
-            console.log("Removing media", {webm, poster, smallPoster});
+            let {webm, tiny, small, big} = getPaths(id);
+            console.log("Removing media", {webm, tiny, small, big});
+            await fs.promises.unlink(tiny);
+            await fs.promises.unlink(small);
+            await fs.promises.unlink(big);
             await fs.promises.unlink(webm);
-            await fs.promises.unlink(poster);
-            await fs.promises.unlink(smallPoster);
         }
         return true;
     } catch (e) {
@@ -311,12 +309,13 @@ function getFileType(filePath) {
     return mimeType === false ? mimeType : mimeType.split('/')[0];
 }
 
-function getPaths(id) {
+export function getPaths(id) {
     let big = path.join(bigPic, id + '.webp');
+    let tiny = path.join(tinyPic, id + '.webp');
     let small = path.join(smallPic, id + '.webp');
     let webm = path.join(streamVid, id + '.webm');
     let classifyPoster = path.join(temp, id + '.jpeg');
-    return {big, small, webm, classifyPoster}
+    return {big, tiny, small, webm, classifyPoster}
 }
 
 async function checkFileExists(file) {
