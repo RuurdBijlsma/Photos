@@ -3,6 +3,7 @@ import Utils from "../../../Utils.js";
 import {resizeImage} from "../transcode.js";
 import {getPaths} from '../watchAndSynchonize.js'
 import path from "path";
+import config from '../../../../res/photos/config.json';
 
 await Utils.initDb();
 
@@ -18,8 +19,8 @@ for (let i = 0; i < count; i += batchSize) {
         let tinyHeight = Math.min(item.height, 260);
         let {tiny} = getPaths(item.id);
         let inputImg = path.resolve(item.type === 'video' ?
-            path.join(`res/photos/thumbnails/big/${item.id}.webp`) :
-            path.join('res/photos/photos', item.filePath));
+            path.join(config.thumbnails, 'big', `${item.id}.webp`) :
+            path.join(config.media, item.filePath));
         promises.push(
             resizeImage({input: inputImg, output: tiny, height: tinyHeight,})
         );
