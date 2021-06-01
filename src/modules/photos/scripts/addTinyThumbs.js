@@ -14,18 +14,18 @@ for (let i = 0; i < count; i += batchSize) {
         limit: batchSize,
         offset: i,
     });
-    let promises = [];
-    for (let item of items) {
-        let tinyHeight = Math.min(item.height, 260);
-        let {tiny} = getPaths(item.id);
-        let inputImg = path.join(config.thumbnails, 'big', `${item.id}.webp`);
-        if (!await checkFileExists(tiny)) {
-            promises.push(
-                resizeImage({input: inputImg, output: tiny, height: tinyHeight,})
-            );
-        }
-    }
     try {
+        let promises = [];
+        for (let item of items) {
+            let tinyHeight = Math.min(item.height, 260);
+            let {tiny} = getPaths(item.id);
+            let inputImg = path.join(config.thumbnails, 'big', `${item.id}.webp`);
+            if (!await checkFileExists(tiny)) {
+                promises.push(
+                    resizeImage({input: inputImg, output: tiny, height: tinyHeight,})
+                );
+            }
+        }
         await Promise.all(promises);
     } catch (e) {
         console.warn(e);
