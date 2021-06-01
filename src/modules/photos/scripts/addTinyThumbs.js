@@ -7,7 +7,7 @@ import config from '../../../../res/photos/config.json';
 
 await Utils.initDb();
 
-let count = await MediaItem.count();
+let count = await MediaItem.count({where:{type:'video'}});
 let batchSize = 50;
 for (let i = 0; i < count; i += batchSize) {
     let items = await MediaItem.findAll({
