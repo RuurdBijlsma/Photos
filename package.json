@@ -8,6 +8,7 @@
     "start": "node --experimental-json-modules src/index.js",
     "debugStart": "set DEBUG=* & node --experimental-json-modules src/index.js",
 
+    "fixVectors": "node --experimental-json-modules src/modules/photos/scripts/fixVectors.js",
     "addTinyThumbs": "node --experimental-json-modules src/modules/photos/scripts/addTinyThumbs.js",
     "buildSuggestions": "node --experimental-json-modules src/modules/photos/scripts/buildSuggestions.js",
     "fixSubType": "node --experimental-json-modules src/modules/photos/scripts/fixSubType.js",

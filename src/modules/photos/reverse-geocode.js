@@ -43,12 +43,14 @@ export default async function geocode({latitude, longitude}) {
             (err, res) => {
                 if (err)
                     return reject("Geocode error for", point);
-                let [[{name: place, countryCode: country, admin1Code, admin2Code}]] = res;
+                let [[{name: place, countryCode: country, admin1Code, admin2Code, admin3Code, admin4Code}]] = res;
                 let geocodeData = {
                     place,
                     country: lookup.byIso(country).country,
                     admin: [admin1Code, admin2Code]
                 };
+                if (config.geocodeAdmin3and4)
+                    geocodeData.admin.push(admin3Code, admin4Code);
                 geocodeData.admin = geocodeData.admin
                     .filter(a => a)
                     .map(a => a.hasOwnProperty('name') ? a.name : a)

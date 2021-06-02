@@ -137,9 +137,7 @@ export async function searchMediaRanked({query, limit = false, includedFields}) 
     from "MediaItems", to_tsquery('english', $1) query
     where query @@ vector
     order by rank desc
-        ${limit ? `limit = $2` : ''}`
-
-        ,
+        ${limit ? `limit = $2` : ''}`,
         {
             model: MediaItem,
             mapToModel: true,
@@ -220,29 +218,39 @@ export async function addSuggestion(obj, transaction) {
     }
 }
 
+export function dateToWords(date) {
+    if (date === null || date === undefined)
+        return [];
+
+    let year = date.getFullYear();
+    let month = date.getMonth() + 1;
+    let day = date.getDate();
+    let monthName = Utils.months[month - 1];
+    return [day, month, monthName, year];
+}
+
+export const toVector = (weight, ...items) =>
+    sequelize.fn('setweight',
+        sequelize.fn('to_tsvector', 'english',
+            items.filter(n => n !== null && n !== undefined).join(' ')
+        ),
+        weight
+    );
+export const toText = a => Array.isArray(a) ? a.map(b => b.text) : [a];
+
 /**
  * @param {{
  *     id,type,subType,filename,filePath,
  *     width,height,durationMs?,bytes,createDate?,exif,
- *     location?: {latitude,longitude,altitude?,place?,country?,admin1?,admin2?,admin3?,admin4?},
+ *     location?: {latitude,longitude,altitude?,place?,country?,admin: string[]?},
  *     classifications?: {confidence: number, labels: string[], glossaries: string[]}[],
  * }} data MediaItem data
  * @returns {Promise<void>}
  */
 export async function insertMediaItem(data) {
-    const toVector = (weight, ...items) =>
-        sequelize.fn('setweight',
-            sequelize.fn('to_tsvector', 'english',
-                items.filter(n => n !== null && n !== undefined).join(' ')
-            ),
-            weight
-        );
-    const toText = a => Array.isArray(a) ? a.map(b => b.text) : [a];
-    let classA, classB, classC;
-    if (data.classifications)
-        [classA, classB, classC] = data.classifications.sort((a, b) => b.confidence - a.confidence);
-    else
-        [classA, classB, classC] = [null, null, null]
+    let [classA, classB, classC] = data.classifications ?
+        data.classifications.sort((a, b) => b.confidence - a.confidence) :
+        [null, null, null];
 
     try {
         await Database.db.transaction({}, async transaction => {
@@ -254,27 +262,26 @@ export async function insertMediaItem(data) {
                 ),
                 vectorB: toVector('B',
                     data.filename, ...toText(classB?.labels),
-                    data.location?.admin1,
-                    data.location?.admin2,
-                    data.location?.admin3,
-                    data.location?.admin4,
+                    ...(data.location?.admin ?? []),
+                    data.subType === 'none' ? null : data.subType,
                 ),
                 vectorC: toVector('C',
                     ...toText(classC?.labels), ...toText(classA?.glossaries),
-                    ...toText(classB?.glossaries), ...toText(classC?.glossaries)
+                    ...toText(classB?.glossaries), ...toText(classC?.glossaries),
+                    data.type,
                 ),
                 ...data,
             }, {transaction});
             await Database.db.query(
                 `update "MediaItems"
-                    set vector = setweight("vectorA", 'A') || setweight("vectorB", 'B') || setweight("vectorC", 'C')
+                    set vector = "vectorA" || "vectorB" || "vectorC"
                     where id = '${data.id}'`
                 , {transaction});
 
             // Add suggestions to db
             const places = [
                 data.location?.place, data.location?.country,
-                data.location?.admin1, data.location?.admin2, data.location?.admin3, data.location?.admin4
+                ...(data.location?.admin ?? [])
             ].flat().filter(n => n !== null && n !== undefined).map(p => ({text: p, type: 'place'}));
             const labels = [
                 ...classA?.labels, classB?.labels, classC?.labels
