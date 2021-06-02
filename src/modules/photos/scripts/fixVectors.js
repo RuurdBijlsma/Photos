@@ -14,7 +14,7 @@ const startOffset = +(process.argv[2] ?? 0);
 console.log('start offset', startOffset);
 
 let count = await MediaItem.count();
-let batchSize = 20;
+let batchSize = 1;
 for (let i = 0; i < count; i += batchSize) {
     let items = await MediaItem.findAll({
         include: [
