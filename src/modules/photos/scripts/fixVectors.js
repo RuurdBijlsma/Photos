@@ -1,6 +1,6 @@
 import {MediaItem} from "../../../database/models/photos/MediaItemModel.js";
 import Utils from "../../../Utils.js";
-import {addSuggestion, dateToWords, toVector} from "../../../database/models/photos/mediaUtils.js";
+import {dateToWords, toVector} from "../../../database/models/photos/mediaUtils.js";
 import {MediaClassification} from "../../../database/models/photos/MediaClassificationModel.js";
 import {MediaLabel} from "../../../database/models/photos/MediaLabelModel.js";
 import {MediaLocation} from "../../../database/models/photos/MediaLocationModel.js";
@@ -9,6 +9,9 @@ import Database from "../../../database/Database.js";
 import {MediaGlossary} from "../../../database/models/photos/MediaGlossaryModel.js";
 
 await Utils.initDb();
+
+const startOffset = +(process.argv[2] ?? 0);
+console.log('start offset', startOffset);
 
 let count = await MediaItem.count();
 let batchSize = 50;
