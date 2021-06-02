@@ -290,11 +290,14 @@ export async function insertMediaItem(data) {
             let dates = [];
             if (data.createDate !== null) {
                 let date = data.createDate;
+                let day = date.getDate();
                 let month = Utils.months[date.getMonth()];
                 let year = date.getFullYear().toString();
                 dates.push({type: 'date', text: month});
                 dates.push({type: 'date', text: year});
                 dates.push({type: 'date', text: `${month} ${year}`});
+                dates.push({type: 'date', text: `${day} ${month}`});
+                dates.push({type: 'date', text: `${day} ${month} ${year}`});
             }
 
             try {

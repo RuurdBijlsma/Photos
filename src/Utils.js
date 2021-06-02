@@ -16,7 +16,7 @@ export default class Utils {
 
     static async initDb() {
         const db = new Sequelize(dbName, dbUser, dbPass, {
-            host: 'localhost',
+            host: cred.dbHost,
             dialect: 'postgres',
             logging: false,
             pool: {
