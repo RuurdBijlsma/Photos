@@ -9,12 +9,13 @@ await Utils.initDb();
 const startOffset = +(process.argv[2] ?? 0);
 console.log('start offset', startOffset);
 
-let count = (await MediaItem.count()) - startOffset;
+let count = (await MediaItem.count({where: {type: 'image'}})) - startOffset;
 let batchSize = 20;
 for (let i = 0; i < count; i += batchSize) {
     let items = await MediaItem.findAll({
         limit: batchSize,
         offset: i + startOffset,
+        where: {type: 'image'},
     });
     let promises = [];
     for (let item of items) {
