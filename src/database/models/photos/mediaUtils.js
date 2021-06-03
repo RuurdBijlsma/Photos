@@ -48,7 +48,7 @@ export async function backupDb() {
             console.log(`Backing up database! ${backupTo}`);
             exec(`pg_dump --dbname=postgresql://${dbConfig.dbUser}:${
                     dbConfig.dbPass
-                }@127.0.0.1:5432/${dbConfig.dbName} -Fc > ${backupTo}`,
+                }@${dbConfig.dbHost}:${dbConfig.dbPort}/${dbConfig.dbName} -Fc > ${backupTo}`,
                 (error, stderr, stdout) => {
                     if (error) {
                         console.warn('db backup error', error);
