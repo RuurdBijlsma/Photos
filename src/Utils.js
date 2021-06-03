@@ -1,30 +1,12 @@
 import Log from "./Log.js";
 import crypto from "crypto";
-import {Sequelize} from "sequelize";
-import cred from "../res/auth/credentials.json";
-import Database from "./database/Database.js";
 
-const console = new Log("Utils");
-const {dbUser, dbPass, dbName} = cred;
-
+const console = Log('Utils');
 
 export default class Utils {
     static get months() {
         return ['January', 'February', 'March', 'April', 'May', 'June',
             'July', 'August', 'September', 'October', 'November', 'December'];
-    }
-
-    static async initDb() {
-        const db = new Sequelize(dbName, dbUser, dbPass, {
-            host: cred.dbHost,
-            dialect: 'postgres',
-            logging: false,
-            pool: {
-                acquire: 20000,
-            }
-        });
-        await Database.setDb(db);
-        return db;
     }
 
     static getToken(nBytes = 48) {

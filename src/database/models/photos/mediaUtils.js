@@ -7,8 +7,6 @@ import Utils from "../../../Utils.js";
 import path from "path";
 import sequelize from 'sequelize';
 import {initMediaPlace, MediaPlace} from "./MediaPlaceModel.js";
-import {exec} from "child_process";
-import dbConfig from "../../../../res/auth/credentials.json";
 import {initMediaSuggestion, MediaSuggestion} from "./MediaSuggestionModel.js";
 import Database from "../../Database.js";
 
@@ -39,24 +37,6 @@ export async function initMedia(db) {
 
     MediaClassification.hasMany(MediaGlossary, {onDelete: 'CASCADE'});
     MediaGlossary.belongsTo(MediaClassification);
-}
-
-export async function backupDb() {
-    return new Promise((resolve, reject) => {
-            let dateTime = new Date().toJSON().replace(/:/g, '_');
-            let backupTo = path.resolve(`./res/photos/backups/rsdb_${dateTime}.dump`);
-            console.log(`Backing up database! ${backupTo}`);
-            exec(`pg_dump --dbname=postgresql://${dbConfig.dbUser}:${
-                    dbConfig.dbPass
-                }@${dbConfig.dbHost}:${dbConfig.dbPort}/${dbConfig.dbName} -Fc > ${backupTo}`,
-                (error, stderr, stdout) => {
-                    if (error) {
-                        console.warn('db backup error', error);
-                        return reject(error);
-                    }
-                }).on('close', resolve);
-        }
-    )
 }
 
 export async function getMonthPhotos(year, month) {

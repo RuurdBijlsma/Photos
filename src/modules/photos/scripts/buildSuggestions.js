@@ -7,7 +7,7 @@ import {MediaLocation} from "../../../database/models/photos/MediaLocationModel.
 import {MediaPlace} from "../../../database/models/photos/MediaPlaceModel.js";
 import Database from "../../../database/Database.js";
 
-await Utils.initDb();
+await Database.initDb();
 
 let count = await MediaItem.count();
 let batchSize = 50;

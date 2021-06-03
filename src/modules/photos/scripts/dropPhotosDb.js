@@ -4,12 +4,11 @@ import {MediaLabel} from "../../../database/models/photos/MediaLabelModel.js";
 import {MediaGlossary} from "../../../database/models/photos/MediaGlossaryModel.js";
 import {MediaClassification} from "../../../database/models/photos/MediaClassificationModel.js";
 import {MediaItem} from "../../../database/models/photos/MediaItemModel.js";
-import {backupDb} from "../../../database/models/photos/mediaUtils.js";
-import Utils from "../../../Utils.js";
+import Database from "../../../database/Database.js";
 
-await Utils.initDb();
+await Database.initDb();
 
-await backupDb();
+await Database.backup('pre-drop-photos');
 console.log("BACKUP DONE");
 
 await MediaItem.drop({cascade: true});

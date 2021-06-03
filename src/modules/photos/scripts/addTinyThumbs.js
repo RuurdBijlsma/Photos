@@ -1,11 +1,11 @@
 import {MediaItem} from "../../../database/models/photos/MediaItemModel.js";
-import Utils from "../../../Utils.js";
 import {resizeImage} from "../transcode.js";
 import {checkFileExists, getPaths} from '../watchAndSynchonize.js'
 import path from "path";
 import config from '../../../../res/photos/config.json';
+import Database from "../../../database/Database.js";
 
-await Utils.initDb();
+await Database.initDb();
 
 let count = await MediaItem.count();
 let batchSize = 50;

@@ -17,12 +17,10 @@ import AuthModule from './modules/auth/AuthModule.js';
 import TwimoteModule from "./modules/twimote-bot/TwimoteModule.js";
 import PhotosModule from "./modules/photos/PhotosModule.js";
 
-import seq from "sequelize";
 import cred from "../res/auth/credentials.json"
-import Utils from "./Utils.js";
+import Database from "./database/Database.js";
 
-const {Sequelize} = seq;
-const {dbUser, dbPass, dbName} = cred;
+const {dbUser, dbName} = cred;
 const console = new Log("Controller");
 
 class Controller {
@@ -75,7 +73,7 @@ class Controller {
         }
         this.io = socketIo(server);
         console.log("Initializing DB connection with ", {dbName, dbUser});
-        this.db = await Utils.initDb();
+        this.db = await Database.initDb();
 
         this.setRoutes();
         server.listen(port, () =>

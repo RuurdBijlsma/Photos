@@ -1,7 +1,7 @@
 import {MediaItem} from "../../../database/models/photos/MediaItemModel.js";
-import Utils from "../../../Utils.js";
+import Database from "../../../database/Database.js";
 
-await Utils.initDb();
+await Database.initDb();
 
 let count = await MediaItem.count();
 let batchSize = 50;

@@ -6,10 +6,11 @@ import path from "path";
 import mime from "mime-types";
 import config from "../../../res/photos/config.json";
 import {MediaItem} from "../../database/models/photos/MediaItemModel.js";
-import {backupDb, getUniqueId, insertMediaItem} from "../../database/models/photos/mediaUtils.js";
+import {getUniqueId, insertMediaItem} from "../../database/models/photos/mediaUtils.js";
 import seq from "sequelize";
 import TelegramBot from "node-telegram-bot-api";
 import os from "os";
+import Database from "../../database/Database.js";
 
 const {Op} = seq;
 
@@ -26,7 +27,7 @@ export async function watchAndSynchronize() {
     if (process.platform !== 'win32')
         setInterval(async () => {
             try {
-                await backupDb();
+                await Database.backup();
             } catch (e) {
                 return bot.sendMessage(config.chatId, `Couldn't backup database!\n\n${JSON.stringify(e)}`);
             }

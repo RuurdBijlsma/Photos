@@ -1,10 +1,10 @@
 import {MediaItem} from "../../../database/models/photos/MediaItemModel.js";
-import Utils from "../../../Utils.js";
 import {imageSize, loadExif} from "../exif.js";
 import path from "path";
 import config from '../../../../res/photos/config.json'
+import Database from "../../../database/Database.js";
 
-await Utils.initDb();
+await Database.initDb();
 
 const startOffset = +(process.argv[2] ?? 0);
 console.log('start offset', startOffset);
@@ -20,8 +20,8 @@ for (let i = 0; i < count; i += batchSize) {
     let promises = [];
     for (let item of items) {
         promises.push(new Promise(async resolve => {
-            if (!item.filename.includes("edited"))
-                return resolve();
+            // if (!item.filename.includes("edited"))
+            //     return resolve();
             let filePath = path.resolve(path.join(config.media, item.filePath));
             let exif = null;
             try {
@@ -30,7 +30,6 @@ for (let i = 0; i < count; i += batchSize) {
                 console.log(`Can't get exif for ${item.filename}`);
             }
             let imgDim = await imageSize(filePath, exif);
-            let fname = item.filename;
 
             if (imgDim !== null && isFinite(imgDim.height) && isFinite(imgDim.width)) {
                 await item.update({
