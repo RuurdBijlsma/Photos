@@ -11,6 +11,7 @@ import seq from "sequelize";
 import TelegramBot from "node-telegram-bot-api";
 import os from "os";
 import Database from "../../database/Database.js";
+import {checkFileExists} from "../../utils.js";
 
 const {Op} = seq;
 
@@ -321,12 +322,6 @@ export function getPaths(id) {
     let webm = path.join(streamVid, id + '.webm');
     let classifyPoster = path.join(temp, id + '.jpeg');
     return {big, tiny, small, webm, classifyPoster}
-}
-
-export async function checkFileExists(file) {
-    return fs.promises.access(file, fs.constants.F_OK)
-        .then(() => true)
-        .catch(() => false);
 }
 
 async function useDir(dir) {

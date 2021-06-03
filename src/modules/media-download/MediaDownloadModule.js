@@ -3,8 +3,7 @@ import path from 'path';
 import plexCredentials from '../../../res/download/credentials.json';
 import PlexAPI from "plex-api";
 import Auth from "../../database/Auth.js";
-import fs from 'fs'
-import Utils from "../../Utils.js";
+import {getToken} from "../../utils.js";
 
 const client = new PlexAPI({
     hostname: 'ruurdbijlsma.com',
@@ -128,7 +127,7 @@ export default class MediaDownloadModule extends ApiModule {
                 return res.sendStatus(401);
 
             let file = req.query.file.replace(/\/media\/data\//, this.mediaPath);
-            let token = await Utils.getToken();
+            let token = await getToken();
             this.tokens[token] = file;
             setTimeout(() => {
                 if (this.tokens.hasOwnProperty(token))

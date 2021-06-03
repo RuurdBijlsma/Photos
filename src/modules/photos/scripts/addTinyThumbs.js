@@ -1,9 +1,10 @@
 import {MediaItem} from "../../../database/models/photos/MediaItemModel.js";
 import {resizeImage} from "../transcode.js";
-import {checkFileExists, getPaths} from '../watchAndSynchonize.js'
+import {getPaths} from '../watchAndSynchonize.js'
 import path from "path";
 import config from '../../../../res/photos/config.json';
 import Database from "../../../database/Database.js";
+import {checkFileExists} from "../../../utils.js";
 
 await Database.initDb();
 

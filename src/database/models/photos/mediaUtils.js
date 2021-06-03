@@ -3,12 +3,12 @@ import {initMediaLocation, MediaLocation} from "./MediaLocationModel.js";
 import {initMediaItem, MediaItem} from "./MediaItemModel.js";
 import {initMediaLabel, MediaLabel} from "./MediaLabelModel.js";
 import {initMediaGlossary, MediaGlossary} from "./MediaGlossaryModel.js";
-import Utils from "../../../Utils.js";
 import path from "path";
 import sequelize from 'sequelize';
 import {initMediaPlace, MediaPlace} from "./MediaPlaceModel.js";
 import {initMediaSuggestion, MediaSuggestion} from "./MediaSuggestionModel.js";
 import Database from "../../Database.js";
+import {getToken, months} from "../../../utils.js";
 
 const {Op} = sequelize;
 
@@ -173,7 +173,7 @@ export async function getMediaById(id) {
 export async function getUniqueId() {
     let id;
     do {
-        id = await Utils.getToken(16);
+        id = await getToken(16);
     } while (await MediaItem.findOne({where: {id}}));
     return id;
 }
@@ -230,7 +230,7 @@ export function dateToWords(date) {
     let year = date.getFullYear();
     let month = date.getMonth() + 1;
     let day = date.getDate();
-    let monthName = Utils.months[month - 1];
+    let monthName = months[month - 1];
     let shortMonthName = monthName.substr(0, 3);
     return [day, month, shortMonthName, monthName, year];
 }
@@ -301,7 +301,7 @@ export async function insertMediaItem(data) {
             if (data.createDate !== null) {
                 let date = data.createDate;
                 let day = date.getDate();
-                let month = Utils.months[date.getMonth()];
+                let month = months[date.getMonth()];
                 let year = date.getFullYear().toString();
                 dates.push({type: 'date', text: month});
                 dates.push({type: 'date', text: year});

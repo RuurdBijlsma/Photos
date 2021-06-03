@@ -10,8 +10,8 @@ import {MediaLabel} from "./models/photos/MediaLabelModel.js";
 import {MediaPlace} from "./models/photos/MediaPlaceModel.js";
 import {MediaGlossary} from "./models/photos/MediaGlossaryModel.js";
 import {MediaItem} from "./models/photos/MediaItemModel.js";
-import {checkFileExists} from "../modules/photos/watchAndSynchonize.js";
 import path from "path";
+import {checkFileExists} from "../utils.js";
 
 const restoreFile = process.argv[2];
 if (!restoreFile)

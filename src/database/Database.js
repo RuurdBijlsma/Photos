@@ -6,9 +6,9 @@ import {initEmote} from "./models/EmoteModel.js";
 import {initMedia} from "./models/photos/mediaUtils.js";
 import path from "path";
 import {exec} from "child_process";
-import {checkFileExists} from "../modules/photos/watchAndSynchonize";
 import {Sequelize} from "sequelize";
 import cred from "../../res/auth/credentials.json";
+import {checkFileExists} from "../utils.js";
 
 const {dbUser, dbPass, dbName, dbHost, dbPort} = cred;
 const console = new Log("Database");

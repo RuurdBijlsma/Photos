@@ -7,6 +7,7 @@ import ffmpeg from 'fluent-ffmpeg';
 import filenamify from 'filenamify';
 import {Emote} from "../../database/models/EmoteModel.js";
 import seq from "sequelize";
+import {checkFileExists} from "../../utils.js";
 
 const {Op} = seq;
 
@@ -394,12 +395,6 @@ export async function search(query) {
         where: {name: {[Op.iLike]: `%${query}%`},},
         limit: 20,
     });
-}
-
-async function checkFileExists(file) {
-    return fs.promises.access(file, fs.constants.F_OK)
-        .then(() => true)
-        .catch(() => false)
 }
 
 // await text2media("widepeepoHappy R I OMEGALUL L U widepeepoHappy")

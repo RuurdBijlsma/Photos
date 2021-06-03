@@ -1,11 +1,11 @@
 import {MediaItem} from "../../../database/models/photos/MediaItemModel.js";
-import Utils from "../../../Utils.js";
 import {addSuggestion} from "../../../database/models/photos/mediaUtils.js";
 import {MediaClassification} from "../../../database/models/photos/MediaClassificationModel.js";
 import {MediaLabel} from "../../../database/models/photos/MediaLabelModel.js";
 import {MediaLocation} from "../../../database/models/photos/MediaLocationModel.js";
 import {MediaPlace} from "../../../database/models/photos/MediaPlaceModel.js";
 import Database from "../../../database/Database.js";
+import {months} from "../../../utils.js";
 
 await Database.initDb();
 
@@ -29,7 +29,7 @@ for (let i = 0; i < count; i += batchSize) {
         if (item.createDate !== null) {
             let date = item.createDate;
             let day = date.getDate();
-            let month = Utils.months[date.getMonth()];
+            let month = months[date.getMonth()];
             let year = date.getFullYear().toString();
             dates.push({type: 'date', text: month});
             dates.push({type: 'date', text: year});
