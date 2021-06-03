@@ -20,6 +20,8 @@ for (let i = 0; i < count; i += batchSize) {
     let promises = [];
     for (let item of items) {
         promises.push(new Promise(async resolve => {
+            if (!item.filename.includes("edited"))
+                return resolve();
             let filePath = path.resolve(path.join(config.media, item.filePath));
             let exif = null;
             try {
@@ -28,6 +30,7 @@ for (let i = 0; i < count; i += batchSize) {
                 console.log(`Can't get exif for ${item.filename}`);
             }
             let imgDim = await imageSize(filePath, exif);
+            let fname = item.filename;
 
             if (imgDim !== null && isFinite(imgDim.height) && isFinite(imgDim.width)) {
                 await item.update({

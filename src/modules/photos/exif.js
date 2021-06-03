@@ -209,6 +209,6 @@ export async function probeVideo(videoPath) {
 
 
 // probeVideo('./photos/home.mp4');
-// getExif('./res/photos/photos/IMG_20140619_164827.jpg').then(d => {
+// getExif('./res/photos/photos/IMG_20121102_084306-edited.jpg').then(d => {
 //     console.log(d);
 // })
