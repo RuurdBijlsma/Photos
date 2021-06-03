@@ -195,8 +195,6 @@ async function processMedia(filePath, triesLeft = 2) {
             let tinyHeight = Math.min(metadata.height, 260);
             let {tiny, small, big} = getPaths(id);
             let orientation = metadata.exif?.Orientation ?? 1;
-            if (orientation >= 5)
-                [metadata.width, metadata.height] = [metadata.height, metadata.width];
             await resizeImage({input: filePath, orientation, output: big, height,});
             await resizeImage({input: filePath, orientation, output: small, height: smallHeight,});
             await resizeImage({input: filePath, orientation, output: tiny, height: tinyHeight,});

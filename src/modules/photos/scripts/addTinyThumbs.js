@@ -31,6 +31,6 @@ for (let i = 0; i < count; i += batchSize) {
     } catch (e) {
         console.warn(e);
     }
-    console.log(`Progress [${i + 1} / ${count}]`);
+    console.log(`Progress [${i + batchSize} / ${count}]`);
 }
 console.log("Done creating tiny images");

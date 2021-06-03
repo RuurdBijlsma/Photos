@@ -22,109 +22,130 @@ async function dateFromFile(filePath) {
  * @param exifData
  * @returns {Promise<{width, height}|null>}
  */
-async function imageSize(filePath, exifData = null) {
-    let width = exifData?.image?.ImageWidth
-    let height = exifData?.image?.ImageHeight;
-    if (Number.isFinite(width) && Number.isFinite(height))
-        return {width, height}
-
+export async function imageSize(filePath, exifData = null) {
     let imgSize;
+
+    let orientation = exifData?.image?.Orientation ?? 1;
+    let swap = orientation >= 5;
+
     try {
         imgSize = await probeSize(fs.createReadStream(filePath));
-        return {width: imgSize.width, height: imgSize.height};
+        // console.log("Using probeSize");
+        // noinspection JSSuspiciousNameCombination
+        return swap ? {width: imgSize.height, height: imgSize.width} : {width: imgSize.width, height: imgSize.height};
     } catch (e) {
     }
 
     try {
         let result = await ffmpeg.ffprobe(filePath);
+        // console.log("Using ffprobe");
         let {width, height} = result.streams[0];
-        return {width, height};
+        // noinspection JSSuspiciousNameCombination
+        return swap ? {width: height, height: width} : {width, height};
     } catch (e) {
+    }
+
+    let width = exifData?.image?.ImageWidth
+    let height = exifData?.image?.ImageHeight;
+    if (Number.isFinite(width) && Number.isFinite(height)) {
+        // console.log("Using exif");
+        // noinspection JSSuspiciousNameCombination
+        return swap ? {width: height, height: width} : {width, height};
     }
 
     return null;
 }
 
-export async function getExif(image) {
+export async function loadExif(image) {
     return new Promise((resolve, reject) => {
         new ExifImage({image}, async (error, data) => {
-            if (error) {
-                let {size} = await fs.promises.stat(image);
-                let createDate = await dateFromFile(image);
-                let imgDim = await imageSize(image);
-                if (imgDim === null)
-                    return reject(`Can't get image dimensions for ${image}`);
-
-                console.log(`No exif for ${image}`)
-                return resolve({
-                    type: 'image', subType: 'none', ...imgDim, duration: null,
-                    size, createDate, gps: null, exif: {}
-                });
-            }
-
-            let gps = null;
-            if (data.gps.GPSLatitude && data.gps.GPSLongitude) {
-                let lad = data.gps.GPSLatitude;
-                let latString = `${lad[0]}°${lad.slice(1).join(`'`)}"${data.gps.GPSLatitudeRef}`;
-                let lod = data.gps.GPSLongitude;
-                let lonString = `${lod[0]}°${lod.slice(1).join(`'`)}"${data.gps.GPSLongitudeRef}`;
-                let {lat, lon} = parseDMS(`${latString} ${lonString}`);
-                gps = {latitude: lat, longitude: lon};
-                gps.altitude = data.gps.GPSAltitude;
-                let geocodeData = await geocode(gps);
-                gps = {...gps, ...geocodeData};
-            }
-
-            let fileStat = await fs.promises.stat(image);
-            let imgDim = await imageSize(image, data);
-            if (imgDim === null)
-                return reject(`Can't get image dimensions for ${image}`);
-
-            let createDate = null;
-            let timeFields = ['DateTimeOriginal', 'CreateDate'];
-            for (let timeField of timeFields) {
-                if (data.exif[timeField] &&
-                    data.exif[timeField].includes(' ') &&
-                    data.exif[timeField].match(/[^ ]+ [^ ]+/)) {
-                    let [date, time] = data.exif[timeField].split(' ');
-                    date = date.replace(/:/gi, '/');
-                    createDate = new Date(`${date}, ${time}`);
-                }
-            }
-            if (createDate === null)
-                createDate = new Date(fileStat.birthtimeMs);
-
-            let exifData = {
-                Make: data.image.Make,
-                Model: data.image.Model,
-                Orientation: data.image.Orientation,
-                XResolution: data.image.XResolution,
-                YResolution: data.image.YResolution,
-                ResolutionUnit: data.image.ResolutionUnit,
-                ...data.exif,
-            }
-            for (let field in exifData) {
-                let value = exifData[field];
-                if (value === undefined)
-                    delete exifData[field];
-                if (value instanceof Buffer)
-                    delete exifData[field];
-                if (typeof value === "string" && value.includes('\x00'))
-                    delete exifData[field];
-            }
-
-            let filename = path.basename(image);
-            let subType = 'none';
-            if (filename.includes("PORTRAIT") && filename.includes("COVER"))
-                subType = 'Portrait';
-            else if (filename.startsWith('PANO'))
-                subType = 'VR';
-            resolve({
-                type: 'image', subType, ...imgDim, duration: null,
-                size: fileStat.size, createDate, gps, exif: exifData
-            });
+            if (error)
+                return reject(error);
+            resolve(data);
         });
     });
+}
+
+export async function getExif(image) {
+    let data;
+    try {
+        data = await loadExif(image);
+    } catch (e) {
+        let {size} = await fs.promises.stat(image);
+        let createDate = await dateFromFile(image);
+        let imgDim = await imageSize(image);
+        if (imgDim === null)
+            throw new Error(`Can't get image dimensions for ${image}`);
+
+        console.log(`No exif for ${image}`)
+        return {
+            type: 'image', subType: 'none', ...imgDim, duration: null,
+            size, createDate, gps: null, exif: {}
+        };
+    }
+
+    let gps = null;
+    if (data.gps.GPSLatitude && data.gps.GPSLongitude) {
+        let lad = data.gps.GPSLatitude;
+        let latString = `${lad[0]}°${lad.slice(1).join(`'`)}"${data.gps.GPSLatitudeRef}`;
+        let lod = data.gps.GPSLongitude;
+        let lonString = `${lod[0]}°${lod.slice(1).join(`'`)}"${data.gps.GPSLongitudeRef}`;
+        let {lat, lon} = parseDMS(`${latString} ${lonString}`);
+        gps = {latitude: lat, longitude: lon};
+        gps.altitude = data.gps.GPSAltitude;
+        let geocodeData = await geocode(gps);
+        gps = {...gps, ...geocodeData};
+    }
+
+    let fileStat = await fs.promises.stat(image);
+    let imgDim = await imageSize(image, data);
+    if (imgDim === null)
+        throw new Error(`Can't get image dimensions for ${image}`);
+
+    let createDate = null;
+    let timeFields = ['DateTimeOriginal', 'CreateDate'];
+    for (let timeField of timeFields) {
+        if (data.exif[timeField] &&
+            data.exif[timeField].includes(' ') &&
+            data.exif[timeField].match(/[^ ]+ [^ ]+/)) {
+            let [date, time] = data.exif[timeField].split(' ');
+            date = date.replace(/:/gi, '/');
+            createDate = new Date(`${date}, ${time}`);
+        }
+    }
+    if (createDate === null)
+        createDate = new Date(fileStat.birthtimeMs);
+
+    let exifData = {
+        Make: data.image.Make,
+        Model: data.image.Model,
+        Orientation: data.image.Orientation,
+        XResolution: data.image.XResolution,
+        YResolution: data.image.YResolution,
+        ResolutionUnit: data.image.ResolutionUnit,
+        ...data.exif,
+    }
+    for (let field in exifData) {
+        let value = exifData[field];
+        if (value === undefined)
+            delete exifData[field];
+        if (value instanceof Buffer)
+            delete exifData[field];
+        if (typeof value === "string" && value.includes('\x00'))
+            delete exifData[field];
+    }
+
+    let filename = path.basename(image);
+    let subType = 'none';
+    if (filename.includes("PORTRAIT") && filename.includes("COVER"))
+        subType = 'Portrait';
+    else if (filename.startsWith('PANO'))
+        subType = 'VR';
+
+    return {
+        type: 'image', subType, ...imgDim, duration: null,
+        size: fileStat.size, createDate, gps, exif: exifData
+    };
 }
 
 export async function probeVideo(videoPath) {
@@ -188,6 +209,6 @@ export async function probeVideo(videoPath) {
 
 
 // probeVideo('./photos/home.mp4');
-// getExif('./res/photos/photos/IMG_20160920_131523.jpg').then(d => {
+// getExif('./res/photos/photos/IMG_20140619_164827.jpg').then(d => {
 //     console.log(d);
 // })

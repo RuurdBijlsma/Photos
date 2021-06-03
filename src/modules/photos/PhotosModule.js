@@ -8,7 +8,7 @@ import mime from 'mime-types'
 import {
     getMediaById,
     getMonthPhotos,
-    getPhotoMonths,
+    getPhotoMonths, getPhotosForMonth, getPhotosPerDayMonth,
     getRandomLabels,
     getRandomLocations,
     searchMediaRanked
@@ -64,7 +64,6 @@ export default class PhotosModule extends ApiModule {
             limit = Math.min(200, limit);
             let photos = await MediaItem.findAll({
                 order: [['createDate', 'DESC']],
-
                 limit,
                 offset,
                 attributes: ['id', 'type', 'subType', 'durationMs', 'createDate', 'width', 'height']
@@ -125,6 +124,18 @@ export default class PhotosModule extends ApiModule {
                 includedFields: ['id', 'type', 'subType', 'durationMs', 'createDate', 'width', 'height'],
             })
             res.send(result);
+        });
+
+        app.post('/photos/dateSearch/', async (req, res) => {
+            let user = await Auth.checkRequest(req);
+            if (!user) return res.sendStatus(401);
+            let month = +req.query.m;
+            let day = +req.query.d;
+            if (isFinite(month) && isFinite(day)) {
+                res.send(await getPhotosPerDayMonth(day, month));
+            } else if (isFinite(month)) {
+                res.send(await getPhotosForMonth(month));
+            }
         });
 
         app.post('/photos/:id', async (req, res) => {

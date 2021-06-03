@@ -198,6 +198,31 @@ export async function getUniqueId() {
     return id;
 }
 
+export async function getPhotosForMonth(month) {
+    return await Database.db.query(`
+        select id, type, "subType", width, height, "createDate", "durationMs"
+        from "MediaItems"
+        where extract(month from "createDate") = $1
+        order by "createDate" desc;
+    `, {
+        bind: [month],
+        type: sequelize.QueryTypes.SELECT,
+    });
+}
+
+export async function getPhotosPerDayMonth(day, month) {
+    return await Database.db.query(`
+        select *
+        from "MediaItems"
+        where extract(month from "createDate") = $2
+          and extract(day from "createDate") = $1
+        order by "createDate" desc;
+    `, {
+        bind: [day, month],
+        type: sequelize.QueryTypes.SELECT,
+    });
+}
+
 export async function addSuggestion(obj, transaction) {
     if (typeof obj.type !== 'string' || typeof obj.text !== 'string') {
         console.warn("Can't add suggestion", obj);
@@ -226,7 +251,8 @@ export function dateToWords(date) {
     let month = date.getMonth() + 1;
     let day = date.getDate();
     let monthName = Utils.months[month - 1];
-    return [day, month, monthName, year];
+    let shortMonthName = monthName.substr(0, 3);
+    return [day, month, shortMonthName, monthName, year];
 }
 
 export const toVector = (weight, ...items) =>
@@ -241,7 +267,7 @@ export const toText = a => Array.isArray(a) ? a.map(b => b.text) : [a];
 /**
  * @param {{
  *     id,type,subType,filename,filePath,
- *     width,height,durationMs?,bytes,createDate?,exif,
+ *     width,height,durationMs?,bytes,createDate?:Date,exif,
  *     location?: {latitude,longitude,altitude?,place?,country?,admin: string[]?},
  *     classifications?: {confidence: number, labels: string[], glossaries: string[]}[],
  * }} data MediaItem data
@@ -257,17 +283,21 @@ export async function insertMediaItem(data) {
             let item = await MediaItem.create({
                 vectorA: toVector('A',
                     ...toText(classA?.labels),
+                    ...dateToWords(data.createDate),
                     data.location?.place,
                     data.location?.country,
                 ),
                 vectorB: toVector('B',
-                    data.filename, ...toText(classB?.labels),
+                    data.filename,
+                    ...toText(classB?.labels),
                     ...(data.location?.admin ?? []),
                     data.subType === 'none' ? null : data.subType,
                 ),
                 vectorC: toVector('C',
-                    ...toText(classC?.labels), ...toText(classA?.glossaries),
-                    ...toText(classB?.glossaries), ...toText(classC?.glossaries),
+                    ...toText(classC?.labels),
+                    ...toText(classA?.glossaries),
+                    ...toText(classB?.glossaries),
+                    ...toText(classC?.glossaries),
                     data.type,
                 ),
                 ...data,
