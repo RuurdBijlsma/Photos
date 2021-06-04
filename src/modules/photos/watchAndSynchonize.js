@@ -6,7 +6,7 @@ import path from "path";
 import mime from "mime-types";
 import config from "../../../res/photos/config.json";
 import {MediaItem} from "../../database/models/photos/MediaItemModel.js";
-import {getUniqueId, insertMediaItem} from "../../database/models/photos/mediaUtils.js";
+import {dropMediaItem, getUniqueId, insertMediaItem} from "../../database/models/photos/mediaUtils.js";
 import seq from "sequelize";
 import TelegramBot from "node-telegram-bot-api";
 import os from "os";
@@ -86,9 +86,10 @@ async function syncFiles() {
     let count = await MediaItem.count();
     if (files.length !== count) {
         let names = files.map(f => path.basename(f));
-        await MediaItem.destroy({
+        let toRemove = await MediaItem.findAll({
             where: {filename: {[Op.notIn]: names,}}
         });
+        await Promise.all(toRemove.map(i => dropMediaItem(i.id)));
     }
 
     // Delete all thumbnail files when there is no database entry for them
@@ -172,17 +173,18 @@ async function singleInstance(fun, param) {
     return result;
 }
 
-async function processMedia(filePath, triesLeft = 2) {
+export async function processMedia(filePath, triesLeft = 2, transaction = null) {
     // console.log("Processing media", filePath);
     try {
+        const spreadTransaction = transaction ? {transaction} : {};
         const id = await getUniqueId();
         let type = getFileType(filePath);
         if (type === false) return;
         let filename = path.basename(filePath);
 
-        let alreadyInDb = await MediaItem.findOne({where: {filename}});
+        let alreadyInDb = await MediaItem.findOne({where: {filename}, ...spreadTransaction});
         if (alreadyInDb)
-            await alreadyInDb.destroy();
+            await dropMediaItem(alreadyInDb.id, transaction);
 
         let fileStat = await fs.promises.stat(filePath);
         if (fileStat.size === 0)
@@ -229,7 +231,8 @@ async function processMedia(filePath, triesLeft = 2) {
             exif: metadata.exif,
             classifications: labels,
             location: metadata.gps,
-        })
+        }, transaction);
+        return id;
     } catch (e) {
         if (triesLeft === 0) {
             await bot.sendMessage(config.chatId, `[Photos] Failed to process "${
@@ -241,10 +244,9 @@ async function processMedia(filePath, triesLeft = 2) {
             console.warn("Process media failed for", filePath, `RETRYING AFTER ${waitTime}ms...`);
             console.warn(e);
             await waitSleep(waitTime);
-            return processMedia(filePath, triesLeft - 1);
+            return processMedia(filePath, triesLeft - 1, transaction);
         }
     }
-    return true;
 }
 
 async function removeMedia(filePath, triesLeft = 2) {
@@ -253,8 +255,10 @@ async function removeMedia(filePath, triesLeft = 2) {
         if (type === false) return;
         let filename = path.basename(filePath);
         let item = await MediaItem.findOne({where: {filename}});
+        if (item === null)
+            return;
         const id = item.id;
-        await item?.destroy?.();
+        await dropMediaItem(id);
 
         if (type === 'image') {
             let {tiny, small, big} = getPaths(id);

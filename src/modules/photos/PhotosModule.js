@@ -1,11 +1,12 @@
 import ApiModule from "../../ApiModule.js";
-import {watchAndSynchronize} from "./watchAndSynchonize.js";
+import {processMedia, watchAndSynchronize} from "./watchAndSynchonize.js";
 import Log from "../../Log.js";
 import {MediaItem} from "../../database/models/photos/MediaItemModel.js";
 import config from "../../../res/photos/config.json";
 import path from "path";
 import mime from 'mime-types'
 import {
+    dropMediaItem,
     getMediaById,
     getMonthPhotos,
     getPhotoMonths, getPhotosForMonth, getPhotosPerDayMonth,
@@ -18,6 +19,7 @@ import geocode from "./reverse-geocode.js";
 import Auth from "../../database/Auth.js";
 import sequelize from "sequelize";
 import {MediaSuggestion} from "../../database/models/photos/MediaSuggestionModel.js";
+import Database from "../../database/Database.js";
 
 const {Op} = sequelize;
 const console = new Log("PhotosModule");
@@ -31,6 +33,26 @@ export default class PhotosModule extends ApiModule {
 
     async setRoutes(app, io, db) {
         app.use('/photos', express.static(config.thumbnails));
+
+        app.post('/photos/reprocess/:id', async (req, res) => {
+            let user = await Auth.checkRequest(req);
+            if (!user) return res.sendStatus(401);
+            const id = req.params.id;
+            if (typeof id !== 'string')
+                return res.sendStatus(400);
+            let item = await MediaItem.findOne({where: {id}});
+            if (item === null)
+                return res.sendStatus(404);
+
+            let filePath = path.resolve(path.join(config.media, item.filePath));
+
+            let newId = null;
+            await Database.db.transaction({}, async transaction => {
+                await dropMediaItem(item.id, transaction);
+                newId = await processMedia(filePath, 2, transaction);
+            });
+            res.send({id:newId});
+        });
 
         app.post('/photos/month-photos', async (req, res) => {
             let user = await Auth.checkRequest(req);
@@ -143,10 +165,10 @@ export default class PhotosModule extends ApiModule {
             if (!user) return res.sendStatus(401);
             const id = req.params.id;
             if (!id)
-                return res.send(401);
+                return res.sendStatus(401);
             let item = await getMediaById(id);
             if (item === null)
-                return res.send(404);
+                return res.sendStatus(404);
             res.send(item);
         });
 

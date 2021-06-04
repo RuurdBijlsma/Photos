@@ -116,7 +116,7 @@ export async function searchMediaRanked({query, limit = false, includedFields}) 
         `select ${includedFields.map(f=>`"${f}"`).join(', ')}, ts_rank_cd(vector, query) as rank
     from "MediaItems", to_tsquery('english', $1) query
     where query @@ vector
-    order by rank desc
+    order by "createDate" desc
         ${limit ? `limit = $2` : ''}`,
         {
             model: MediaItem,
@@ -203,6 +203,73 @@ export async function getPhotosPerDayMonth(day, month) {
     });
 }
 
+export function getDateSuggestions(date) {
+    if (date === null)
+        return [];
+    let suggestions = [];
+    let day = date.getDate();
+    let month = months[date.getMonth()];
+    let year = date.getFullYear().toString();
+    suggestions.push({type: 'date', text: month});
+    suggestions.push({type: 'date', text: year});
+    suggestions.push({type: 'date', text: `${month} ${year}`});
+    suggestions.push({type: 'date', text: `${day} ${month}`});
+    suggestions.push({type: 'date', text: `${day} ${month} ${year}`});
+    return suggestions;
+}
+
+export function getClassificationSuggestions(mediaClassifications) {
+    if (!Array.isArray(mediaClassifications))
+        return [];
+    return mediaClassifications
+        .flatMap(c => c.MediaLabels ?? [])
+        .map(p => ({text: p.text, type: 'label'}))
+}
+
+export function getPlacesSuggestions(mediaPlaces) {
+    if (!Array.isArray(mediaPlaces))
+        return [];
+    return mediaPlaces.map(p => ({text: p.text, type: 'place'}))
+}
+
+export async function dropMediaItem(id, transaction = null) {
+    let spreadTransaction = transaction ? {transaction} : {};
+    let item = await MediaItem.findOne({
+        where: {id},
+        include: [
+            {model: MediaClassification, include: [MediaLabel]},
+            {model: MediaLocation, include: [MediaPlace]},
+        ],
+        ...spreadTransaction,
+    });
+    if (item === null)
+        return false;
+    let suggestions = [];
+    suggestions.push(...getPlacesSuggestions(item.MediaLocation?.MediaPlaces));
+    suggestions.push(...getClassificationSuggestions(item.MediaClassifications));
+    suggestions.push(...getDateSuggestions(item.createDate));
+    await Promise.all(suggestions.map(o => removeSuggestion(o, transaction)));
+
+    await item.destroy({...spreadTransaction});
+}
+
+async function removeSuggestion(obj, transaction) {
+    let spreadTransaction = transaction ? {transaction} : {};
+    if (typeof obj.type !== 'string' || typeof obj.text !== 'string') {
+        console.warn("Can't remove suggestion", obj);
+        return;
+    }
+
+    const {text, type} = obj;
+    let suggestion = await MediaSuggestion.findOne({where: {type, text}, ...spreadTransaction});
+    if (suggestion.count === 1) {
+        await suggestion.destroy({...spreadTransaction});
+    } else {
+        suggestion.count--;
+        await suggestion.save({...spreadTransaction});
+    }
+}
+
 export async function addSuggestion(obj, transaction) {
     if (typeof obj.type !== 'string' || typeof obj.text !== 'string') {
         console.warn("Can't add suggestion", obj);
@@ -251,15 +318,16 @@ export const toText = a => Array.isArray(a) ? a.map(b => b.text) : [a];
  *     location?: {latitude,longitude,altitude?,place?,country?,admin: string[]?},
  *     classifications?: {confidence: number, labels: string[], glossaries: string[]}[],
  * }} data MediaItem data
+ * @param transaction? Sequelize transaction
  * @returns {Promise<void>}
  */
-export async function insertMediaItem(data) {
+export async function insertMediaItem(data, transaction = null) {
     let [classA, classB, classC] = data.classifications ?
         data.classifications.sort((a, b) => b.confidence - a.confidence) :
         [null, null, null];
 
     try {
-        await Database.db.transaction({}, async transaction => {
+        const insert = async transaction => {
             let item = await MediaItem.create({
                 vectorA: toVector('A',
                     ...toText(classA?.labels),
@@ -297,19 +365,7 @@ export async function insertMediaItem(data) {
                 ...classA?.labels, classB?.labels, classC?.labels
             ].flat().filter(n => n !== null && n !== undefined).map(p => ({text: p.text, type: 'label'}));
 
-            let dates = [];
-            if (data.createDate !== null) {
-                let date = data.createDate;
-                let day = date.getDate();
-                let month = months[date.getMonth()];
-                let year = date.getFullYear().toString();
-                dates.push({type: 'date', text: month});
-                dates.push({type: 'date', text: year});
-                dates.push({type: 'date', text: `${month} ${year}`});
-                dates.push({type: 'date', text: `${day} ${month}`});
-                dates.push({type: 'date', text: `${day} ${month} ${year}`});
-            }
-
+            let dates = getDateSuggestions(data.createDate);
             try {
                 await Promise.all([...places, ...labels, ...dates].map(o => addSuggestion(o, transaction)));
             } catch (e) {
@@ -353,61 +409,18 @@ export async function insertMediaItem(data) {
                         MediaClassificationId: classification.id
                     })), {transaction});
                 }
-        });
-        console.log(
-            `inserted ${data.filename}`
-        );
+        };
+        if (transaction === null)
+            await Database.db.transaction({}, insert);
+        else
+            await insert(transaction);
+        console.log(`inserted ${data.filename}`);
         // transaction has been committed. Do something after the commit if required.
     } catch (err) {
         console.warn("MediaItem insert ERROR", err);
         throw new Error(err);
         // do something with the err.
     }
-}
-
-export async function removeTestMediaItem() {
-    let filename = 'IMG_20200722_203422.jpg';
-    let item = await MediaItem.findOne({where: {filename}});
-    await item.destroy();
-}
-
-export async function insertTestMediaItem() {
-    let filePath = 'IMG_20200722_203422.jpg';
-    let filename = path.basename(filePath);
-    if (!await MediaItem.findOne({where: {filename}})) {
-        await insertMediaItem({
-            type: 'image',
-            subType: 'none',
-            filename,
-            filePath,
-            width: 1280,
-            height: 720,
-            bytes: 128038102,
-            createDate: new Date(),
-            exif: {
-                Make: 'OnePlus',
-            },
-            classifications: [
-                {
-                    labels: ['cat', 'animal'],
-                    glossaries: ['domestic animal', 'animal description here'],
-                    confidence: 1,
-                }
-            ],
-            location: {
-                longitude: 50,
-                latitude: 5,
-                altitude: 0,
-                country: 'TempLand',
-                place: 'TempTown',
-                admin1: 'Temp District',
-                admin2: 'Temp Region',
-            }
-        })
-    }
-
-    let freshItem = await getMediaByFilename(filename);
-    console.log("Created test media item", freshItem.toJSON());
 }
 
 async function swapWidthAndHeightOnPortraitPhotos() {
