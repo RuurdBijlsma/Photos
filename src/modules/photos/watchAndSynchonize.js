@@ -20,7 +20,7 @@ const tinyPic = await useDir(path.join(config.thumbnails, 'tiny'));
 const smallPic = await useDir(path.join(config.thumbnails, 'small'));
 const bigPic = await useDir(path.join(config.thumbnails, 'big'));
 const streamVid = await useDir(path.join(config.thumbnails, 'webm'));
-const temp = await useDir(path.join(config.thumbnails, 'temp'));
+export const temp = await useDir(path.join(config.thumbnails, 'temp'));
 const processJobs = new Set();
 
 

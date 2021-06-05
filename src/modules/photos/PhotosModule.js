@@ -6,7 +6,7 @@ import config from "../../../res/photos/config.json";
 import path from "path";
 import mime from 'mime-types'
 import {
-    addSuggestion,
+    addSuggestion, changeItemDate,
     dropMediaItem,
     getDateSuggestions,
     getMediaById,
@@ -23,7 +23,7 @@ import Auth from "../../database/Auth.js";
 import sequelize from "sequelize";
 import {MediaSuggestion} from "../../database/models/photos/MediaSuggestionModel.js";
 import Database from "../../database/Database.js";
-import {updatePhotoDate} from "./exif.js";
+import {updatePhotoDate, updateVideoDate} from "./exif.js";
 
 const {Op} = sequelize;
 const console = new Log("PhotosModule");
@@ -50,25 +50,12 @@ export default class PhotosModule extends ApiModule {
             let date = new Date(req.body.date);
             if (isNaN(date.getDate()))
                 return res.sendStatus(400);
-            let suggestions = getDateSuggestions(item.createDate);
-            let newSuggestions = getDateSuggestions(date);
-
-            await Database.db.transaction({}, async transaction => {
-                await Promise.all(suggestions.map(o => removeSuggestion(o, transaction)))
-                await item.update({createDate: date}, {transaction});
-                await Promise.all(newSuggestions.map(o => addSuggestion(o, transaction)));
-            });
             try {
-                if (item.type === 'image') {
-                    await updatePhotoDate(path.join(config.media, item.filePath), date);
-                } else {
-
-                }
+                await changeItemDate(item, date);
+                res.send(true);
             } catch (e) {
-                console.log(`Couldn't update file (${item.filename}) date to ${date}\n`, e);
+                res.send(false);
             }
-
-            res.send(true);
         });
 
         app.post('/photos/reprocess/:id', async (req, res) => {

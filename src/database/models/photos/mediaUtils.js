@@ -8,6 +8,9 @@ import {initMediaPlace, MediaPlace} from "./MediaPlaceModel.js";
 import {initMediaSuggestion, MediaSuggestion} from "./MediaSuggestionModel.js";
 import Database from "../../Database.js";
 import {getToken, months} from "../../../utils.js";
+import {updatePhotoDate, updateVideoDate} from "../../../modules/photos/exif.js";
+import path from "path";
+import config from "../../../../res/photos/config.json";
 
 const {Op} = sequelize;
 
@@ -36,6 +39,29 @@ export async function initMedia(db) {
 
     MediaClassification.hasMany(MediaGlossary, {onDelete: 'CASCADE'});
     MediaGlossary.belongsTo(MediaClassification);
+}
+
+export async function changeItemDate(item, newDate) {
+    if (newDate === null || item === null) return false;
+
+    let suggestions = item.createDate !== null ? getDateSuggestions(item.createDate) : [];
+    let newSuggestions = getDateSuggestions(newDate);
+
+    await Database.db.transaction({}, async transaction => {
+        await Promise.all(suggestions.map(o => removeSuggestion(o, transaction)))
+        await item.update({createDate: newDate}, {transaction});
+        await Promise.all(newSuggestions.map(o => addSuggestion(o, transaction)));
+    });
+    try {
+        if (item.type === 'image') {
+            await updatePhotoDate(path.join(config.media, item.filePath), newDate);
+        } else {
+            await updateVideoDate(path.join(config.media, item.filePath), newDate);
+        }
+    } catch (e) {
+        console.log(`Couldn't update file (${item.filename}) date to ${newDate}\n`, e);
+    }
+    return true;
 }
 
 export async function getMonthPhotos(year, month) {

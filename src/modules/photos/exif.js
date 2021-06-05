@@ -6,6 +6,11 @@ import geocode from "./reverse-geocode.js";
 import path from "path";
 import probeSize from 'probe-image-size';
 import {filenameToDate} from "fix-exif-data";
+import {format} from 'date-fns'
+import modifyExif from 'modify-exif'
+import {temp} from "./watchAndSynchonize.js";
+import config from '../../../res/photos/config.json'
+import {exec} from "child_process";
 
 const {ExifImage} = exif;
 
@@ -207,17 +212,40 @@ export async function probeVideo(videoPath) {
     };
 }
 
+export async function updateVideoDate(filePath, date) {
+    let tempOutput = path.resolve(path.join(temp, path.basename(filePath)));
+    const newDateString = format(date, 'yyyy-MM-dd HH:mm:ss');
+
+    let success = await new Promise((resolve, reject) => {
+        let command = `ffmpeg -y -i "${path.resolve(filePath)}" -c copy -metadata creation_time="${newDateString}" "${tempOutput}"`;
+        console.log(command);
+        exec(command, (error, stderr, stdout) => {
+            if (error) {
+                console.warn('video date change error', error);
+                return resolve(false);
+            }
+        }).on('close', () => resolve(true));
+    });
+    if (success) {
+        await fs.promises.rename(tempOutput, filePath);
+    }
+}
+
 export async function updatePhotoDate(filePath, date) {
     const originalFile = await fs.promises.readFile(filePath);
     const newDateString = format(date, 'yyyy:MM:dd HH:mm:ss');
 
-    const newFile = modifyExifModule(originalFile, date => {
+    const newFile = modifyExif(originalFile, data => {
         // 36867: tag ID of DateTimeOriginal tag
         data.Exif['36867'] = newDateString;
     });
 
     await fs.promises.writeFile(filePath, newFile);
 }
+
+// updateVideoDate(path.join(config.media, 'VID_20210514_033314.mp4'), new Date('1 dec 2023')).then(r => {
+//     console.log(r);
+// });
 
 // probeVideo('./photos/home.mp4');
 // getExif('./res/photos/photos/IMG_20121102_084306-edited.jpg').then(d => {
