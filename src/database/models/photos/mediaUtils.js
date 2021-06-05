@@ -3,7 +3,6 @@ import {initMediaLocation, MediaLocation} from "./MediaLocationModel.js";
 import {initMediaItem, MediaItem} from "./MediaItemModel.js";
 import {initMediaLabel, MediaLabel} from "./MediaLabelModel.js";
 import {initMediaGlossary, MediaGlossary} from "./MediaGlossaryModel.js";
-import path from "path";
 import sequelize from 'sequelize';
 import {initMediaPlace, MediaPlace} from "./MediaPlaceModel.js";
 import {initMediaSuggestion, MediaSuggestion} from "./MediaSuggestionModel.js";
@@ -253,7 +252,7 @@ export async function dropMediaItem(id, transaction = null) {
     await item.destroy({...spreadTransaction});
 }
 
-async function removeSuggestion(obj, transaction) {
+export async function removeSuggestion(obj, transaction) {
     let spreadTransaction = transaction ? {transaction} : {};
     if (typeof obj.type !== 'string' || typeof obj.text !== 'string') {
         console.warn("Can't remove suggestion", obj);

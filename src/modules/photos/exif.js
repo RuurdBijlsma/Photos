@@ -207,6 +207,17 @@ export async function probeVideo(videoPath) {
     };
 }
 
+export async function updatePhotoDate(filePath, date) {
+    const originalFile = await fs.promises.readFile(filePath);
+    const newDateString = format(date, 'yyyy:MM:dd HH:mm:ss');
+
+    const newFile = modifyExifModule(originalFile, date => {
+        // 36867: tag ID of DateTimeOriginal tag
+        data.Exif['36867'] = newDateString;
+    });
+
+    await fs.promises.writeFile(filePath, newFile);
+}
 
 // probeVideo('./photos/home.mp4');
 // getExif('./res/photos/photos/IMG_20121102_084306-edited.jpg').then(d => {

@@ -6,12 +6,15 @@ import config from "../../../res/photos/config.json";
 import path from "path";
 import mime from 'mime-types'
 import {
+    addSuggestion,
     dropMediaItem,
+    getDateSuggestions,
     getMediaById,
     getMonthPhotos,
     getPhotoMonths, getPhotosForMonth, getPhotosPerDayMonth,
     getRandomLabels,
     getRandomLocations,
+    removeSuggestion,
     searchMediaRanked
 } from "../../database/models/photos/mediaUtils.js";
 import express from "express";
@@ -20,6 +23,7 @@ import Auth from "../../database/Auth.js";
 import sequelize from "sequelize";
 import {MediaSuggestion} from "../../database/models/photos/MediaSuggestionModel.js";
 import Database from "../../database/Database.js";
+import {updatePhotoDate} from "./exif.js";
 
 const {Op} = sequelize;
 const console = new Log("PhotosModule");
@@ -34,15 +38,46 @@ export default class PhotosModule extends ApiModule {
     async setRoutes(app, io, db) {
         app.use('/photos', express.static(config.thumbnails));
 
-        app.post('/photos/reprocess/:id', async (req, res) => {
+        app.post('/photos/changeDate/:id', async (req, res) => {
+            if (!isFinite(req.body.date)) return res.sendStatus(400);
+            const id = req.params.id;
+            if (typeof id !== 'string') return res.sendStatus(400);
             let user = await Auth.checkRequest(req);
             if (!user) return res.sendStatus(401);
-            const id = req.params.id;
-            if (typeof id !== 'string')
-                return res.sendStatus(400);
             let item = await MediaItem.findOne({where: {id}});
-            if (item === null)
-                return res.sendStatus(404);
+            if (item === null) return res.sendStatus(404);
+
+            let date = new Date(req.body.date);
+            if (isNaN(date.getDate()))
+                return res.sendStatus(400);
+            let suggestions = getDateSuggestions(item.createDate);
+            let newSuggestions = getDateSuggestions(date);
+
+            await Database.db.transaction({}, async transaction => {
+                await Promise.all(suggestions.map(o => removeSuggestion(o, transaction)))
+                await item.update({createDate: date}, {transaction});
+                await Promise.all(newSuggestions.map(o => addSuggestion(o, transaction)));
+            });
+            try {
+                if (item.type === 'image') {
+                    await updatePhotoDate(path.join(config.media, item.filePath), date);
+                } else {
+
+                }
+            } catch (e) {
+                console.log(`Couldn't update file (${item.filename}) date to ${date}\n`, e);
+            }
+
+            res.send(true);
+        });
+
+        app.post('/photos/reprocess/:id', async (req, res) => {
+            const id = req.params.id;
+            if (typeof id !== 'string') return res.sendStatus(400);
+            let user = await Auth.checkRequest(req);
+            if (!user) return res.sendStatus(401);
+            let item = await MediaItem.findOne({where: {id}});
+            if (item === null) return res.sendStatus(404);
 
             let filePath = path.resolve(path.join(config.media, item.filePath));
 
@@ -51,7 +86,7 @@ export default class PhotosModule extends ApiModule {
                 await dropMediaItem(item.id, transaction);
                 newId = await processMedia(filePath, 2, transaction);
             });
-            res.send({id:newId});
+            res.send({id: newId});
         });
 
         app.post('/photos/month-photos', async (req, res) => {
