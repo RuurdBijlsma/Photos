@@ -6,15 +6,13 @@ import config from "../../../res/photos/config.json";
 import path from "path";
 import mime from 'mime-types'
 import {
-    addSuggestion, changeItemDate,
+    changeItemDate,
     dropMediaItem,
-    getDateSuggestions,
     getMediaById,
     getMonthPhotos,
     getPhotoMonths, getPhotosForMonth, getPhotosPerDayMonth,
     getRandomLabels,
     getRandomLocations,
-    removeSuggestion,
     searchMediaRanked
 } from "../../database/models/photos/mediaUtils.js";
 import express from "express";
@@ -23,7 +21,6 @@ import Auth from "../../database/Auth.js";
 import sequelize from "sequelize";
 import {MediaSuggestion} from "../../database/models/photos/MediaSuggestionModel.js";
 import Database from "../../database/Database.js";
-import {updatePhotoDate, updateVideoDate} from "./exif.js";
 
 const {Op} = sequelize;
 const console = new Log("PhotosModule");
