@@ -11,6 +11,7 @@ import {getToken, months} from "../../../utils.js";
 import {updatePhotoDate, updateVideoDate} from "../../../modules/photos/exif.js";
 import path from "path";
 import config from "../../../../res/photos/config.json";
+import {initMediaFailed} from "./MediaFailedModule.js";
 
 const {Op} = sequelize;
 
@@ -24,6 +25,7 @@ export async function initMedia(db) {
     initMediaItem(db);
     initMediaPlace(db);
     initMediaSuggestion(db);
+    initMediaFailed(db);
 
     MediaItem.hasMany(MediaClassification, {onDelete: 'CASCADE'});
     MediaClassification.belongsTo(MediaItem);

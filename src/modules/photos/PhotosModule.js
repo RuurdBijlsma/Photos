@@ -4,6 +4,7 @@ import Log from "../../Log.js";
 import {MediaItem} from "../../database/models/photos/MediaItemModel.js";
 import config from "../../../res/photos/config.json";
 import path from "path";
+import WordNet from 'node-wordnet'
 import mime from 'mime-types'
 import {
     changeItemDate,
@@ -21,7 +22,9 @@ import Auth from "../../database/Auth.js";
 import sequelize from "sequelize";
 import {MediaSuggestion} from "../../database/models/photos/MediaSuggestionModel.js";
 import Database from "../../database/Database.js";
+import {MediaGlossary} from "../../database/models/photos/MediaGlossaryModel.js";
 
+const wordnet = new WordNet();
 const {Op} = sequelize;
 const console = new Log("PhotosModule");
 
@@ -35,12 +38,38 @@ export default class PhotosModule extends ApiModule {
     async setRoutes(app, io, db) {
         app.use('/photos', express.static(config.thumbnails));
 
+        app.post('/photos/defineLabel/:label', async (req, res) => {
+            let label = req.params.label;
+            if (typeof label !== 'string') return res.sendStatus(400);
+
+            let result = await MediaSuggestion.findOne({
+                where: {type: 'label', text: label},
+                attributes: ['text'],
+            });
+            if (result === null) return res.send({isLabel: false, glossary: null});
+
+            try {
+                label = label.replace(/ /g, '_');
+                let words = await wordnet.lookupAsync(label);
+                let results = words.filter(w => w.synonyms.includes(label) && w.pos === 'n');
+                let glossaries = await Promise.all(
+                    results.map(r => MediaGlossary.findOne({where: {text: r.gloss.trim()}}))
+                ).then(r => r.filter(w => w !== null));
+                if (glossaries.length === 0) return res.send({isLabel: false, glossary: null});
+                let glossary = glossaries[0].text;
+                const capitalize = c => c.substr(0, 1).toUpperCase() + c.substr(1);
+                glossary = glossary.split('.').map(capitalize).join('.');
+                return res.send({isLabel: true, glossary});
+            } catch (e) {
+                res.sendStatus(500);
+            }
+        });
+
         app.post('/photos/changeDate/:id', async (req, res) => {
             if (!isFinite(req.body.date)) return res.sendStatus(400);
             const id = req.params.id;
             if (typeof id !== 'string') return res.sendStatus(400);
-            let user = await Auth.checkRequest(req);
-            if (!user) return res.sendStatus(401);
+            if (!await Auth.checkRequest(req)) return res.sendStatus(401);
             let item = await MediaItem.findOne({where: {id}});
             if (item === null) return res.sendStatus(404);
 
@@ -58,8 +87,7 @@ export default class PhotosModule extends ApiModule {
         app.post('/photos/reprocess/:id', async (req, res) => {
             const id = req.params.id;
             if (typeof id !== 'string') return res.sendStatus(400);
-            let user = await Auth.checkRequest(req);
-            if (!user) return res.sendStatus(401);
+            if (!await Auth.checkRequest(req)) return res.sendStatus(401);
             let item = await MediaItem.findOne({where: {id}});
             if (item === null) return res.sendStatus(404);
 
@@ -74,8 +102,7 @@ export default class PhotosModule extends ApiModule {
         });
 
         app.post('/photos/month-photos', async (req, res) => {
-            let user = await Auth.checkRequest(req);
-            if (!user) return res.sendStatus(401);
+            if (!await Auth.checkRequest(req)) return res.sendStatus(401);
             try {
                 let months = req.body.months;
                 let result = await Promise.all(
@@ -88,14 +115,12 @@ export default class PhotosModule extends ApiModule {
         });
 
         app.post('/photos/months', async (req, res) => {
-            let user = await Auth.checkRequest(req);
-            if (!user) return res.sendStatus(401);
+            if (!await Auth.checkRequest(req)) return res.sendStatus(401);
             res.send(await getPhotoMonths());
         });
 
         app.post('/photos/list', async (req, res) => {
-            let user = await Auth.checkRequest(req);
-            if (!user) return res.sendStatus(401);
+            if (!await Auth.checkRequest(req)) return res.sendStatus(401);
             let limit = +req.query.limit;
             if (!isFinite(limit))
                 limit = 10;
@@ -113,8 +138,7 @@ export default class PhotosModule extends ApiModule {
         })
 
         app.post('/photos/locations/', async (req, res) => {
-            let user = await Auth.checkRequest(req);
-            if (!user) return res.sendStatus(401);
+            if (!await Auth.checkRequest(req)) return res.sendStatus(401);
             let now = +new Date();
             const refreshEvery = 1000 * 60 * 15;// 15 minutes
             if (!this.randomLocations || this.randomLocations.date + refreshEvery < now) {
@@ -125,8 +149,7 @@ export default class PhotosModule extends ApiModule {
         });
 
         app.post('/photos/labels/', async (req, res) => {
-            let user = await Auth.checkRequest(req);
-            if (!user) return res.sendStatus(401);
+            if (!await Auth.checkRequest(req)) return res.sendStatus(401);
             let now = +new Date();
             const refreshEvery = 1000 * 60 * 15;// 15 minutes
             if (!this.randomLabels || this.randomLabels.date + refreshEvery < now) {
@@ -137,8 +160,7 @@ export default class PhotosModule extends ApiModule {
         });
 
         app.post('/photos/suggestions', async (req, res) => {
-            let user = await Auth.checkRequest(req);
-            if (!user) return res.sendStatus(401);
+            if (!await Auth.checkRequest(req)) return res.sendStatus(401);
 
             let query = req.query.q;
             query = query.split(' ').filter(n => n.length > 0).join(' ');
@@ -151,13 +173,12 @@ export default class PhotosModule extends ApiModule {
                 },
                 order: [['count', 'DESC']],
                 limit: 10,
-                attributes: ['text', 'count'],
+                attributes: ['text', 'count', 'type'],
             }));
         });
 
         app.post('/photos/search/', async (req, res) => {
-            let user = await Auth.checkRequest(req);
-            if (!user) return res.sendStatus(401);
+            if (!await Auth.checkRequest(req)) return res.sendStatus(401);
             let query = req.query.q;
             query = query.split(' ').filter(n => n.length > 0).join(' ');
             let result = await searchMediaRanked({
@@ -168,8 +189,7 @@ export default class PhotosModule extends ApiModule {
         });
 
         app.post('/photos/dateSearch/', async (req, res) => {
-            let user = await Auth.checkRequest(req);
-            if (!user) return res.sendStatus(401);
+            if (!await Auth.checkRequest(req)) return res.sendStatus(401);
             let month = +req.query.m;
             let day = +req.query.d;
             if (isFinite(month) && isFinite(day)) {
@@ -180,8 +200,7 @@ export default class PhotosModule extends ApiModule {
         });
 
         app.post('/photos/:id', async (req, res) => {
-            let user = await Auth.checkRequest(req);
-            if (!user) return res.sendStatus(401);
+            if (!await Auth.checkRequest(req)) return res.sendStatus(401);
             const id = req.params.id;
             if (!id)
                 return res.sendStatus(401);

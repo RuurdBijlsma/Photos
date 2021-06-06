@@ -12,6 +12,7 @@ import TelegramBot from "node-telegram-bot-api";
 import os from "os";
 import Database from "../../database/Database.js";
 import {checkFileExists} from "../../utils.js";
+import {MediaFailed} from "../../database/models/photos/MediaFailedModule.js";
 
 const {Op} = seq;
 
@@ -133,6 +134,11 @@ async function isProcessed(filePath) {
 
     let item = await MediaItem.findOne({where: {filename}});
     if (!item) {
+        let hasFailed = await MediaFailed.findOne({where: {filePath}});
+        if(hasFailed) {
+            console.warn(`${filePath} will not be reprocessed, it has already failed before.`);
+            return true;
+        }
         console.log(`${filePath} not processed, reason: Not in DB`);
         return false;
     }
@@ -238,6 +244,17 @@ export async function processMedia(filePath, triesLeft = 2, transaction = null) 
             await bot.sendMessage(config.chatId, `[Photos] Failed to process "${
                 filePath
             }"\n\n${JSON.stringify(e)}`);
+            let type;
+            try {
+                type = getFileType(filePath);
+            } catch (e) {
+                type = 'none'
+            }
+            await MediaFailed.create({
+                filePath,
+                reason: e,
+                type,
+            });
             return false;
         } else {
             const waitTime = (3 - triesLeft) ** 2 * 5000;
