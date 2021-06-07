@@ -4,11 +4,10 @@ import Log from "../../Log.js";
 import {MediaItem} from "../../database/models/photos/MediaItemModel.js";
 import config from "../../../res/photos/config.json";
 import path from "path";
-import WordNet from 'node-wordnet'
 import mime from 'mime-types'
 import {
     changeItemDate,
-    dropMediaItem,
+    dropMediaItem, getBoundingBox, getGlossary,
     getMediaById,
     getMonthPhotos,
     getPhotoMonths, getPhotosForMonth, getPhotosPerDayMonth,
@@ -22,9 +21,8 @@ import Auth from "../../database/Auth.js";
 import sequelize from "sequelize";
 import {MediaSuggestion} from "../../database/models/photos/MediaSuggestionModel.js";
 import Database from "../../database/Database.js";
-import {MediaGlossary} from "../../database/models/photos/MediaGlossaryModel.js";
+import {MediaLocation} from "../../database/models/photos/MediaLocationModel.js";
 
-const wordnet = new WordNet();
 const {Op} = sequelize;
 const console = new Log("PhotosModule");
 
@@ -38,31 +36,70 @@ export default class PhotosModule extends ApiModule {
     async setRoutes(app, io, db) {
         app.use('/photos', express.static(config.thumbnails));
 
+        app.post('/photos/photosInBounds', async (req, res) => {
+            try {
+                let {minLat, maxLat, minLng, maxLng} = req.body;
+                if (!await Auth.checkRequest(req)) return res.sendStatus(401);
+                res.send(await MediaItem.findAll({
+                    include: {
+                        model: MediaLocation,
+                        where: {
+                            latitude: {
+                                [Op.gte]: minLat,
+                                [Op.lte]: maxLat,
+                            },
+                            longitude: {
+                                [Op.gte]: minLng,
+                                [Op.lte]: maxLng,
+                            },
+                        },
+                        attributes: ['latitude', 'longitude'],
+                    },
+                    limit: 500,
+                    attributes: ['id', 'type','width','height'],
+                }));
+            } catch (e) {
+                res.sendStatus(400);
+            }
+        });
+
+        app.post('/photos/boundingBox/:place', async (req, res) => {
+            let place = req.params.place;
+            if (typeof place !== 'string') return res.sendStatus(400);
+            if (!await Auth.checkRequest(req)) return res.sendStatus(401);
+            let results = await getBoundingBox(place);
+            if (results.length === 0) return res.sendStatus(404);
+            let result = results[0];
+            if (result.maxlat === null || result.minlat === null || result.maxlng === null || result.minlng === null)
+                return res.sendStatus(404);
+            res.send(result);
+        });
+
+        app.post('/photos/isPlace/:place', async (req, res) => {
+            let place = req.params.place;
+            if (typeof place !== 'string') return res.sendStatus(400);
+            if (!await Auth.checkRequest(req)) return res.sendStatus(401);
+
+            let result = await MediaSuggestion.findOne({
+                where: {type: 'place', text: {[Op.iLike]: `${place}`,},},
+                attributes: ['text'],
+            })
+
+            res.send({isPlace: result !== null, name: result?.text ?? null});
+        });
+
         app.post('/photos/defineLabel/:label', async (req, res) => {
             let label = req.params.label;
             if (typeof label !== 'string') return res.sendStatus(400);
+            if (!await Auth.checkRequest(req)) return res.sendStatus(401);
 
             let result = await MediaSuggestion.findOne({
                 where: {type: 'label', text: label},
                 attributes: ['text'],
             });
-            if (result === null) return res.send({isLabel: false, glossary: null});
-
-            try {
-                label = label.replace(/ /g, '_');
-                let words = await wordnet.lookupAsync(label);
-                let results = words.filter(w => w.synonyms.includes(label) && w.pos === 'n');
-                let glossaries = await Promise.all(
-                    results.map(r => MediaGlossary.findOne({where: {text: r.gloss.trim()}}))
-                ).then(r => r.filter(w => w !== null));
-                if (glossaries.length === 0) return res.send({isLabel: false, glossary: null});
-                let glossary = glossaries[0].text;
-                const capitalize = c => c.substr(0, 1).toUpperCase() + c.substr(1);
-                glossary = glossary.split('.').map(capitalize).join('.');
-                return res.send({isLabel: true, glossary});
-            } catch (e) {
-                res.sendStatus(500);
-            }
+            if (result === null)
+                return res.send({isLabel: false, glossary: null});
+            res.send(getGlossary(label));
         });
 
         app.post('/photos/changeDate/:id', async (req, res) => {
@@ -166,11 +203,7 @@ export default class PhotosModule extends ApiModule {
             query = query.split(' ').filter(n => n.length > 0).join(' ');
 
             res.send(await MediaSuggestion.findAll({
-                where: {
-                    text: {
-                        [Op.iLike]: `%${query}%`,
-                    },
-                },
+                where: {text: {[Op.iLike]: `%${query}%`,},},
                 order: [['count', 'DESC']],
                 limit: 10,
                 attributes: ['text', 'count', 'type'],
@@ -181,11 +214,33 @@ export default class PhotosModule extends ApiModule {
             if (!await Auth.checkRequest(req)) return res.sendStatus(401);
             let query = req.query.q;
             query = query.split(' ').filter(n => n.length > 0).join(' ');
-            let result = await searchMediaRanked({
+
+            let queryType = await MediaSuggestion.findOne({
+                where: {text: {[Op.iLike]: `${query}`,},},
+                attributes: ['text', 'type'],
+            });
+            let type = null, info = null;
+            if (queryType !== null) {
+                if (queryType.type === 'place') {
+                    type = 'place';
+                    info = queryType.text;
+                    console.log(info);
+                } else if (queryType.type === 'label') {
+                    let {isLabel, glossary} = await getGlossary(query);
+                    if (isLabel) {
+                        info = glossary;
+                        type = 'label';
+                    }
+                } else {
+                    type = queryType.type;
+                }
+            }
+
+            let results = await searchMediaRanked({
                 query,
                 includedFields: ['id', 'type', 'subType', 'durationMs', 'createDate', 'width', 'height'],
             })
-            res.send(result);
+            res.send({results, type, info});
         });
 
         app.post('/photos/dateSearch/', async (req, res) => {

@@ -12,7 +12,9 @@ import {updatePhotoDate, updateVideoDate} from "../../../modules/photos/exif.js"
 import path from "path";
 import config from "../../../../res/photos/config.json";
 import {initMediaFailed} from "./MediaFailedModule.js";
+import WordNet from "node-wordnet";
 
+const wordnet = new WordNet();
 const {Op} = sequelize;
 
 export async function initMedia(db) {
@@ -41,6 +43,36 @@ export async function initMedia(db) {
 
     MediaClassification.hasMany(MediaGlossary, {onDelete: 'CASCADE'});
     MediaGlossary.belongsTo(MediaClassification);
+}
+
+export async function getBoundingBox(place) {
+    return await Database.db.query(`
+        select max(latitude) as maxlat, min(latitude) as minlat, max(longitude) as maxlng, min(longitude) as minlng
+        from "MediaLocations"
+            inner join "MediaPlaces" MP on "MediaLocations".id = MP."MediaLocationId"
+        where text = $1
+    `, {
+        bind: [place],
+        type: sequelize.QueryTypes.SELECT,
+    });
+}
+
+export async function getGlossary(label) {
+    try {
+        label = label.replace(/ /g, '_');
+        let words = await wordnet.lookupAsync(label);
+        let results = words.filter(w => w.synonyms.includes(label) && w.pos === 'n');
+        let glossaries = await Promise.all(
+            results.map(r => MediaGlossary.findOne({where: {text: r.gloss.trim()}}))
+        ).then(r => r.filter(w => w !== null));
+        if (glossaries.length === 0) return {isLabel: false, glossary: null};
+        let glossary = glossaries[0].text;
+        const capitalize = c => c.substr(0, 1).toUpperCase() + c.substr(1);
+        glossary = glossary.split('.').map(capitalize).join('.');
+        return {isLabel: true, glossary};
+    } catch (e) {
+        return {isLabel: false, glossary: null};
+    }
 }
 
 export async function changeItemDate(item, newDate) {
