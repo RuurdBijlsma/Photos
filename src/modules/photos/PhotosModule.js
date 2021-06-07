@@ -56,7 +56,7 @@ export default class PhotosModule extends ApiModule {
                         attributes: ['latitude', 'longitude'],
                     },
                     limit: 500,
-                    attributes: ['id', 'type','width','height'],
+                    attributes: ['id', 'type', 'width', 'height'],
                 }));
             } catch (e) {
                 res.sendStatus(400);
@@ -72,7 +72,13 @@ export default class PhotosModule extends ApiModule {
             let result = results[0];
             if (result.maxlat === null || result.minlat === null || result.maxlng === null || result.minlng === null)
                 return res.sendStatus(404);
-            res.send(result);
+            // Add about 1 meter padding
+            res.send({
+                maxlat: result.maxlat + 0.00001,
+                minlat: result.minlat - 0.00001,
+                maxlng: result.maxlng + 0.00001,
+                minlng: result.minlng - 0.00001,
+            });
         });
 
         app.post('/photos/isPlace/:place', async (req, res) => {
