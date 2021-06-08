@@ -33,6 +33,14 @@ export default class PhotosModule extends ApiModule {
         this.randomLocations = null;
     }
 
+    fixMediaArrayDates(arr) {
+        return arr.map(media => ({...media, createDate: media?.createDate?.getTime?.()}));
+    }
+
+    fixMediaDate(media) {
+        return {...media, createDate: media?.createDate?.getTime?.()};
+    }
+
     async setRoutes(app, io, db) {
         app.use('/photos', express.static(config.thumbnails));
 
@@ -144,14 +152,24 @@ export default class PhotosModule extends ApiModule {
             res.send({id: newId});
         });
 
-        app.post('/photos/month-photos', async (req, res) => {
+        app.post('/photos/months-photos', async (req, res) => {
             if (!await Auth.checkRequest(req)) return res.sendStatus(401);
             try {
                 let months = req.body.months;
                 let result = await Promise.all(
-                    months.map(date => getMonthPhotos(...date))
+                    months.map(date => getMonthPhotos(...date).then(this.fixMediaArrayDates))
                 );
                 res.send(result);
+            } catch (e) {
+                res.sendStatus(500);
+            }
+        });
+
+        app.post('/photos/month-photos', async (req, res) => {
+            if (!await Auth.checkRequest(req)) return res.sendStatus(401);
+            try {
+                let month = req.body.month;
+                res.send(await getMonthPhotos(...month).then(this.fixMediaArrayDates));
             } catch (e) {
                 res.sendStatus(500);
             }
@@ -176,7 +194,7 @@ export default class PhotosModule extends ApiModule {
                 limit,
                 offset,
                 attributes: ['id', 'type', 'subType', 'durationMs', 'createDate', 'width', 'height']
-            });
+            }).then(this.fixMediaArrayDates);
             res.send(photos);
         })
 
@@ -245,7 +263,7 @@ export default class PhotosModule extends ApiModule {
             let results = await searchMediaRanked({
                 query,
                 includedFields: ['id', 'type', 'subType', 'durationMs', 'createDate', 'width', 'height'],
-            })
+            }).then(this.fixMediaArrayDates);
             res.send({results, type, info});
         });
 
@@ -254,9 +272,9 @@ export default class PhotosModule extends ApiModule {
             let month = +req.query.m;
             let day = +req.query.d;
             if (isFinite(month) && isFinite(day)) {
-                res.send(await getPhotosPerDayMonth(day, month));
+                res.send(await getPhotosPerDayMonth(day, month).then(this.fixMediaArrayDates));
             } else if (isFinite(month)) {
-                res.send(await getPhotosForMonth(month));
+                res.send(await getPhotosForMonth(month).then(this.fixMediaArrayDates));
             }
         });
 
@@ -265,7 +283,7 @@ export default class PhotosModule extends ApiModule {
             const id = req.params.id;
             if (!id)
                 return res.sendStatus(401);
-            let item = await getMediaById(id);
+            let item = await getMediaById(id).then(this.fixMediaDate);
             if (item === null)
                 return res.sendStatus(404);
             res.send(item);
