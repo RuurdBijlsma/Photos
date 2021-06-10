@@ -303,8 +303,10 @@ export default class PhotosModule extends ApiModule {
         });
 
         console.log("Initializing geocoder");
+        console.time("Init geocoder");
         await geocode({latitude: 50, longitude: 5});
         console.log("Initialized geocoder");
+        console.timeEnd("Init geocoder");
         await watchAndSynchronize()
         console.log("Watching and synchronizing Photos");
     }
