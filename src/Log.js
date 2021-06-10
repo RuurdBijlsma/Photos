@@ -18,4 +18,12 @@ export default class Log {
     warn(...message) {
         console.warn(this.tag, ...message);
     }
+
+    time(...args) {
+        return console.time(...args)
+    }
+
+    timeEnd(...args) {
+        return console.timeEnd(...args)
+    }
 }
