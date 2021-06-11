@@ -34,10 +34,11 @@ export default class PhotosModule extends ApiModule {
     }
 
     fixMediaArrayDates(arr) {
-        return arr.map(media => ({...media, createDate: media?.createDate?.getTime?.()}));
+        return arr.map(m => m.toJSON ? m.toJSON() : m).map(media => ({...media, createDate: media?.createDate?.getTime?.()}));
     }
 
     fixMediaDate(media) {
+        media = media.toJSON ? media.toJSON() : media;
         return {...media, createDate: media?.createDate?.getTime?.()};
     }
 
