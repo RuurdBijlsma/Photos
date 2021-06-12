@@ -312,6 +312,10 @@ export default class PhotosModule extends ApiModule {
             let item = await getMediaById(id).then(this.fixMediaDate);
             if (item === null)
                 return res.sendStatus(404);
+            delete item.vector;
+            delete item.vectorA;
+            delete item.vectorB;
+            delete item.vectorC;
             res.send(item);
         });
 

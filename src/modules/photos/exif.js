@@ -9,7 +9,6 @@ import {filenameToDate} from "fix-exif-data";
 import {format} from 'date-fns'
 import modifyExif from 'modify-exif'
 import {temp} from "./watchAndSynchonize.js";
-import config from '../../../res/photos/config.json'
 import {exec} from "child_process";
 
 const {ExifImage} = exif;
