@@ -22,6 +22,7 @@ import sequelize from "sequelize";
 import {MediaSuggestion} from "../../database/models/photos/MediaSuggestionModel.js";
 import Database from "../../database/Database.js";
 import {MediaLocation} from "../../database/models/photos/MediaLocationModel.js";
+import fs from "fs";
 
 const {Op} = sequelize;
 const console = new Log("PhotosModule");
@@ -34,16 +35,40 @@ export default class PhotosModule extends ApiModule {
     }
 
     fixMediaArrayDates(arr) {
-        return arr.map(m => m.toJSON ? m.toJSON() : m).map(media => ({...media, createDate: media?.createDate?.getTime?.()}));
+        if (arr === null) return null;
+        return arr.map(m => m.toJSON ? m.toJSON() : m).map(media => ({
+            ...media,
+            createDate: media?.createDate?.getTime?.()
+        }));
     }
 
     fixMediaDate(media) {
+        if (media === null) return null;
         media = media.toJSON ? media.toJSON() : media;
         return {...media, createDate: media?.createDate?.getTime?.()};
     }
 
     async setRoutes(app, io, db) {
         app.use('/photos', express.static(config.thumbnails));
+
+        app.post('/deleteItem/:id', async (req, res) => {
+            let id = req.params.id;
+            if (typeof id !== 'string') return res.sendStatus(400);
+            if (!await Auth.checkRequest(req)) return res.sendStatus(401);
+            let item = await MediaItem.findOne({where: {id}});
+            if (item === null) return res.sendStatus(404);
+
+            try {
+                let filePath = path.resolve(path.join(config.media, item.filePath));
+                await dropMediaItem(id);
+                await fs.promises.unlink(filePath);
+                console.log("Deleted item", filePath);
+                res.send(true);
+            } catch (e) {
+                console.warn("Delete failed", e);
+                res.send(false);
+            }
+        });
 
         app.post('/photos/photosInBounds', async (req, res) => {
             try {

@@ -38,19 +38,23 @@ export async function watchAndSynchronize() {
     console.log("Watching", config.media);
     fs.watch(config.media, async (eventType, filename) => {
         if (eventType === 'rename') {
-            let changedFile = path.join(config.media, filename);
-            if (await checkFileExists(changedFile)) {
-                await waitSleep(600);
-                let {files} = await getFilesRecursive(changedFile);
-                for (let file of files)
-                    await singleInstance(processMedia, file);
-            } else {
-                let ext = path.extname(changedFile)
-                if (ext !== '')
-                    await singleInstance(removeMedia, changedFile);
-                else
-                    // Deleted item might be a folder, sync to make sure the files get removed
-                    await singleInstance(syncFiles);
+            try {
+                let changedFile = path.join(config.media, filename);
+                if (await checkFileExists(changedFile)) {
+                    await waitSleep(600);
+                    let {files} = await getFilesRecursive(changedFile);
+                    for (let file of files)
+                        await singleInstance(processMedia, file);
+                } else {
+                    let ext = path.extname(changedFile)
+                    if (ext !== '')
+                        await singleInstance(removeMedia, changedFile);
+                    else
+                        // Deleted item might be a folder, sync to make sure the files get removed
+                        await singleInstance(syncFiles);
+                }
+            } catch (e) {
+                console.warn('watch error', e);
             }
         }
     });
@@ -135,7 +139,7 @@ async function isProcessed(filePath) {
     let item = await MediaItem.findOne({where: {filename}});
     if (!item) {
         let hasFailed = await MediaFailed.findOne({where: {filePath}});
-        if(hasFailed) {
+        if (hasFailed) {
             console.warn(`${filePath} will not be reprocessed, it has already failed before.`);
             return true;
         }
