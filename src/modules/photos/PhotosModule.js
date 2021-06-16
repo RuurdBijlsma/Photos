@@ -1,5 +1,5 @@
 import ApiModule from "../../ApiModule.js";
-import {processMedia, watchAndSynchronize} from "./watchAndSynchonize.js";
+import {getPaths, processMedia, watchAndSynchronize} from "./watchAndSynchonize.js";
 import Log from "../../Log.js";
 import {MediaItem} from "../../database/models/photos/MediaItemModel.js";
 import config from "../../../res/photos/config.json";
@@ -23,6 +23,7 @@ import {MediaSuggestion} from "../../database/models/photos/MediaSuggestionModel
 import Database from "../../database/Database.js";
 import {MediaLocation} from "../../database/models/photos/MediaLocationModel.js";
 import fs from "fs";
+import {checkFileExists} from "../../utils.js";
 
 const {Op} = sequelize;
 const console = new Log("PhotosModule");
@@ -51,7 +52,23 @@ export default class PhotosModule extends ApiModule {
     async setRoutes(app, io, db) {
         app.use('/photos', express.static(config.thumbnails));
 
-        app.post('/deleteItem/:id', async (req, res) => {
+        app.post('/photos/searchTip', async (req, res) => {
+            if (!await Auth.checkRequest(req)) return res.sendStatus(401);
+
+            let result = await Database.db.query(`
+                select text, count::FLOAT / (select max(count) from "MediaSuggestions") + random() * 5 as rcount
+                from "MediaSuggestions"
+                where text != 'instrumentality'
+                  and text != 'instrumentation'
+                  and text != 'structure'
+                  and text != 'device'
+                order by rcount desc
+                limit 1
+           `, {type: sequelize.QueryTypes.SELECT});
+            res.send(result?.[0]);
+        });
+
+        app.post('/photos/deleteItem/:id', async (req, res) => {
             let id = req.params.id;
             if (typeof id !== 'string') return res.sendStatus(400);
             if (!await Auth.checkRequest(req)) return res.sendStatus(401);
@@ -62,6 +79,13 @@ export default class PhotosModule extends ApiModule {
                 let filePath = path.resolve(path.join(config.media, item.filePath));
                 await dropMediaItem(id);
                 await fs.promises.unlink(filePath);
+                let files = getPaths(id);
+                for (let key in files)
+                    if (files.hasOwnProperty(key))
+                        if (await checkFileExists(files[key])) {
+                            console.log("Deleting", files[key])
+                            await fs.promises.unlink(files[key])
+                        }
                 console.log("Deleted item", filePath);
                 res.send(true);
             } catch (e) {
