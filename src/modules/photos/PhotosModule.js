@@ -50,7 +50,7 @@ export default class PhotosModule extends ApiModule {
     }
 
     async setRoutes(app, io, db) {
-        app.use('/photos', express.static(config.thumbnails));
+        // app.use('/photos', express.static(config.thumbnails));
 
         app.post('/photos/totalBounds', async (req, res) => {
             if (!await Auth.checkRequest(req)) return res.sendStatus(401);
@@ -356,7 +356,7 @@ export default class PhotosModule extends ApiModule {
             res.send(item);
         });
 
-        app.get('/photos/full/:id', async (req, res) => {
+        app.get('/photo/full/:id', async (req, res) => {
             const id = req.params.id;
             let item = await MediaItem.findOne({where: {id}});
             if (item === null)
