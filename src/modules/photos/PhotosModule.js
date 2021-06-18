@@ -50,7 +50,8 @@ export default class PhotosModule extends ApiModule {
     }
 
     async setRoutes(app, io, db) {
-        // app.use('/photos', express.static(config.thumbnails));
+        if (process.platform === 'win32')
+            app.use('/photo', express.static(config.thumbnails));
 
         app.post('/photos/totalBounds', async (req, res) => {
             if (!await Auth.checkRequest(req)) return res.sendStatus(401);
