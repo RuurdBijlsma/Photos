@@ -10,6 +10,7 @@ import {format} from 'date-fns'
 import modifyExif from 'modify-exif'
 import {temp} from "./watchAndSynchonize.js";
 import {exec} from "child_process";
+import config from '../../../res/photos/config.json'
 
 const {ExifImage} = exif;
 
@@ -241,6 +242,10 @@ export async function updatePhotoDate(filePath, date) {
 
     await fs.promises.writeFile(filePath, newFile);
 }
+
+// probeVideo(path.join(config.media, 'VID_20210614_033907.mp4')).then(c => {
+//     console.log(c);
+// })
 
 // updateVideoDate(path.join(config.media, 'VID_20210514_033314.mp4'), new Date('1 dec 2023')).then(r => {
 //     console.log(r);

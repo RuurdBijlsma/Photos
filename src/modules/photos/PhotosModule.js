@@ -52,6 +52,18 @@ export default class PhotosModule extends ApiModule {
     async setRoutes(app, io, db) {
         app.use('/photos', express.static(config.thumbnails));
 
+        app.post('/photos/totalBounds', async (req, res) => {
+            if (!await Auth.checkRequest(req)) return res.sendStatus(401);
+            let result = await Database.db.query(`
+                select min(latitude) as minlat, max(latitude) maxlat, min(longitude) minlng, max(longitude) maxlng
+                from "MediaLocations"
+            `, {type: sequelize.QueryTypes.SELECT});
+            if (Array.isArray(result) && result.length > 0)
+                res.send(result[0])
+            else
+                res.send(null);
+        })
+
         app.post('/photos/searchTip', async (req, res) => {
             if (!await Auth.checkRequest(req)) return res.sendStatus(401);
 
@@ -113,8 +125,9 @@ export default class PhotosModule extends ApiModule {
                         },
                         attributes: ['latitude', 'longitude'],
                     },
-                    limit: 500,
+                    limit: 1000,
                     attributes: ['id', 'type', 'width', 'height'],
+                    order: ['id'],
                 }));
             } catch (e) {
                 res.sendStatus(400);
