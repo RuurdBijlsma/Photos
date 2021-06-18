@@ -6,5 +6,6 @@
   "telegramToken": "1823771308:89a9asd89fa9708sdf9asd7f9as7df98sf",
   "chatId": 626213452,
   "geocodeAdmin3and4": true,
-  "skipGeocode": false
+  "skipGeocode": false,
+  "hostThumbnails": true
 }
