@@ -357,7 +357,7 @@ export default class PhotosModule extends ApiModule {
             res.send(item);
         });
 
-        app.get('/photo/full/:id', async (req, res) => {
+        app.get('/photos/full/:id', async (req, res) => {
             const id = req.params.id;
             let item = await MediaItem.findOne({where: {id}});
             if (item === null)
