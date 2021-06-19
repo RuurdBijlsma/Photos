@@ -18,6 +18,7 @@ for (let i = 0; i < count; i += batchSize) {
         offset: i + startOffset,
         where: {createDateString: null},
     });
+    console.log("items length", items.length)
     let promises = [];
     for (let item of items) {
         promises.push(new Promise(resolve => {
