@@ -49,6 +49,6 @@ for (let i = 0; i < count; i += batchSize) {
         }));
     }
     await Promise.all(promises);
-    console.log(`Progress [${i + batchSize} / ${count}]`);
+    console.log(`Progress [${i + batchSize + startOffset} / ${count}]`);
 }
 console.log("Done fixing");
