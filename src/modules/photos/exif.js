@@ -21,6 +21,42 @@ async function dateFromFile(filePath) {
     return new Date(fileStat.birthtimeMs);
 }
 
+export async function getCreateDate(image, exifData) {
+    let createDate = null;
+    let timeFields = ['DateTimeOriginal', 'CreateDate'];
+    for (let timeField of timeFields) {
+        if (exifData.exif[timeField] &&
+            exifData.exif[timeField].includes(' ') &&
+            exifData.exif[timeField].match(/[^ ]+ [^ ]+/)) {
+            let [date, time] = exifData.exif[timeField].split(' ');
+            date = date.replace(/:/g, '/');
+            let timezone = '';
+            try {
+                if (exifData.gps?.GPSTimeStamp && exifData.gps?.GPSDateStamp) {
+                    let createDateUTC = new Date(`${date}, ${time} UTC`);
+                    let gpsDateUTC = new Date(`${
+                        exifData.gps.GPSDateStamp.replace(/:/g, '/')
+                    } ${
+                        exifData.gps.GPSTimeStamp.map(n => n.toString().padStart(2, '0')).join(':')
+                    } UTC`);
+                    let difference = Math.round((createDateUTC - gpsDateUTC) / 3600000 * 4) / 4;
+                    let hoursDifference = difference - (difference % 1);
+                    let minutesDifference = (Math.abs(difference) % 1) * 60;
+                    timezone = ` ${hoursDifference > 0 ? '+' : ''}${hoursDifference}:${minutesDifference}`
+                }
+            } catch (e) {
+                console.log("Couldn't determine timezone for ", image);
+            }
+            createDate = new Date(`${date}, ${time}${timezone}`);
+        }
+    }
+
+    if (createDate === null)
+        createDate = await dateFromFile(image);
+
+    return createDate;
+}
+
 /**
  * Get image dimensions
  * @param filePath
@@ -107,19 +143,7 @@ export async function getExif(image) {
     if (imgDim === null)
         throw new Error(`Can't get image dimensions for ${image}`);
 
-    let createDate = null;
-    let timeFields = ['DateTimeOriginal', 'CreateDate'];
-    for (let timeField of timeFields) {
-        if (data.exif[timeField] &&
-            data.exif[timeField].includes(' ') &&
-            data.exif[timeField].match(/[^ ]+ [^ ]+/)) {
-            let [date, time] = data.exif[timeField].split(' ');
-            date = date.replace(/:/gi, '/');
-            createDate = new Date(`${date}, ${time}`);
-        }
-    }
-    if (createDate === null)
-        createDate = new Date(fileStat.birthtimeMs);
+    let createDate = await getCreateDate(image, data);
 
     let exifData = {
         Make: data.image.Make,
@@ -172,6 +196,8 @@ export async function probeVideo(videoPath) {
     let createDate = null;
     if (format.tags.creation_time)
         createDate = new Date(format.tags.creation_time);
+    if (createDate === null || createDate.getTime() === 0)
+        createDate = await dateFromFile(videoPath);
     let gps = null;
     if (format.tags.location !== undefined) {
         let [[latitude], [longitude]] = format.tags.location.matchAll(/[+-]\d+\.\d+/g)

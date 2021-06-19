@@ -45,6 +45,7 @@
     "filenamify": "^4.2.0",
     "fix-exif-data": "github:ruurdbijlsma/exif-date-fix",
     "fluent-ffmpeg": "^2.1.2",
+    "geo-tz": "^6.0.1",
     "gify-parse": "^1.0.7",
     "gm": "^1.23.1",
     "gmail-send": "^1.8.10",
