@@ -8,7 +8,7 @@ import {initMediaPlace, MediaPlace} from "./MediaPlaceModel.js";
 import {initMediaSuggestion, MediaSuggestion} from "./MediaSuggestionModel.js";
 import Database from "../../Database.js";
 import {getToken, months} from "../../../utils.js";
-import {updatePhotoDate, updateVideoDate} from "../../../modules/photos/exif.js";
+import {dateToString, updatePhotoDate, updateVideoDate} from "../../../modules/photos/exif.js";
 import path from "path";
 import config from "../../../../res/photos/config.json";
 import {initMediaFailed} from "./MediaFailedModule.js";
@@ -83,7 +83,10 @@ export async function changeItemDate(item, newDate) {
 
     await Database.db.transaction({}, async transaction => {
         await Promise.all(suggestions.map(o => removeSuggestion(o, transaction)))
-        await item.update({createDate: newDate}, {transaction});
+        await item.update({
+            createDate: newDate,
+            createDateString: dateToString(newDate),
+        }, {transaction});
         await Promise.all(newSuggestions.map(o => addSuggestion(o, transaction)));
     });
     try {
@@ -100,7 +103,7 @@ export async function changeItemDate(item, newDate) {
 
 export async function getMonthPhotos(year, month) {
     return await Database.db.query(`
-        select id, type, "subType", width, height, "createDate", "durationMs"
+        select id, type, "subType", width, height, "createDateString", "durationMs"
         from "MediaItems"
         where extract(month from "createDate") = $1
           and extract(year from "createDate") = $2
@@ -239,7 +242,7 @@ export async function getUniqueId() {
 
 export async function getPhotosForMonth(month) {
     return await Database.db.query(`
-        select id, type, "subType", width, height, "createDate", "durationMs"
+        select id, type, "subType", width, height, "createDateString", "durationMs"
         from "MediaItems"
         where extract(month from "createDate") = $1
         order by "createDate" desc;
@@ -321,6 +324,8 @@ export async function removeSuggestion(obj, transaction) {
 
     const {text, type} = obj;
     let suggestion = await MediaSuggestion.findOne({where: {type, text}, ...spreadTransaction});
+    if (suggestion === null)
+        return;
     if (suggestion.count === 1) {
         await suggestion.destroy({...spreadTransaction});
     } else {
@@ -373,7 +378,7 @@ export const toText = a => Array.isArray(a) ? a.map(b => b.text) : [a];
 /**
  * @param {{
  *     id,type,subType,filename,filePath,
- *     width,height,durationMs?,bytes,createDate?:Date,exif,
+ *     width,height,durationMs?,bytes,createDateString?:string,exif,
  *     location?: {latitude,longitude,altitude?,place?,country?,admin: string[]?},
  *     classifications?: {confidence: number, labels: string[], glossaries: string[]}[],
  * }} data MediaItem data
@@ -387,6 +392,10 @@ export async function insertMediaItem(data, transaction = null) {
 
     try {
         const insert = async transaction => {
+            data.createDate = new Date(data.createDateString);
+            if (typeof data.createDateString !== 'string') {
+                console.warn("FOUT")
+            }
             let item = await MediaItem.create({
                 vectorA: toVector('A',
                     ...toText(classA?.labels),
@@ -421,7 +430,7 @@ export async function insertMediaItem(data, transaction = null) {
                 ...(data.location?.admin ?? [])
             ].flat().filter(n => n !== null && n !== undefined).map(p => ({text: p, type: 'place'}));
             const labels = [
-                ...classA?.labels, classB?.labels, classC?.labels
+                classA?.labels, classB?.labels, classC?.labels
             ].flat().filter(n => n !== null && n !== undefined).map(p => ({text: p.text, type: 'label'}));
 
             let dates = getDateSuggestions(data.createDate);

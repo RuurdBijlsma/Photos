@@ -50,6 +50,10 @@ export function initMediaItem(sequelize) {
             type: DataTypes.DATE,
             allowNull: true,
         },
+        createDateString: {
+            type: DataTypes.STRING,
+            allowNull: true,
+        },
         exif: {
             type: DataTypes.JSONB,
             allowNull: false,

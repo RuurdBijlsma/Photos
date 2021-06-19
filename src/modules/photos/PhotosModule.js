@@ -35,20 +35,6 @@ export default class PhotosModule extends ApiModule {
         this.randomLocations = null;
     }
 
-    fixMediaArrayDates(arr) {
-        if (arr === null) return null;
-        return arr.map(m => m.toJSON ? m.toJSON() : m).map(media => ({
-            ...media,
-            createDate: media?.createDate?.getTime?.()
-        }));
-    }
-
-    fixMediaDate(media) {
-        if (media === null) return null;
-        media = media.toJSON ? media.toJSON() : media;
-        return {...media, createDate: media?.createDate?.getTime?.()};
-    }
-
     async setRoutes(app, io, db) {
         if (config.hostThumbnails)
             app.use('/photo', express.static(config.thumbnails));
@@ -221,7 +207,7 @@ export default class PhotosModule extends ApiModule {
             try {
                 let months = req.body.months;
                 let result = await Promise.all(
-                    months.map(date => getMonthPhotos(...date).then(this.fixMediaArrayDates))
+                    months.map(date => getMonthPhotos(...date))
                 );
                 res.send(result);
             } catch (e) {
@@ -257,7 +243,7 @@ export default class PhotosModule extends ApiModule {
                 order: [['createDate', 'DESC']],
                 limit,
                 offset,
-                attributes: ['id', 'type', 'subType', 'durationMs', 'createDate', 'width', 'height']
+                attributes: ['id', 'type', 'subType', 'durationMs', 'createDateString', 'width', 'height']
             }).then(this.fixMediaArrayDates);
             res.send(photos);
         })
@@ -326,7 +312,7 @@ export default class PhotosModule extends ApiModule {
 
             let results = await searchMediaRanked({
                 query,
-                includedFields: ['id', 'type', 'subType', 'durationMs', 'createDate', 'width', 'height'],
+                includedFields: ['id', 'type', 'subType', 'durationMs', 'createDateString', 'width', 'height'],
             }).then(this.fixMediaArrayDates);
             res.send({results, type, info});
         });

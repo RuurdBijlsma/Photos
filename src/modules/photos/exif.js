@@ -14,45 +14,48 @@ import config from '../../../res/photos/config.json'
 
 const {ExifImage} = exif;
 
-async function dateFromFile(filePath) {
+export async function dateFromFile(filePath) {
     let date = filenameToDate(path.basename(filePath));
     if (date !== null) return date;
     let fileStat = await fs.promises.stat(filePath);
     return new Date(fileStat.birthtimeMs);
 }
 
-export async function getCreateDate(image, exifData) {
+export function dateToString(d) {
+    return `${
+        d.getFullYear()
+    }/${
+        (d.getMonth() + 1).toString().padStart(2, '0')
+    }/${
+        (d.getDate()).toString().padStart(2, '0')
+    } ${
+        (d.getHours()).toString().padStart(2, '0')
+    }:${
+        (d.getMinutes()).toString().padStart(2, '0')
+    }:${
+        (d.getSeconds()).toString().padStart(2, '0')
+    }`;
+}
+
+export async function getCreateDate(image, exifData = null) {
     let createDate = null;
-    let timeFields = ['DateTimeOriginal', 'CreateDate'];
-    for (let timeField of timeFields) {
-        if (exifData.exif[timeField] &&
-            exifData.exif[timeField].includes(' ') &&
-            exifData.exif[timeField].match(/[^ ]+ [^ ]+/)) {
-            let [date, time] = exifData.exif[timeField].split(' ');
-            date = date.replace(/:/g, '/');
-            let timezone = '';
-            try {
-                if (exifData.gps?.GPSTimeStamp && exifData.gps?.GPSDateStamp) {
-                    let createDateUTC = new Date(`${date}, ${time} UTC`);
-                    let gpsDateUTC = new Date(`${
-                        exifData.gps.GPSDateStamp.replace(/:/g, '/')
-                    } ${
-                        exifData.gps.GPSTimeStamp.map(n => n.toString().padStart(2, '0')).join(':')
-                    } UTC`);
-                    let difference = Math.round((createDateUTC - gpsDateUTC) / 3600000 * 4) / 4;
-                    let hoursDifference = difference - (difference % 1);
-                    let minutesDifference = (Math.abs(difference) % 1) * 60;
-                    timezone = ` ${hoursDifference > 0 ? '+' : ''}${hoursDifference}:${minutesDifference}`
-                }
-            } catch (e) {
-                console.log("Couldn't determine timezone for ", image);
+    if (exifData !== null) {
+        let timeFields = ['DateTimeOriginal', 'CreateDate'];
+        for (let timeField of timeFields) {
+            if (exifData.exif[timeField] &&
+                exifData.exif[timeField].includes(' ') &&
+                exifData.exif[timeField].match(/[^ ]+ [^ ]+/)) {
+                let [date, time] = exifData.exif[timeField].split(' ');
+                date = date.replace(/:/g, '/');
+                createDate = `${date} ${time}`;
             }
-            createDate = new Date(`${date}, ${time}${timezone}`);
         }
     }
 
-    if (createDate === null)
-        createDate = await dateFromFile(image);
+    if (createDate === null) {
+        let d = await dateFromFile(image);
+        createDate = dateToString(d);
+    }
 
     return createDate;
 }
@@ -113,7 +116,7 @@ export async function getExif(image) {
         data = await loadExif(image);
     } catch (e) {
         let {size} = await fs.promises.stat(image);
-        let createDate = await dateFromFile(image);
+        let createDate = dateToString(await dateFromFile(image));
         let imgDim = await imageSize(image);
         if (imgDim === null)
             throw new Error(`Can't get image dimensions for ${image}`);
@@ -195,9 +198,9 @@ export async function probeVideo(videoPath) {
     let duration = Math.round(1000 * format.duration);
     let createDate = null;
     if (format.tags.creation_time)
-        createDate = new Date(format.tags.creation_time);
-    if (createDate === null || createDate.getTime() === 0)
-        createDate = await dateFromFile(videoPath);
+        createDate = dateToString(new Date(format.tags.creation_time));
+    if (createDate === null)
+        createDate = dateToString(await dateFromFile(videoPath));
     let gps = null;
     if (format.tags.location !== undefined) {
         let [[latitude], [longitude]] = format.tags.location.matchAll(/[+-]\d+\.\d+/g)
@@ -278,6 +281,6 @@ export async function updatePhotoDate(filePath, date) {
 // });
 
 // probeVideo('./photos/home.mp4');
-// getExif('./res/photos/photos/IMG_20121102_084306-edited.jpg').then(d => {
+// getExif('./res/photos/photos/20170724_200236.jpg').then(d => {
 //     console.log(d);
 // })

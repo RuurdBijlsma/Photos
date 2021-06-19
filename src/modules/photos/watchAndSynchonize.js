@@ -71,7 +71,7 @@ async function syncFiles() {
     let {files, videos, images} = await getFilesRecursive(config.media);
     let newFiles = [];
     let freeGb = os.freemem() / 1000000000;
-    let batchSize = Math.max(1, Math.ceil(freeGb * 10));
+    let batchSize = Math.min(Math.max(1, Math.ceil(freeGb * 10)), 30);
     console.log(`Checking ${files.length} files to see if they need to get processed. [BatchSize: ${batchSize}]`);
     for (let i = 0; i < images.length; i += batchSize) {
         let slice = images.slice(i, i + batchSize);
@@ -237,7 +237,7 @@ export async function processMedia(filePath, triesLeft = 2, transaction = null) 
             height: metadata.height,
             durationMs: metadata.duration,
             bytes: metadata.size,
-            createDate: metadata.createDate,
+            createDateString: metadata.createDate,
             exif: metadata.exif,
             classifications: labels,
             location: metadata.gps,
