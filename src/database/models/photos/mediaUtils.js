@@ -11,8 +11,8 @@ import {getToken, months} from "../../../utils.js";
 import {dateToString, updatePhotoDate, updateVideoDate} from "../../../modules/photos/exif.js";
 import path from "path";
 import config from "../../../../res/photos/config.json";
-import {initMediaFailed} from "./MediaFailedModule.js";
 import WordNet from "node-wordnet";
+import {initMediaBlocked} from "./MediaBlockedModule.js";
 
 const wordnet = new WordNet();
 const {Op} = sequelize;
@@ -27,7 +27,7 @@ export async function initMedia(db) {
     initMediaItem(db);
     initMediaPlace(db);
     initMediaSuggestion(db);
-    initMediaFailed(db);
+    initMediaBlocked(db);
 
     MediaItem.hasMany(MediaClassification, {onDelete: 'CASCADE'});
     MediaClassification.belongsTo(MediaItem);

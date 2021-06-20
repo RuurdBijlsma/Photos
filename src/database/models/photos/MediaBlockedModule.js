@@ -2,22 +2,31 @@ import seq from "sequelize";
 
 const {DataTypes, Model} = seq;
 
-export class MediaFailed extends Model {
+export class MediaBlocked extends Model {
 }
 
-export function initMediaFailed(sequelize) {
-    MediaFailed.init({
+export function initMediaBlocked(sequelize) {
+    MediaBlocked.init({
         filePath: {
             type: DataTypes.STRING,
             primaryKey: true,
+        },
+        id: {
+            type: DataTypes.STRING,
+            allowNull: false,
+            unique: true,
         },
         type: {
             type: DataTypes.STRING,
             allowNull: false,
         },
         reason: {
-            type: DataTypes.JSONB,
+            type: DataTypes.STRING,
             allowNull: false,
+        },
+        error: {
+            type: DataTypes.JSONB,
+            allowNull: true,
         },
     }, {
         sequelize,
@@ -27,5 +36,5 @@ export function initMediaFailed(sequelize) {
         ],
     });
 
-    return MediaFailed;
+    return MediaBlocked;
 }

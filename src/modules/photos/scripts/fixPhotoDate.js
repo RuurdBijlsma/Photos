@@ -10,15 +10,14 @@ await Database.initDb();
 const startOffset = +(process.argv[2] ?? 0);
 console.log('start offset', startOffset);
 
-let count = (await MediaItem.count({where: {createDateString: null}})) - startOffset;
+let count = (await MediaItem.count()) - startOffset;
 let batchSize = 20;
 for (let i = 0; i < count; i += batchSize) {
     let items = await MediaItem.findAll({
         limit: batchSize,
         offset: i + startOffset,
-        where: {createDateString: null},
     });
-    console.log("items length", items.length)
+    console.log('offset', i + startOffset, 'limit', batchSize, "items length", items.length)
     let promises = [];
     for (let item of items) {
         promises.push(new Promise(resolve => {

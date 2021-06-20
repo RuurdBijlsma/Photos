@@ -11,8 +11,8 @@ import seq from "sequelize";
 import TelegramBot from "node-telegram-bot-api";
 import os from "os";
 import Database from "../../database/Database.js";
-import {checkFileExists} from "../../utils.js";
-import {MediaFailed} from "../../database/models/photos/MediaFailedModule.js";
+import {checkFileExists, getToken} from "../../utils.js";
+import {MediaBlocked} from "../../database/models/photos/MediaBlockedModule.js";
 
 const {Op} = seq;
 
@@ -138,7 +138,8 @@ async function isProcessed(filePath) {
 
     let item = await MediaItem.findOne({where: {filename}});
     if (!item) {
-        let hasFailed = await MediaFailed.findOne({where: {filePath}});
+        let fullRel = path.relative(config.media, filePath);
+        let hasFailed = await MediaBlocked.findOne({where: {filePath: fullRel}});
         if (hasFailed) {
             console.warn(`${filePath} will not be reprocessed, it has already failed before.`);
             return true;
@@ -186,6 +187,7 @@ async function singleInstance(fun, param) {
 export async function processMedia(filePath, triesLeft = 2, transaction = null) {
     // console.log("Processing media", filePath);
     try {
+        let fullRel = path.relative(config.media, filePath);
         const spreadTransaction = transaction ? {transaction} : {};
         const id = await getUniqueId();
         let type = getFileType(filePath);
@@ -226,7 +228,6 @@ export async function processMedia(filePath, triesLeft = 2, transaction = null) 
             labels = await classify(classifyPoster);
             await fs.promises.unlink(classifyPoster);
         }
-        let fullRel = path.relative(config.media, filePath);
         await insertMediaItem({
             id,
             type,
@@ -254,10 +255,16 @@ export async function processMedia(filePath, triesLeft = 2, transaction = null) 
             } catch (e) {
                 type = 'none'
             }
-            await MediaFailed.create({
-                filePath,
-                reason: e,
+            let fullRel = path.relative(config.media, filePath);
+            await MediaBlocked.create({
+                filePath: fullRel,
+                error: {
+                    name: e.name,
+                    message: e.message,
+                },
+                reason: 'error',
                 type,
+                id: await getToken(),
             });
             return false;
         } else {

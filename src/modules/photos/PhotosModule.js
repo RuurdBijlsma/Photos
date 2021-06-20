@@ -23,7 +23,8 @@ import {MediaSuggestion} from "../../database/models/photos/MediaSuggestionModel
 import Database from "../../database/Database.js";
 import {MediaLocation} from "../../database/models/photos/MediaLocationModel.js";
 import fs from "fs";
-import {checkFileExists} from "../../utils.js";
+import {checkFileExists, getToken} from "../../utils.js";
+import {MediaBlocked} from "../../database/models/photos/MediaBlockedModule.js";
 
 const {Op} = sequelize;
 const console = new Log("PhotosModule");
@@ -39,6 +40,11 @@ export default class PhotosModule extends ApiModule {
         if (config.hostThumbnails)
             app.use('/photo', express.static(config.thumbnails));
 
+        app.post('/photos/blockedItems', async (req, res) => {
+            if (!await Auth.checkRequest(req)) return res.sendStatus(401);
+            res.send(await MediaBlocked.findAll());
+        });
+
         app.post('/photos/totalBounds', async (req, res) => {
             if (!await Auth.checkRequest(req)) return res.sendStatus(401);
             let result = await Database.db.query(`
@@ -49,7 +55,7 @@ export default class PhotosModule extends ApiModule {
                 res.send(result[0])
             else
                 res.send(null);
-        })
+        });
 
         app.post('/photos/searchTip', async (req, res) => {
             if (!await Auth.checkRequest(req)) return res.sendStatus(401);
@@ -85,6 +91,12 @@ export default class PhotosModule extends ApiModule {
                             console.log("Deleting", files[key])
                             await fs.promises.unlink(files[key])
                         }
+                await MediaBlocked.create({
+                    type: item.type,
+                    filePath: item.filePath,
+                    reason: 'deleted',
+                    id: await getToken(),
+                });
                 console.log("Deleted item", filePath);
                 res.send(true);
             } catch (e) {
@@ -183,6 +195,17 @@ export default class PhotosModule extends ApiModule {
             } catch (e) {
                 res.send(false);
             }
+        });
+
+        app.post('/photos/retryProcess', async (req, res) => {
+            const filePath = req.body.filePath;
+            if (typeof filePath !== 'string') return res.sendStatus(400);
+            if (!await Auth.checkRequest(req)) return res.sendStatus(401);
+            let item = await MediaBlocked.findOne({where: {filePath}});
+            if (item !== null)
+                await item.destroy();
+            let result = await processMedia(path.join(config.media, filePath));
+            res.send({success: result !== false, id: result});
         });
 
         app.post('/photos/reprocess/:id', async (req, res) => {
@@ -342,6 +365,19 @@ export default class PhotosModule extends ApiModule {
             delete item.vectorC;
             res.send(item);
         });
+
+        app.get('/photos/blocked/:id', async (req, res) => {
+            const id = req.params.id;
+            let item = await MediaBlocked.findOne({where: {id}});
+            if (item === null)
+                return res.sendStatus(404);
+            let file = path.resolve(path.join(config.media, item.filePath));
+            if (item.type === 'video') {
+                let mimeType = mime.lookup(path.extname(item.filename));
+                res.contentType(mimeType);
+            }
+            res.sendFile(file, {acceptRanges: true});
+        })
 
         app.get('/photos/full/:id', async (req, res) => {
             const id = req.params.id;
