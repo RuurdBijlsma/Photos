@@ -37,7 +37,7 @@ class Controller {
             new MediaDownloadModule(),
             new ReverseProxyModule(),
             new AuthModule(),
-            new PhotosModule(),
+            // new PhotosModule(),
         ];
         // if (process.platform !== 'win32')
         //     this.modules.push(new TwimoteModule())
