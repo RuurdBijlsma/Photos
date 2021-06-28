@@ -6,6 +6,7 @@ yarn-debug.log*
 yarn-error.log*
 res/music
 ls
+temp
 
 res/photos/backups/*
 !res/photos/backups/db_backups_go_here

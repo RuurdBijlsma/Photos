@@ -9,9 +9,8 @@ import {MediaItem} from "../../database/models/photos/MediaItemModel.js";
 import {dropMediaItem, getUniqueId, insertMediaItem} from "../../database/models/photos/mediaUtils.js";
 import seq from "sequelize";
 import TelegramBot from "node-telegram-bot-api";
-import os from "os";
 import Database from "../../database/Database.js";
-import {checkFileExists, getToken} from "../../utils.js";
+import {batchSize, checkFileExists, getToken} from "../../utils.js";
 import {MediaBlocked} from "../../database/models/photos/MediaBlockedModule.js";
 
 const {Op} = seq;
@@ -26,6 +25,26 @@ const processJobs = new Set();
 
 
 export async function watchAndSynchronize() {
+    let items = [
+        '98 - DEu54IB.jpg',
+        '99 - ureGd5u.jpg',
+        '100 - TWoDSd2.jpg',
+        '101 - 2wO50zp.jpg',
+        '102 - ZRkRiMe.jpg',
+        '103 - ypsUCP7.jpg',
+        '104 - HRU3Mnt.jpg',
+        '105 - 5KDkyrN.jpg',
+        '106 - LQGoxco.jpg',
+        '107 - joAEmnE.jpg',
+        '108 - TZWfYqj.jpg',
+        '109 - WW06glD.jpg',
+        '110 - oDMMIjW.jpg',
+        '111 - IuUFUfX.jpg',
+        '112 - 1rda642.jpg',
+        '113 - 3bOGHSt.png',
+    ];
+    // console.log(await Promise.all(items.map(i => processIfNeeded(`./temp/${i}`))));
+
     if (process.platform !== 'win32')
         setInterval(async () => {
             try {
@@ -34,6 +53,7 @@ export async function watchAndSynchronize() {
                 return bot.sendMessage(config.chatId, `Couldn't backup database!\n\n${JSON.stringify(e)}`);
             }
         }, config.backupInterval);
+    // else return console.warn("NOT WATCHING AND SYNCHRONIZING ON WINDOWS");
 
     console.log("Watching", config.media);
     fs.watch(config.media, async (eventType, filename) => {
@@ -70,8 +90,6 @@ async function syncFiles() {
     // Sync files: add thumbnails and database entries for files in media directory
     let {files, videos, images} = await getFilesRecursive(config.media);
     let newFiles = [];
-    let freeGb = os.freemem() / 1000000000;
-    let batchSize = Math.min(Math.max(1, Math.ceil(freeGb * 10)), 30);
     console.log(`Checking ${files.length} files to see if they need to get processed. [BatchSize: ${batchSize}]`);
     for (let i = 0; i < images.length; i += batchSize) {
         let slice = images.slice(i, i + batchSize);
@@ -248,7 +266,7 @@ export async function processMedia(filePath, triesLeft = 2, transaction = null) 
         if (triesLeft === 0) {
             await bot.sendMessage(config.chatId, `[Photos] Failed to process "${
                 filePath
-            }"\n\n${JSON.stringify(e)}`);
+            }"\n\n${JSON.stringify(e.message)}`);
             let type;
             try {
                 type = getFileType(filePath);
@@ -270,7 +288,7 @@ export async function processMedia(filePath, triesLeft = 2, transaction = null) 
         } else {
             const waitTime = (3 - triesLeft) ** 2 * 5000;
             console.warn("Process media failed for", filePath, `RETRYING AFTER ${waitTime}ms...`);
-            console.warn(e);
+            console.warn(e.message);
             await waitSleep(waitTime);
             return processMedia(filePath, triesLeft - 1, transaction);
         }

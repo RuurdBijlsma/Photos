@@ -7,12 +7,15 @@ import sequelize from 'sequelize';
 import {initMediaPlace, MediaPlace} from "./MediaPlaceModel.js";
 import {initMediaSuggestion, MediaSuggestion} from "./MediaSuggestionModel.js";
 import Database from "../../Database.js";
-import {getToken, months} from "../../../utils.js";
+import {checkFileExists, getToken, months} from "../../../utils.js";
 import {dateToString, updatePhotoDate, updateVideoDate} from "../../../modules/photos/exif.js";
 import path from "path";
 import config from "../../../../res/photos/config.json";
 import WordNet from "node-wordnet";
-import {initMediaBlocked} from "./MediaBlockedModule.js";
+import {initMediaBlocked, MediaBlocked} from "./MediaBlockedModule.js";
+import fs from "fs";
+import {getPaths, processMedia} from "../../../modules/photos/watchAndSynchonize.js";
+import {filenameToDate} from "fix-exif-data";
 
 const wordnet = new WordNet();
 const {Op} = sequelize;
@@ -43,6 +46,61 @@ export async function initMedia(db) {
 
     MediaClassification.hasMany(MediaGlossary, {onDelete: 'CASCADE'});
     MediaGlossary.belongsTo(MediaClassification);
+}
+
+export async function autoFixDate(id) {
+    let item = await MediaItem.findOne({where: {id}});
+    if (item === null) return {success: false, code: 404};
+    let date = filenameToDate(item.filename);
+    if (date !== null) {
+        return await changeItemDate(item, date);
+    } else {
+        return false;
+    }
+}
+
+export async function reprocess(id) {
+    let item = await MediaItem.findOne({where: {id}});
+    if (item === null) return {success: false, code: 404};
+
+    let filePath = path.resolve(path.join(config.media, item.filePath));
+
+    let newId = null;
+    await Database.db.transaction({}, async transaction => {
+        await dropMediaItem(item.id, transaction);
+        newId = await processMedia(filePath, 2, transaction);
+    });
+    return {success: true, id: newId};
+}
+
+export async function deleteFile(id) {
+    let item = await MediaItem.findOne({where: {id}});
+    if (item === null) return {success: false, code: 404};
+
+    try {
+        let filePath = path.resolve(path.join(config.media, item.filePath));
+        await dropMediaItem(id);
+        if (await checkFileExists(filePath))
+            await fs.promises.unlink(filePath);
+        let files = getPaths(id);
+        for (let key in files)
+            if (files.hasOwnProperty(key))
+                if (await checkFileExists(files[key])) {
+                    console.log("Deleting", files[key])
+                    await fs.promises.unlink(files[key])
+                }
+        await MediaBlocked.create({
+            type: item.type,
+            filePath: item.filePath,
+            reason: 'deleted',
+            id: await getToken(),
+        });
+        console.log("Deleted item", filePath);
+        return {success: true};
+    } catch (e) {
+        console.warn("Delete failed", e);
+        return {success: false};
+    }
 }
 
 export async function getBoundingBox(place) {

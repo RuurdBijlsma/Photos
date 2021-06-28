@@ -1,18 +1,19 @@
 import ApiModule from "../../ApiModule.js";
-import {getPaths, processMedia, watchAndSynchronize} from "./watchAndSynchonize.js";
+import {processMedia, watchAndSynchronize} from "./watchAndSynchonize.js";
 import Log from "../../Log.js";
 import {MediaItem} from "../../database/models/photos/MediaItemModel.js";
 import config from "../../../res/photos/config.json";
 import path from "path";
 import mime from 'mime-types'
 import {
-    changeItemDate,
-    dropMediaItem, getBoundingBox, getGlossary,
+    autoFixDate,
+    changeItemDate, deleteFile,
+    getBoundingBox, getGlossary,
     getMediaById,
     getMonthPhotos,
     getPhotoMonths, getPhotosForMonth, getPhotosPerDayMonth,
     getRandomLabels,
-    getRandomLocations,
+    getRandomLocations, reprocess,
     searchMediaRanked
 } from "../../database/models/photos/mediaUtils.js";
 import express from "express";
@@ -22,9 +23,8 @@ import sequelize from "sequelize";
 import {MediaSuggestion} from "../../database/models/photos/MediaSuggestionModel.js";
 import Database from "../../database/Database.js";
 import {MediaLocation} from "../../database/models/photos/MediaLocationModel.js";
-import fs from "fs";
-import {checkFileExists, getToken} from "../../utils.js";
 import {MediaBlocked} from "../../database/models/photos/MediaBlockedModule.js";
+import {batchSize} from "../../utils.js";
 
 const {Op} = sequelize;
 const console = new Log("PhotosModule");
@@ -39,6 +39,84 @@ export default class PhotosModule extends ApiModule {
     async setRoutes(app, io, db) {
         if (config.hostThumbnails)
             app.use('/photo', express.static(config.thumbnails));
+
+        app.post('/photos/batchDelete', async (req, res) => {
+            if (!await Auth.checkRequest(req)) return res.sendStatus(401);
+            let ids = req.body.ids;
+            if (!Array.isArray(ids)) return res.sendStatus(400);
+
+            console.log('batch delete', ids);
+            let results = await Promise.all(ids.map(id => deleteFile(id)));
+            let success = results.every(r => r.success);
+
+            res.send({success, results});
+        });
+
+        app.post('/photos/batchFixDate', async (req, res) => {
+            if (!await Auth.checkRequest(req)) return res.sendStatus(401);
+            let ids = req.body.ids;
+            if (!Array.isArray(ids)) return res.sendStatus(400);
+
+            console.log('fix date', ids);
+            let results = await Promise.all(ids.map(id => autoFixDate(id))).then(s => s.map(success => ({success})));
+            let success = results.every(r => r.success);
+
+            res.send({success, results});
+        });
+
+        app.post('/photos/batchReprocess', async (req, res) => {
+            if (!await Auth.checkRequest(req)) return res.sendStatus(401);
+            let ids = req.body.ids;
+            if (!Array.isArray(ids)) return res.sendStatus(400);
+
+            console.log('fix date', ids);
+            let results = [];
+            for (let i = 0; i < ids.length; i += batchSize) {
+                let slice = ids.slice(i, i + batchSize);
+                console.log(`Reprocessing images [${i}-${Math.min(ids.length, i + batchSize)} / ${ids.length}]`);
+                results.push(...await Promise.all(slice.map(reprocess)));
+            }
+            let success = results.every(r => r.success);
+
+            res.send({success, results});
+        });
+
+        app.post('/photos/deleteItem/:id', async (req, res) => {
+            let id = req.params.id;
+            if (typeof id !== 'string') return res.sendStatus(400);
+            if (!await Auth.checkRequest(req)) return res.sendStatus(401);
+            let result = await deleteFile(id);
+            if (result.code) return res.sendStatus(result.code);
+            res.send(result.success);
+        });
+
+        app.post('/photos/changeDate/:id', async (req, res) => {
+            if (!isFinite(req.body.date)) return res.sendStatus(400);
+            const id = req.params.id;
+            if (typeof id !== 'string') return res.sendStatus(400);
+            if (!await Auth.checkRequest(req)) return res.sendStatus(401);
+            let item = await MediaItem.findOne({where: {id}});
+            if (item === null) return res.sendStatus(404);
+
+            let date = new Date(req.body.date);
+            if (isNaN(date.getDate()))
+                return res.sendStatus(400);
+            try {
+                await changeItemDate(item, date);
+                res.send(true);
+            } catch (e) {
+                res.send(false);
+            }
+        });
+
+        app.post('/photos/reprocess/:id', async (req, res) => {
+            const id = req.params.id;
+            if (typeof id !== 'string') return res.sendStatus(400);
+            if (!await Auth.checkRequest(req)) return res.sendStatus(401);
+            let result = await reprocess(id);
+            if (result.code) return res.sendStatus(result.code);
+            res.send({id: result.id});
+        });
 
         app.post('/photos/blockedItems', async (req, res) => {
             if (!await Auth.checkRequest(req)) return res.sendStatus(401);
@@ -71,38 +149,6 @@ export default class PhotosModule extends ApiModule {
                 limit 1
            `, {type: sequelize.QueryTypes.SELECT});
             res.send(result?.[0]);
-        });
-
-        app.post('/photos/deleteItem/:id', async (req, res) => {
-            let id = req.params.id;
-            if (typeof id !== 'string') return res.sendStatus(400);
-            if (!await Auth.checkRequest(req)) return res.sendStatus(401);
-            let item = await MediaItem.findOne({where: {id}});
-            if (item === null) return res.sendStatus(404);
-
-            try {
-                let filePath = path.resolve(path.join(config.media, item.filePath));
-                await dropMediaItem(id);
-                await fs.promises.unlink(filePath);
-                let files = getPaths(id);
-                for (let key in files)
-                    if (files.hasOwnProperty(key))
-                        if (await checkFileExists(files[key])) {
-                            console.log("Deleting", files[key])
-                            await fs.promises.unlink(files[key])
-                        }
-                await MediaBlocked.create({
-                    type: item.type,
-                    filePath: item.filePath,
-                    reason: 'deleted',
-                    id: await getToken(),
-                });
-                console.log("Deleted item", filePath);
-                res.send(true);
-            } catch (e) {
-                console.warn("Delete failed", e);
-                res.send(false);
-            }
         });
 
         app.post('/photos/photosInBounds', async (req, res) => {
@@ -178,25 +224,6 @@ export default class PhotosModule extends ApiModule {
             res.send(getGlossary(label));
         });
 
-        app.post('/photos/changeDate/:id', async (req, res) => {
-            if (!isFinite(req.body.date)) return res.sendStatus(400);
-            const id = req.params.id;
-            if (typeof id !== 'string') return res.sendStatus(400);
-            if (!await Auth.checkRequest(req)) return res.sendStatus(401);
-            let item = await MediaItem.findOne({where: {id}});
-            if (item === null) return res.sendStatus(404);
-
-            let date = new Date(req.body.date);
-            if (isNaN(date.getDate()))
-                return res.sendStatus(400);
-            try {
-                await changeItemDate(item, date);
-                res.send(true);
-            } catch (e) {
-                res.send(false);
-            }
-        });
-
         app.post('/photos/retryProcess', async (req, res) => {
             const filePath = req.body.filePath;
             if (typeof filePath !== 'string') return res.sendStatus(400);
@@ -206,23 +233,6 @@ export default class PhotosModule extends ApiModule {
                 await item.destroy();
             let result = await processMedia(path.join(config.media, filePath));
             res.send({success: result !== false, id: result});
-        });
-
-        app.post('/photos/reprocess/:id', async (req, res) => {
-            const id = req.params.id;
-            if (typeof id !== 'string') return res.sendStatus(400);
-            if (!await Auth.checkRequest(req)) return res.sendStatus(401);
-            let item = await MediaItem.findOne({where: {id}});
-            if (item === null) return res.sendStatus(404);
-
-            let filePath = path.resolve(path.join(config.media, item.filePath));
-
-            let newId = null;
-            await Database.db.transaction({}, async transaction => {
-                await dropMediaItem(item.id, transaction);
-                newId = await processMedia(filePath, 2, transaction);
-            });
-            res.send({id: newId});
         });
 
         app.post('/photos/months-photos', async (req, res) => {
