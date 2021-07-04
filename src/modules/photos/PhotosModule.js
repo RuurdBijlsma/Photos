@@ -153,7 +153,19 @@ export default class PhotosModule extends ApiModule {
 
         app.post('/photos/photosInBounds', async (req, res) => {
             try {
-                let {minLat, maxLat, minLng, maxLng} = req.body;
+                let {minLat, maxLat, minLng, maxLng, startDate, endDate} = req.body;
+                startDate = new Date(startDate);
+                endDate = new Date(endDate);
+                let whereSpread = {};
+                if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime()))
+                    whereSpread = {
+                        where: {
+                            createDate: {
+                                [Op.gte]: startDate,
+                                [Op.lte]: endDate,
+                            }
+                        }
+                    }
                 if (!await Auth.checkRequest(req)) return res.sendStatus(401);
                 res.send(await MediaItem.findAll({
                     include: {
@@ -170,6 +182,7 @@ export default class PhotosModule extends ApiModule {
                         },
                         attributes: ['latitude', 'longitude'],
                     },
+                    ...whereSpread,
                     limit: 1000,
                     attributes: ['id', 'type', 'width', 'height'],
                     order: ['id'],
