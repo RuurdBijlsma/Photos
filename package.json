@@ -10,6 +10,7 @@
     "changePassword": "node --experimental-json-modules src/modules/photos/scripts/changePassword.js",
     "restoreDb": "node --experimental-json-modules src/database/restoreDb.js",
     "backupDb": "node --experimental-json-modules src/database/backupDb.js",
+    "fixTinyGifThumbs": "node --experimental-json-modules src/modules/photos/scripts/fixTinyGifThumbs.js",
     "fixImgDims": "node --experimental-json-modules src/modules/photos/scripts/fixImgDims.js",
     "fixVectors": "node --experimental-json-modules src/modules/photos/scripts/fixVectors.js",
     "addTinyThumbs": "node --experimental-json-modules src/modules/photos/scripts/addTinyThumbs.js",
