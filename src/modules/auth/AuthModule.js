@@ -10,7 +10,7 @@ export default class AuthModule extends ApiModule {
     setRoutes(app, io, db) {
         app.post('/auth', async (req, res) => {
             let authResult = await Auth.checkRequest(req);
-            res.send(authResult !== false);
+            res.send(authResult);
         });
 
         app.post('/auth/createUser', async (req, res) => {

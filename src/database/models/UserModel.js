@@ -24,10 +24,17 @@ export function initUser(sequelize) {
             type: DataTypes.STRING,
             allowNull: false,
         },
+        mapboxToken:{
+            type: DataTypes.STRING,
+            allowNull: false,
+            defaultValue: '',
+        },
     }, {
         sequelize,
         indexes: [
             {unique: false, fields: ['name']},
+            {unique: false, fields: ['email']},
+            {unique:false, fields: ['mapboxToken']}
         ],
     });
 

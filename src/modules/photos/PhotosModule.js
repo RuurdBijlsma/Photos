@@ -24,7 +24,7 @@ import {MediaSuggestion} from "../../database/models/photos/MediaSuggestionModel
 import Database from "../../database/Database.js";
 import {MediaLocation} from "../../database/models/photos/MediaLocationModel.js";
 import {MediaBlocked} from "../../database/models/photos/MediaBlockedModule.js";
-import {batchSize} from "../../utils.js";
+import {batchSize, checkFileExists} from "../../utils.js";
 
 const {Op} = sequelize;
 const console = new Log("PhotosModule");
@@ -40,13 +40,35 @@ export default class PhotosModule extends ApiModule {
         if (config.hostThumbnails)
             app.use('/photo', express.static(config.thumbnails));
 
+        app.post('/photos/mapboxToken', async (req, res) => {
+            let user = await Auth.checkRequest(req);
+            if (!user) return res.sendStatus(401);
+            return user.mapboxToken;
+        });
+
+        app.post('/photos/setMapboxToken', async (req, res) => {
+            if (typeof req.body.token !== 'string') return res.sendStatus(400);
+            let user = await Auth.checkRequest(req);
+            if (!user) return res.sendStatus(401);
+            await user.update({mapboxToken: req.body.token});
+            res.send(true);
+        });
+
         app.post('/photos/batchDelete', async (req, res) => {
             if (!await Auth.checkRequest(req)) return res.sendStatus(401);
             let ids = req.body.ids;
             if (!Array.isArray(ids)) return res.sendStatus(400);
 
             console.log('batch delete', ids);
-            let results = await Promise.all(ids.map(id => deleteFile(id)));
+            let results = [];
+            for (let i = 0; i < ids.length; i += batchSize) {
+                let slice = ids.slice(i, i + batchSize);
+                console.log(`Deleting files [${i}-${Math.min(ids.length, i + batchSize)} / ${ids.length}]`);
+                try {
+                    results.push(...await Promise.all(slice.map(deleteFile)));
+                } catch (e) {
+                }
+            }
             let success = results.every(r => r.success);
 
             res.send({success, results});
@@ -58,7 +80,15 @@ export default class PhotosModule extends ApiModule {
             if (!Array.isArray(ids)) return res.sendStatus(400);
 
             console.log('fix date', ids);
-            let results = await Promise.all(ids.map(id => autoFixDate(id))).then(s => s.map(success => ({success})));
+            let results = [];
+            for (let i = 0; i < ids.length; i += batchSize) {
+                let slice = ids.slice(i, i + batchSize);
+                console.log(`Fixing dates [${i}-${Math.min(ids.length, i + batchSize)} / ${ids.length}]`);
+                try {
+                    results.push(...await Promise.all(slice.map(autoFixDate)).then(s => s.map(success => ({success}))));
+                } catch (e) {
+                }
+            }
             let success = results.every(r => r.success);
 
             res.send({success, results});
@@ -74,7 +104,10 @@ export default class PhotosModule extends ApiModule {
             for (let i = 0; i < ids.length; i += batchSize) {
                 let slice = ids.slice(i, i + batchSize);
                 console.log(`Reprocessing images [${i}-${Math.min(ids.length, i + batchSize)} / ${ids.length}]`);
-                results.push(...await Promise.all(slice.map(reprocess)));
+                try {
+                    results.push(...await Promise.all(slice.map(reprocess)));
+                } catch (e) {
+                }
             }
             let success = results.every(r => r.success);
 
@@ -85,9 +118,13 @@ export default class PhotosModule extends ApiModule {
             let id = req.params.id;
             if (typeof id !== 'string') return res.sendStatus(400);
             if (!await Auth.checkRequest(req)) return res.sendStatus(401);
-            let result = await deleteFile(id);
-            if (result.code) return res.sendStatus(result.code);
-            res.send(result.success);
+            try {
+                let result = await deleteFile(id);
+                if (result.code) return res.sendStatus(result.code);
+                res.send(result.success);
+            } catch (e) {
+                res.sendStatus(500);
+            }
         });
 
         app.post('/photos/changeDate/:id', async (req, res) => {
@@ -113,9 +150,13 @@ export default class PhotosModule extends ApiModule {
             const id = req.params.id;
             if (typeof id !== 'string') return res.sendStatus(400);
             if (!await Auth.checkRequest(req)) return res.sendStatus(401);
-            let result = await reprocess(id);
-            if (result.code) return res.sendStatus(result.code);
-            res.send({id: result.id});
+            try {
+                let result = await reprocess(id);
+                if (result.code) return res.sendStatus(result.code);
+                res.send({id: result.id});
+            } catch (e) {
+                res.sendStatus(500);
+            }
         });
 
         app.post('/photos/blockedItems', async (req, res) => {
@@ -244,8 +285,12 @@ export default class PhotosModule extends ApiModule {
             let item = await MediaBlocked.findOne({where: {filePath}});
             if (item !== null)
                 await item.destroy();
-            let result = await processMedia(path.join(config.media, filePath));
-            res.send({success: result !== false, id: result});
+            try{
+                let result = await processMedia(path.join(config.media, filePath));
+                res.send({success: result !== false, id: result});
+            }catch (e){
+                res.sendStatus(500);
+            }
         });
 
         app.post('/photos/months-photos', async (req, res) => {
@@ -290,7 +335,7 @@ export default class PhotosModule extends ApiModule {
                 limit,
                 offset,
                 attributes: ['id', 'type', 'subType', 'durationMs', 'createDateString', 'width', 'height']
-            }).then(this.fixMediaArrayDates);
+            });
             res.send(photos);
         })
 
@@ -368,9 +413,9 @@ export default class PhotosModule extends ApiModule {
             let month = +req.query.m;
             let day = +req.query.d;
             if (isFinite(month) && isFinite(day)) {
-                res.send(await getPhotosPerDayMonth(day, month).then(this.fixMediaArrayDates));
+                res.send(await getPhotosPerDayMonth(day, month));
             } else if (isFinite(month)) {
-                res.send(await getPhotosForMonth(month).then(this.fixMediaArrayDates));
+                res.send(await getPhotosForMonth(month));
             }
         });
 
@@ -379,7 +424,7 @@ export default class PhotosModule extends ApiModule {
             const id = req.params.id;
             if (!id)
                 return res.sendStatus(401);
-            let item = await getMediaById(id).then(this.fixMediaDate);
+            let item = await getMediaById(id);
             if (item === null)
                 return res.sendStatus(404);
             delete item.vector;
@@ -399,7 +444,10 @@ export default class PhotosModule extends ApiModule {
                 let mimeType = mime.lookup(path.extname(item.filename));
                 res.contentType(mimeType);
             }
-            res.sendFile(file, {acceptRanges: true});
+            if (await checkFileExists(file))
+                res.sendFile(file, {acceptRanges: true});
+            else
+                res.sendStatus(404);
         })
 
         app.get('/photos/full/:id', async (req, res) => {

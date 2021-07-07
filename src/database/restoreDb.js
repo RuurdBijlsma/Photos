@@ -23,7 +23,7 @@ if (!await checkFileExists(file))
 await Database.initDb();
 
 console.log("Backing up before restoring");
-await Database.backup('pre-backup');
+await Database.backup('pre-restore');
 await MediaItem.drop({cascade: true});
 await MediaGlossary.drop({cascade: true});
 await MediaPlace.drop({cascade: true});

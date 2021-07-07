@@ -1,5 +1,4 @@
 import express from 'express';
-import https from "https";
 import http from "http";
 import socketIo from "socket.io";
 import bodyParser from "body-parser";
@@ -14,7 +13,7 @@ import SignalModule from 'multi-signal-server'
 import VM5Module from "./modules/vue-music-5/VM5Module.js";
 
 import AuthModule from './modules/auth/AuthModule.js';
-import TwimoteModule from "./modules/twimote-bot/TwimoteModule.js";
+// import TwimoteModule from "./modules/twimote-bot/TwimoteModule.js";
 import PhotosModule from "./modules/photos/PhotosModule.js";
 
 import cred from "../res/auth/credentials.json"
@@ -61,23 +60,16 @@ class Controller {
         }
     }
 
-    async start(port = 3000, key, cert, params) {
-        this.params = params;
-        let credentials = Controller.getHttpsCredentials(key, cert);
-        let server;
-        if (credentials) {
-            server = https.createServer(credentials, this.app);
-        } else {
-            server = http.createServer(this.app);
-            console.warn("Could not get HTTPS credentials, switching to HTTP");
-        }
+    async start(port = 3000) {
+        let server = http.createServer(this.app);
         this.io = socketIo(server);
         console.log("Initializing DB connection with ", {dbName, dbUser});
         this.db = await Database.initDb();
 
         this.setRoutes();
+
         server.listen(port, () =>
-            console.log(`${credentials ? 'HTTPS' : 'HTTP'} server listening on port ${port}!`)
+            console.log(`HTTP server listening on port ${port}!`)
         );
     }
 }
