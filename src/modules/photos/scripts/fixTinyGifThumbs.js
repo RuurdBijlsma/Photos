@@ -43,4 +43,4 @@ for (let i = 0; i < count; i += batchSize) {
     }
     console.log(`Progress [${i + batchSize} / ${count}]`);
 }
-console.log("Done creating tiny images");
+console.log("Done fixing tiny gif thumbs");
