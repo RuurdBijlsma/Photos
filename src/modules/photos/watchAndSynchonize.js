@@ -16,6 +16,7 @@ import {MediaBlocked} from "../../database/models/photos/MediaBlockedModule.js";
 const {Op} = seq;
 
 const bot = new TelegramBot(config.telegramToken, {polling: false});
+await useDir(path.join(config.media, 'upload'));
 const tinyPic = await useDir(path.join(config.thumbnails, 'tiny'));
 const smallPic = await useDir(path.join(config.thumbnails, 'small'));
 const bigPic = await useDir(path.join(config.thumbnails, 'big'));
@@ -25,24 +26,24 @@ const processJobs = new Set();
 
 
 export async function watchAndSynchronize() {
-    let items = [
-        '98 - DEu54IB.jpg',
-        '99 - ureGd5u.jpg',
-        '100 - TWoDSd2.jpg',
-        '101 - 2wO50zp.jpg',
-        '102 - ZRkRiMe.jpg',
-        '103 - ypsUCP7.jpg',
-        '104 - HRU3Mnt.jpg',
-        '105 - 5KDkyrN.jpg',
-        '106 - LQGoxco.jpg',
-        '107 - joAEmnE.jpg',
-        '108 - TZWfYqj.jpg',
-        '109 - WW06glD.jpg',
-        '110 - oDMMIjW.jpg',
-        '111 - IuUFUfX.jpg',
-        '112 - 1rda642.jpg',
-        '113 - 3bOGHSt.png',
-    ];
+    // let items = [
+    //     '98 - DEu54IB.jpg',
+    //     '99 - ureGd5u.jpg',
+    //     '100 - TWoDSd2.jpg',
+    //     '101 - 2wO50zp.jpg',
+    //     '102 - ZRkRiMe.jpg',
+    //     '103 - ypsUCP7.jpg',
+    //     '104 - HRU3Mnt.jpg',
+    //     '105 - 5KDkyrN.jpg',
+    //     '106 - LQGoxco.jpg',
+    //     '107 - joAEmnE.jpg',
+    //     '108 - TZWfYqj.jpg',
+    //     '109 - WW06glD.jpg',
+    //     '110 - oDMMIjW.jpg',
+    //     '111 - IuUFUfX.jpg',
+    //     '112 - 1rda642.jpg',
+    //     '113 - 3bOGHSt.png',
+    // ];
     // console.log(await Promise.all(items.map(i => processIfNeeded(`./temp/${i}`))));
 
     if (process.platform !== 'win32')
@@ -274,16 +275,17 @@ export async function processMedia(filePath, triesLeft = 2, transaction = null) 
                 type = 'none'
             }
             let fullRel = path.relative(config.media, filePath);
-            await MediaBlocked.create({
-                filePath: fullRel,
-                error: {
-                    name: e.name,
-                    message: e.message,
-                },
-                reason: 'error',
-                type,
-                id: await getToken(),
-            });
+            if (!await MediaBlocked.findOne({where: {filePath: fullRel}}))
+                await MediaBlocked.create({
+                    filePath: fullRel,
+                    error: {
+                        name: e.name,
+                        message: e.message,
+                    },
+                    reason: 'error',
+                    type,
+                    id: await getToken(),
+                });
             return false;
         } else {
             const waitTime = (3 - triesLeft) ** 2 * 5000;

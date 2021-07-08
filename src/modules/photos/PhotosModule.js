@@ -14,7 +14,7 @@ import {
     getPhotoMonths, getPhotosForMonth, getPhotosPerDayMonth,
     getRandomLabels,
     getRandomLocations, reprocess,
-    searchMediaRanked
+    searchMediaRanked, uploadFile
 } from "../../database/models/photos/mediaUtils.js";
 import express from "express";
 import geocode from "./reverse-geocode.js";
@@ -39,6 +39,34 @@ export default class PhotosModule extends ApiModule {
     async setRoutes(app, io, db) {
         if (config.hostThumbnails)
             app.use('/photo', express.static(config.thumbnails));
+
+        app.post('/photos/upload', async (req, res) => {
+            if (!req.files || Object.keys(req.files).length === 0)
+                return res.status(400).send('No files were uploaded.');
+
+            let authenticated;
+            try {
+                let {email, password} = req.body;
+                authenticated = await Auth.check(email, password);
+            } catch (e) {
+                authenticated = false;
+            }
+            if (!authenticated) return res.sendStatus(401);
+
+            let files = !Array.isArray(req.files.media) ? [req.files.media] : req.files.media;
+
+            let results = [];
+            for (let i = 0; i < files.length; i += batchSize) {
+                let slice = files.slice(i, i + batchSize);
+                console.log(`Uploading files [${i}-${Math.min(files.length, i + batchSize)} / ${files.length}]`);
+                try {
+                    results.push(...await Promise.all(slice.map(uploadFile)));
+                } catch (e) {
+                    console.warn('upload error', e);
+                }
+            }
+            res.send({success: true, results});
+        });
 
         app.post('/photos/mapboxToken', async (req, res) => {
             let user = await Auth.checkRequest(req);
@@ -67,6 +95,7 @@ export default class PhotosModule extends ApiModule {
                 try {
                     results.push(...await Promise.all(slice.map(deleteFile)));
                 } catch (e) {
+                    console.warn('Deleting error', e);
                 }
             }
             let success = results.every(r => r.success);
@@ -87,6 +116,7 @@ export default class PhotosModule extends ApiModule {
                 try {
                     results.push(...await Promise.all(slice.map(autoFixDate)).then(s => s.map(success => ({success}))));
                 } catch (e) {
+                    console.warn('Fixing dates error', e);
                 }
             }
             let success = results.every(r => r.success);
@@ -107,6 +137,7 @@ export default class PhotosModule extends ApiModule {
                 try {
                     results.push(...await Promise.all(slice.map(reprocess)));
                 } catch (e) {
+                    console.warn('Reprocessing images error', e);
                 }
             }
             let success = results.every(r => r.success);
@@ -123,6 +154,7 @@ export default class PhotosModule extends ApiModule {
                 if (result.code) return res.sendStatus(result.code);
                 res.send(result.success);
             } catch (e) {
+                console.warn('deleteFile error', e);
                 res.sendStatus(500);
             }
         });
@@ -285,10 +317,10 @@ export default class PhotosModule extends ApiModule {
             let item = await MediaBlocked.findOne({where: {filePath}});
             if (item !== null)
                 await item.destroy();
-            try{
+            try {
                 let result = await processMedia(path.join(config.media, filePath));
                 res.send({success: result !== false, id: result});
-            }catch (e){
+            } catch (e) {
                 res.sendStatus(500);
             }
         });
@@ -441,7 +473,7 @@ export default class PhotosModule extends ApiModule {
                 return res.sendStatus(404);
             let file = path.resolve(path.join(config.media, item.filePath));
             if (item.type === 'video') {
-                let mimeType = mime.lookup(path.extname(item.filename));
+                let mimeType = mime.lookup(path.extname(item.filePath));
                 res.contentType(mimeType);
             }
             if (await checkFileExists(file))

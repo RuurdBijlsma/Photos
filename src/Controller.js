@@ -18,6 +18,7 @@ import PhotosModule from "./modules/photos/PhotosModule.js";
 
 import cred from "../res/auth/credentials.json"
 import Database from "./database/Database.js";
+import fileUpload from "express-fileupload";
 
 const {dbUser, dbName} = cred;
 const console = new Log("Controller");
@@ -26,6 +27,7 @@ class Controller {
     constructor() {
         this.app = express();
         this.app.use(cors());
+        this.app.use(fileUpload());
         this.app.use(bodyParser.json());
 
         this.modules = [

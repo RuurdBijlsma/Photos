@@ -16,6 +16,7 @@ import {initMediaBlocked, MediaBlocked} from "./MediaBlockedModule.js";
 import fs from "fs";
 import {getPaths, processMedia} from "../../../modules/photos/watchAndSynchonize.js";
 import {filenameToDate} from "fix-exif-data";
+import util from "util";
 
 const wordnet = new WordNet();
 const {Op} = sequelize;
@@ -46,6 +47,32 @@ export async function initMedia(db) {
 
     MediaClassification.hasMany(MediaGlossary, {onDelete: 'CASCADE'});
     MediaGlossary.belongsTo(MediaClassification);
+}
+
+export async function uploadFile(file) {
+    let destination = path.join(config.media, 'upload', file.name);
+    try {
+        let fileExists = await checkFileExists(destination);
+        let filePath = path.relative(config.media, destination);
+        let mediaItem = await MediaItem.findOne({where: {filePath}});
+        if (mediaItem) {
+            return {success: false, error: 'file already exists!', id: mediaItem.id};
+        }
+        if (!fileExists) {
+            await util.promisify(file.mv)(destination);
+        }
+        let blocked = await MediaBlocked.findOne({where: {filePath}});
+        if (blocked)
+            await blocked.destroy();
+        let id = await processMedia(destination);
+        if(id===false){
+            return {success: false, error: 'media processing error'};
+        }else{
+            return {success: true, id};
+        }
+    } catch (e) {
+        return {success: false, error: e.message};
+    }
 }
 
 export async function autoFixDate(id) {
@@ -89,12 +116,13 @@ export async function deleteFile(id) {
                     console.log("Deleting", files[key])
                     await fs.promises.unlink(files[key])
                 }
-        await MediaBlocked.create({
-            type: item.type,
-            filePath: item.filePath,
-            reason: 'deleted',
-            id: await getToken(),
-        });
+        if (!await MediaBlocked.findOne({where: {filePath: item.filePath}}))
+            await MediaBlocked.create({
+                type: item.type,
+                filePath: item.filePath,
+                reason: 'deleted',
+                id: await getToken(),
+            });
         console.log("Deleted item", filePath);
         return {success: true};
     } catch (e) {
