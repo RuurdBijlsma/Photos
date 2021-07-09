@@ -1,5 +1,5 @@
 import ApiModule from "../../ApiModule.js";
-import {processMedia, watchAndSynchronize} from "./watchAndSynchonize.js";
+import {processMedia, watchAndSynchronize, zipDir} from "./watchAndSynchonize.js";
 import Log from "../../Log.js";
 import {MediaItem} from "../../database/models/photos/MediaItemModel.js";
 import config from "../../../res/photos/config.json";
@@ -7,13 +7,13 @@ import path from "path";
 import mime from 'mime-types'
 import {
     autoFixDate,
-    changeItemDate, deleteFile,
+    changeItemDate, createZip, deleteFile,
     getBoundingBox, getGlossary,
     getMediaById,
     getMonthPhotos,
     getPhotoMonths, getPhotosForMonth, getPhotosPerDayMonth,
     getRandomLabels,
-    getRandomLocations, reprocess,
+    getRandomLocations, getZipPath, reprocess,
     searchMediaRanked, uploadFile
 } from "../../database/models/photos/mediaUtils.js";
 import express from "express";
@@ -80,6 +80,28 @@ export default class PhotosModule extends ApiModule {
             if (!user) return res.sendStatus(401);
             await user.update({mapboxToken: req.body.token});
             res.send(true);
+        });
+
+        app.get('/photos/zip/:id', async (req, res) => {
+            const zipId = req.params.id;
+            let zipFile = getZipPath(zipId);
+            if (await checkFileExists(zipFile))
+                res.sendFile(zipFile);
+            else
+                res.sendStatus(400);
+        });
+
+        app.post('/photos/batchDownload', async (req, res) => {
+            if (!await Auth.checkRequest(req)) return res.sendStatus(401);
+            let ids = req.body.ids;
+            if (!Array.isArray(ids)) return res.sendStatus(400);
+            console.log('batch download', ids);
+
+            let items = await MediaItem.findAll({
+                where: {id: {[Op.in]: ids}}
+            });
+            let zipId = await createZip(items.map(i => path.join(config.media, i.filePath)));
+            res.send({zipId});
         });
 
         app.post('/photos/batchDelete', async (req, res) => {
@@ -480,7 +502,7 @@ export default class PhotosModule extends ApiModule {
                 res.sendFile(file, {acceptRanges: true});
             else
                 res.sendStatus(404);
-        })
+        });
 
         app.get('/photos/full/:id', async (req, res) => {
             const id = req.params.id;

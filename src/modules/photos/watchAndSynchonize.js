@@ -16,7 +16,8 @@ import {MediaBlocked} from "../../database/models/photos/MediaBlockedModule.js";
 const {Op} = seq;
 
 const bot = new TelegramBot(config.telegramToken, {polling: false});
-await useDir(path.join(config.media, 'upload'));
+export const uploadDir = await useDir(path.join(config.media, 'upload'));
+export const zipDir = await useDir(path.join(config.thumbnails, 'zip'));
 const tinyPic = await useDir(path.join(config.thumbnails, 'tiny'));
 const smallPic = await useDir(path.join(config.thumbnails, 'small'));
 const bigPic = await useDir(path.join(config.thumbnails, 'big'));

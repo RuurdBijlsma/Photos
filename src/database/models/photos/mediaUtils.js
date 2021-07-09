@@ -14,9 +14,10 @@ import config from "../../../../res/photos/config.json";
 import WordNet from "node-wordnet";
 import {initMediaBlocked, MediaBlocked} from "./MediaBlockedModule.js";
 import fs from "fs";
-import {getPaths, processMedia} from "../../../modules/photos/watchAndSynchonize.js";
+import {getPaths, processMedia, temp, uploadDir, zipDir} from "../../../modules/photos/watchAndSynchonize.js";
 import {filenameToDate} from "fix-exif-data";
 import util from "util";
+import archiver from "archiver";
 
 const wordnet = new WordNet();
 const {Op} = sequelize;
@@ -50,7 +51,7 @@ export async function initMedia(db) {
 }
 
 export async function uploadFile(file) {
-    let destination = path.join(config.media, 'upload', file.name);
+    let destination = path.join(uploadDir, file.name);
     try {
         let fileExists = await checkFileExists(destination);
         let filePath = path.relative(config.media, destination);
@@ -65,14 +66,54 @@ export async function uploadFile(file) {
         if (blocked)
             await blocked.destroy();
         let id = await processMedia(destination);
-        if(id===false){
+        if (id === false) {
             return {success: false, error: 'media processing error'};
-        }else{
+        } else {
             return {success: true, id};
         }
     } catch (e) {
         return {success: false, error: e.message};
     }
+}
+
+export function getZipPath(zipId) {
+    return path.join(zipDir, zipId + '.zip');
+}
+
+export async function createZip(files) {
+    let zipId = await getToken();
+    let zipPath = getZipPath(zipId);
+    const output = fs.createWriteStream(zipPath);
+    const archive = archiver('zip', {
+        zlib: {level: 1}
+    });
+    output.on('close', () => {
+        console.log(archive.pointer() + ' total bytes');
+        console.log('archiver has been finalized and the output file descriptor has closed.');
+    });
+    output.on('end', () => console.log('Data has been drained'));
+    archive.on('warning', err => {
+        console.warn(err);
+    });
+    archive.on('error', err => {
+        throw err;
+    });
+    archive.pipe(output);
+
+    let addedFiles = [];
+    for (let file of files) {
+        let name = path.basename(file);
+        let i = 0;
+        while (addedFiles.includes(name)) {
+            let extName = path.extname(name);
+            let nameWithoutExt = name.substr(name.length - extName.length);
+            name = `${nameWithoutExt}(${i})${extName}`
+        }
+        addedFiles.push(name);
+        archive.file(file, {name});
+    }
+    await archive.finalize();
+    return zipId;
 }
 
 export async function autoFixDate(id) {
