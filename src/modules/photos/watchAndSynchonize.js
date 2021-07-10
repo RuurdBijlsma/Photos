@@ -29,26 +29,6 @@ const processJobs = new Set();
 
 
 export async function watchAndSynchronize() {
-    // let items = [
-    //     '98 - DEu54IB.jpg',
-    //     '99 - ureGd5u.jpg',
-    //     '100 - TWoDSd2.jpg',
-    //     '101 - 2wO50zp.jpg',
-    //     '102 - ZRkRiMe.jpg',
-    //     '103 - ypsUCP7.jpg',
-    //     '104 - HRU3Mnt.jpg',
-    //     '105 - 5KDkyrN.jpg',
-    //     '106 - LQGoxco.jpg',
-    //     '107 - joAEmnE.jpg',
-    //     '108 - TZWfYqj.jpg',
-    //     '109 - WW06glD.jpg',
-    //     '110 - oDMMIjW.jpg',
-    //     '111 - IuUFUfX.jpg',
-    //     '112 - 1rda642.jpg',
-    //     '113 - 3bOGHSt.png',
-    // ];
-    // console.log(await Promise.all(items.map(i => processIfNeeded(`./temp/${i}`))));
-
     if (process.platform !== 'win32')
         setInterval(async () => {
             try {
