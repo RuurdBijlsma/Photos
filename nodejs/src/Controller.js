@@ -7,6 +7,9 @@ import AuthModule from './modules/auth/AuthModule.js';
 import PhotosModule from "./modules/photos/PhotosModule.js";
 import Database from "./database/Database.js";
 import fileUpload from "express-fileupload";
+import {User} from "./database/models/UserModel.js";
+import bcrypt from "bcrypt";
+
 const console = new Log("Controller");
 
 class Controller {
@@ -33,6 +36,16 @@ class Controller {
         let server = http.createServer(this.app);
         console.log("Initializing DB connection");
         this.db = await Database.initDb();
+        let userCount = await User.count();
+        if (userCount === 0) {
+            let salt = await bcrypt.genSalt(10);
+            await User.create({
+                name: process.env.UI_NAME ?? 'user',
+                email: process.env.UI_EMAIL ?? 'user@gmail.com',
+                password: await bcrypt.hash(process.env.UI_PASSWORD ?? '0123456789', salt),
+            });
+            console.log("Created new user");
+        }
 
         this.setRoutes();
 

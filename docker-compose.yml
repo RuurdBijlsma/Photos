@@ -16,6 +16,9 @@ services:
     build:
       context: .
     environment:
+      UI_NAME: user
+      UI_EMAIL: user@gmail.com
+      UI_PASSWORD: 0123456789
       DB_SCHEMA: postgres
       DB_USER: postgres
       DB_PASSWORD: postgres

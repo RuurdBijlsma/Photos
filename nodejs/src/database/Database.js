@@ -100,6 +100,7 @@ class Database {
                 host: this.dbConfig.host,
                 port: this.dbConfig.port,
                 dialect: 'postgres',
+                logging: false,
                 dialectOptions: {
                     ssl: this.dbConfig.ssl,
                 },
