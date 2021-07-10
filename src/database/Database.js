@@ -1,13 +1,10 @@
 import Log from "../Log.js";
 import {initUser} from "./models/UserModel.js";
-import {initSudoku} from "./models/SudokuModel.js";
-import {initEmoteSticker} from "./models/EmoteStickerModel.js";
-import {initEmote} from "./models/EmoteModel.js";
-import {initMedia} from "./models/photos/mediaUtils.js";
+import {initMedia} from "./models/mediaUtils.js";
 import path from "path";
 import {exec} from "child_process";
 import {Sequelize} from "sequelize";
-import cred from "../../res/auth/credentials.json";
+import cred from "../../res/db-config.json";
 import {checkFileExists} from "../utils.js";
 
 const {dbUser, dbPass, dbName, dbHost, dbPort} = cred;
@@ -30,12 +27,6 @@ class Database {
 
             console.log("Init user");
             initUser(this.db);
-            console.log("Init sudoku");
-            initSudoku(this.db);
-            console.log("Init emote sticker");
-            initEmoteSticker(this.db);
-            console.log("Init emote");
-            initEmote(this.db);
             console.log("Init media tables");
             await initMedia(this.db);
 

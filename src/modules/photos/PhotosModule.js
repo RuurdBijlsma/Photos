@@ -1,8 +1,8 @@
 import ApiModule from "../../ApiModule.js";
-import {processMedia, watchAndSynchronize, zipDir} from "./watchAndSynchonize.js";
+import {processMedia, watchAndSynchronize} from "./watchAndSynchonize.js";
 import Log from "../../Log.js";
-import {MediaItem} from "../../database/models/photos/MediaItemModel.js";
-import config from "../../../res/photos/config.json";
+import {MediaItem} from "../../database/models/MediaItemModel.js";
+import config from "../../../res/photos-config.json";
 import path from "path";
 import mime from 'mime-types'
 import {
@@ -15,15 +15,15 @@ import {
     getRandomLabels,
     getRandomLocations, getZipPath, reprocess,
     searchMediaRanked, uploadFile
-} from "../../database/models/photos/mediaUtils.js";
+} from "../../database/models/mediaUtils.js";
 import express from "express";
 import geocode from "./reverse-geocode.js";
 import Auth from "../../database/Auth.js";
 import sequelize from "sequelize";
-import {MediaSuggestion} from "../../database/models/photos/MediaSuggestionModel.js";
+import {MediaSuggestion} from "../../database/models/MediaSuggestionModel.js";
 import Database from "../../database/Database.js";
-import {MediaLocation} from "../../database/models/photos/MediaLocationModel.js";
-import {MediaBlocked} from "../../database/models/photos/MediaBlockedModule.js";
+import {MediaLocation} from "../../database/models/MediaLocationModel.js";
+import {MediaBlocked} from "../../database/models/MediaBlockedModule.js";
 import {batchSize, checkFileExists} from "../../utils.js";
 
 const {Op} = sequelize;
@@ -36,7 +36,7 @@ export default class PhotosModule extends ApiModule {
         this.randomLocations = null;
     }
 
-    async setRoutes(app, io, db) {
+    async setRoutes(app, db) {
         if (config.hostThumbnails)
             app.use('/photo', express.static(config.thumbnails));
 

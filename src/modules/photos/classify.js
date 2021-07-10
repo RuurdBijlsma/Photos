@@ -9,11 +9,11 @@ const wordnet = new WordNet();
 let model, labels, syns;
 
 async function initClassifier() {
-    labels = await fs.promises.readFile('./res/photos/classifier/labels.txt').then(f => f.toString().split(EOL));
-    syns = await fs.promises.readFile('./res/photos/classifier/syns.txt').then(f => f.toString().split(EOL));
+    labels = await fs.promises.readFile('./res/classifier/labels.txt').then(f => f.toString().split(EOL));
+    syns = await fs.promises.readFile('./res/classifier/syns.txt').then(f => f.toString().split(EOL));
 
     // https://tfhub.dev/google/imagenet/inception_resnet_v2/classification/5
-    let modelPath = path.resolve('./res/photos/classifier/inceptionresnet/model.json');
+    let modelPath = path.resolve('./res/classifier/inceptionresnet/model.json');
     if (process.platform === 'win32')
         modelPath = modelPath.substr(3);
     model = await tf.loadGraphModel(`file:///${modelPath}`);

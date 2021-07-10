@@ -10,7 +10,7 @@ import {format} from 'date-fns'
 import modifyExif from 'modify-exif'
 import {temp} from "./watchAndSynchonize.js";
 import {exec} from "child_process";
-import config from '../../../res/photos/config.json'
+import config from '../../../res/photos-config.json'
 
 const {ExifImage} = exif;
 

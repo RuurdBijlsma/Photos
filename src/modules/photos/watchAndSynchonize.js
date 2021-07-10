@@ -4,17 +4,19 @@ import {getExif, probeVideo} from "./exif.js";
 import fs from 'fs';
 import path from "path";
 import mime from "mime-types";
-import config from "../../../res/photos/config.json";
-import {MediaItem} from "../../database/models/photos/MediaItemModel.js";
-import {dropMediaItem, getUniqueId, insertMediaItem} from "../../database/models/photos/mediaUtils.js";
+import config from "../../../res/photos-config.json";
+import {MediaItem} from "../../database/models/MediaItemModel.js";
+import {dropMediaItem, getUniqueId, insertMediaItem} from "../../database/models/mediaUtils.js";
 import seq from "sequelize";
 import TelegramBot from "node-telegram-bot-api";
 import Database from "../../database/Database.js";
 import {batchSize, checkFileExists, getToken} from "../../utils.js";
-import {MediaBlocked} from "../../database/models/photos/MediaBlockedModule.js";
+import {MediaBlocked} from "../../database/models/MediaBlockedModule.js";
 
 const {Op} = seq;
 
+// Make sure the thumbnails dir exists
+await useDir(config.thumbnails);
 const bot = new TelegramBot(config.telegramToken, {polling: false});
 export const uploadDir = await useDir(path.join(config.media, 'upload'));
 export const zipDir = await useDir(path.join(config.thumbnails, 'zip'));

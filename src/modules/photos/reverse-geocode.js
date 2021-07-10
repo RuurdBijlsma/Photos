@@ -1,6 +1,6 @@
 import geocoder from "local-reverse-geocoder";
 import lookup from "country-code-lookup";
-import config from '../../../res/photos/config.json'
+import config from '../../../res/photos-config.json'
 
 if (config.skipGeocode)
     console.warn("SKIPPING GEOCODING");
