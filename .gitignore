@@ -8,18 +8,18 @@ res/music
 ls
 temp
 
-res/backups/*
-!res/backups/db_backups_go_here
-res/photos-config.json
-res/cert.pem
-res/photos
-res/thumbnails
-res/classifier/model1/*
-!res/classifier/model1/model_location
-res/classifier/inceptionresnet/*
-!res/classifier/inceptionresnet/model_location
-res/geonames/*
-!res/geonames/geocode_files_will_dump_here
+nodejs/res/backups/*
+!nodejs/res/backups/db_backups_go_here
+nodejs/res/photos-config.json
+nodejs/res/cert.pem
+nodejs/res/photos
+nodejs/res/thumbnails
+nodejs/res/classifier/model1/*
+!nodejs/res/classifier/model1/model_location
+nodejs/res/classifier/inceptionresnet/*
+!nodejs/res/classifier/inceptionresnet/model_location
+nodejs/res/geonames/*
+!nodejs/res/geonames/geocode_files_will_dump_here
 
 .idea
 files

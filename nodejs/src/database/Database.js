@@ -4,10 +4,8 @@ import {initMedia} from "./models/mediaUtils.js";
 import path from "path";
 import {exec} from "child_process";
 import {Sequelize} from "sequelize";
-import cred from "../../res/db-config.json";
 import {checkFileExists} from "../utils.js";
 
-const {dbUser, dbPass, dbName, dbHost, dbPort} = cred;
 const console = new Log("Database");
 
 class Database {
@@ -80,18 +78,35 @@ class Database {
     }
 
     get connectionString() {
-        return `postgresql://${dbUser}:${dbPass}@${dbHost}:${dbPort}/${dbName}`;
+        return `postgresql://${this.dbConfig.user}:${this.dbConfig.pass}@${this.dbConfig.host}:${this.dbConfig.port}/${this.dbConfig.schema}`;
+    }
+
+    get dbConfig() {
+        return {
+            user: process.env.DB_USER || 'postgres',
+            pass: process.env.DB_PASSWORD || '',
+            host: process.env.DB_HOST || 'localhost',
+            port: process.env.DB_PORT || 5432,
+            schema: process.env.DB_SCHEMA || 'postgres',
+            ssl: process.env.DB_SSL === "true",
+        }
     }
 
     async initDb() {
-        const db = new Sequelize(dbName, dbUser, dbPass, {
-            host: cred.dbHost,
-            dialect: 'postgres',
-            logging: false,
-            pool: {
-                acquire: 20000,
-            }
-        });
+        const db = new Sequelize(this.dbConfig.schema,
+            this.dbConfig.user,
+            this.dbConfig.pass,
+            {
+                host: this.dbConfig.host,
+                port: this.dbConfig.port,
+                dialect: 'postgres',
+                dialectOptions: {
+                    ssl: this.dbConfig.ssl,
+                },
+                pool: {
+                    acquire: 20000,
+                },
+            });
         await this.setDb(db);
         return db;
     }

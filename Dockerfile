@@ -1,9 +1,9 @@
 # Dockerfile
 
 FROM node:16-buster-slim
-WORKDIR /app
-COPY . .
-# Install yarn and other dependencies via apk
+WORKDIR /nodejs
+COPY ./nodejs/. /
+# Install dependencies via apt
 RUN apt-get update && \
     apt-get install -y build-essential \
     wget \

@@ -5,10 +5,8 @@ import cors from "cors";
 import Log from "./Log.js";
 import AuthModule from './modules/auth/AuthModule.js';
 import PhotosModule from "./modules/photos/PhotosModule.js";
-import cred from "../res/db-config.json"
 import Database from "./database/Database.js";
 import fileUpload from "express-fileupload";
-const {dbUser, dbName} = cred;
 const console = new Log("Controller");
 
 class Controller {
@@ -33,7 +31,7 @@ class Controller {
 
     async start(port = 3000) {
         let server = http.createServer(this.app);
-        console.log("Initializing DB connection with ", {dbName, dbUser});
+        console.log("Initializing DB connection");
         this.db = await Database.initDb();
 
         this.setRoutes();

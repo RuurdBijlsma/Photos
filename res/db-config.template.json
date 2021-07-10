@@ -1,7 +1,0 @@
-{
-  "dbHost": "localhost",
-  "dbName": "fd",
-  "dbUser": "asd",
-  "dbPass": "asdg",
-  "dbPort": 5432
-}
