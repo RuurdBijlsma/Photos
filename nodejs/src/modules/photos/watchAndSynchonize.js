@@ -4,7 +4,7 @@ import {getExif, probeVideo} from "./exif.js";
 import fs from 'fs';
 import path from "path";
 import mime from "mime-types";
-import config from "../../../res/photos-config.json";
+import config from '../../config.js'
 import {MediaItem} from "../../database/models/MediaItemModel.js";
 import {dropMediaItem, getUniqueId, insertMediaItem} from "../../database/models/mediaUtils.js";
 import seq from "sequelize";

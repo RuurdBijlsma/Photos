@@ -1,6 +1,6 @@
 import geocoder from "local-reverse-geocoder";
 import lookup from "country-code-lookup";
-import config from '../../../res/photos-config.json'
+import config from '../../config.js'
 
 if (config.skipGeocode)
     console.warn("SKIPPING GEOCODING");
@@ -17,7 +17,7 @@ async function init() {
                 admin3And4: config.geocodeAdmin3and4,
                 alternateNames: false,
             },
-            dumpDirectory: './res/photos/geonames'
+            dumpDirectory: './res/geonames'
         }, () => {
             resolve();
         });

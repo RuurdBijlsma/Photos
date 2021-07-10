@@ -10,7 +10,7 @@ import Database from "../Database.js";
 import {checkFileExists, getToken, months} from "../../utils.js";
 import {dateToString, updatePhotoDate, updateVideoDate} from "../../modules/photos/exif.js";
 import path from "path";
-import config from "../../../res/photos-config.json";
+import config from '../../config.js'
 import WordNet from "node-wordnet";
 import {initMediaBlocked, MediaBlocked} from "./MediaBlockedModule.js";
 import fs from "fs";

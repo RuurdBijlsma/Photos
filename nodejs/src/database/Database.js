@@ -83,11 +83,11 @@ class Database {
 
     get dbConfig() {
         return {
-            user: process.env.DB_USER || 'postgres',
-            pass: process.env.DB_PASSWORD || '',
-            host: process.env.DB_HOST || 'localhost',
-            port: process.env.DB_PORT || 5432,
-            schema: process.env.DB_SCHEMA || 'postgres',
+            user: process.env.DB_USER ?? 'postgres',
+            pass: process.env.DB_PASSWORD ?? '',
+            host: process.env.DB_HOST ?? 'localhost',
+            port: process.env.DB_PORT ?? 5432,
+            schema: process.env.DB_SCHEMA ?? 'postgres',
             ssl: process.env.DB_SSL === "true",
         }
     }

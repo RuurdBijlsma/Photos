@@ -14,10 +14,6 @@ nodejs/res/photos-config.json
 nodejs/res/cert.pem
 nodejs/res/photos
 nodejs/res/thumbnails
-nodejs/res/classifier/model1/*
-!nodejs/res/classifier/model1/model_location
-nodejs/res/classifier/inceptionresnet/*
-!nodejs/res/classifier/inceptionresnet/model_location
 nodejs/res/geonames/*
 !nodejs/res/geonames/geocode_files_will_dump_here
 

@@ -2,7 +2,7 @@ import ApiModule from "../../ApiModule.js";
 import {processMedia, watchAndSynchronize} from "./watchAndSynchonize.js";
 import Log from "../../Log.js";
 import {MediaItem} from "../../database/models/MediaItemModel.js";
-import config from "../../../res/photos-config.json";
+import config from "../../config.js";
 import path from "path";
 import mime from 'mime-types'
 import {
