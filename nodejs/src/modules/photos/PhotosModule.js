@@ -364,7 +364,7 @@ export default class PhotosModule extends ApiModule {
             if (!await Auth.checkRequest(req)) return res.sendStatus(401);
             try {
                 let month = req.body.month;
-                res.send(await getMonthPhotos(...month).then(this.fixMediaArrayDates));
+                res.send(await getMonthPhotos(...month));
             } catch (e) {
                 res.sendStatus(500);
             }
