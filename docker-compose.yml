@@ -18,7 +18,7 @@ services:
     image: nginx:stable
     container_name: production_nginx
     volumes:
-      - ./nginx/default.conf:/etc/nginx/conf.d/photos.conf
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/photos.conf
     ports:
       - 3333:3333
     networks:
