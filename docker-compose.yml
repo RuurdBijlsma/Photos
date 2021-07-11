@@ -25,7 +25,6 @@ services:
       DB_HOST: postgres
     depends_on:
       - postgres
-      - hosting
     ports:
       - '3000:3000'
     volumes:
