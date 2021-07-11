@@ -13,9 +13,5 @@ RUN apt-get update && \
     libc6-dev \
     ffmpeg
 RUN npm install
+EXPOSE 3000
 CMD [ "npm", "start" ]
-
-FROM nginx:stable
-COPY ./nginx/nginx.conf /etc/nginx/conf.d/default.conf
-
-EXPOSE 3333
