@@ -1,6 +1,6 @@
 export default {
     "media": process.env.MEDIA_DIR ?? "/photos",
-    "thumbnails": process.env.THUMBNAILS_DIR ?? "./res/thumbnails",
+    "thumbnails": process.env.THUMBNAILS_DIR ?? "/thumbnails",
     "syncInterval": process.env.SYNC_INTERVAL ?? 86400000,
     "backupInterval": process.env.BACKUP_INTERVAL ?? 172800000,
     "telegramToken": process.env.TELEGRAM_TOKEN ?? "",
