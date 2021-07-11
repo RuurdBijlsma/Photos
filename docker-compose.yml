@@ -11,6 +11,8 @@ services:
       - '5432:5432'
     volumes:
       - photos-db:/var/lib/postgresql/data
+    networks:
+      - backend
 
   nginx:
     image: nginx:stable
