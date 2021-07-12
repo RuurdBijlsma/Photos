@@ -1,9 +1,0 @@
-.git
-.gitignore
-nodejs/node_modules/
-.idea
-nodejs/res/backups/*
-nodejs/res/geonames/admin1_codes
-nodejs/res/geonames/admin2_codes
-nodejs/res/geonames/all_countries
-nodejs/res/geonames/cities

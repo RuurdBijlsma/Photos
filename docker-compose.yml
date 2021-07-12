@@ -3,6 +3,7 @@
 version: '3.8'
 services:
   postgres:
+    container_name: postgres
     image: postgres
     environment:
       POSTGRES_USER: postgres
@@ -13,8 +14,9 @@ services:
       - photos-db:/var/lib/postgresql/data
 
   photos:
+    container_name: photos
     build:
-      context: .
+      context: ./nodejs
     environment:
       UI_NAME: user
       UI_EMAIL: user@gmail.com
@@ -25,25 +27,31 @@ services:
       DB_HOST: postgres
     depends_on:
       - postgres
-    expose:
-      - '3000'
     links:
       - postgres
+    expose:
+      - '3000'
     volumes:
       - ./media/photos:/photos
       - ./media/thumbnails:/thumbnails
 
   nginx:
-    image: nginx:stable
-    volumes:
-      - ./nginx/default.conf:/etc/nginx/conf.d/photos.conf
-      - ./media/thumbnails:/thumbnails
+    container_name: nginx
+    build:
+      context: ./nginx
+    environment:
+      PUBLIC_PATH: '/'
+      HISTORY_MODE: 'true'
     ports:
       - 3333:3333
+      - 80:80
     depends_on:
       - photos
     links:
       - photos
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/photos.conf
+      - ./media/thumbnails:/thumbnails
 
 volumes:
   photos-db:

@@ -1,0 +1,6 @@
+node_modules/
+res/backups/*
+res/geonames/admin1_codes
+res/geonames/admin2_codes
+res/geonames/all_countries
+res/geonames/cities

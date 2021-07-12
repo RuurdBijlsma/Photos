@@ -1,0 +1,3 @@
+[submodule "nginx/frontend"]
+	path = nginx/frontend
+	url = https://github.com/RuurdBijlsma/Photos

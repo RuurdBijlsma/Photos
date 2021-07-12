@@ -8,7 +8,8 @@ res/music
 ls
 temp
 
-testtest
+media
+
 nodejs/res/backups/*
 !nodejs/res/backups/db_backups_go_here
 nodejs/res/photos-config.json
