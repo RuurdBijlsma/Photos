@@ -5,6 +5,7 @@ import path from "path";
 import {exec} from "child_process";
 import {Sequelize} from "sequelize";
 import {checkFileExists} from "../utils.js";
+import config from "../config.js";
 
 const console = new Log("Database");
 
@@ -43,7 +44,7 @@ class Database {
             if (name !== '')
                 name += '_';
             let dateTime = new Date().toJSON().replace(/:/g, '_');
-            let backupTo = path.resolve(`./res/photos/backups/rsdb_${name}${dateTime}.dump`);
+            let backupTo = path.resolve(path.join(config.backups, `rsdb_${name}${dateTime}.dump`));
             console.log(`Backing up database! ${backupTo}`);
             exec(`pg_dump --dbname=${this.connectionString} -Fc > ${backupTo}`,
                 (error, stderr, stdout) => {
@@ -84,7 +85,7 @@ class Database {
     get dbConfig() {
         return {
             user: process.env.DB_USER ?? 'postgres',
-            pass: process.env.DB_PASSWORD ?? '',
+            pass: process.env.DB_PASSWORD ?? 'postgres',
             host: process.env.DB_HOST ?? 'localhost',
             port: process.env.DB_PORT ?? 5432,
             schema: process.env.DB_SCHEMA ?? 'postgres',

@@ -6,7 +6,6 @@
   "type": "module",
   "scripts": {
     "start": "node --experimental-json-modules src/index.js",
-    "start-win": "set MEDIA_DIR=D:\\Backup\\Photos\\photos\\photos& node --experimental-json-modules src/index.js",
     "debugStart": "set DEBUG=* & node --experimental-json-modules src/index.js",
     "restoreDb": "node --experimental-json-modules src/database/restoreDb.js",
     "backupDb": "node --experimental-json-modules src/database/backupDb.js",
@@ -37,6 +36,7 @@
     "cors": "^2.8.5",
     "country-code-lookup": "0.0.19",
     "date-fns": "^2.22.1",
+    "dotenv": "^10.0.0",
     "exif": "^0.6.0",
     "express": "^4.17.1",
     "express-fileupload": "^1.2.1",

@@ -1,11 +1,9 @@
+import dotenv from 'dotenv';
 import ApiController from "./Controller.js";
 import Commander from 'commander';
 import pJson from '../package.json'
 
-//docker todo
-// https://semaphoreci.com/community/tutorials/dockerizing-a-node-js-web-application
-// postgres dockertje
-// nginx dockertje
+dotenv.config();
 
 Commander
     .version(pJson.version)

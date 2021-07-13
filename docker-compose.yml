@@ -25,6 +25,9 @@ services:
       DB_USER: postgres
       DB_PASSWORD: postgres
       DB_HOST: postgres
+      BACKUPS_DIR: /backups
+      MEDIA_DIR: /photos
+      THUMBNAILS_DIR: /thumbnails
     depends_on:
       - postgres
     links:
@@ -34,6 +37,7 @@ services:
     volumes:
       - ./media/photos:/photos
       - ./media/thumbnails:/thumbnails
+      - ./media/db-backups:/backups
 
   nginx:
     container_name: nginx
