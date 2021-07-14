@@ -30,6 +30,7 @@ View map of all your photos and videos. Photos are blue circles, videos are oran
 
 Possible search features
 
+* Item in photo (using machine learning image classification)
 * Place taken (country, province, municipality, city)
 * Date taken
 * Filename
