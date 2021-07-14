@@ -1,5 +1,12 @@
 # Ruurd Photos
 
+* [Screenshots](https://github.com/RuurdBijlsma/Photos#homepage)
+* [Setup](https://github.com/RuurdBijlsma/Photos#prerequisites)
+   * [Prerequisites](https://github.com/RuurdBijlsma/Photos#prerequisites)
+   * [Guide](https://github.com/RuurdBijlsma/Photos#setup-server)
+   * [Automatic upload from Android](https://github.com/RuurdBijlsma/Photos#automatic-upload-from-android)
+   * [Setting up HTTPS](https://github.com/RuurdBijlsma/Photos#setting-up-https)
+
 ### Homepage
 
 Homepage showing all photos in a grid. Aspect ratio of photos is maintained and scroll is infinite. Scrollbar on the
