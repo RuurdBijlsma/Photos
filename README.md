@@ -68,6 +68,7 @@ Possible search features
     * Set `UI_NAME` (line 21) to your preferred username.
     * Set `UI_EMAIL` (line 22) to your email (used for login).
     * Set `UI_PASSWORD` (line 23) to your password.
+    * (Optional) set Telegram token and chatId to get an error message when a photo or video fails to process.
 4. Run `docker-compose up --build` and wait for you photos to process (takes a WHILE).
 5. Visit http://localhost/settings, enter `http://localhost:3333` as the API url.
 6. Log in to your account after pressing "Apply changes".
