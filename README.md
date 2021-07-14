@@ -51,6 +51,10 @@ Possible search features
 
 ![f](https://github.com/ruurdbijlsma/Photos/blob/master/.gh/home-dark.png?raw=true)
 
+### Responsive layout and touch support
+
+![f](https://github.com/ruurdbijlsma/Photos/blob/master/.gh/mobile.png?raw=true)
+
 ## Prerequisites
 
 * Git (https://git-scm.com/)
