@@ -43,3 +43,80 @@ Possible search features
 ### Dark theme
 
 ![f](https://github.com/ruurdbijlsma/Photos/blob/master/.gh/home-dark.png?raw=true)
+
+## Prerequisites
+
+* Git (https://git-scm.com/)
+* Docker + docker-compose (https://www.docker.com/products/docker-desktop)
+
+## Setup server
+
+1. Clone this repo `git clone https://github.com/ruurdbijlsma/Photos`.
+2. Create folder `./media/photos` and put your photos and videos there .
+3. Configure variables in `docker-compose.yml`.
+    * Set `UI_NAME` (line 21) to your preferred username.
+    * Set `UI_EMAIL` (line 22) to your email (used for login).
+    * Set `UI_PASSWORD` (line 23) to your password.
+4. Start `docker-compose up` and wait for you photos to process.
+5. Visit http://localhost/settings, enter `http://localhost:3333` as the API url.
+6. Log in to your account after pressing "Apply changes".
+7. (optional) Set a Mapbox api key on the settings page to make the maps work.
+
+### Automatic upload from Android
+
+1. Download FolderSync (https://play.google.com/store/apps/details?id=dk.tacit.android.foldersync.lite&hl=nl&gl=US)
+2. Set up SFTP sync account to your server
+3. Set up sync to remote folderpair to automatically upload files from /DCIM/Camera (on phone) to ./media/photos (on server)
+
+### Setting up HTTPS
+
+Use nginx reverse-proxy for this, the server runs at localhost:3333, the frontend runs at localhost:80.
+
+Example nginx conf:
+
+```
+server {
+        listen 80;
+        server_name mysite.com;
+        return 307 https://$server_name$request_uri;
+}
+server {
+    listen              443 ssl;
+    server_name         mysite.com;
+
+    location / {
+        proxy_pass http://localhost:80;
+        proxy_redirect http://localhost:80/ /;
+        proxy_read_timeout 60s;
+
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "Upgrade";
+    }
+
+    ssl_certificate /etc/letsencrypt/live/mysite.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/mysite.com/privkey.pem;
+}
+server {
+        listen 80;
+        server_name api.mysite.com;
+        return 307 https://$server_name$request_uri;
+}
+server {
+    listen              443 ssl;
+    server_name         api.mysite.com;
+
+    location / {
+        proxy_pass http://localhost:3333;
+        proxy_redirect http://localhost:3333/ /;
+        proxy_read_timeout 60s;
+
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "Upgrade";
+    }
+
+    ssl_certificate /etc/letsencrypt/live/mysite.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/mysite.com/privkey.pem;
+}
+```
