@@ -68,7 +68,7 @@ Possible search features
     * Set `UI_NAME` (line 21) to your preferred username.
     * Set `UI_EMAIL` (line 22) to your email (used for login).
     * Set `UI_PASSWORD` (line 23) to your password.
-4. Start `docker-compose up` and wait for you photos to process.
+4. Run `docker-compose up --build` and wait for you photos to process (takes a WHILE).
 5. Visit http://localhost/settings, enter `http://localhost:3333` as the API url.
 6. Log in to your account after pressing "Apply changes".
 7. (optional) Set a Mapbox api key on the settings page to make the maps work.
