@@ -1,6 +1,9 @@
 import geocoder from "local-reverse-geocoder";
 import lookup from "country-code-lookup";
 import config from '../../config.js'
+import Log from '../../Log.js'
+
+const console = new Log('geocode');
 
 if (config.skipGeocode)
     console.warn("SKIPPING GEOCODING");

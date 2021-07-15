@@ -1,53 +1,56 @@
-import {initMediaClassification, MediaClassification} from "./MediaClassificationModel.js";
-import {initMediaLocation, MediaLocation} from "./MediaLocationModel.js";
-import {initMediaItem, MediaItem} from "./MediaItemModel.js";
-import {initMediaLabel, MediaLabel} from "./MediaLabelModel.js";
-import {initMediaGlossary, MediaGlossary} from "./MediaGlossaryModel.js";
+import {initClassification, Classification} from "./ClassificationModel.js";
+import {initLocation, Location} from "./LocationModel.js";
+import {initMedia, Media} from "./MediaModel.js";
+import {initLabel, Label} from "./LabelModel.js";
+import {initGlossary, Glossary} from "./GlossaryModel.js";
 import sequelize from 'sequelize';
-import {initMediaPlace, MediaPlace} from "./MediaPlaceModel.js";
-import {initMediaSuggestion, MediaSuggestion} from "./MediaSuggestionModel.js";
+import {initPlace, Place} from "./PlaceModel.js";
+import {initSuggestion, Suggestion} from "./SuggestionModel.js";
 import Database from "../Database.js";
 import {checkFileExists, getToken, months} from "../../utils.js";
 import {dateToString, updatePhotoDate, updateVideoDate} from "../../modules/photos/exif.js";
 import path from "path";
 import config from '../../config.js'
 import WordNet from "node-wordnet";
-import {initMediaBlocked, MediaBlocked} from "./MediaBlockedModule.js";
+import {initBlocked, Blocked} from "./BlockedModel.js";
 import fs from "fs";
-import {getPaths, processMedia, temp, uploadDir, zipDir} from "../../modules/photos/watchAndSynchonize.js";
+import {getPaths, processMedia, uploadDir, zipDir} from "../../modules/photos/watchAndSynchonize.js";
 import {filenameToDate} from "fix-exif-data";
 import util from "util";
 import archiver from "archiver";
+import Log from '../../Log.js'
+
+const console = new Log('mediaUtils');
 
 const wordnet = new WordNet();
 const {Op} = sequelize;
 
-export async function initMedia(db) {
+export async function initTables(db) {
     await db.query(`CREATE EXTENSION IF NOT EXISTS pg_trgm`);
 
-    initMediaLabel(db);
-    initMediaGlossary(db);
-    initMediaClassification(db);
-    initMediaLocation(db);
-    initMediaItem(db);
-    initMediaPlace(db);
-    initMediaSuggestion(db);
-    initMediaBlocked(db);
+    initLabel(db);
+    initGlossary(db);
+    initClassification(db);
+    initLocation(db);
+    initMedia(db);
+    initPlace(db);
+    initSuggestion(db);
+    initBlocked(db);
 
-    MediaItem.hasMany(MediaClassification, {onDelete: 'CASCADE'});
-    MediaClassification.belongsTo(MediaItem);
+    Media.hasMany(Classification, {onDelete: 'CASCADE'});
+    Classification.belongsTo(Media);
 
-    MediaItem.hasOne(MediaLocation, {onDelete: 'CASCADE'});
-    MediaLocation.belongsTo(MediaItem);
+    Media.hasOne(Location, {onDelete: 'CASCADE'});
+    Location.belongsTo(Media);
 
-    MediaLocation.hasMany(MediaPlace, {onDelete: 'CASCADE'});
-    MediaPlace.belongsTo(MediaLocation);
+    Location.hasMany(Place, {onDelete: 'CASCADE'});
+    Place.belongsTo(Location);
 
-    MediaClassification.hasMany(MediaLabel, {onDelete: 'CASCADE'});
-    MediaLabel.belongsTo(MediaClassification);
+    Classification.hasMany(Label, {onDelete: 'CASCADE'});
+    Label.belongsTo(Classification);
 
-    MediaClassification.hasMany(MediaGlossary, {onDelete: 'CASCADE'});
-    MediaGlossary.belongsTo(MediaClassification);
+    Classification.hasMany(Glossary, {onDelete: 'CASCADE'});
+    Glossary.belongsTo(Classification);
 }
 
 export async function uploadFile(file) {
@@ -55,14 +58,14 @@ export async function uploadFile(file) {
     try {
         let fileExists = await checkFileExists(destination);
         let filePath = path.relative(config.media, destination);
-        let mediaItem = await MediaItem.findOne({where: {filePath}});
-        if (mediaItem) {
-            return {success: false, error: 'file already exists!', id: mediaItem.id};
+        let mediaMedia = await Media.findOne({where: {filePath}});
+        if (mediaMedia) {
+            return {success: false, error: 'file already exists!', id: mediaMedia.id};
         }
         if (!fileExists) {
             await util.promisify(file.mv)(destination);
         }
-        let blocked = await MediaBlocked.findOne({where: {filePath}});
+        let blocked = await Blocked.findOne({where: {filePath}});
         if (blocked)
             await blocked.destroy();
         let id = await processMedia(destination);
@@ -117,37 +120,37 @@ export async function createZip(files) {
 }
 
 export async function autoFixDate(id) {
-    let item = await MediaItem.findOne({where: {id}});
+    let item = await Media.findOne({where: {id}});
     if (item === null) return {success: false, code: 404};
     let date = filenameToDate(item.filename);
     if (date !== null) {
-        return await changeItemDate(item, date);
+        return await changeMediaDate(item, date);
     } else {
         return false;
     }
 }
 
 export async function reprocess(id) {
-    let item = await MediaItem.findOne({where: {id}});
+    let item = await Media.findOne({where: {id}});
     if (item === null) return {success: false, code: 404};
 
     let filePath = path.resolve(path.join(config.media, item.filePath));
 
     let newId = null;
     await Database.db.transaction({}, async transaction => {
-        await dropMediaItem(item.id, transaction);
+        await dropMedia(item.id, transaction);
         newId = await processMedia(filePath, 2, transaction);
     });
     return {success: true, id: newId};
 }
 
 export async function deleteFile(id) {
-    let item = await MediaItem.findOne({where: {id}});
+    let item = await Media.findOne({where: {id}});
     if (item === null) return {success: false, code: 404};
 
     try {
         let filePath = path.resolve(path.join(config.media, item.filePath));
-        await dropMediaItem(id);
+        await dropMedia(id);
         if (await checkFileExists(filePath))
             await fs.promises.unlink(filePath);
         let files = getPaths(id);
@@ -157,8 +160,8 @@ export async function deleteFile(id) {
                     console.log("Deleting", files[key])
                     await fs.promises.unlink(files[key])
                 }
-        if (!await MediaBlocked.findOne({where: {filePath: item.filePath}}))
-            await MediaBlocked.create({
+        if (!await Blocked.findOne({where: {filePath: item.filePath}}))
+            await Blocked.create({
                 type: item.type,
                 filePath: item.filePath,
                 reason: 'deleted',
@@ -175,8 +178,8 @@ export async function deleteFile(id) {
 export async function getBoundingBox(place) {
     return await Database.db.query(`
         select max(latitude) as maxlat, min(latitude) as minlat, max(longitude) as maxlng, min(longitude) as minlng
-        from "MediaLocations"
-            inner join "MediaPlaces" MP on "MediaLocations".id = MP."MediaLocationId"
+        from "Locations"
+            inner join "Places" MP on "Locations".id = MP."LocationId"
         where text = $1
     `, {
         bind: [place],
@@ -190,7 +193,7 @@ export async function getGlossary(label) {
         let words = await wordnet.lookupAsync(label);
         let results = words.filter(w => w.synonyms.includes(label) && w.pos === 'n');
         let glossaries = await Promise.all(
-            results.map(r => MediaGlossary.findOne({where: {text: r.gloss.trim()}}))
+            results.map(r => Glossary.findOne({where: {text: r.gloss.trim()}}))
         ).then(r => r.filter(w => w !== null));
         if (glossaries.length === 0) return {isLabel: false, glossary: null};
         let glossary = glossaries[0].text;
@@ -202,7 +205,7 @@ export async function getGlossary(label) {
     }
 }
 
-export async function changeItemDate(item, newDate) {
+export async function changeMediaDate(item, newDate) {
     if (newDate === null || item === null) return false;
 
     let suggestions = item.createDate !== null ? getDateSuggestions(item.createDate) : [];
@@ -231,7 +234,7 @@ export async function changeItemDate(item, newDate) {
 export async function getMonthPhotos(year, month) {
     return await Database.db.query(`
         select id, type, "subType", width, height, "createDateString", "durationMs"
-        from "MediaItems"
+        from "Media"
         where extract(month from "createDate") = $1
           and extract(year from "createDate") = $2
         order by "createDate" desc;
@@ -246,7 +249,7 @@ export async function getPhotoMonths() {
         select extract(year from "createDate")                       as year,
                extract(month from "createDate")                      as month,
                count(*)::INT                                         as count
-        from "MediaItems"
+        from "Media"
         where "createDate" is not null
         group by year, month
         order by year desc, month desc;
@@ -257,12 +260,12 @@ export async function getPhotoMonths() {
 
 export async function getRandomLocations(limit = 50) {
     return await Database.db.query(`
-        select distinct on (text) text, "MediaItemId"
-        from "MediaLocations"
-        inner join "MediaPlaces" MP on "MediaLocations".id = MP."MediaLocationId"
+        select distinct on (text) text, "MediaId"
+        from "Locations"
+        inner join "Places" MP on "Locations".id = MP."LocationId"
         where text in (select text
-        from (select text, count(text)::FLOAT / (select count(*) from "MediaPlaces") * 10 + random() as count
-        from "MediaPlaces"
+        from (select text, count(text)::FLOAT / (select count(*) from "Places") * 10 + random() as count
+        from "Places"
         where not "isCode"
         group by text
         order by count desc
@@ -276,14 +279,14 @@ export async function getRandomLocations(limit = 50) {
 
 export async function getRandomLabels(limit = 50) {
     return await Database.db.query(`
-    select distinct on (text) text, "MediaItemId"
-    from "MediaClassifications"
-    inner join "MediaLabels" ML on "MediaClassifications".id = ML."MediaClassificationId"
+    select distinct on (text) text, "MediaId"
+    from "Classifications"
+    inner join "Labels" ML on "Classifications".id = ML."ClassificationId"
     where text in (
     select text
     from (
-    select text, count(text)::FLOAT / (select count(*) from "MediaLabels") * 25 + random() as count
-    from "MediaLabels"
+    select text, count(text)::FLOAT / (select count(*) from "Labels") * 25 + random() as count
+    from "Labels"
     where level <= 2
     group by text
     order by count desc
@@ -303,12 +306,12 @@ export async function searchMediaRanked({query, limit = false, includedFields}) 
         bind.push(limit);
     return await Database.db.query(
         `select ${includedFields.map(f=>`"${f}"`).join(', ')}, ts_rank_cd(vector, query) as rank
-    from "MediaItems", to_tsquery('english', $1) query
+    from "Media", to_tsquery('english', $1) query
     where query @@ vector
     order by "createDate" desc
         ${limit ? `limit = $2` : ''}`,
         {
-            model: MediaItem,
+            model: Media,
             mapToModel: true,
             bind,
             type: sequelize.QueryTypes.SELECT,
@@ -333,28 +336,28 @@ export async function searchMedia({
         options.limit = limit;
     if (include)
         options.include = [
-            {model: MediaClassification, include: [MediaLabel, MediaGlossary]},
-            {model: MediaLocation}
+            {model: Classification, include: [Label, Glossary]},
+            {model: Location}
         ]
-    return await MediaItem.findAll(options);
+    return await Media.findAll(options);
 }
 
 export async function getMediaByFilename(filename) {
-    return await MediaItem.findOne({
+    return await Media.findOne({
         where: {filename},
         include: [
-            {model: MediaClassification, include: [MediaLabel, MediaGlossary]},
-            {model: MediaLocation, include: [MediaPlace]},
+            {model: Classification, include: [Label, Glossary]},
+            {model: Location, include: [Place]},
         ],
     });
 }
 
 export async function getMediaById(id) {
-    return await MediaItem.findOne({
+    return await Media.findOne({
         where: {id},
         include: [
-            {model: MediaClassification, include: [MediaLabel, MediaGlossary]},
-            {model: MediaLocation, include: [MediaPlace]},
+            {model: Classification, include: [Label, Glossary]},
+            {model: Location, include: [Place]},
         ],
     });
 }
@@ -363,14 +366,14 @@ export async function getUniqueId() {
     let id;
     do {
         id = await getToken(16);
-    } while (await MediaItem.findOne({where: {id}}));
+    } while (await Media.findOne({where: {id}}));
     return id;
 }
 
 export async function getPhotosForMonth(month) {
     return await Database.db.query(`
         select id, type, "subType", width, height, "createDateString", "durationMs"
-        from "MediaItems"
+        from "Media"
         where extract(month from "createDate") = $1
         order by "createDate" desc;
     `, {
@@ -382,7 +385,7 @@ export async function getPhotosForMonth(month) {
 export async function getPhotosPerDayMonth(day, month) {
     return await Database.db.query(`
         select *
-        from "MediaItems"
+        from "Media"
         where extract(month from "createDate") = $2
           and extract(day from "createDate") = $1
         order by "createDate" desc;
@@ -407,35 +410,35 @@ export function getDateSuggestions(date) {
     return suggestions;
 }
 
-export function getClassificationSuggestions(mediaClassifications) {
-    if (!Array.isArray(mediaClassifications))
+export function getClassificationSuggestions(classifications) {
+    if (!Array.isArray(classifications))
         return [];
-    return mediaClassifications
-        .flatMap(c => c.MediaLabels ?? [])
+    return classifications
+        .flatMap(c => c.Labels ?? [])
         .map(p => ({text: p.text, type: 'label'}))
 }
 
-export function getPlacesSuggestions(mediaPlaces) {
-    if (!Array.isArray(mediaPlaces))
+export function getPlacesSuggestions(places) {
+    if (!Array.isArray(places))
         return [];
-    return mediaPlaces.map(p => ({text: p.text, type: 'place'}))
+    return places.map(p => ({text: p.text, type: 'place'}))
 }
 
-export async function dropMediaItem(id, transaction = null) {
+export async function dropMedia(id, transaction = null) {
     let spreadTransaction = transaction ? {transaction} : {};
-    let item = await MediaItem.findOne({
+    let item = await Media.findOne({
         where: {id},
         include: [
-            {model: MediaClassification, include: [MediaLabel]},
-            {model: MediaLocation, include: [MediaPlace]},
+            {model: Classification, include: [Label]},
+            {model: Location, include: [Place]},
         ],
         ...spreadTransaction,
     });
     if (item === null)
         return false;
     let suggestions = [];
-    suggestions.push(...getPlacesSuggestions(item.MediaLocation?.MediaPlaces));
-    suggestions.push(...getClassificationSuggestions(item.MediaClassifications));
+    suggestions.push(...getPlacesSuggestions(item.Location?.Places));
+    suggestions.push(...getClassificationSuggestions(item.Classifications));
     suggestions.push(...getDateSuggestions(item.createDate));
     await Promise.all(suggestions.map(o => removeSuggestion(o, transaction)));
 
@@ -450,7 +453,7 @@ export async function removeSuggestion(obj, transaction) {
     }
 
     const {text, type} = obj;
-    let suggestion = await MediaSuggestion.findOne({where: {type, text}, ...spreadTransaction});
+    let suggestion = await Suggestion.findOne({where: {type, text}, ...spreadTransaction});
     if (suggestion === null)
         return;
     if (suggestion.count === 1) {
@@ -467,7 +470,7 @@ export async function addSuggestion(obj, transaction) {
         return;
     }
     const {text, type} = obj;
-    let [item, created] = await MediaSuggestion.findOrCreate({
+    let [item, created] = await Suggestion.findOrCreate({
         where: {text}, defaults: {
             type,
             vector: sequelize.fn('to_tsvector', 'english', text),
@@ -508,11 +511,11 @@ export const toText = a => Array.isArray(a) ? a.map(b => b.text) : [a];
  *     width,height,durationMs?,bytes,createDateString?:string,exif,
  *     location?: {latitude,longitude,altitude?,place?,country?,admin: string[]?},
  *     classifications?: {confidence: number, labels: string[], glossaries: string[]}[],
- * }} data MediaItem data
+ * }} data Media data
  * @param transaction? Sequelize transaction
  * @returns {Promise<void>}
  */
-export async function insertMediaItem(data, transaction = null) {
+export async function insertMedia(data, transaction = null) {
     let [classA, classB, classC] = data.classifications ?
         data.classifications.sort((a, b) => b.confidence - a.confidence) :
         [null, null, null];
@@ -523,7 +526,7 @@ export async function insertMediaItem(data, transaction = null) {
             if (typeof data.createDateString !== 'string') {
                 console.warn("FOUT")
             }
-            let item = await MediaItem.create({
+            let item = await Media.create({
                 vectorA: toVector('A',
                     ...toText(classA?.labels),
                     ...dateToWords(data.createDate),
@@ -546,7 +549,7 @@ export async function insertMediaItem(data, transaction = null) {
                 ...data,
             }, {transaction});
             await Database.db.query(
-                `update "MediaItems"
+                `update "Media"
                     set vector = "vectorA" || "vectorB" || "vectorC"
                     where id = '${data.id}'`
                 , {transaction});
@@ -567,11 +570,11 @@ export async function insertMediaItem(data, transaction = null) {
             }
 
             if (data.location) {
-                let locItem = await MediaLocation.create({
+                let locMedia = await Location.create({
                     latitude: data.location.latitude,
                     longitude: data.location.longitude,
                     altitude: data.location.altitude,
-                    MediaItemId: item.id,
+                    MediaId: item.id,
                 }, {transaction});
                 let places = [
                     {type: 'place', text: data.location.place},
@@ -581,27 +584,27 @@ export async function insertMediaItem(data, transaction = null) {
                         , text: a
                     })),
                 ];
-                await MediaPlace.bulkCreate(places.map(({text, type}) => ({
+                await Place.bulkCreate(places.map(({text, type}) => ({
                         text,
                         type,
                         isCode: text.match(/[0-9]+/g) !== null,
-                        MediaLocationId: locItem.id,
+                        LocationId: locMedia.id,
                     })), {transaction}
                 )
             }
             if (data.classifications)
                 for (let {confidence, labels, glossaries} of data.classifications) {
-                    let classification = await MediaClassification.create({
+                    let classification = await Classification.create({
                         confidence,
-                        MediaItemId: item.id,
+                        MediaId: item.id,
                     }, {transaction});
-                    await MediaLabel.bulkCreate(labels.map(label => ({
+                    await Label.bulkCreate(labels.map(label => ({
                         ...label,
-                        MediaClassificationId: classification.id
+                        ClassificationId: classification.id
                     })), {transaction});
-                    await MediaGlossary.bulkCreate(glossaries.map(glossary => ({
+                    await Glossary.bulkCreate(glossaries.map(glossary => ({
                         ...glossary,
-                        MediaClassificationId: classification.id
+                        ClassificationId: classification.id
                     })), {transaction});
                 }
         };
@@ -612,7 +615,7 @@ export async function insertMediaItem(data, transaction = null) {
         console.log(`inserted ${data.filename}`);
         // transaction has been committed. Do something after the commit if required.
     } catch (err) {
-        console.warn("MediaItem insert ERROR", err);
+        console.warn("Media insert ERROR", err);
         throw new Error(err);
         // do something with the err.
     }
@@ -620,12 +623,12 @@ export async function insertMediaItem(data, transaction = null) {
 
 async function swapWidthAndHeightOnPortraitPhotos() {
     await Database.db.query(`
-        update "MediaItems"
+        update "Media"
         set width=height,
             height=width
         where id in (
             select id
-            from "MediaItems"
+            from "Media"
             where (exif -> 'Orientation')::INT > 4
         )
     `, {type: sequelize.QueryTypes.UPDATE});

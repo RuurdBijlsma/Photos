@@ -1,6 +1,6 @@
 import Log from "../Log.js";
 import {initUser} from "./models/UserModel.js";
-import {initMedia} from "./models/mediaUtils.js";
+import {initTables} from "./models/mediaUtils.js";
 import path from "path";
 import {exec} from "child_process";
 import {Sequelize} from "sequelize";
@@ -27,13 +27,10 @@ class Database {
             console.log("Init user");
             initUser(this.db);
             console.log("Init media tables");
-            await initMedia(this.db);
+            await initTables(this.db);
 
             console.log("Syncing db");
             await this.db.sync();
-
-            // await insertTestMediaItem();
-            // await removeTestMediaItem();
         } catch (e) {
             console.warn("Postgres connection failed", e);
         }

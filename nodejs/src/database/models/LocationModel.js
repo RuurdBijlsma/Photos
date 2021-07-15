@@ -2,11 +2,11 @@ import seq from "sequelize";
 
 const {DataTypes, Model} = seq;
 
-export class MediaLocation extends Model {
+export class Location extends Model {
 }
 
-export function initMediaLocation(sequelize) {
-    MediaLocation.init({
+export function initLocation(sequelize) {
+    Location.init({
         // Model attributes are defined here
         id: {
             type: DataTypes.INTEGER,
@@ -37,5 +37,5 @@ export function initMediaLocation(sequelize) {
         ],
     });
 
-    return MediaLocation;
+    return Location;
 }

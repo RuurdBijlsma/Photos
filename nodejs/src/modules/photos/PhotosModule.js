@@ -1,13 +1,13 @@
 import ApiModule from "../../ApiModule.js";
 import {processMedia, watchAndSynchronize} from "./watchAndSynchonize.js";
 import Log from "../../Log.js";
-import {MediaItem} from "../../database/models/MediaItemModel.js";
+import {Media} from "../../database/models/MediaModel.js";
 import config from "../../config.js";
 import path from "path";
 import mime from 'mime-types'
 import {
     autoFixDate,
-    changeItemDate, createZip, deleteFile,
+    changeMediaDate, createZip, deleteFile,
     getBoundingBox, getGlossary,
     getMediaById,
     getMonthPhotos,
@@ -20,10 +20,10 @@ import express from "express";
 import geocode from "./reverse-geocode.js";
 import Auth from "../../database/Auth.js";
 import sequelize from "sequelize";
-import {MediaSuggestion} from "../../database/models/MediaSuggestionModel.js";
+import {Suggestion} from "../../database/models/SuggestionModel.js";
 import Database from "../../database/Database.js";
-import {MediaLocation} from "../../database/models/MediaLocationModel.js";
-import {MediaBlocked} from "../../database/models/MediaBlockedModule.js";
+import {Location} from "../../database/models/LocationModel.js";
+import {Blocked} from "../../database/models/BlockedModel.js";
 import {batchSize, checkFileExists} from "../../utils.js";
 
 const {Op} = sequelize;
@@ -97,7 +97,7 @@ export default class PhotosModule extends ApiModule {
             if (!Array.isArray(ids)) return res.sendStatus(400);
             console.log('batch download', ids);
 
-            let items = await MediaItem.findAll({
+            let items = await Media.findAll({
                 where: {id: {[Op.in]: ids}}
             });
             let zipId = await createZip(items.map(i => path.join(config.media, i.filePath)));
@@ -186,14 +186,14 @@ export default class PhotosModule extends ApiModule {
             const id = req.params.id;
             if (typeof id !== 'string') return res.sendStatus(400);
             if (!await Auth.checkRequest(req)) return res.sendStatus(401);
-            let item = await MediaItem.findOne({where: {id}});
+            let item = await Media.findOne({where: {id}});
             if (item === null) return res.sendStatus(404);
 
             let date = new Date(req.body.date);
             if (isNaN(date.getDate()))
                 return res.sendStatus(400);
             try {
-                await changeItemDate(item, date);
+                await changeMediaDate(item, date);
                 res.send(true);
             } catch (e) {
                 res.send(false);
@@ -215,14 +215,14 @@ export default class PhotosModule extends ApiModule {
 
         app.post('/photos/blockedItems', async (req, res) => {
             if (!await Auth.checkRequest(req)) return res.sendStatus(401);
-            res.send(await MediaBlocked.findAll());
+            res.send(await Blocked.findAll());
         });
 
         app.post('/photos/totalBounds', async (req, res) => {
             if (!await Auth.checkRequest(req)) return res.sendStatus(401);
             let result = await Database.db.query(`
                 select min(latitude) as minlat, max(latitude) maxlat, min(longitude) minlng, max(longitude) maxlng
-                from "MediaLocations"
+                from "Locations"
             `, {type: sequelize.QueryTypes.SELECT});
             if (Array.isArray(result) && result.length > 0)
                 res.send(result[0])
@@ -234,8 +234,8 @@ export default class PhotosModule extends ApiModule {
             if (!await Auth.checkRequest(req)) return res.sendStatus(401);
 
             let result = await Database.db.query(`
-                select text, count::FLOAT / (select max(count) from "MediaSuggestions") + random() * 5 as rcount
-                from "MediaSuggestions"
+                select text, count::FLOAT / (select max(count) from "Suggestions") + random() * 5 as rcount
+                from "Suggestions"
                 where text != 'instrumentality'
                   and text != 'instrumentation'
                   and text != 'structure'
@@ -262,9 +262,9 @@ export default class PhotosModule extends ApiModule {
                         }
                     }
                 if (!await Auth.checkRequest(req)) return res.sendStatus(401);
-                res.send(await MediaItem.findAll({
+                res.send(await Media.findAll({
                     include: {
-                        model: MediaLocation,
+                        model: Location,
                         where: {
                             latitude: {
                                 [Op.gte]: minLat,
@@ -310,7 +310,7 @@ export default class PhotosModule extends ApiModule {
             if (typeof place !== 'string') return res.sendStatus(400);
             if (!await Auth.checkRequest(req)) return res.sendStatus(401);
 
-            let result = await MediaSuggestion.findOne({
+            let result = await Suggestion.findOne({
                 where: {type: 'place', text: {[Op.iLike]: `${place}`,},},
                 attributes: ['text'],
             })
@@ -323,7 +323,7 @@ export default class PhotosModule extends ApiModule {
             if (typeof label !== 'string') return res.sendStatus(400);
             if (!await Auth.checkRequest(req)) return res.sendStatus(401);
 
-            let result = await MediaSuggestion.findOne({
+            let result = await Suggestion.findOne({
                 where: {type: 'label', text: label},
                 attributes: ['text'],
             });
@@ -336,7 +336,7 @@ export default class PhotosModule extends ApiModule {
             const filePath = req.body.filePath;
             if (typeof filePath !== 'string') return res.sendStatus(400);
             if (!await Auth.checkRequest(req)) return res.sendStatus(401);
-            let item = await MediaBlocked.findOne({where: {filePath}});
+            let item = await Blocked.findOne({where: {filePath}});
             if (item !== null)
                 await item.destroy();
             try {
@@ -384,7 +384,7 @@ export default class PhotosModule extends ApiModule {
             if (!isFinite(offset))
                 offset = 0;
             limit = Math.min(200, limit);
-            let photos = await MediaItem.findAll({
+            let photos = await Media.findAll({
                 order: [['createDate', 'DESC']],
                 limit,
                 offset,
@@ -421,7 +421,7 @@ export default class PhotosModule extends ApiModule {
             let query = req.query.q;
             query = query.split(' ').filter(n => n.length > 0).join(' ');
 
-            res.send(await MediaSuggestion.findAll({
+            res.send(await Suggestion.findAll({
                 where: {text: {[Op.iLike]: `%${query}%`,},},
                 order: [['count', 'DESC']],
                 limit: 10,
@@ -434,7 +434,7 @@ export default class PhotosModule extends ApiModule {
             let query = req.query.q;
             query = query.split(' ').filter(n => n.length > 0).join(' ');
 
-            let queryType = await MediaSuggestion.findOne({
+            let queryType = await Suggestion.findOne({
                 where: {text: {[Op.iLike]: `${query}`,},},
                 attributes: ['text', 'type'],
             });
@@ -458,7 +458,7 @@ export default class PhotosModule extends ApiModule {
             let results = await searchMediaRanked({
                 query,
                 includedFields: ['id', 'type', 'subType', 'durationMs', 'createDateString', 'width', 'height'],
-            }).then(this.fixMediaArrayDates);
+            });
             res.send({results, type, info});
         });
 
@@ -490,7 +490,7 @@ export default class PhotosModule extends ApiModule {
 
         app.get('/photos/blocked/:id', async (req, res) => {
             const id = req.params.id;
-            let item = await MediaBlocked.findOne({where: {id}});
+            let item = await Blocked.findOne({where: {id}});
             if (item === null)
                 return res.sendStatus(404);
             let file = path.resolve(path.join(config.media, item.filePath));
@@ -506,7 +506,7 @@ export default class PhotosModule extends ApiModule {
 
         app.get('/photos/full/:id', async (req, res) => {
             const id = req.params.id;
-            let item = await MediaItem.findOne({where: {id}});
+            let item = await Media.findOne({where: {id}});
             if (item === null)
                 return res.sendStatus(404);
             let file = path.resolve(path.join(config.media, item.filePath));

@@ -2,11 +2,11 @@ import seq from "sequelize";
 
 const {DataTypes, Model} = seq;
 
-export class MediaItem extends Model {
+export class Media extends Model {
 }
 
-export function initMediaItem(sequelize) {
-    MediaItem.init({
+export function initMedia(sequelize) {
+    Media.init({
         // Model attributes are defined here
         id: {
             type: DataTypes.STRING,
@@ -109,5 +109,5 @@ export function initMediaItem(sequelize) {
         ],
     });
 
-    return MediaItem;
+    return Media;
 }

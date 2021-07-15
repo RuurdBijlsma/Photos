@@ -2,11 +2,11 @@ import seq from "sequelize";
 
 const {DataTypes, Model} = seq;
 
-export class MediaClassification extends Model {
+export class Classification extends Model {
 }
 
-export function initMediaClassification(sequelize) {
-    MediaClassification.init({
+export function initClassification(sequelize) {
+    Classification.init({
         // Model attributes are defined here
         id: {
             type: DataTypes.INTEGER,
@@ -27,5 +27,5 @@ export function initMediaClassification(sequelize) {
         ],
     });
 
-    return MediaClassification;
+    return Classification;
 }

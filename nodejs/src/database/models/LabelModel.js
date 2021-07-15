@@ -2,11 +2,11 @@ import seq from "sequelize";
 
 const {DataTypes, Model} = seq;
 
-export class MediaGlossary extends Model {
+export class Label extends Model {
 }
 
-export function initMediaGlossary(sequelize) {
-    MediaGlossary.init({
+export function initLabel(sequelize) {
+    Label.init({
         // Model attributes are defined here
         id: {
             type: DataTypes.INTEGER,
@@ -32,5 +32,5 @@ export function initMediaGlossary(sequelize) {
         ],
     });
 
-    return MediaGlossary;
+    return Label;
 }

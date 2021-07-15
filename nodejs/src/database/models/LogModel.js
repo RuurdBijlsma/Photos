@@ -2,11 +2,11 @@ import seq from "sequelize";
 
 const {DataTypes, Model} = seq;
 
-export class MediaBlocked extends Model {
+export class Log extends Model {
 }
 
-export function initMediaBlocked(sequelize) {
-    MediaBlocked.init({
+export function initLog(sequelize) {
+    Log.init({
         filePath: {
             type: DataTypes.STRING,
             primaryKey: true,
@@ -36,5 +36,5 @@ export function initMediaBlocked(sequelize) {
         ],
     });
 
-    return MediaBlocked;
+    return Log;
 }

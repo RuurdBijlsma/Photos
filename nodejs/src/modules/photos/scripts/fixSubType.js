@@ -1,13 +1,13 @@
-import {MediaItem} from "../../../database/models/photos/MediaItemModel.js";
+import {Media} from "../../../database/models/MediaModel.js";
 import Database from "../../../database/Database.js";
 
 
 await Database.initDb();
 
-let count = await MediaItem.count();
+let count = await Media.count();
 let batchSize = 50;
 for (let i = 0; i < count; i += batchSize) {
-    let items = await MediaItem.findAll({
+    let items = await Media.findAll({
         where: {
             type: 'image'
         },

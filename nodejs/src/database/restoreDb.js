@@ -1,14 +1,17 @@
 import Database from "./Database.js";
 import {User} from "./models/UserModel.js";
-import {MediaSuggestion} from "./models/MediaSuggestionModel.js";
-import {MediaLocation} from "./models/MediaLocationModel.js";
-import {MediaClassification} from "./models/MediaClassificationModel.js";
-import {MediaLabel} from "./models/MediaLabelModel.js";
-import {MediaPlace} from "./models/MediaPlaceModel.js";
-import {MediaGlossary} from "./models/MediaGlossaryModel.js";
-import {MediaItem} from "./models/MediaItemModel.js";
+import {Suggestion} from "./models/SuggestionModel.js";
+import {Location} from "./models/LocationModel.js";
+import {Classification} from "./models/ClassificationModel.js";
+import {Label} from "./models/LabelModel.js";
+import {Place} from "./models/PlaceModel.js";
+import {Glossary} from "./models/GlossaryModel.js";
+import {Media} from "./models/MediaModel.js";
 import path from "path";
 import {checkFileExists} from "../utils.js";
+import Log from '../Log.js'
+
+const console = new Log('restoreDb');
 
 const restoreFile = process.argv[2];
 if (!restoreFile)
@@ -21,13 +24,13 @@ await Database.initDb();
 
 console.log("Backing up before restoring");
 await Database.backup('pre-restore');
-await MediaItem.drop({cascade: true});
-await MediaGlossary.drop({cascade: true});
-await MediaPlace.drop({cascade: true});
-await MediaLabel.drop({cascade: true});
-await MediaClassification.drop({cascade: true});
-await MediaLocation.drop({cascade: true});
-await MediaSuggestion.drop({cascade: true});
+await Media.drop({cascade: true});
+await Glossary.drop({cascade: true});
+await Place.drop({cascade: true});
+await Label.drop({cascade: true});
+await Classification.drop({cascade: true});
+await Location.drop({cascade: true});
+await Suggestion.drop({cascade: true});
 await User.drop({cascade: true});
 console.log("Dropped all tables before restoring");
 await Database.restore(file);

@@ -1,7 +1,7 @@
-import {MediaItem} from "../../../database/models/photos/MediaItemModel.js";
+import {Media} from "../../../database/models/MediaModel.js";
 import {dateFromFile, dateToString, getCreateDate, loadExif} from "../exif.js";
 import path from "path";
-import config from '../../../../res/photos/config.json'
+import config from '../../../config.js'
 import Database from "../../../database/Database.js";
 import ffmpeg from "../promise-ffmpeg.js";
 
@@ -10,10 +10,10 @@ await Database.initDb();
 const startOffset = +(process.argv[2] ?? 0);
 console.log('start offset', startOffset);
 
-let count = (await MediaItem.count()) - startOffset;
+let count = (await Media.count()) - startOffset;
 let batchSize = 20;
 for (let i = 0; i < count; i += batchSize) {
-    let items = await MediaItem.findAll({
+    let items = await Media.findAll({
         limit: batchSize,
         offset: i + startOffset,
     });

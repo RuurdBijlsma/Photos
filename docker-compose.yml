@@ -54,7 +54,7 @@ services:
     links:
       - photos
     volumes:
-      - ./nginx/default.conf:/etc/nginx/conf.d/photos.conf
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf
       - ./media/thumbnails:/thumbnails
 
 volumes:

@@ -5,13 +5,16 @@ import fs from 'fs';
 import path from "path";
 import mime from "mime-types";
 import config from '../../config.js'
-import {MediaItem} from "../../database/models/MediaItemModel.js";
-import {dropMediaItem, getUniqueId, insertMediaItem} from "../../database/models/mediaUtils.js";
+import {Media} from "../../database/models/MediaModel.js";
+import {dropMedia, getUniqueId, insertMedia} from "../../database/models/mediaUtils.js";
 import seq from "sequelize";
 import TelegramBot from "node-telegram-bot-api";
 import Database from "../../database/Database.js";
 import {batchSize, checkFileExists, getToken} from "../../utils.js";
-import {MediaBlocked} from "../../database/models/MediaBlockedModule.js";
+import {Blocked} from "../../database/models/BlockedModel.js";
+import Log from '../../Log.js'
+
+const console = new Log('watcher');
 
 const {Op} = seq;
 
@@ -34,7 +37,8 @@ export async function watchAndSynchronize() {
             try {
                 await Database.backup();
             } catch (e) {
-                return bot.sendMessage(config.chatId, `Couldn't backup database!\n\n${JSON.stringify(e)}`);
+                if (config.chatId !== 0)
+                    return bot.sendMessage(config.chatId, `Couldn't backup database!\n\n${JSON.stringify(e)}`);
             }
         }, config.backupInterval);
     // else return console.warn("NOT WATCHING AND SYNCHRONIZING ON WINDOWS");
@@ -90,13 +94,13 @@ async function syncFiles() {
     files.push(...newFiles);
 
     // Find and remove all database entries that don't have an associated file
-    let count = await MediaItem.count();
+    let count = await Media.count();
     if (files.length !== count) {
         let names = files.map(f => path.basename(f));
-        let toRemove = await MediaItem.findAll({
+        let toRemove = await Media.findAll({
             where: {filename: {[Op.notIn]: names,}}
         });
-        await Promise.all(toRemove.map(i => dropMediaItem(i.id)));
+        await Promise.all(toRemove.map(i => dropMedia(i.id)));
     }
 
     // Delete all thumbnail files when there is no database entry for them
@@ -116,7 +120,7 @@ async function deleteThumbIfAllowed(thumbPath, idToFile = {}) {
     let thumbFile = path.basename(thumbPath);
     let id = thumbFile.substr(0, thumbFile.length - path.extname(thumbFile).length);
     if (!idToFile.hasOwnProperty(id))
-        idToFile[id] = MediaItem.findOne({where: {id}, attributes: ['filename']});
+        idToFile[id] = Media.findOne({where: {id}, attributes: ['filename']});
     let item = await idToFile[id];
     if (item === null) {
         await fs.promises.unlink(thumbPath);
@@ -138,10 +142,10 @@ async function isProcessed(filePath) {
     let type = getFileType(filePath);
     if (type === false) return true;
 
-    let item = await MediaItem.findOne({where: {filename}});
+    let item = await Media.findOne({where: {filename}});
     if (!item) {
         let fullRel = path.relative(config.media, filePath);
-        let hasFailed = await MediaBlocked.findOne({where: {filePath: fullRel}});
+        let hasFailed = await Blocked.findOne({where: {filePath: fullRel}});
         if (hasFailed) {
             console.warn(`${filePath} will not be reprocessed, it has already failed before.`);
             return true;
@@ -196,9 +200,9 @@ export async function processMedia(filePath, triesLeft = 2, transaction = null) 
         if (type === false) return;
         let filename = path.basename(filePath);
 
-        let alreadyInDb = await MediaItem.findOne({where: {filename}, ...spreadTransaction});
+        let alreadyInDb = await Media.findOne({where: {filename}, ...spreadTransaction});
         if (alreadyInDb)
-            await dropMediaItem(alreadyInDb.id, transaction);
+            await dropMedia(alreadyInDb.id, transaction);
 
         let fileStat = await fs.promises.stat(filePath);
         if (fileStat.size === 0)
@@ -230,7 +234,7 @@ export async function processMedia(filePath, triesLeft = 2, transaction = null) 
             labels = await classify(classifyPoster);
             await fs.promises.unlink(classifyPoster);
         }
-        await insertMediaItem({
+        await insertMedia({
             id,
             type,
             subType: metadata.subType,
@@ -248,9 +252,10 @@ export async function processMedia(filePath, triesLeft = 2, transaction = null) 
         return id;
     } catch (e) {
         if (triesLeft === 0) {
-            await bot.sendMessage(config.chatId, `[Photos] Failed to process "${
-                filePath
-            }"\n\n${JSON.stringify(e.message)}`);
+            if (config.chatId !== 0)
+                await bot.sendMessage(config.chatId, `[Photos] Failed to process "${
+                    filePath
+                }"\n\n${JSON.stringify(e.message)}`);
             let type;
             try {
                 type = getFileType(filePath);
@@ -258,8 +263,8 @@ export async function processMedia(filePath, triesLeft = 2, transaction = null) 
                 type = 'none'
             }
             let fullRel = path.relative(config.media, filePath);
-            if (!await MediaBlocked.findOne({where: {filePath: fullRel}}))
-                await MediaBlocked.create({
+            if (!await Blocked.findOne({where: {filePath: fullRel}}))
+                await Blocked.create({
                     filePath: fullRel,
                     error: {
                         name: e.name,
@@ -285,11 +290,11 @@ async function removeMedia(filePath, triesLeft = 2) {
         let type = getFileType(filePath);
         if (type === false) return;
         let filename = path.basename(filePath);
-        let item = await MediaItem.findOne({where: {filename}});
+        let item = await Media.findOne({where: {filename}});
         if (item === null)
             return;
         const id = item.id;
-        await dropMediaItem(id);
+        await dropMedia(id);
 
         if (type === 'image') {
             let {tiny, small, big} = getPaths(id);
@@ -308,9 +313,10 @@ async function removeMedia(filePath, triesLeft = 2) {
         return true;
     } catch (e) {
         if (triesLeft === 0) {
-            await bot.sendMessage(config.chatId, `[Photos] Failed to remove media, file path: "${
-                filePath
-            }"\n\n${JSON.stringify(e)}`);
+            if (config.chatId !== 0)
+                await bot.sendMessage(config.chatId, `[Photos] Failed to remove media, file path: "${
+                    filePath
+                }"\n\n${JSON.stringify(e)}`);
             return false;
         } else {
             const waitTime = (3 - triesLeft) ** 2 * 5000;

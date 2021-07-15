@@ -7,7 +7,7 @@ yarn-error.log*
 res/music
 ls
 temp
-
+.env
 media
 
 nodejs/res/backups/*

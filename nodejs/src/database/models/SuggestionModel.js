@@ -2,11 +2,11 @@ import seq from "sequelize";
 
 const {DataTypes, Model} = seq;
 
-export class MediaSuggestion extends Model {
+export class Suggestion extends Model {
 }
 
-export function initMediaSuggestion(sequelize) {
-    MediaSuggestion.init({
+export function initSuggestion(sequelize) {
+    Suggestion.init({
         text: {
             type: DataTypes.STRING,
             primaryKey: true,
@@ -44,5 +44,5 @@ export function initMediaSuggestion(sequelize) {
         ],
     });
 
-    return MediaSuggestion;
+    return Suggestion;
 }

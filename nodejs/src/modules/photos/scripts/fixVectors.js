@@ -1,25 +1,24 @@
-import {MediaItem} from "../../../database/models/photos/MediaItemModel.js";
-import Utils from "../../../Utils.js";
-import {dateToWords, toVector} from "../../../database/models/photos/mediaUtils.js";
-import {MediaClassification} from "../../../database/models/photos/MediaClassificationModel.js";
-import {MediaLabel} from "../../../database/models/photos/MediaLabelModel.js";
-import {MediaLocation} from "../../../database/models/photos/MediaLocationModel.js";
-import {MediaPlace} from "../../../database/models/photos/MediaPlaceModel.js";
+import {Media} from "../../../database/models/MediaModel.js";
+import {dateToWords, toVector} from "../../../database/models/mediaUtils.js";
+import {Classification} from "../../../database/models/ClassificationModel.js";
+import {Label} from "../../../database/models/LabelModel.js";
+import {Location} from "../../../database/models/LocationModel.js";
+import {Place} from "../../../database/models/PlaceModel.js";
 import Database from "../../../database/Database.js";
-import {MediaGlossary} from "../../../database/models/photos/MediaGlossaryModel.js";
+import {Glossary} from "../../../database/models/GlossaryModel.js";
 
-await Utils.initDb();
+await Database.initDb();
 
 const startOffset = +(process.argv[2] ?? 0);
 console.log('start offset', startOffset);
 
-let count = (await MediaItem.count()) - startOffset;
+let count = (await Media.count()) - startOffset;
 let batchSize = 20;
 for (let i = 0; i < count; i += batchSize) {
-    let items = await MediaItem.findAll({
+    let items = await Media.findAll({
         include: [
-            {model: MediaClassification, include: [MediaLabel, MediaGlossary]},
-            {model: MediaLocation, include: [MediaPlace]}
+            {model: Classification, include: [Label, Glossary]},
+            {model: Location, include: [Place]}
         ],
         limit: batchSize,
         offset: i + startOffset,
@@ -28,7 +27,7 @@ for (let i = 0; i < count; i += batchSize) {
     for (let item of items) {
         let aWords = [], bWords = [], cWords = [];
 
-        let places = item.MediaLocation?.MediaPlaces;
+        let places = item.Location?.Places;
         if (Array.isArray(places)) {
             let place = places.find(p => p.type === 'place')?.text;
             let country = places.find(p => p.type === 'country')?.text;
@@ -40,9 +39,9 @@ for (let i = 0; i < count; i += batchSize) {
             bWords.push(admin1, admin2, admin3, admin4);
         }
 
-        let classes = item.MediaClassifications.map(c => ({
-            labels: c.MediaLabels.map(l => l.text),
-            glossaries: c.MediaGlossaries.map(l => l.text),
+        let classes = item.Classifications.map(c => ({
+            labels: c.Labels.map(l => l.text),
+            glossaries: c.Glossaries.map(l => l.text),
         }));
         if (classes[0]) {
             aWords.push(...(classes[0]?.labels ?? []))
@@ -78,7 +77,7 @@ for (let i = 0; i < count; i += batchSize) {
                         vectorC: toVector('C', ...cWords),
                     }, {transaction})
                     await Database.db.query(
-                        `update "MediaItems"
+                        `update "Media"
                         set vector = "vectorA" || "vectorB" || "vectorC"
                         where id = '${item.id}'`
                         , {transaction});

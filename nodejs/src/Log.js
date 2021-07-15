@@ -4,26 +4,34 @@ export default class Log {
     }
 
     debug(...message) {
-        console.debug(this.tag, ...message);
+        this._log('debug', ...message);
     }
 
     log(...message) {
-        console.log(this.tag, ...message);
+        this._log('log', ...message);
     }
 
     error(...message) {
-        console.error(this.tag, ...message);
+        this._log('error', ...message);
     }
 
     warn(...message) {
-        console.warn(this.tag, ...message);
+        this._log('warn', ...message);
     }
 
-    time(...args) {
-        return console.time(...args)
+    time(key) {
+        this._log('time', key);
     }
 
-    timeEnd(...args) {
-        return console.timeEnd(...args)
+    timeEnd(key) {
+        this._log('timeEnd', key);
+    }
+
+    _log(type, ...args) {
+        if (type.startsWith('time')) {
+            console[type](...args);
+        } else {
+            console[type](`[${this.tag}]`, ...args);
+        }
     }
 }

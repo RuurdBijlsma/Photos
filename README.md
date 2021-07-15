@@ -65,14 +65,12 @@ Possible search features
 1. Clone this repo `git clone https://github.com/ruurdbijlsma/Photos`.
 2. Create folder `./media/photos` and put your photos and videos there .
 3. Configure variables in `docker-compose.yml`.
-    * Set `UI_NAME` (line 21) to your preferred username.
     * Set `UI_EMAIL` (line 22) to your email (used for login).
     * Set `UI_PASSWORD` (line 23) to your password.
     * (Optional) set Telegram token and chatId to get an error message when a photo or video fails to process.
-4. Run `docker-compose up --build` and wait for you photos to process (takes a WHILE).
-5. Visit http://localhost/settings, enter `http://localhost:3333` as the API url.
-6. Log in to your account after pressing "Apply changes".
-7. (optional) Set a Mapbox api key on the settings page to make the maps work.
+4. Run `docker-compose up --build` and wait until your photos are processed (takes a WHILE).
+5. Visit http://localhost, enter `http://localhost:3333` as the API endpoint and log in with your credentials from step 3.
+6. (optional) Set a Mapbox api key on the settings page to make the maps work.
 
 ### Automatic upload from Android
 

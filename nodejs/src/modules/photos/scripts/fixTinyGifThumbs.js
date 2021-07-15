@@ -1,14 +1,14 @@
-import {MediaItem} from "../../../database/models/photos/MediaItemModel.js";
+import {Media} from "../../../database/models/MediaModel.js";
 import {resizeImage} from "../transcode.js";
 import {getPaths} from '../watchAndSynchonize.js'
 import path from "path";
-import config from '../../../../res/photos/config.json';
+import config from '../../../config.js';
 import Database from "../../../database/Database.js";
 import sequelize from 'sequelize'
 
 await Database.initDb();
 
-let count = await MediaItem.count({
+let count = await Media.count({
     where: {
         filename: {
             [sequelize.Op.iLike]: '%.gif'
@@ -17,7 +17,7 @@ let count = await MediaItem.count({
 });
 let batchSize = 5;
 for (let i = 0; i < count; i += batchSize) {
-    let items = await MediaItem.findAll({
+    let items = await Media.findAll({
         limit: batchSize,
         offset: i,
         where: {

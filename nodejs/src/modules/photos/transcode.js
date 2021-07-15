@@ -1,4 +1,7 @@
 import ffmpeg from "./promise-ffmpeg.js";
+import Log from '../../Log.js'
+
+const console = new Log('transcode');
 
 //Exif orientation
 //1 = 0 degrees: the correct orientation, no adjustment is required.
