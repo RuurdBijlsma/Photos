@@ -1,4 +1,3 @@
-import Log from "../Log.js";
 import {initUser} from "./models/UserModel.js";
 import {initTables} from "./models/mediaUtils.js";
 import path from "path";
@@ -6,8 +5,10 @@ import {exec} from "child_process";
 import {Sequelize} from "sequelize";
 import {checkFileExists} from "../utils.js";
 import config from "../config.js";
+import Clog from "../Clog.js";
+import DbInfo from "./DbInfo.js";
 
-const console = new Log("Database");
+const console = new Clog("Database");
 
 class Database {
     constructor() {
@@ -31,6 +32,7 @@ class Database {
 
             console.log("Syncing db");
             await this.db.sync();
+            DbInfo.isConnected = true;
         } catch (e) {
             console.warn("Postgres connection failed", e);
         }

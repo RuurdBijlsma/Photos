@@ -6,15 +6,15 @@ import path from "path";
 import mime from "mime-types";
 import config from '../../config.js'
 import {Media} from "../../database/models/MediaModel.js";
-import {dropMedia, getUniqueId, insertMedia} from "../../database/models/mediaUtils.js";
+import {deleteOldLogs, dropMedia, getUniqueId, insertMedia} from "../../database/models/mediaUtils.js";
 import seq from "sequelize";
 import TelegramBot from "node-telegram-bot-api";
 import Database from "../../database/Database.js";
 import {batchSize, checkFileExists, getToken} from "../../utils.js";
 import {Blocked} from "../../database/models/BlockedModel.js";
-import Log from '../../Log.js'
+import Clog from '../../Clog.js'
 
-const console = new Log('watcher');
+const console = new Clog('watcher');
 
 const {Op} = seq;
 
@@ -32,8 +32,10 @@ const processJobs = new Set();
 
 
 export async function watchAndSynchronize() {
+    await deleteOldLogs();
     if (process.platform !== 'win32')
         setInterval(async () => {
+            await deleteOldLogs();
             try {
                 await Database.backup();
             } catch (e) {

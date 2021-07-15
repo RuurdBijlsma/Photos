@@ -18,9 +18,10 @@ import {getPaths, processMedia, uploadDir, zipDir} from "../../modules/photos/wa
 import {filenameToDate} from "fix-exif-data";
 import util from "util";
 import archiver from "archiver";
-import Log from '../../Log.js'
+import Clog from '../../Clog.js'
+import {initLog, Log} from "./LogModel.js";
 
-const console = new Log('mediaUtils');
+const console = new Clog('mediaUtils');
 
 const wordnet = new WordNet();
 const {Op} = sequelize;
@@ -36,6 +37,7 @@ export async function initTables(db) {
     initPlace(db);
     initSuggestion(db);
     initBlocked(db);
+    initLog(db);
 
     Media.hasMany(Classification, {onDelete: 'CASCADE'});
     Classification.belongsTo(Media);
@@ -51,6 +53,19 @@ export async function initTables(db) {
 
     Classification.hasMany(Glossary, {onDelete: 'CASCADE'});
     Glossary.belongsTo(Classification);
+}
+
+export async function deleteOldLogs(cutoffDate = null) {
+    const day = 1000 * 60 * 60 * 24;
+    cutoffDate ??= new Date(Date.now() - day * 7);
+    console.log("Deleting logs older than", cutoffDate);
+    await Log.destroy({
+        where: {
+            createdAt: {
+                [Op.lte]: cutoffDate,
+            },
+        },
+    });
 }
 
 export async function uploadFile(file) {

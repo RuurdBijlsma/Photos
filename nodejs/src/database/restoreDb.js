@@ -9,9 +9,9 @@ import {Glossary} from "./models/GlossaryModel.js";
 import {Media} from "./models/MediaModel.js";
 import path from "path";
 import {checkFileExists} from "../utils.js";
-import Log from '../Log.js'
+import Clog from '../Clog.js'
 
-const console = new Log('restoreDb');
+const console = new Clog('restoreDb');
 
 const restoreFile = process.argv[2];
 if (!restoreFile)

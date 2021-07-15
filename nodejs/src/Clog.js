@@ -1,4 +1,7 @@
-export default class Log {
+import {Log} from "./database/models/LogModel.js";
+import Database from "./database/DbInfo.js";
+
+export default class Clog {
     constructor(tag) {
         this.tag = tag;
     }
@@ -32,6 +35,17 @@ export default class Log {
             console[type](...args);
         } else {
             console[type](`[${this.tag}]`, ...args);
+            try {
+                if (Database.isConnected)
+                    Log.create({
+                        type,
+                        tag: this.tag,
+                        session: Database.session,
+                        stamp: Math.floor(performance.now()*1000000),
+                        message: args.join('\n'),
+                    }).then();
+            } catch (e) {
+            }
         }
     }
 }

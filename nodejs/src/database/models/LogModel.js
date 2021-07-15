@@ -7,32 +7,39 @@ export class Log extends Model {
 
 export function initLog(sequelize) {
     Log.init({
-        filePath: {
-            type: DataTypes.STRING,
-            primaryKey: true,
-        },
         id: {
-            type: DataTypes.STRING,
-            allowNull: false,
-            unique: true,
+            type: DataTypes.INTEGER,
+            autoIncrement: true,
+            primaryKey: true,
         },
         type: {
             type: DataTypes.STRING,
             allowNull: false,
         },
-        reason: {
+        tag: {
             type: DataTypes.STRING,
             allowNull: false,
         },
-        error: {
-            type: DataTypes.JSONB,
-            allowNull: true,
+        session: {
+            type: DataTypes.STRING,
+            allowNull: false,
+        },
+        stamp: {
+            type: DataTypes.BIGINT,
+            allowNull: false,
+        },
+        message: {
+            type: DataTypes.TEXT,
+            allowNull: false,
         },
     }, {
         sequelize,
         indexes: [
             {unique: false, fields: ['type']},
-            {unique: false, fields: ['reason']},
+            {unique: false, fields: ['tag']},
+            {unique: false, fields: ['session']},
+            {unique: false, fields: ['stamp']},
+            {unique: false, fields: ['message']},
         ],
     });
 

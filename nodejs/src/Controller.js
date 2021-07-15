@@ -2,7 +2,7 @@ import express from 'express';
 import http from "http";
 import bodyParser from "body-parser";
 import cors from "cors";
-import Log from "./Log.js";
+import Clog from "./Clog.js";
 import AuthModule from './modules/auth/AuthModule.js';
 import PhotosModule from "./modules/photos/PhotosModule.js";
 import Database from "./database/Database.js";
@@ -10,7 +10,7 @@ import fileUpload from "express-fileupload";
 import {User} from "./database/models/UserModel.js";
 import bcrypt from "bcrypt";
 
-const console = new Log("Controller");
+const console = new Clog("Controller");
 
 class Controller {
     constructor() {

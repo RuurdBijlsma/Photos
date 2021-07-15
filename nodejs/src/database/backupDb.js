@@ -1,7 +1,7 @@
 import Database from "./Database.js";
-import Log from '../Log.js'
+import Clog from '../Clog.js'
 
-const console = new Log('backupDb');
+const console = new Clog('backupDb');
 
 
 await Database.initDb();

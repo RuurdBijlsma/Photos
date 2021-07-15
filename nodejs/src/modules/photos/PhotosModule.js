@@ -1,6 +1,6 @@
 import ApiModule from "../../ApiModule.js";
 import {processMedia, watchAndSynchronize} from "./watchAndSynchonize.js";
-import Log from "../../Log.js";
+import Clog from "../../Clog.js";
 import {Media} from "../../database/models/MediaModel.js";
 import config from "../../config.js";
 import path from "path";
@@ -27,7 +27,7 @@ import {Blocked} from "../../database/models/BlockedModel.js";
 import {batchSize, checkFileExists} from "../../utils.js";
 
 const {Op} = sequelize;
-const console = new Log("PhotosModule");
+const console = new Clog("PhotosModule");
 
 export default class PhotosModule extends ApiModule {
     constructor() {

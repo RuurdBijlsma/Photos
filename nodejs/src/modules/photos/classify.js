@@ -4,9 +4,9 @@ import {EOL} from "os";
 import iMaxN from './iMaxN.js';
 import WordNet from 'node-wordnet'
 import path from "path";
-import Log from '../../Log.js'
+import Clog from '../../Clog.js'
 
-const console = new Log('classify');
+const console = new Clog('classify');
 const wordnet = new WordNet();
 let model, labels, syns;
 

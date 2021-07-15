@@ -1,8 +1,8 @@
 import {User} from "./models/UserModel.js";
 import bcrypt from "bcrypt";
-import Log from "../Log.js";
+import Clog from "../Clog.js";
 
-const console = new Log("Auth");
+const console = new Clog("Auth");
 
 class Auth {
     constructor() {
