@@ -1,5 +1,6 @@
 import {Log} from "./database/models/LogModel.js";
 import Database from "./database/DbInfo.js";
+import DbInfo from "./database/DbInfo.js";
 
 export default class Clog {
     constructor(tag) {
@@ -40,9 +41,9 @@ export default class Clog {
                     Log.create({
                         type,
                         tag: this.tag,
-                        session: Database.session,
-                        stamp: Math.floor(performance.now()*1000000),
-                        message: args.join('\n'),
+                        stamp: Math.floor(performance.now() * 1000000),
+                        message: args.join(' • '),
+                        LogSessionId: DbInfo.session,
                     }).then();
             } catch (e) {
             }

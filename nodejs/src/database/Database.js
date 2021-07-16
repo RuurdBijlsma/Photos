@@ -7,6 +7,7 @@ import {checkFileExists} from "../utils.js";
 import config from "../config.js";
 import Clog from "../Clog.js";
 import DbInfo from "./DbInfo.js";
+import {LogSession} from "./models/LogSessionModel.js";
 
 const console = new Clog("Database");
 
@@ -32,6 +33,8 @@ class Database {
 
             console.log("Syncing db");
             await this.db.sync();
+            let session = await LogSession.create();
+            DbInfo.session = session.id;
             DbInfo.isConnected = true;
         } catch (e) {
             console.warn("Postgres connection failed", e);

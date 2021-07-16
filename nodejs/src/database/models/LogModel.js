@@ -20,10 +20,6 @@ export function initLog(sequelize) {
             type: DataTypes.STRING,
             allowNull: false,
         },
-        session: {
-            type: DataTypes.STRING,
-            allowNull: false,
-        },
         stamp: {
             type: DataTypes.BIGINT,
             allowNull: false,
@@ -37,7 +33,6 @@ export function initLog(sequelize) {
         indexes: [
             {unique: false, fields: ['type']},
             {unique: false, fields: ['tag']},
-            {unique: false, fields: ['session']},
             {unique: false, fields: ['stamp']},
             {unique: false, fields: ['message']},
         ],

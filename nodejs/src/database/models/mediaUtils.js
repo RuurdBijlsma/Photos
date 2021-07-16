@@ -20,6 +20,7 @@ import util from "util";
 import archiver from "archiver";
 import Clog from '../../Clog.js'
 import {initLog, Log} from "./LogModel.js";
+import {initLogSession, LogSession} from "./LogSessionModel.js";
 
 const console = new Clog('mediaUtils');
 
@@ -38,6 +39,7 @@ export async function initTables(db) {
     initSuggestion(db);
     initBlocked(db);
     initLog(db);
+    initLogSession(db);
 
     Media.hasMany(Classification, {onDelete: 'CASCADE'});
     Classification.belongsTo(Media);
@@ -53,13 +55,16 @@ export async function initTables(db) {
 
     Classification.hasMany(Glossary, {onDelete: 'CASCADE'});
     Glossary.belongsTo(Classification);
+
+    LogSession.hasMany(Log, {onDelete: 'CASCADE', foreignKey: {allowNull: false,}});
+    Log.belongsTo(LogSession);
 }
 
 export async function deleteOldLogs(cutoffDate = null) {
     const day = 1000 * 60 * 60 * 24;
     cutoffDate ??= new Date(Date.now() - day * 7);
-    console.log("Deleting logs older than", cutoffDate);
-    await Log.destroy({
+    console.log("Deleting log sessions older than", cutoffDate);
+    await LogSession.destroy({
         where: {
             createdAt: {
                 [Op.lte]: cutoffDate,

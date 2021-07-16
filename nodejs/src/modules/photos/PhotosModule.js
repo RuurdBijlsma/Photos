@@ -40,6 +40,10 @@ export default class PhotosModule extends ApiModule {
         if (config.hostThumbnails)
             app.use('/photo', express.static(config.thumbnails));
 
+        // app.post('/photos/logs', async (req, res) => {
+        //
+        // });
+
         app.post('/photos/upload', async (req, res) => {
             if (!req.files || Object.keys(req.files).length === 0)
                 return res.status(400).send('No files were uploaded.');
@@ -80,15 +84,6 @@ export default class PhotosModule extends ApiModule {
             if (!user) return res.sendStatus(401);
             await user.update({mapboxToken: req.body.token});
             res.send(true);
-        });
-
-        app.get('/photos/zip/:id', async (req, res) => {
-            const zipId = req.params.id;
-            let zipFile = getZipPath(zipId);
-            if (await checkFileExists(zipFile))
-                res.sendFile(zipFile);
-            else
-                res.sendStatus(400);
         });
 
         app.post('/photos/batchDownload', async (req, res) => {
