@@ -2,10 +2,10 @@
 
 * [Screenshots](https://github.com/RuurdBijlsma/Photos#homepage)
 * [Setup](https://github.com/RuurdBijlsma/Photos#prerequisites)
-   * [Prerequisites](https://github.com/RuurdBijlsma/Photos#prerequisites)
-   * [Guide](https://github.com/RuurdBijlsma/Photos#setup-server)
-   * [Automatic upload from Android](https://github.com/RuurdBijlsma/Photos#automatic-upload-from-android)
-   * [Setting up HTTPS](https://github.com/RuurdBijlsma/Photos#setting-up-https)
+    * [Prerequisites](https://github.com/RuurdBijlsma/Photos#prerequisites)
+    * [Guide](https://github.com/RuurdBijlsma/Photos#setup-server)
+    * [Automatic upload from Android](https://github.com/RuurdBijlsma/Photos#automatic-upload-from-android)
+    * [Setting up HTTPS](https://github.com/RuurdBijlsma/Photos#setting-up-https)
 
 ### Homepage
 
@@ -62,21 +62,23 @@ Possible search features
 
 ## Setup server
 
-1. Clone this repo `git clone https://github.com/ruurdbijlsma/Photos`.
-2. Create folder `./media/photos` and put your photos and videos there .
-3. Configure variables in `docker-compose.yml`.
-    * Set `UI_EMAIL` (line 22) to your email (used for login).
-    * Set `UI_PASSWORD` (line 23) to your password.
-    * (Optional) set Telegram token and chatId to get an error message when a photo or video fails to process.
-4. Run `docker-compose up --build` and wait until your photos are processed (takes a WHILE).
-5. Visit http://localhost, enter `http://localhost:3333` as the API endpoint and log in with your credentials from step 3.
-6. (optional) Set a Mapbox api key on the settings page to make the maps work.
+1. Clone this repo `git clone https://github.com/ruurdbijlsma/Photos`
+2. `cd Photos`
+3. Copy `example.env` to `.env`
+    * Change `PHOTOS_DIR` to where your source photos are.
+    * Change `EMAIL` and `PASSWORD` to what you want to use to log in.
+    * (Optional) change `THUMBNAILS_DIR` and `BACKUPS_DIR`
+4. Run `docker-compose up --build` and wait until your photos are processed (takes a WHILE)
+5. Visit http://localhost, enter `http://localhost:3333` as the API endpoint and log in with your credentials from step
+   3
+6. (optional) Set a Mapbox api key on the settings page to make the maps work
 
 ### Automatic upload from Android
 
 1. Download FolderSync (https://play.google.com/store/apps/details?id=dk.tacit.android.foldersync.lite&hl=nl&gl=US)
 2. Set up SFTP sync account to your server
-3. Set up sync to remote folderpair to automatically upload files from /DCIM/Camera (on phone) to ./media/photos (on server)
+3. Set up sync to remote folderpair to automatically upload files from /DCIM/Camera (on phone) to ./media/photos (on
+   server)
 
 ### Setting up HTTPS
 

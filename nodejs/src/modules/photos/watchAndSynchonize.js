@@ -20,6 +20,7 @@ const {Op} = seq;
 
 // Make sure the thumbnails dir exists
 await useDir(config.thumbnails);
+console.log("USING BOT TOKEN", config.telegramToken, "CHAT ID", config.chatId)
 const bot = new TelegramBot(config.telegramToken, {polling: false});
 export const uploadDir = await useDir(path.join(config.media, 'upload'));
 export const zipDir = await useDir(path.join(config.thumbnails, 'zip'));

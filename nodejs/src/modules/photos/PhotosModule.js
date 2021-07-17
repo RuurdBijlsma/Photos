@@ -13,7 +13,7 @@ import {
     getMonthPhotos,
     getPhotoMonths, getPhotosForMonth, getPhotosPerDayMonth,
     getRandomLabels,
-    getRandomLocations, getZipPath, reprocess,
+    getRandomLocations, reprocess,
     searchMediaRanked, uploadFile
 } from "../../database/models/mediaUtils.js";
 import express from "express";
