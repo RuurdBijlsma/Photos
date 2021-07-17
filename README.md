@@ -64,7 +64,7 @@ Possible search features
 
 1. Clone this repo `git clone https://github.com/ruurdbijlsma/Photos`
 2. `cd Photos`
-3. Copy `example.env` to `.env`
+3. Copy `example.env` to `.env`: `cp example.env .env` and edit `.env`
     * Change `PHOTOS_DIR` to where your source photos are.
     * Change `EMAIL` and `PASSWORD` to what you want to use to log in.
     * (Optional) change `THUMBNAILS_DIR` and `BACKUPS_DIR`
