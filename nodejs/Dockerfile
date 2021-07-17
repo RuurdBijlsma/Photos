@@ -1,6 +1,6 @@
 # Dockerfile
 
-FROM node:16-buster-slim
+FROM node:buster-slim
 WORKDIR /nodejs
 COPY . .
 
