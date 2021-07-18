@@ -1,3 +1,0 @@
-[submodule "nginx/frontend"]
-	path = nginx/frontend
-	url = git@github.com:RuurdBijlsma/Photos.git
