@@ -280,7 +280,7 @@ export async function getPhotoMonths() {
 
 export async function getRandomLocations(limit = 50) {
     return await Database.db.query(`
-        select distinct on (text) text, "MediaId"
+        select distinct on (text) text, "MediumId"
         from "Locations"
         inner join "Places" MP on "Locations".id = MP."LocationId"
         where text in (select text
@@ -299,7 +299,7 @@ export async function getRandomLocations(limit = 50) {
 
 export async function getRandomLabels(limit = 50) {
     return await Database.db.query(`
-    select distinct on (text) text, "MediaId"
+    select distinct on (text) text, "MediumId"
     from "Classifications"
     inner join "Labels" ML on "Classifications".id = ML."ClassificationId"
     where text in (
@@ -594,7 +594,7 @@ export async function insertMedia(data, transaction = null) {
                     latitude: data.location.latitude,
                     longitude: data.location.longitude,
                     altitude: data.location.altitude,
-                    MediaId: item.id,
+                    MediumId: item.id,
                 }, {transaction});
                 let places = [
                     {type: 'place', text: data.location.place},
@@ -616,7 +616,7 @@ export async function insertMedia(data, transaction = null) {
                 for (let {confidence, labels, glossaries} of data.classifications) {
                     let classification = await Classification.create({
                         confidence,
-                        MediaId: item.id,
+                        MediumId: item.id,
                     }, {transaction});
                     await Label.bulkCreate(labels.map(label => ({
                         ...label,
