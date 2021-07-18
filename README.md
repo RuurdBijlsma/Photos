@@ -62,7 +62,7 @@ Possible search features
 
 ## Setup server
 
-1. Clone this repo `git clone --recurse-submodules https://github.com/ruurdbijlsma/Photos`
+1. Clone this repo `git clone --recurse-submodules git@github.com:RuurdBijlsma/Photos.git`
 2. `cd Photos`
 3. Copy `example.env` to `.env`: `cp example.env .env` and edit `.env`
     * Change `PHOTOS_DIR` to where your source photos are.
