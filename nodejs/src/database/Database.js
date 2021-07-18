@@ -70,7 +70,7 @@ class Database {
             return false;
         return new Promise(resolve => {
             console.log(`Restoring database! ${file}`);
-            exec(`pg_restore.exe --dbname=${this.connectionString} ${file}`,
+            exec(`pg_restore --dbname=${this.connectionString} ${file}`,
                 (error, stderr, stdout) => {
                     if (error) {
                         console.warn('db restore error', error);
