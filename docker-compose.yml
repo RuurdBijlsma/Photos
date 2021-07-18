@@ -6,8 +6,8 @@ services:
     container_name: postgres
     image: postgres
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: "postgres"
+      POSTGRES_PASSWORD: "postgres"
     expose:
       - '5432'
     volumes:
@@ -18,18 +18,18 @@ services:
     build:
       context: ./nodejs
     environment:
-      UI_NAME: ${NAME}
-      UI_EMAIL: ${EMAIL}
-      UI_PASSWORD: ${PASSWORD}
-      TELEGRAM_TOKEN: ${TELEGRAM_BOT_TOKEN}
-      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID}
-      DB_SCHEMA: postgres
-      DB_USER: postgres
-      DB_PASSWORD: postgres
-      DB_HOST: postgres
-      BACKUPS_DIR: /backups
-      MEDIA_DIR: /photos
-      THUMBNAILS_DIR: /thumbnails
+      UI_NAME: "${NAME}"
+      UI_EMAIL: "${EMAIL}"
+      UI_PASSWORD: "${PASSWORD}"
+      TELEGRAM_TOKEN: "${TELEGRAM_BOT_TOKEN}"
+      TELEGRAM_CHAT_ID: "${TELEGRAM_CHAT_ID}"
+      DB_SCHEMA: "postgres"
+      DB_USER: "postgres"
+      DB_PASSWORD: "postgres"
+      DB_HOST: "postgres"
+      BACKUPS_DIR: "/backups"
+      MEDIA_DIR: "/photos"
+      THUMBNAILS_DIR: "/thumbnails"
     depends_on:
       - postgres
     links:
