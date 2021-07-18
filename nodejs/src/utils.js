@@ -3,7 +3,7 @@ import fs from "fs";
 import os from "os";
 
 export const freeGb = os.freemem() / 1000000000;
-export const batchSize = Math.min(Math.max(1, Math.ceil(freeGb * 3)), 30);
+export const batchSize = Math.min(Math.max(1, Math.ceil(freeGb)), 30);
 
 export async function checkFileExists(file) {
     return fs.promises.access(file, fs.constants.F_OK)
