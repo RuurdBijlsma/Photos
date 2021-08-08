@@ -25,6 +25,8 @@ import Database from "../../database/Database.js";
 import {Location} from "../../database/models/LocationModel.js";
 import {Blocked} from "../../database/models/BlockedModel.js";
 import {batchSize, checkFileExists} from "../../utils.js";
+import {Log} from "../../database/models/LogModel.js";
+import DbInfo from "../../database/DbInfo.js";
 
 const {Op} = sequelize;
 const console = new Clog("PhotosModule");
@@ -40,9 +42,13 @@ export default class PhotosModule extends ApiModule {
         if (config.hostThumbnails)
             app.use('/photo', express.static(config.thumbnails));
 
-        // app.post('/photos/logs', async (req, res) => {
-        //
-        // });
+        app.post('/photos/logs', async (req, res) => {
+            res.send(await Log.findAll({
+                where: {
+                    LogSessionId: DbInfo.session,
+                },
+            }));
+        });
 
         app.post('/photos/upload', async (req, res) => {
             if (!req.files || Object.keys(req.files).length === 0)

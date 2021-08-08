@@ -614,6 +614,8 @@ export async function insertMedia(data, transaction = null) {
             }
             if (data.classifications)
                 for (let {confidence, labels, glossaries} of data.classifications) {
+                    if (item.id === null)
+                        console.warn("FOUT 2")
                     let classification = await Classification.create({
                         confidence,
                         MediumId: item.id,
