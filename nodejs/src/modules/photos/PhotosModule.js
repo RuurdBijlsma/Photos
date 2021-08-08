@@ -28,6 +28,7 @@ import {batchSize, checkFileExists} from "../../utils.js";
 import {Log} from "../../database/models/LogModel.js";
 import DbInfo from "../../database/DbInfo.js";
 import {rotateImage} from "./transcode.js";
+import fs from "fs";
 
 const {Op} = sequelize;
 const console = new Clog("PhotosModule");
@@ -42,6 +43,26 @@ export default class PhotosModule extends ApiModule {
     async setRoutes(app, db) {
         if (config.hostThumbnails)
             app.use('/photo', express.static(config.thumbnails));
+
+        app.post('/photos/getRestoreOptions', async (req, res) => {
+            if (!await Auth.checkRequest(req)) return res.sendStatus(401);
+            res.send((await fs.promises.readdir(config.backups)).reverse());
+        });
+
+        app.post('/photos/restoreDb', async (req, res) => {
+            let filename = req.body.file;
+            if (typeof filename !== 'string')
+                return res.status(400).send('filename in body is wrong.');
+            if (!await Auth.checkRequest(req)) return res.sendStatus(401);
+            await Database.restore(path.join(config.backups, filename));
+            res.send(true);
+        });
+
+        app.post('/photos/backupDb', async (req, res) => {
+            if (!await Auth.checkRequest(req)) return res.sendStatus(401);
+            await Database.backup('manual');
+            res.send(true);
+        });
 
         app.post('/photos/clearErrors', async (req, res) => {
             if (!await Auth.checkRequest(req)) return res.sendStatus(401);
@@ -97,6 +118,7 @@ export default class PhotosModule extends ApiModule {
                 where: {
                     LogSessionId: DbInfo.session,
                 },
+                order: sequelize.col('createdAt'),
             }));
         });
 

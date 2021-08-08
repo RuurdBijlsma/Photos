@@ -1,4 +1,4 @@
-import {initUser} from "./models/UserModel.js";
+import {initUser, User} from "./models/UserModel.js";
 import {initTables} from "./models/mediaUtils.js";
 import path from "path";
 import {exec} from "child_process";
@@ -8,6 +8,13 @@ import config from "../config.js";
 import Clog from "../Clog.js";
 import DbInfo from "./DbInfo.js";
 import {LogSession} from "./models/LogSessionModel.js";
+import {Media} from "./models/MediaModel.js";
+import {Glossary} from "./models/GlossaryModel.js";
+import {Place} from "./models/PlaceModel.js";
+import {Label} from "./models/LabelModel.js";
+import {Classification} from "./models/ClassificationModel.js";
+import {Location} from "./models/LocationModel.js";
+import {Suggestion} from "./models/SuggestionModel.js";
 
 const console = new Clog("Database");
 
@@ -54,29 +61,54 @@ class Database {
                         console.warn('db backup error', error);
                         return reject(error);
                     }
-                }).on('close', resolve);
+                }).on('close',
+                () => {
+                    console.log("Backup complete");
+                    resolve();
+                });
         });
     }
 
     /**
      * @param filePath:string
+     * @param dropAll:boolean
      * @returns {Promise<boolean>}
      */
-    async restore(filePath) {
+    async restore(filePath, dropAll = true) {
         if (!filePath)
             return false;
         let file = path.resolve(filePath);
         if (!await checkFileExists(file))
             return false;
+
+        if (dropAll) {
+            console.log("Backing up before restoring");
+            await this.backup('pre-restore');
+            await Media.drop({cascade: true});
+            await Glossary.drop({cascade: true});
+            await Place.drop({cascade: true});
+            await Label.drop({cascade: true});
+            await Classification.drop({cascade: true});
+            await Location.drop({cascade: true});
+            await Suggestion.drop({cascade: true});
+            await User.drop({cascade: true});
+            console.log("Dropped all tables before restoring");
+        }
+
         return new Promise(resolve => {
             console.log(`Restoring database! ${file}`);
             exec(`pg_restore --dbname=${this.connectionString} ${file}`,
                 (error, stderr, stdout) => {
                     if (error) {
                         console.warn('db restore error', error);
+                        console.log("Restore complete");
                         return resolve(false);
                     }
-                }).on('close', () => resolve(true));
+                }).on('close',
+                () => {
+                    console.log("Restore complete");
+                    resolve(true);
+                });
         });
     }
 

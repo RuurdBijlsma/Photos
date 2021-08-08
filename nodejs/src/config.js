@@ -6,7 +6,7 @@ export default {
         return process.env.THUMBNAILS_DIR ?? "../media/thumbnails";
     },
     get backups() {
-        return process.env.MEDIA_DIR ?? "../media/photos";
+        return process.env.BACKUPS_DIR ?? "../media/db-backups";
     },
     get syncInterval() {
         return process.env.SYNC_INTERVAL ?? 86400000;
