@@ -43,6 +43,18 @@ export default class PhotosModule extends ApiModule {
         if (config.hostThumbnails)
             app.use('/photo', express.static(config.thumbnails));
 
+        app.post('/photos/clearErrors', async (req, res) => {
+            if (!await Auth.checkRequest(req)) return res.sendStatus(401);
+            await Blocked.destroy({where: {reason: 'error'}});
+            res.send(true);
+        });
+
+        app.post('/photos/clearTrash', async (req, res) => {
+            if (!await Auth.checkRequest(req)) return res.sendStatus(401);
+            await Blocked.destroy({where: {reason: 'deleted'}});
+            res.send(true);
+        });
+
         app.post('/photos/rotateImage', async (req, res) => {
             let id = req.body.id;
             let angle = req.body.angle;
