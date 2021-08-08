@@ -7,7 +7,7 @@ import path from "path";
 import mime from 'mime-types'
 import {
     autoFixDate,
-    changeMediaDate, createZip, deleteFile,
+    changeMediaDate, createZip, deleteFile, dropMedia,
     getBoundingBox, getGlossary,
     getMediaById,
     getMonthPhotos,
@@ -27,6 +27,7 @@ import {Blocked} from "../../database/models/BlockedModel.js";
 import {batchSize, checkFileExists} from "../../utils.js";
 import {Log} from "../../database/models/LogModel.js";
 import DbInfo from "../../database/DbInfo.js";
+import {rotateImage} from "./transcode.js";
 
 const {Op} = sequelize;
 const console = new Clog("PhotosModule");
@@ -42,6 +43,43 @@ export default class PhotosModule extends ApiModule {
         if (config.hostThumbnails)
             app.use('/photo', express.static(config.thumbnails));
 
+        app.post('/photos/rotateImage', async (req, res) => {
+            let id = req.body.id;
+            let angle = req.body.angle;
+            let saveCopy = req.body.copy;
+            if (typeof id !== 'string' || typeof angle !== "number" || typeof saveCopy !== "boolean")
+                return res.status(400).send('Angle, id or saveCopy in body are wrong.');
+            if (!await Auth.checkRequest(req)) return res.sendStatus(401);
+            let media = await Media.findOne({where: {id}});
+            if (media === null) return res.sendStatus(404);
+
+            let newFileName = media.filePath;
+            if (saveCopy) {
+                let ext = path.extname(media.filePath);
+                let baseFile = media.filePath.substr(0, media.filePath.length - ext.length);
+                let i = 1;
+                do {
+                    newFileName = `${baseFile}(${i++})${ext}`;
+                } while (await checkFileExists(path.join(config.media, newFileName)));
+            }
+            try {
+                let success = await rotateImage(path.join(config.media, media.filePath), angle, path.join(config.media, newFileName));
+                if (success) {
+                    if (!saveCopy)
+                        await dropMedia(id);
+                    let newId = await processMedia(path.join(config.media, newFileName));
+                    if (newId === false)
+                        return res.send({success: false, id: null});
+                    res.send({success: true, id: newId});
+                } else {
+                    res.send({success: false, id: null});
+                }
+            } catch (e) {
+                console.warn(`Couldn't rotate image ${media.filePath}`, e.message);
+                res.send({success: false, id: null});
+            }
+        });
+
         app.post('/photos/logs', async (req, res) => {
             res.send(await Log.findAll({
                 where: {
@@ -54,6 +92,7 @@ export default class PhotosModule extends ApiModule {
             if (!req.files || Object.keys(req.files).length === 0)
                 return res.status(400).send('No files were uploaded.');
 
+            console.log('Receiving file upload');
             let authenticated;
             try {
                 let {email, password} = req.body;

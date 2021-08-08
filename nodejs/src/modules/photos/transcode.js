@@ -1,6 +1,10 @@
 import ffmpeg from "./promise-ffmpeg.js";
 import Clog from '../../Clog.js'
+import Canvas from "canvas";
+import {imageSize, loadExif, transferExif} from "./exif.js";
+import fs from "fs";
 
+const {loadImage, createCanvas} = Canvas;
 const console = new Clog('transcode');
 
 //Exif orientation
@@ -54,6 +58,90 @@ export async function resizeImage({input, orientation = 1, output, width = null,
             })
             .saveToFile(output);
     })
+}
+
+export async function rotateImage(image, radians, output) {
+    let imgDim;
+    try {
+        let data = await loadExif(image);
+        imgDim = await imageSize(image, data);
+    } catch (e) {
+        console.warn(`Can't rotate image ${image}!`, e.message);
+        return false;
+    }
+    if (imgDim === null)
+        console.warn(`Can't rotate image ${image}! image dimensions can't be retrieved`);
+    let canvas = createCanvas(imgDim.width, imgDim.height);
+    let context = canvas.getContext('2d');
+    let img = await loadImage(image);
+
+    //Rotate image
+    let cc = getCropCoordinates(radians, {w: img.width, h: img.height});
+    canvas.width = cc.w;
+    canvas.height = cc.h;
+
+    canvasDrawImage(context, img, cc.x, cc.y, radians);
+    // high quality jpeg
+    let stream = canvas.createJPEGStream({
+        quality: 0.95,
+        chromaSubsampling: false,
+    });
+    // temp file is needed in case image path is equal to output path
+    // We can't overwrite the original yet because there is exif data in there
+    let tempOutput = output + '_temp.jpg';
+    const out = fs.createWriteStream(tempOutput);
+    stream.pipe(out);
+    return new Promise(resolve => {
+        out.on('finish', async () => {
+            await transferExif(image, tempOutput);
+            await fs.promises.rename(tempOutput, output);
+            resolve(true);
+        });
+        out.on('error', e => {
+            console.warn("jpeg write error", e);
+            resolve(false);
+        })
+    });
+}
+
+function canvasDrawImage(ctx, img, x, y, angle = 0) {
+    ctx.translate(ctx.canvas.width / 2, ctx.canvas.height / 2);
+    ctx.rotate(angle);
+    ctx.drawImage(img, -img.width / 2, -img.height / 2, img.width, img.height);
+    ctx.rotate(-angle);
+    ctx.translate(-ctx.canvas.width / 2, -ctx.canvas.height / 2);
+}
+
+function getCropCoordinates(angleInRadians, imageDimensions) {
+    const ang = angleInRadians;
+    const img = imageDimensions;
+
+    const quadrant = Math.floor(ang / (Math.PI / 2)) & 3;
+    const sign_alpha = (quadrant & 1) === 0 ? ang : Math.PI - ang;
+    const alpha = (sign_alpha % Math.PI + Math.PI) % Math.PI;
+
+    const bb = {
+        w: img.w * Math.cos(alpha) + img.h * Math.sin(alpha),
+        h: img.w * Math.sin(alpha) + img.h * Math.cos(alpha)
+    };
+
+    const gamma = img.w < img.h ? Math.atan2(bb.w, bb.h) : Math.atan2(bb.h, bb.w);
+
+    const delta = Math.PI - alpha - gamma;
+
+    const length = img.w < img.h ? img.h : img.w;
+    const d = length * Math.cos(alpha);
+    const a = d * Math.sin(alpha) / Math.sin(delta);
+
+    const y = a * Math.cos(gamma);
+    const x = y * Math.tan(gamma);
+
+    return {
+        x: Math.round(x),
+        y: Math.round(y),
+        w: Math.round(bb.w - 2 * x),
+        h: Math.round(bb.h - 2 * y),
+    };
 }
 
 // resize({input: './photos/IMG_20200731_203422.jpg', output: 'test.webp', height: 500})

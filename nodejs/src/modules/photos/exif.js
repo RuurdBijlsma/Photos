@@ -11,10 +11,39 @@ import modifyExif from 'modify-exif'
 import {temp} from "./watchAndSynchonize.js";
 import {exec} from "child_process";
 import Clog from '../../Clog.js'
+import getExifModule from "get-exif";
+import {rotateImage} from "./transcode.js";
 
 const console = new Clog('exif');
 
 const {ExifImage} = exif;
+
+export async function transferExif(sourceFile, destinationFile) {
+    const source = await fs.promises.readFile(sourceFile);
+    let sourceExif = getExifModule(source);
+
+    const copyKeys = ['Exif', 'GPS', '0th', '1st', 'Interop'];
+    const dimensionKeys = ['40962', '40963'];
+
+    const newFile = modifyExif(await fs.promises.readFile(destinationFile), data => {
+        console.log('sourceExif', sourceExif);
+        for (let copyKey of copyKeys)
+            for (let key in sourceExif[copyKey]) {
+                if (sourceExif[copyKey].hasOwnProperty(key) && !dimensionKeys.includes(key)) {
+                    data[copyKey][key] = sourceExif[copyKey][key];
+                }
+            }
+    });
+
+    let newExif = getExifModule(newFile);
+    console.log(newExif);
+
+    // let writtenExif = getExifModule(newFile).Exif;
+    await fs.promises.writeFile(destinationFile, newFile);
+    console.log('written', destinationFile,);
+}
+
+// await rotateImage('20170723_175323.jpg', 0.04, '20170723_175323_rotated.jpg');
 
 export async function dateFromFile(filePath) {
     let date = filenameToDate(path.basename(filePath));

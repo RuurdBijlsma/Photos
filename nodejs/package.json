@@ -21,7 +21,8 @@
     "testClassify": "node --experimental-json-modules src/modules/photos/scripts/classify.js",
     "testResize": "node --experimental-json-modules src/modules/photos/scripts/testResize.js",
     "testExif": "node --experimental-json-modules src/modules/photos/exif.js",
-    "testGeocode": "node --experimental-json-modules src/modules/photos/reverse-geocode.js"
+    "testGeocode": "node --experimental-json-modules src/modules/photos/reverse-geocode.js",
+    "testTranscode": "node --experimental-json-modules src/modules/photos/transcode.js"
   },
   "repository": "https://github.com/RuurdBijlsma/photos-server",
   "keywords": [],
@@ -32,6 +33,7 @@
     "archiver": "^5.3.0",
     "bcrypt": "^5.0.0",
     "body-parser": "^1.19.0",
+    "canvas": "^2.8.0",
     "commander": "^4.1.1",
     "cors": "^2.8.5",
     "country-code-lookup": "0.0.19",
@@ -43,6 +45,7 @@
     "filenamify": "^4.2.0",
     "fix-exif-data": "github:ruurdbijlsma/exif-date-fix",
     "fluent-ffmpeg": "^2.1.2",
+    "get-exif": "github:ruurdbijlsma/get-exif",
     "gify-parse": "^1.0.7",
     "local-reverse-geocoder": "^0.10.0",
     "mime-types": "^2.1.30",
@@ -52,6 +55,7 @@
     "parse-dms": "0.0.5",
     "pg": "^8.6.0",
     "pg-promise": "^10.10.2",
+    "piexifjs": "^1.0.6",
     "probe-image-size": "^7.0.0",
     "sequelize": "^6.6.2",
     "wndb-with-exceptions": "^3.0.2"
