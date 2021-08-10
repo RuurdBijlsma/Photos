@@ -7,7 +7,7 @@ import path from "path";
 import mime from 'mime-types'
 import {
     autoFixDate,
-    changeMediaDate, createZip, deleteFile, dropMedia,
+    changeMediaDate, createZip, deleteFile, dropMedia, getAlbums,
     getBoundingBox, getGlossary,
     getMediaById,
     getMonthPhotos,
@@ -24,11 +24,12 @@ import {Suggestion} from "../../database/models/SuggestionModel.js";
 import Database from "../../database/Database.js";
 import {Location} from "../../database/models/LocationModel.js";
 import {Blocked} from "../../database/models/BlockedModel.js";
-import {batchSize, checkFileExists} from "../../utils.js";
+import {batchSize, checkFileExists, getToken} from "../../utils.js";
 import {Log} from "../../database/models/LogModel.js";
 import DbInfo from "../../database/DbInfo.js";
 import {rotateImage} from "./transcode.js";
 import fs from "fs";
+import {Album} from "../../database/models/AlbumModel.js";
 
 const {Op} = sequelize;
 const console = new Clog("PhotosModule");
@@ -43,6 +44,91 @@ export default class PhotosModule extends ApiModule {
     async setRoutes(app, db) {
         if (config.hostThumbnails)
             app.use('/photo', express.static(config.thumbnails));
+
+        app.post('/photos/renameAlbum', async (req, res) => {
+            if (!await Auth.checkRequest(req)) return res.sendStatus(401);
+            let album = await Album.findOne({where: {id: req.body.id}});
+            await album.update({name: req.body.name});
+            res.send(true);
+        });
+
+        app.post('/photos/deleteAlbum', async (req, res) => {
+            if (!await Auth.checkRequest(req)) return res.sendStatus(401);
+            let album = await Album.findOne({where: {id: req.body.id}});
+            await album.destroy();
+            res.send(true);
+        });
+
+        app.post('/photos/removeFromAlbum', async (req, res) => {
+            if (!await Auth.checkRequest(req)) return res.sendStatus(401);
+            let album = await Album.findOne({where: {id: req.body.id}});
+            let ids = req.body.ids;
+            if (!Array.isArray(ids)) return res.sendStatus(400);
+            album.removeMedia({where: {id: {[Op.in]: ids}}})
+            res.send(true);
+        });
+
+        app.post('/photos/addToAlbum', async (req, res) => {
+            if (!await Auth.checkRequest(req)) return res.sendStatus(401);
+            let album = await Album.findOne({where: {id: req.body.id}});
+            let ids = req.body.ids;
+            if (!Array.isArray(ids)) return res.sendStatus(400);
+            album.addMedia(await Media.findAll({
+                where: {id: {[Op.in]: ids}}
+            }))
+            res.send(true);
+        });
+
+        app.post('/photos/createAlbum', async (req, res) => {
+            if (!await Auth.checkRequest(req)) return res.sendStatus(401);
+            if (typeof req.body.name !== 'string')
+                return res.sendStatus(400);
+
+            let album = await Album.create({
+                id: await getToken(20),
+                name: req.body.name,
+            });
+            let ids = req.body.ids;
+            if (Array.isArray(ids))
+                album.addMedia(await Media.findAll({
+                    where: {id: {[Op.in]: ids}}
+                }))
+            res.send({id: album.id});
+        });
+
+        app.post('/photos/getAlbums', async (req, res) => {
+            if (!await Auth.checkRequest(req)) return res.sendStatus(401);
+            // res.send(await Album.findAll({
+            //     order: sequelize.col('createdAt')
+            // }));
+            res.send(await getAlbums());
+        });
+
+        app.post('/photos/getAlbum/:id', async (req, res) => {
+            if (!await Auth.checkRequest(req)) return res.sendStatus(401);
+            if (typeof req.params.id !== 'string') return res.sendStatus(400);
+            let sort = req.body.sort;
+            if (!sort)
+                sort = 'createDate asc';
+            sort = sort.split(' ');
+            if (sort.length !== 2) return res.sendStatus(400);
+            let [column, order] = sort;
+            order = order.toUpperCase();
+            if (!['ASC', 'DESC'].includes(order)) return res.sendStatus(400);
+            let sqlOrder;
+            if (column === 'added') {
+                sqlOrder = [[sequelize.literal(`"Media->AlbumMedia"."createdAt"`), order]]
+            } else if (column === 'createDate') {
+                sqlOrder = [[Media, 'createdAt', order]];
+            }
+            console.log('sending album with sort', sort, column, order);
+
+            res.send(await Album.findOne({
+                where: {id: req.params.id},
+                include: [Media],
+                order: sqlOrder,
+            }));
+        });
 
         app.post('/photos/getRestoreOptions', async (req, res) => {
             if (!await Auth.checkRequest(req)) return res.sendStatus(401);

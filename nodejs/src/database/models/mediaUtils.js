@@ -21,6 +21,7 @@ import archiver from "archiver";
 import Clog from '../../Clog.js'
 import {initLog, Log} from "./LogModel.js";
 import {initLogSession, LogSession} from "./LogSessionModel.js";
+import {Album, initAlbum} from "./AlbumModel.js";
 
 const console = new Clog('mediaUtils');
 
@@ -40,6 +41,7 @@ export async function initTables(db) {
     initBlocked(db);
     initLog(db);
     initLogSession(db);
+    initAlbum(db);
 
     Media.hasMany(Classification, {onDelete: 'CASCADE'});
     Classification.belongsTo(Media);
@@ -58,6 +60,26 @@ export async function initTables(db) {
 
     LogSession.hasMany(Log, {onDelete: 'CASCADE', foreignKey: {allowNull: false,}});
     Log.belongsTo(LogSession);
+
+    Media.belongsToMany(Album, {through: 'AlbumMedia'});
+    Album.belongsToMany(Media, {through: 'AlbumMedia'});
+}
+
+export async function getAlbums() {
+    return await Database.db.query(`
+        WITH summary AS (
+            SELECT am."AlbumId",
+                   am."MediumId",
+                   ROW_NUMBER() OVER (PARTITION BY am."AlbumId") AS rank
+            FROM "AlbumMedia" am)
+        SELECT "AlbumId", "MediumId", "name", "createdAt", "updatedAt"
+        FROM summary
+                 inner join "Albums" A on A.id = "AlbumId"
+        WHERE rank = 1
+        order by "updatedAt" desc;
+    `, {
+        type: sequelize.QueryTypes.SELECT,
+    });
 }
 
 export async function deleteOldLogs(cutoffDate = null) {
