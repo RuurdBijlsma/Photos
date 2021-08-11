@@ -93,6 +93,7 @@ class Database {
             await Suggestion.drop({cascade: true});
             await User.drop({cascade: true});
             console.log("Dropped all tables before restoring");
+            await this.db.sync();
         }
 
         return new Promise(resolve => {

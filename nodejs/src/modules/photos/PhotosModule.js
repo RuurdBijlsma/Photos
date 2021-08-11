@@ -30,6 +30,8 @@ import DbInfo from "../../database/DbInfo.js";
 import {rotateImage} from "./transcode.js";
 import fs from "fs";
 import {Album} from "../../database/models/AlbumModel.js";
+import {google} from "googleapis";
+import Photos from "googlephotos";
 
 const {Op} = sequelize;
 const console = new Clog("PhotosModule");
@@ -39,11 +41,66 @@ export default class PhotosModule extends ApiModule {
         super();
         this.randomLabels = null;
         this.randomLocations = null;
+        this.googleAuths = {};
     }
 
     async setRoutes(app, db) {
         if (config.hostThumbnails)
             app.use('/photo', express.static(config.thumbnails));
+
+        app.post('/photos/importAlbum', async (req, res) => {
+            if (!await Auth.checkRequest(req)) return res.sendStatus(401);
+            let filenames = req.body.filenames;
+            let name = req.body.name;
+            if (typeof name !== 'string' || !Array.isArray(filenames))
+                return res.sendStatus(400);
+            let medias = await Promise.all(
+                filenames.map(filename => Media.findOne({where: {filename}}))
+            );
+            let foundMedias = medias.filter(m => !!m);
+            let successes = medias.map(m => +!!m);
+            let success = successes.reduce((a, b) => a + b) > 0;
+
+            let album;
+            if (success) {
+                album = await Album.create({
+                    id: await getToken(20),
+                    name,
+                });
+                await album.addMedia(foundMedias);
+            }
+
+            res.send({albumId: album?.id ?? null, successes, success});
+        });
+
+        app.post('/photos/googleAuthTokens', async (req, res) => {
+            if (!await Auth.checkRequest(req)) return res.sendStatus(401);
+            const oauth2Client = this.googleAuths[req.body.clientId];
+
+            try {
+                const {tokens} = await oauth2Client.getToken(req.body.code);
+                oauth2Client.setCredentials(tokens);
+                res.send(tokens);
+            } catch (e) {
+                console.warn('error getting auth tokens', e);
+                res.sendStatus(500);
+            }
+        });
+
+        app.post('/photos/googleAuthUrl', async (req, res) => {
+            if (!await Auth.checkRequest(req)) return res.sendStatus(401);
+            const oauth2Client = new google.auth.OAuth2(req.body.clientId, req.body.clientSecret, req.body.redirectUrl);
+            this.googleAuths[req.body.clientId] = oauth2Client;
+
+            const scopes = [Photos.Scopes.READ_ONLY, Photos.Scopes.SHARING];
+            const url = oauth2Client.generateAuthUrl({
+                // 'online' (default) or 'offline' (gets refresh_token)
+                access_type: 'offline',
+                scope: scopes,
+            });
+
+            res.send({url});
+        });
 
         app.post('/photos/renameAlbum', async (req, res) => {
             if (!await Auth.checkRequest(req)) return res.sendStatus(401);
@@ -73,7 +130,7 @@ export default class PhotosModule extends ApiModule {
             let album = await Album.findOne({where: {id: req.body.id}});
             let ids = req.body.ids;
             if (!Array.isArray(ids)) return res.sendStatus(400);
-            album.addMedia(await Media.findAll({
+            await album.addMedia(await Media.findAll({
                 where: {id: {[Op.in]: ids}}
             }))
             res.send(true);
@@ -90,7 +147,7 @@ export default class PhotosModule extends ApiModule {
             });
             let ids = req.body.ids;
             if (Array.isArray(ids))
-                album.addMedia(await Media.findAll({
+                await album.addMedia(await Media.findAll({
                     where: {id: {[Op.in]: ids}}
                 }))
             res.send({id: album.id});
@@ -121,7 +178,6 @@ export default class PhotosModule extends ApiModule {
             } else if (column === 'createDate') {
                 sqlOrder = [[Media, 'createdAt', order]];
             }
-            console.log('sending album with sort', sort, column, order);
 
             res.send(await Album.findOne({
                 where: {id: req.params.id},

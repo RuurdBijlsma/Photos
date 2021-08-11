@@ -47,6 +47,8 @@
     "fluent-ffmpeg": "^2.1.2",
     "get-exif": "github:ruurdbijlsma/get-exif",
     "gify-parse": "^1.0.7",
+    "googleapis": "^84.0.0",
+    "googlephotos": "^0.3.4",
     "local-reverse-geocoder": "^0.10.0",
     "mime-types": "^2.1.30",
     "modify-exif": "^0.0.1",

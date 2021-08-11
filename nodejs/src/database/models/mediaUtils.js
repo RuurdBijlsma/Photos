@@ -61,8 +61,17 @@ export async function initTables(db) {
     LogSession.hasMany(Log, {onDelete: 'CASCADE', foreignKey: {allowNull: false,}});
     Log.belongsTo(LogSession);
 
-    Media.belongsToMany(Album, {through: 'AlbumMedia'});
-    Album.belongsToMany(Media, {through: 'AlbumMedia'});
+    const AlbumMedia = db.define('AlbumMedia', {
+        id: {
+            type: sequelize.INTEGER,
+            primaryKey: true,
+            autoIncrement: true
+        },
+        status: sequelize.DataTypes.STRING
+    })
+
+    Media.belongsToMany(Album, {through: {model: AlbumMedia, unique: false}});
+    Album.belongsToMany(Media, {through: {model: AlbumMedia, unique: false}});
 }
 
 export async function getAlbums() {
@@ -72,10 +81,10 @@ export async function getAlbums() {
                    am."MediumId",
                    ROW_NUMBER() OVER (PARTITION BY am."AlbumId") AS rank
             FROM "AlbumMedia" am)
-        SELECT "AlbumId", "MediumId", "name", "createdAt", "updatedAt"
+        SELECT A.id, "MediumId", "name", "createdAt", "updatedAt"
         FROM summary
-                 inner join "Albums" A on A.id = "AlbumId"
-        WHERE rank = 1
+                 right JOIN "Albums" A on A.id = "AlbumId"
+        WHERE rank = 1 or "MediumId" IS NULL
         order by "updatedAt" desc;
     `, {
         type: sequelize.QueryTypes.SELECT,
