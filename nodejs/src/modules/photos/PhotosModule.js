@@ -118,10 +118,13 @@ export default class PhotosModule extends ApiModule {
 
         app.post('/photos/removeFromAlbum', async (req, res) => {
             if (!await Auth.checkRequest(req)) return res.sendStatus(401);
-            let album = await Album.findOne({where: {id: req.body.id}});
             let ids = req.body.ids;
             if (!Array.isArray(ids)) return res.sendStatus(400);
-            album.removeMedia({where: {id: {[Op.in]: ids}}})
+            let album = await Album.findOne({where: {id: req.body.id}});
+            if (album === null) return res.sendStatus(404);
+            await album.removeMedia(await Media.findAll({
+                where: {id: {[Op.in]: ids}}
+            }));
             res.send(true);
         });
 

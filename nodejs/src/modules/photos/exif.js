@@ -19,6 +19,7 @@ const console = new Clog('exif');
 const {ExifImage} = exif;
 
 export async function transferExif(sourceFile, destinationFile) {
+    console.log(`Transferring exif from ${sourceFile} to ${destinationFile}`);
     const source = await fs.promises.readFile(sourceFile);
     let sourceExif = getExifModule(source);
 
@@ -26,7 +27,7 @@ export async function transferExif(sourceFile, destinationFile) {
     const dimensionKeys = ['40962', '40963'];
 
     const newFile = modifyExif(await fs.promises.readFile(destinationFile), data => {
-        console.log('sourceExif', sourceExif);
+        // console.log('sourceExif', sourceExif);
         for (let copyKey of copyKeys)
             for (let key in sourceExif[copyKey]) {
                 if (sourceExif[copyKey].hasOwnProperty(key) && !dimensionKeys.includes(key)) {
@@ -36,11 +37,11 @@ export async function transferExif(sourceFile, destinationFile) {
     });
 
     let newExif = getExifModule(newFile);
-    console.log(newExif);
+    // console.log(newExif);
 
     // let writtenExif = getExifModule(newFile).Exif;
     await fs.promises.writeFile(destinationFile, newFile);
-    console.log('written', destinationFile,);
+    // console.log('written', destinationFile,);
 }
 
 // await rotateImage('20170723_175323.jpg', 0.04, '20170723_175323_rotated.jpg');
