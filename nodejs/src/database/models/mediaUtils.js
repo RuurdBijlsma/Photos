@@ -68,7 +68,7 @@ export async function initTables(db) {
             autoIncrement: true
         },
         status: sequelize.DataTypes.STRING
-    })
+    });
 
     Media.belongsToMany(Album, {through: {model: AlbumMedia, unique: false}});
     Album.belongsToMany(Media, {through: {model: AlbumMedia, unique: false}});
@@ -78,13 +78,18 @@ export async function getAlbums() {
     return await Database.db.query(`
         WITH summary AS (
             SELECT am."AlbumId",
+                   count,
                    am."MediumId",
                    ROW_NUMBER() OVER (PARTITION BY am."AlbumId") AS rank
-            FROM "AlbumMedia" am)
-        SELECT A.id, "MediumId", "name", "createdAt", "updatedAt"
+            FROM "AlbumMedia" am
+                     inner join (select "AlbumId", count(*) as count
+                                 from "AlbumMedia"
+                                 group by "AlbumId") as test on test."AlbumId" = am."AlbumId")
+        SELECT summary.count, A.id, "MediumId", "name", "createdAt", "updatedAt"
         FROM summary
                  right JOIN "Albums" A on A.id = "AlbumId"
-        WHERE rank = 1 or "MediumId" IS NULL
+        WHERE rank = greatest(1, summary.count / 2)
+           or "MediumId" IS NULL
         order by "updatedAt" desc;
     `, {
         type: sequelize.QueryTypes.SELECT,
