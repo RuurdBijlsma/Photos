@@ -120,23 +120,33 @@ export default class PhotosModule extends ApiModule {
             if (!await Auth.checkRequest(req)) return res.sendStatus(401);
             let ids = req.body.ids;
             if (!Array.isArray(ids)) return res.sendStatus(400);
-            let album = await Album.findOne({where: {id: req.body.id}});
-            if (album === null) return res.sendStatus(404);
-            await album.removeMedia(await Media.findAll({
-                where: {id: {[Op.in]: ids}}
-            }));
-            res.send(true);
+            try {
+                let album = await Album.findOne({where: {id: req.body.id}});
+                if (album === null) return res.sendStatus(404);
+                await album.removeMedia(await Media.findAll({
+                    where: {id: {[Op.in]: ids}}
+                }));
+                res.send(true);
+            } catch (e) {
+                console.warn('remove from album', e);
+                res.sendStatus(500);
+            }
         });
 
         app.post('/photos/addToAlbum', async (req, res) => {
             if (!await Auth.checkRequest(req)) return res.sendStatus(401);
-            let album = await Album.findOne({where: {id: req.body.id}});
-            let ids = req.body.ids;
-            if (!Array.isArray(ids)) return res.sendStatus(400);
-            await album.addMedia(await Media.findAll({
-                where: {id: {[Op.in]: ids}}
-            }))
-            res.send(true);
+            try {
+                let album = await Album.findOne({where: {id: req.body.id}});
+                let ids = req.body.ids;
+                if (!Array.isArray(ids)) return res.sendStatus(400);
+                await album.addMedia(await Media.findAll({
+                    where: {id: {[Op.in]: ids}}
+                }));
+                res.send(true);
+            } catch (e) {
+                console.warn('addToAlbum', e);
+                res.sendStatus(500);
+            }
         });
 
         app.post('/photos/createAlbum', async (req, res) => {
@@ -144,30 +154,32 @@ export default class PhotosModule extends ApiModule {
             if (typeof req.body.name !== 'string')
                 return res.sendStatus(400);
 
-            let album = await Album.create({
-                id: await getToken(20),
-                name: req.body.name,
-            });
-            let ids = req.body.ids;
-            if (Array.isArray(ids))
-                await album.addMedia(await Media.findAll({
-                    where: {id: {[Op.in]: ids}}
-                }))
-            res.send({id: album.id});
+            try {
+                let album = await Album.create({
+                    id: await getToken(20),
+                    name: req.body.name,
+                });
+                let ids = req.body.ids;
+                if (Array.isArray(ids))
+                    await album.addMedia(await Media.findAll({
+                        where: {id: {[Op.in]: ids}}
+                    }))
+                res.send({id: album.id});
+            } catch (e) {
+                console.warn('createAlbum', e);
+                res.sendStatus(500);
+            }
         });
 
         app.post('/photos/getAlbums', async (req, res) => {
             if (!await Auth.checkRequest(req)) return res.sendStatus(401);
-            // res.send(await Album.findAll({
-            //     order: sequelize.col('createdAt')
-            // }));
             res.send(await getAlbums());
         });
 
-        app.post('/photos/getAlbum/:id', async (req, res) => {
-            if (!await Auth.checkRequest(req)) return res.sendStatus(401);
+        app.get('/photos/album/:id', async (req, res) => {
+            // if (!await Auth.checkRequest(req)) return res.sendStatus(401);
             if (typeof req.params.id !== 'string') return res.sendStatus(400);
-            let sort = req.body.sort;
+            let sort = req.query.sort;
             if (!sort)
                 sort = 'createDate asc';
             sort = sort.split(' ');
@@ -181,12 +193,23 @@ export default class PhotosModule extends ApiModule {
             } else if (column === 'createDate') {
                 sqlOrder = [[Media, 'createdAt', order]];
             }
+            try {
+                let result = await Album.findOne({
+                    where: {id: req.params.id},
+                    include: [{
+                        model: Media,
+                        attributes: ['id', 'type', 'subType', 'durationMs', 'createDateString', 'width', 'height'],
+                    }],
+                    order: sqlOrder,
+                });
+                if (result === null)
+                    return res.sendStatus(404);
 
-            res.send(await Album.findOne({
-                where: {id: req.params.id},
-                include: [Media],
-                order: sqlOrder,
-            }));
+                res.send(result);
+            } catch (e) {
+                console.warn('get album', e);
+                res.sendStatus(500);
+            }
         });
 
         app.post('/photos/getRestoreOptions', async (req, res) => {
@@ -693,10 +716,14 @@ export default class PhotosModule extends ApiModule {
         });
 
         app.post('/photos/:id', async (req, res) => {
-            if (!await Auth.checkRequest(req)) return res.sendStatus(401);
             const id = req.params.id;
             if (!id)
                 return res.sendStatus(401);
+            if (req.body.albumId) {
+                if (!await Auth.checkAlbumAuth(req, id)) return res.sendStatus(401);
+            } else {
+                if (!await Auth.checkRequest(req)) return res.sendStatus(401);
+            }
             let item = await getMediaById(id);
             if (item === null)
                 return res.sendStatus(404);

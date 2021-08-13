@@ -67,7 +67,6 @@ export async function initTables(db) {
             primaryKey: true,
             autoIncrement: true
         },
-        status: sequelize.DataTypes.STRING
     });
 
     Media.belongsToMany(Album, {through: {model: AlbumMedia, unique: false}});

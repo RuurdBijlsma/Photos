@@ -36,7 +36,7 @@ export async function transferExif(sourceFile, destinationFile) {
             }
     });
 
-    let newExif = getExifModule(newFile);
+    // let newExif = getExifModule(newFile);
     // console.log(newExif);
 
     // let writtenExif = getExifModule(newFile).Exif;

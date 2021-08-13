@@ -1,6 +1,8 @@
 import {User} from "./models/UserModel.js";
 import bcrypt from "bcrypt";
 import Clog from "../Clog.js";
+import Database from "./Database.js";
+import sequelize from "sequelize";
 
 const console = new Clog("Auth");
 
@@ -12,6 +14,23 @@ class Auth {
         try {
             let {email, password} = req.body.auth;
             return await this.check(email, password);
+        } catch (e) {
+            return false;
+        }
+    }
+
+    async checkAlbumAuth(req, mediaId) {
+        try {
+            let existsInAlbum = await Database.db.query(`
+                        select "MediumId"
+                        from "AlbumMedia"
+                        where "AlbumId" = $1
+                          and "MediumId" = $2
+                    `, {
+                bind: [req.body.albumId, mediaId],
+                type: sequelize.QueryTypes.SELECT,
+            });
+            return existsInAlbum.length > 0;
         } catch (e) {
             return false;
         }
