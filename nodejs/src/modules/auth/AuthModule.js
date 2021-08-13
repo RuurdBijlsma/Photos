@@ -13,16 +13,16 @@ export default class AuthModule extends ApiModule {
             res.send(authResult);
         });
 
-        app.post('/auth/createUser', async (req, res) => {
-            try {
-                let {user, password, email} = req.body;
-                if (email !== 'ruurd@bijlsma.dev')
-                    return res.sendStatus(401);
-                res.send(await Auth.createUser(user, email, password));
-            } catch (e) {
-                res.send(false);
-            }
-        });
+        // app.post('/auth/createUser', async (req, res) => {
+        //     try {
+        //         let {user, password, email} = req.body;
+        //         if (email !== 'ruurd@bijlsma.dev')
+        //             return res.sendStatus(401);
+        //         res.send(await Auth.createUser(user, email, password));
+        //     } catch (e) {
+        //         res.send(false);
+        //     }
+        // });
 
         app.post('/auth/changePassword', async (req, res) => {
             try {
