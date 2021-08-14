@@ -108,6 +108,21 @@ export async function deleteOldLogs(cutoffDate = null) {
     });
 }
 
+export async function deleteOldZips(cutoffDate = null) {
+    const day = 1000 * 60 * 60 * 24;
+    cutoffDate ??= new Date(Date.now() - day * 7);
+    console.log("Deleting zip downloads older than", cutoffDate);
+    let files = await fs.promises.readdir(zipDir);
+    let stats = await Promise.all(files.map(f => fs.promises.stat(path.join(zipDir, f))));
+    for (let i = 0; i < stats.length; i++) {
+        let date = new Date(stats[i].ctime);
+        if (date < cutoffDate) {
+            console.log(`Deleting old zip download: "${files[i]}"`)
+            await fs.promises.unlink(path.join(zipDir, files[i]));
+        }
+    }
+}
+
 export async function uploadFile(file) {
     let destination = path.join(uploadDir, file.name);
     try {

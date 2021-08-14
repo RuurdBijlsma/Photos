@@ -334,10 +334,14 @@ export default class PhotosModule extends ApiModule {
         });
 
         app.post('/photos/batchDownload', async (req, res) => {
-            if (!await Auth.checkRequest(req)) return res.sendStatus(401);
             let ids = req.body.ids;
             if (!Array.isArray(ids)) return res.sendStatus(400);
-            console.log('batch download', ids);
+            if (req.body.albumId) {
+                ids = await Auth.checkAlbumAuth(req, ids);
+                if (ids.length === 0) return res.sendStatus(401);
+            } else {
+                if (!await Auth.checkRequest(req)) return res.sendStatus(401);
+            }
 
             let items = await Media.findAll({
                 where: {id: {[Op.in]: ids}}
@@ -724,7 +728,8 @@ export default class PhotosModule extends ApiModule {
             if (!id)
                 return res.sendStatus(401);
             if (req.body.albumId) {
-                if (!await Auth.checkAlbumAuth(req, id)) return res.sendStatus(401);
+                let ids = await Auth.checkAlbumAuth(req, [id]);
+                if (ids.length === 0) return res.sendStatus(401);
             } else {
                 if (!await Auth.checkRequest(req)) return res.sendStatus(401);
             }

@@ -6,7 +6,7 @@ import path from "path";
 import mime from "mime-types";
 import config from '../../config.js'
 import {Media} from "../../database/models/MediaModel.js";
-import {deleteOldLogs, dropMedia, getUniqueId, insertMedia} from "../../database/models/mediaUtils.js";
+import {deleteOldLogs, deleteOldZips, dropMedia, getUniqueId, insertMedia} from "../../database/models/mediaUtils.js";
 import seq from "sequelize";
 import TelegramBot from "node-telegram-bot-api";
 import Database from "../../database/Database.js";
@@ -34,14 +34,16 @@ const processJobs = new Set();
 
 export async function watchAndSynchronize() {
     await deleteOldLogs();
+    await deleteOldZips();
     if (process.platform !== 'win32')
         setInterval(async () => {
             await deleteOldLogs();
+            await deleteOldZips();
             try {
                 await Database.backup();
             } catch (e) {
                 if (config.chatId !== 0)
-                    return bot.sendMessage(config.chatId, `Couldn't backup database!\n\n${JSON.stringify(e)}`);
+                    await bot.sendMessage(config.chatId, `Couldn't backup database!\n\n${JSON.stringify(e)}`);
             }
         }, config.backupInterval);
     // else return console.warn("NOT WATCHING AND SYNCHRONIZING ON WINDOWS");

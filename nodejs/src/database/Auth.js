@@ -19,18 +19,18 @@ class Auth {
         }
     }
 
-    async checkAlbumAuth(req, mediaId) {
+    async checkAlbumAuth(req, mediaIds) {
         try {
             let existsInAlbum = await Database.db.query(`
                         select "MediumId"
                         from "AlbumMedia"
                         where "AlbumId" = $1
-                          and "MediumId" = $2
+                          and "MediumId" = ANY($2)
                     `, {
-                bind: [req.body.albumId, mediaId],
+                bind: [req.body.albumId, mediaIds],
                 type: sequelize.QueryTypes.SELECT,
             });
-            return existsInAlbum.length > 0;
+            return existsInAlbum.map(e=>e.MediumId);
         } catch (e) {
             return false;
         }

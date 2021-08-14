@@ -44,7 +44,9 @@ export default class Clog {
                         stamp: Math.floor(performance.now() * 1000000),
                         message: args.join(' • '),
                         LogSessionId: DbInfo.session,
-                    }).then();
+                    }).then().catch(e => {
+                        console.warn('log create error', e);
+                    })
             } catch (e) {
             }
         }
