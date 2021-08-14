@@ -12,7 +12,6 @@ import {temp} from "./watchAndSynchonize.js";
 import {exec} from "child_process";
 import Clog from '../../Clog.js'
 import getExifModule from "get-exif";
-import {rotateImage} from "./transcode.js";
 
 const console = new Clog('exif');
 
@@ -155,7 +154,7 @@ export async function getExif(image) {
 
         console.log(`No exif for ${image}`)
         return {
-            type: 'image', subType: 'none', ...imgDim, duration: null,
+            type: 'image', subType: image.endsWith('gif') ? 'animation' : 'none', ...imgDim, duration: null,
             size, createDate, gps: null, exif: {}
         };
     }

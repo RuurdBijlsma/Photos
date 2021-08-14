@@ -24,7 +24,7 @@ import {Suggestion} from "../../database/models/SuggestionModel.js";
 import Database from "../../database/Database.js";
 import {Location} from "../../database/models/LocationModel.js";
 import {Blocked} from "../../database/models/BlockedModel.js";
-import {batchSize, checkFileExists, getToken} from "../../utils.js";
+import {batchSize, checkFileExists, getToken, isDate} from "../../utils.js";
 import {Log} from "../../database/models/LogModel.js";
 import DbInfo from "../../database/DbInfo.js";
 import {rotateImage} from "./transcode.js";
@@ -675,32 +675,47 @@ export default class PhotosModule extends ApiModule {
             if (!await Auth.checkRequest(req)) return res.sendStatus(401);
             let query = req.query.q;
             query = query.split(' ').filter(n => n.length > 0).join(' ');
+            const subTypes = ['portrait', 'vr', 'slomo', 'animation'];
 
-            let queryType = await Suggestion.findOne({
-                where: {text: {[Op.iLike]: `${query}`,},},
-                attributes: ['text', 'type'],
-            });
+            let dateMeta = isDate(query);
+            let meta = subTypes.includes(query) ? {type: 'subType'} :
+                dateMeta.type !== 'none' ? {type: 'date'} :
+                    await Suggestion.findOne({
+                        where: {text: {[Op.iLike]: `${query}`}},
+                        attributes: ['text', 'type'],
+                    });
             let type = null, info = null;
-            if (queryType !== null) {
-                if (queryType.type === 'place') {
+            if (meta !== null) {
+                if (meta.type === 'place') {
                     type = 'place';
-                    info = queryType.text;
+                    info = meta.text;
                     console.log(info);
-                } else if (queryType.type === 'label') {
+                } else if (meta.type === 'label') {
                     let {isLabel, glossary} = await getGlossary(query);
                     if (isLabel) {
                         info = glossary;
                         type = 'label';
                     }
                 } else {
-                    type = queryType.type;
+                    type = meta.type;
                 }
             }
 
-            let results = await searchMediaRanked({
-                query,
-                includedFields: ['id', 'type', 'subType', 'durationMs', 'createDateString', 'width', 'height'],
-            });
+            let results;
+            if (type === 'subType') {
+                results = await Media.findAll({where: {subType: query}});
+            } else if (type === 'date') {
+                if (dateMeta.type === 'month') {
+                    results = await getPhotosForMonth(dateMeta.month);
+                } else if (dateMeta.type === 'dayMonth') {
+                    results = await getPhotosPerDayMonth(dateMeta.day, dateMeta.month);
+                }
+            } else {
+                results = await searchMediaRanked({
+                    query,
+                    includedFields: ['id', 'type', 'subType', 'durationMs', 'createDateString', 'width', 'height'],
+                });
+            }
             res.send({results, type, info});
         });
 
