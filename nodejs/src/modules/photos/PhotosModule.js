@@ -719,17 +719,6 @@ export default class PhotosModule extends ApiModule {
             res.send({results, type, info});
         });
 
-        app.post('/photos/dateSearch/', async (req, res) => {
-            if (!await Auth.checkRequest(req)) return res.sendStatus(401);
-            let month = +req.query.m;
-            let day = +req.query.d;
-            if (isFinite(month) && isFinite(day)) {
-                res.send(await getPhotosPerDayMonth(day, month));
-            } else if (isFinite(month)) {
-                res.send(await getPhotosForMonth(month));
-            }
-        });
-
         app.post('/photos/:id', async (req, res) => {
             const id = req.params.id;
             if (!id)
