@@ -200,18 +200,54 @@ export async function autoFixDate(id) {
     }
 }
 
+export async function dropAndReprocess(id, filePath, transaction = null) {
+    const config = async transaction => {
+        let mediaAlbums = await Album.findAll({
+            include: {
+                model: Media,
+                where: {id},
+            },
+            transaction,
+        });
+        await dropMedia(id, transaction);
+        let newId = await processMedia(filePath, 2, transaction);
+        if (id === false)
+            return false;
+        for (let album of mediaAlbums) {
+            await album.addMedium(
+                await Media.findOne({
+                    where: {id: newId},
+                    transaction,
+                }),
+                {transaction},
+            );
+        }
+        return newId;
+    };
+    if (transaction === null) {
+        let result = await Database.db.transaction({}, config);
+        console.log(result);
+        return result;
+    } else {
+        let result = await config(transaction);
+        console.log(result);
+        return result;
+    }
+}
+
 export async function reprocess(id) {
     let item = await Media.findOne({where: {id}});
     if (item === null) return {success: false, code: 404};
 
     let filePath = path.resolve(path.join(config.media, item.filePath));
 
-    let newId = null;
-    await Database.db.transaction({}, async transaction => {
-        await dropMedia(item.id, transaction);
-        newId = await processMedia(filePath, 2, transaction);
-    });
-    return {success: true, id: newId};
+    try {
+        let newId = await dropAndReprocess(item.id, filePath);
+        return {success: true, id: newId};
+    } catch (e) {
+        console.warn("reprocess failed", e.message);
+        return {success: false, code: 500};
+    }
 }
 
 export async function deleteFile(id) {
@@ -503,6 +539,16 @@ export async function dropMedia(id, transaction = null) {
             {model: Location, include: [Place]},
         ],
         ...spreadTransaction,
+    });
+    // Remove from album
+    await Database.db.query(`
+        delete
+        from "AlbumMedia"
+        where "MediumId" = $1
+    `, {
+        bind: [id],
+        ...spreadTransaction,
+        type: sequelize.QueryTypes.DELETE,
     });
     if (item === null)
         return false;

@@ -7,7 +7,7 @@ import path from "path";
 import mime from 'mime-types'
 import {
     autoFixDate,
-    changeMediaDate, createZip, deleteFile, dropMedia, getAlbums,
+    changeMediaDate, createZip, deleteFile, dropAndReprocess, dropMedia, getAlbums,
     getBoundingBox, getGlossary,
     getMediaById,
     getMonthPhotos,
@@ -191,9 +191,10 @@ export default class PhotosModule extends ApiModule {
             if (column === 'added') {
                 sqlOrder = [[sequelize.literal(`"Media->AlbumMedia"."createdAt"`), order]]
             } else if (column === 'createDate') {
-                sqlOrder = [[Media, 'createdAt', order]];
+                sqlOrder = [[Media, 'createDate', order]];
             }
             try {
+                console.log('order', sqlOrder);
                 let result = await Album.findOne({
                     where: {id: req.params.id},
                     include: [{
@@ -266,9 +267,9 @@ export default class PhotosModule extends ApiModule {
             try {
                 let success = await rotateImage(path.join(config.media, media.filePath), angle, path.join(config.media, newFileName));
                 if (success) {
-                    if (!saveCopy)
-                        await dropMedia(id);
-                    let newId = await processMedia(path.join(config.media, newFileName));
+                    let newId = saveCopy ?
+                        await processMedia(path.join(config.media, newFileName)) :
+                        await dropAndReprocess(id, path.join(config.media, newFileName));
                     if (newId === false)
                         return res.send({success: false, id: null});
                     res.send({success: true, id: newId});
