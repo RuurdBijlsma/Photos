@@ -3,7 +3,7 @@ import {initTables} from "./models/mediaUtils.js";
 import path from "path";
 import {exec} from "child_process";
 import {Sequelize} from "sequelize";
-import {checkFileExists} from "../utils.js";
+import {checkFileExists, waitSleep} from "../utils.js";
 import config from "../config.js";
 import Clog from "../Clog.js";
 import DbInfo from "./DbInfo.js";
@@ -51,11 +51,12 @@ class Database {
     async backup(name = '') {
         return new Promise((resolve, reject) => {
             if (name !== '')
-                name += '_';
+                name = '_' + name;
             let dateTime = new Date().toJSON().replace(/:/g, '_');
-            let backupTo = path.resolve(path.join(config.backups, `rsdb_${name}${dateTime}.dump`));
+            let backupTo = path.resolve(path.join(config.backups, `${dateTime}_rpdb${name}.dump`));
+            const backupCommand = `pg_dump --dbname=${this.connectionString} -Fc --clean --create --if-exists > ${backupTo}`;
             console.log(`Backing up database! ${backupTo}`);
-            exec(`pg_dump --dbname=${this.connectionString} -Fc > ${backupTo}`,
+            exec(backupCommand,
                 (error, stderr, stdout) => {
                     if (error) {
                         console.warn('db backup error', error);
@@ -81,24 +82,28 @@ class Database {
         if (!await checkFileExists(file))
             return false;
 
-        if (dropAll) {
-            console.log("Backing up before restoring");
-            await this.backup('pre-restore');
-            await Media.drop({cascade: true});
-            await Glossary.drop({cascade: true});
-            await Place.drop({cascade: true});
-            await Label.drop({cascade: true});
-            await Classification.drop({cascade: true});
-            await Location.drop({cascade: true});
-            await Suggestion.drop({cascade: true});
-            await User.drop({cascade: true});
-            console.log("Dropped all tables before restoring");
-            await this.db.sync();
-        }
+        // if (dropAll) {
+        //     console.log("Backing up before restoring");
+        //     await this.backup('pre-restore');
+        //     await Media.drop({cascade: true});
+        //     await Glossary.drop({cascade: true});
+        //     await Place.drop({cascade: true});
+        //     await Label.drop({cascade: true});
+        //     await Classification.drop({cascade: true});
+        //     await Location.drop({cascade: true});
+        //     await Suggestion.drop({cascade: true});
+        //     await User.drop({cascade: true});
+        //     console.log("Dropped all tables before restoring");
+        //     await this.db.sync();
+        // }
 
         return new Promise(resolve => {
             console.log(`Restoring database! ${file}`);
-            exec(`pg_restore --dbname=${this.connectionString} ${file}`,
+            console.warn("==========================================================");
+            console.warn("=====PROGRAM WILL RESTART AFTER RESTORE IS COMPLETE!======");
+            console.warn("====IF THE PROGRAM DOES NOT RESTART START IT MANUALLY.====");
+            console.warn("==========================================================");
+            setTimeout(() => exec(`pg_restore --clean --create --dbname=${this.connectionString} ${file}`,
                 (error, stderr, stdout) => {
                     if (error) {
                         console.warn('db restore error', error);
@@ -108,8 +113,9 @@ class Database {
                 }).on('close',
                 () => {
                     console.log("Restore complete");
+                    process.exit(0);
                     resolve(true);
-                });
+                }), 1000);
         });
     }
 

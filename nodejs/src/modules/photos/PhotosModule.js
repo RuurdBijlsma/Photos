@@ -194,7 +194,6 @@ export default class PhotosModule extends ApiModule {
                 sqlOrder = [[Media, 'createDate', order]];
             }
             try {
-                console.log('order', sqlOrder);
                 let result = await Album.findOne({
                     where: {id: req.params.id},
                     include: [{
@@ -215,7 +214,11 @@ export default class PhotosModule extends ApiModule {
 
         app.post('/photos/getRestoreOptions', async (req, res) => {
             if (!await Auth.checkRequest(req)) return res.sendStatus(401);
-            res.send((await fs.promises.readdir(config.backups)).reverse());
+            let backups = await fs.promises.readdir(config.backups);
+            let mostRecent = backups
+                .sort((a, b) => (a > b) ? -1 : (a < b) ? 1 : 0)
+                .slice(0, req.query.limit ?? 15);
+            res.send(mostRecent);
         });
 
         app.post('/photos/restoreDb', async (req, res) => {
@@ -287,7 +290,10 @@ export default class PhotosModule extends ApiModule {
                 where: {
                     LogSessionId: DbInfo.session,
                 },
-                order: sequelize.col('createdAt'),
+                order: [
+                    [sequelize.col('order'), 'DESC'],
+                ],
+                limit: 1000,
             }));
         });
 

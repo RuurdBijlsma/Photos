@@ -20,8 +20,8 @@ export function initLog(sequelize) {
             type: DataTypes.STRING,
             allowNull: false,
         },
-        stamp: {
-            type: DataTypes.BIGINT,
+        order: {
+            type: DataTypes.INTEGER,
             allowNull: false,
         },
         message: {
@@ -33,7 +33,7 @@ export function initLog(sequelize) {
         indexes: [
             {unique: false, fields: ['type']},
             {unique: false, fields: ['tag']},
-            {unique: false, fields: ['stamp']},
+            {unique: false, fields: ['order']},
             {unique: false, fields: ['message']},
         ],
     });

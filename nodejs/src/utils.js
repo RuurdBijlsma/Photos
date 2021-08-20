@@ -9,6 +9,10 @@ export const months = ['January', 'February', 'March', 'April', 'May', 'June',
 export const shortMonths = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 
+export async function waitSleep(ms = 1000) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 export function isDate(query) {
     const lowerQuery = query.toLowerCase();
     let lowerMonths = [...months, ...shortMonths].map(m => m.toLowerCase());

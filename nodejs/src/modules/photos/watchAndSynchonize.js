@@ -10,7 +10,7 @@ import {deleteOldLogs, deleteOldZips, dropMedia, getUniqueId, insertMedia} from 
 import seq from "sequelize";
 import TelegramBot from "node-telegram-bot-api";
 import Database from "../../database/Database.js";
-import {batchSize, checkFileExists, getToken} from "../../utils.js";
+import {batchSize, checkFileExists, getToken, waitSleep} from "../../utils.js";
 import {Blocked} from "../../database/models/BlockedModel.js";
 import Clog from '../../Clog.js'
 
@@ -374,8 +374,4 @@ async function useDir(dir) {
     if (!await checkFileExists(dir))
         await fs.promises.mkdir(dir);
     return dir;
-}
-
-async function waitSleep(ms = 1000) {
-    return new Promise(resolve => setTimeout(resolve, ms));
 }

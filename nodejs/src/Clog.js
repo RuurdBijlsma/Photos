@@ -41,8 +41,8 @@ export default class Clog {
                     Log.create({
                         type,
                         tag: this.tag,
-                        stamp: Math.floor(performance.now() * 1000000),
                         message: args.join(' • '),
+                        order: Clog.logId++,
                         LogSessionId: DbInfo.session,
                     }).then().catch(e => {
                         console.warn('log create error', e);
@@ -52,3 +52,5 @@ export default class Clog {
         }
     }
 }
+
+Clog.logId = 0;
