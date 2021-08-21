@@ -649,7 +649,7 @@ export default class PhotosModule extends ApiModule {
         app.post('/photos/locations/', async (req, res) => {
             if (!await Auth.checkRequest(req)) return res.sendStatus(401);
             let now = +new Date();
-            const refreshEvery = 1000 * 60 * 15;// 15 minutes
+            const refreshEvery = 1000 * 60 * 5;// 15 minutes
             if (!this.randomLocations || this.randomLocations.date + refreshEvery < now) {
                 this.randomLocations = {date: now, locations: getRandomLocations(15)};
             }
@@ -660,7 +660,7 @@ export default class PhotosModule extends ApiModule {
         app.post('/photos/labels/', async (req, res) => {
             if (!await Auth.checkRequest(req)) return res.sendStatus(401);
             let now = +new Date();
-            const refreshEvery = 1000 * 60 * 15;// 15 minutes
+            const refreshEvery = 1000 * 60 * 5;// 15 minutes
             if (!this.randomLabels || this.randomLabels.date + refreshEvery < now) {
                 this.randomLabels = {date: now, labels: getRandomLabels(15)};
             }

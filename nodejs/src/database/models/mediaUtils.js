@@ -385,19 +385,20 @@ export async function getRandomLocations(limit = 50) {
 
 export async function getRandomLabels(limit = 50) {
     return await Database.db.query(`
-    select distinct on (text) text, "MediumId"
-    from "Classifications"
-    inner join "Labels" ML on "Classifications".id = ML."ClassificationId"
-    where text in (
-    select text
-    from (
-    select text, count(text)::FLOAT / (select count(*) from "Labels") * 25 + random() as count
-    from "Labels"
-    where level <= 2
-    group by text
-    order by count desc
-    limit $1
-    ) as counttable)
+        select distinct on (text) text, "MediumId", confidence
+        from "Classifications"
+                 inner join "Labels" ML on "Classifications".id = ML."ClassificationId"
+        where confidence = 1
+          and text in (
+            select text
+            from (
+                     select text, count(text)::FLOAT / (select count(*) from "Labels") * 25 + random() as count
+                     from "Labels"
+                     where level <= 2
+                     group by text
+                     order by count desc
+                     limit $1
+                 ) as counttable)
     `, {
             bind: [limit],
             type: sequelize.QueryTypes.SELECT,
