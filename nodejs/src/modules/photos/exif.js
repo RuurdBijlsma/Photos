@@ -292,13 +292,13 @@ export async function updatePhotoDate(filePath, date) {
 }
 
 
-probeVideo(path.resolve('PXL_20210831_233655099.mp4')).then(c => {
-    console.log(c);
-})
-
-getExif(path.resolve('PXL_20210831_235008627.jpg')).then(d => {
-    console.log(d);
-})
+// probeVideo(path.resolve('PXL_20210831_233655099.mp4')).then(c => {
+//     console.log(c);
+// })
+//
+// getExif(path.resolve('PXL_20210831_235008627.jpg')).then(d => {
+//     console.log(d);
+// })
 
 // updateVideoDate(path.join(config.media, 'VID_20210514_033314.mp4'), new Date('1 dec 2023')).then(r => {
 //     console.log(r);
