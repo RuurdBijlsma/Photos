@@ -47,7 +47,7 @@ export async function transferExif(sourceFile, destinationFile) {
 
 export async function dateFromFile(filePath) {
     let date = filenameToDate(path.basename(filePath));
-    // if (date !== null) return date;
+    if (date !== null) return date;
     let fileStat = await fs.promises.stat(filePath);
     return new Date(fileStat.birthtimeMs);
 }
