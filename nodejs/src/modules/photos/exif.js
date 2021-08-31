@@ -47,25 +47,13 @@ export async function transferExif(sourceFile, destinationFile) {
 
 export async function dateFromFile(filePath) {
     let date = filenameToDate(path.basename(filePath));
-    if (date !== null) return date;
+    // if (date !== null) return date;
     let fileStat = await fs.promises.stat(filePath);
     return new Date(fileStat.birthtimeMs);
 }
 
 export function dateToString(d) {
-    return `${
-        d.getFullYear()
-    }/${
-        (d.getMonth() + 1).toString().padStart(2, '0')
-    }/${
-        (d.getDate()).toString().padStart(2, '0')
-    } ${
-        (d.getHours()).toString().padStart(2, '0')
-    }:${
-        (d.getMinutes()).toString().padStart(2, '0')
-    }:${
-        (d.getSeconds()).toString().padStart(2, '0')
-    }`;
+    return format(d, 'yyyy-MM-dd HH:mm:ss');
 }
 
 export async function getCreateDate(image, exifData = null) {
@@ -274,7 +262,7 @@ export async function probeVideo(videoPath) {
 
 export async function updateVideoDate(filePath, date) {
     let tempOutput = path.resolve(path.join(temp, path.basename(filePath)));
-    const newDateString = format(date, 'yyyy-MM-dd HH:mm:ss');
+    const newDateString = dateToString(date);
 
     let success = await new Promise((resolve, reject) => {
         let command = `ffmpeg -y -i "${path.resolve(filePath)}" -c copy -metadata creation_time="${newDateString}" "${tempOutput}"`;
@@ -303,15 +291,17 @@ export async function updatePhotoDate(filePath, date) {
     await fs.promises.writeFile(filePath, newFile);
 }
 
-// probeVideo(path.join(config.media, 'VID_20210614_033907.mp4')).then(c => {
-//     console.log(c);
-// })
+
+probeVideo(path.resolve('PXL_20210831_233655099.mp4')).then(c => {
+    console.log(c);
+})
+
+getExif(path.resolve('PXL_20210831_235008627.jpg')).then(d => {
+    console.log(d);
+})
 
 // updateVideoDate(path.join(config.media, 'VID_20210514_033314.mp4'), new Date('1 dec 2023')).then(r => {
 //     console.log(r);
 // });
 
 // probeVideo('./photos/home.mp4');
-// getExif('./res/photos/photos/20170724_200236.jpg').then(d => {
-//     console.log(d);
-// })
