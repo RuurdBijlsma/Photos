@@ -48,6 +48,7 @@ export async function transferExif(sourceFile, destinationFile) {
 export async function dateFromFile(filePath) {
     let date = filenameToDate(path.basename(filePath));
     if (date !== null) return date;
+    console.log('date source', 3);
     let fileStat = await fs.promises.stat(filePath);
     return dateToString(new Date(fileStat.birthtimeMs));
 }
@@ -67,11 +68,13 @@ export async function getCreateDate(image, exifData = null) {
                 let [date, time] = exifData.exif[timeField].split(' ');
                 date = date.replace(/:/g, '/');
                 createDate = `${date} ${time}`;
+                console.log('date source', 1);
             }
         }
     }
 
     if (createDate === null) {
+        console.log('date source', 2);
         createDate = await dateFromFile(image);
     }
 
@@ -139,8 +142,7 @@ export async function getExif(image) {
         if (imgDim === null)
             throw new Error(`Can't get image dimensions for ${image}`);
 
-        console.log(`No exif for ${image}`)
-        console.log(image, createDate);
+        console.log(`No exif for ${image}`);
         return {
             type: 'image', subType: image.endsWith('gif') ? 'animation' : 'none', ...imgDim, duration: null,
             size, createDate, gps: null, exif: {}
@@ -193,7 +195,6 @@ export async function getExif(image) {
     else if (filename.startsWith('PANO'))
         subType = 'VR';
 
-    console.log(image, createDate);
     return {
         type: 'image', subType, ...imgDim, duration: null,
         size: fileStat.size, createDate, gps, exif: exifData
@@ -258,7 +259,6 @@ export async function probeVideo(videoPath) {
         slowMotion = captureFps / 1.9 > fps1 / fps2;
     }
     let subType = slowMotion ? 'slomo' : 'none';
-    console.log(videoPath, createDate);
     return {
         type: 'video', subType, width, height,
         duration, size, createDate, gps, exif: exifData
@@ -300,10 +300,10 @@ export async function updatePhotoDate(filePath, date) {
 // probeVideo(path.resolve('PXL_20210831_184546467.mp4')).then(c => {
 //     console.log(c);
 // })
-//
-// getExif(path.resolve('PXL_20210831_235008627.jpg')).then(d => {
+
+// getExif(path.resolve('IMG_20140713_152945713.jpg')).then(d => {
 //     console.log(d);
-// })
+// });
 
 // updateVideoDate(path.join(config.media, 'VID_20210514_033314.mp4'), new Date('1 dec 2023')).then(r => {
 //     console.log(r);
