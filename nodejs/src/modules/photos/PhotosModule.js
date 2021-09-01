@@ -788,6 +788,6 @@ export default class PhotosModule extends ApiModule {
         await watchAndSynchronize()
         console.log("Watching and synchronizing Photos");
 
-        await fixExifs();
+        // await fixExifs();
     }
 }
