@@ -140,6 +140,7 @@ export async function getExif(image) {
             throw new Error(`Can't get image dimensions for ${image}`);
 
         console.log(`No exif for ${image}`)
+        console.log(image, createDate);
         return {
             type: 'image', subType: image.endsWith('gif') ? 'animation' : 'none', ...imgDim, duration: null,
             size, createDate, gps: null, exif: {}
@@ -192,6 +193,7 @@ export async function getExif(image) {
     else if (filename.startsWith('PANO'))
         subType = 'VR';
 
+    console.log(image, createDate);
     return {
         type: 'image', subType, ...imgDim, duration: null,
         size: fileStat.size, createDate, gps, exif: exifData
@@ -256,6 +258,7 @@ export async function probeVideo(videoPath) {
         slowMotion = captureFps / 1.9 > fps1 / fps2;
     }
     let subType = slowMotion ? 'slomo' : 'none';
+    console.log(videoPath, createDate);
     return {
         type: 'video', subType, width, height,
         duration, size, createDate, gps, exif: exifData
