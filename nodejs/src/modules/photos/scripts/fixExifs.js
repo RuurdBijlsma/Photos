@@ -32,6 +32,7 @@ export async function fixExifs() {
                     } else {
                         metadata = await probeVideo(filePath);
                     }
+                    console.log(item.id, item.filename, metadata.createDate);
                     await item.update({
                         subType: metadata.subType,
                         width: metadata.width,
