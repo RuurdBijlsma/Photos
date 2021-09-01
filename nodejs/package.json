@@ -9,6 +9,7 @@
     "debugStart": "set DEBUG=* & node --experimental-json-modules src/index.js",
     "restoreDb": "node --experimental-json-modules src/database/restoreDb.js",
     "backupDb": "node --experimental-json-modules src/database/backupDb.js",
+    "fixExifs": "node --experimental-json-modules src/modules/photos/scripts/fixExifs.js",
     "changePassword": "node --experimental-json-modules src/modules/photos/scripts/changePassword.js",
     "fixTinyGifThumbs": "node --experimental-json-modules src/modules/photos/scripts/fixTinyGifThumbs.js",
     "fixImgDims": "node --experimental-json-modules src/modules/photos/scripts/fixImgDims.js",

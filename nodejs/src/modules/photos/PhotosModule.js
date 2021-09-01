@@ -32,6 +32,7 @@ import fs from "fs";
 import {Album} from "../../database/models/AlbumModel.js";
 import {google} from "googleapis";
 import Photos from "googlephotos";
+import {fixExifs} from "./scripts/fixExifs.js";
 
 const {Op} = sequelize;
 const console = new Clog("PhotosModule");
@@ -786,5 +787,7 @@ export default class PhotosModule extends ApiModule {
         console.timeEnd("Init geocoder");
         await watchAndSynchronize()
         console.log("Watching and synchronizing Photos");
+
+        await fixExifs();
     }
 }

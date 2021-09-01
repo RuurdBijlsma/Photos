@@ -1,9 +1,9 @@
-import {initUser, User} from "./models/UserModel.js";
+import {initUser} from "./models/UserModel.js";
 import {initTables} from "./models/mediaUtils.js";
 import path from "path";
 import {exec} from "child_process";
 import {Sequelize} from "sequelize";
-import {checkFileExists, waitSleep} from "../utils.js";
+import {checkFileExists} from "../utils.js";
 import config from "../config.js";
 import Clog from "../Clog.js";
 import DbInfo from "./DbInfo.js";
