@@ -48,7 +48,6 @@ export async function transferExif(sourceFile, destinationFile) {
 export async function dateFromFile(filePath) {
     let date = filenameToDate(path.basename(filePath));
     if (date !== null) return date;
-    console.log('date source', 3);
     let fileStat = await fs.promises.stat(filePath);
     return dateToString(new Date(fileStat.birthtimeMs));
 }
@@ -68,13 +67,11 @@ export async function getCreateDate(image, exifData = null) {
                 let [date, time] = exifData.exif[timeField].split(' ');
                 date = date.replace(/:/g, '/');
                 createDate = `${date} ${time}`;
-                console.log('date source', 1);
             }
         }
     }
 
     if (createDate === null) {
-        console.log('date source', 2);
         createDate = await dateFromFile(image);
     }
 
@@ -301,7 +298,7 @@ export async function updatePhotoDate(filePath, date) {
 //     console.log(c);
 // })
 
-// getExif(path.resolve('IMG_20140713_152945713.jpg')).then(d => {
+// getExif(path.resolve('IMG_20140709_170611740.jpg')).then(d => {
 //     console.log(d);
 // });
 

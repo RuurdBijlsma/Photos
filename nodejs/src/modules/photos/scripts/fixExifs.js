@@ -32,9 +32,6 @@ export async function fixExifs() {
                     } else {
                         metadata = await probeVideo(filePath);
                     }
-                    console.log(item.id, metadata.createDate);
-                    if (typeof metadata.createDate !== 'string')
-                        console.log('FOUT')
                     await item.update({
                         subType: metadata.subType,
                         width: metadata.width,
