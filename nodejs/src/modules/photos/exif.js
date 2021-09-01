@@ -49,7 +49,7 @@ export async function dateFromFile(filePath) {
     let date = filenameToDate(path.basename(filePath));
     if (date !== null) return date;
     let fileStat = await fs.promises.stat(filePath);
-    return new Date(fileStat.birthtimeMs);
+    return dateToString(new Date(fileStat.birthtimeMs));
 }
 
 export function dateToString(d) {
@@ -72,8 +72,7 @@ export async function getCreateDate(image, exifData = null) {
     }
 
     if (createDate === null) {
-        let d = await dateFromFile(image);
-        createDate = dateToString(d);
+        createDate = await dateFromFile(image);
     }
 
     return createDate;
@@ -135,7 +134,7 @@ export async function getExif(image) {
         data = await loadExif(image);
     } catch (e) {
         let {size} = await fs.promises.stat(image);
-        let createDate = dateToString(await dateFromFile(image));
+        let createDate = await dateFromFile(image);
         let imgDim = await imageSize(image);
         if (imgDim === null)
             throw new Error(`Can't get image dimensions for ${image}`);
@@ -216,10 +215,12 @@ export async function probeVideo(videoPath) {
     }
     let duration = Math.round(1000 * format.duration);
     let createDate = null;
-    if (format.tags.creation_time)
+    if (format.tags.creation_time) {
+        // timezone is included in tags.creation_time so `new Date()` is allowed
         createDate = dateToString(new Date(format.tags.creation_time));
-    if (createDate === null)
-        createDate = dateToString(await dateFromFile(videoPath));
+    }
+    if (!createDate)
+        createDate = await dateFromFile(videoPath);
     let gps = null;
     if (format.tags.location !== undefined) {
         let [[latitude], [longitude]] = format.tags.location.matchAll(/[+-]\d+\.\d+/g)
@@ -251,7 +252,8 @@ export async function probeVideo(videoPath) {
         exifData.hasOwnProperty('com.android.capture.fps')) {
         let captureFps = +exifData['com.android.capture.fps'];
         let [fps1, fps2] = exifData.video.avg_frame_rate.split('/').map(n => +n);
-        slowMotion = captureFps > (fps1 / fps2);
+        // Capture fps is sometimes a bit higher than actual fps on non slomo videos
+        slowMotion = captureFps / 1.9 > fps1 / fps2;
     }
     let subType = slowMotion ? 'slomo' : 'none';
     return {
@@ -292,9 +294,9 @@ export async function updatePhotoDate(filePath, date) {
 }
 
 
-// probeVideo(path.resolve('PXL_20210831_233655099.mp4')).then(c => {
-//     console.log(c);
-// })
+probeVideo(path.resolve('PXL_20210831_184546467.mp4')).then(c => {
+    console.log(c);
+})
 //
 // getExif(path.resolve('PXL_20210831_235008627.jpg')).then(d => {
 //     console.log(d);
