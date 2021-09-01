@@ -294,9 +294,9 @@ export async function updatePhotoDate(filePath, date) {
 }
 
 
-probeVideo(path.resolve('PXL_20210831_184546467.mp4')).then(c => {
-    console.log(c);
-})
+// probeVideo(path.resolve('PXL_20210831_184546467.mp4')).then(c => {
+//     console.log(c);
+// })
 //
 // getExif(path.resolve('PXL_20210831_235008627.jpg')).then(d => {
 //     console.log(d);
