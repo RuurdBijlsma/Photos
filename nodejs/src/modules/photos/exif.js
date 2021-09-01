@@ -5,7 +5,7 @@ import fs from "fs";
 import geocode from "./reverse-geocode.js";
 import path from "path";
 import probeSize from 'probe-image-size';
-import {filenameToDate} from "fix-exif-data";
+import {filenameToDate} from "exif-date-fix";
 import {format} from 'date-fns'
 import modifyExif from 'modify-exif'
 import {temp} from "./watchAndSynchonize.js";

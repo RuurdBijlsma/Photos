@@ -15,7 +15,7 @@ import WordNet from "node-wordnet";
 import {initBlocked, Blocked} from "./BlockedModel.js";
 import fs from "fs";
 import {getPaths, processMedia, uploadDir, zipDir} from "../../modules/photos/watchAndSynchonize.js";
-import {filenameToDate} from "fix-exif-data";
+import {filenameToDate} from "exif-date-fix";
 import util from "util";
 import archiver from "archiver";
 import Clog from '../../Clog.js'
