@@ -30,6 +30,7 @@ services:
       BACKUPS_DIR: "/backups"
       MEDIA_DIR: "/photos"
       THUMBNAILS_DIR: "/thumbnails"
+      TZ: "${TZ}"
     depends_on:
       - postgres
     links:
