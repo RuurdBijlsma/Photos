@@ -27,10 +27,14 @@ export async function fixExifs() {
                 (async () => {
                     let filePath = path.resolve(path.join(config.media, item.filePath));
                     let metadata;
-                    if (item.type === 'image') {
-                        metadata = await getExif(filePath);
-                    } else {
-                        metadata = await probeVideo(filePath);
+                    try {
+                        if (item.type === 'image') {
+                            metadata = await getExif(filePath);
+                        } else {
+                            metadata = await probeVideo(filePath);
+                        }
+                    } catch (e) {
+                        console.warn("FIX EXIFS ERROR", e);
                     }
                     console.log(item.id, item.filename, metadata.createDate);
                     await item.update({
