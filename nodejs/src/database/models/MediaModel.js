@@ -80,6 +80,7 @@ export function initMedia(sequelize) {
             {unique: false, fields: ['type']},
             {unique: false, fields: ['subType']},
             {unique: false, fields: ['createDate']},
+            {unique: false, fields: ['createDateString']},
             {unique: false, fields: ['bytes']},
             {unique: false, fields: ['durationMs']},
             {unique: false, fields: ['width']},

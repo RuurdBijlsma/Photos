@@ -7,9 +7,8 @@ import path from "path";
 import mime from 'mime-types'
 import {
     autoFixDate,
-    changeMediaDate, createZip, deleteFile, dropAndReprocess, dropMedia, getAlbums,
+    changeMediaDate, createZip, deleteFile, dropAndReprocess, getAlbums,
     getBoundingBox, getGlossary,
-    getMediaById,
     getMonthPhotos,
     getPhotoMonths, getPhotosForMonth, getPhotosPerDayMonth,
     getRandomLabels,
@@ -32,7 +31,11 @@ import fs from "fs";
 import {Album} from "../../database/models/AlbumModel.js";
 import {google} from "googleapis";
 import Photos from "googlephotos";
-import {fixExifs} from "./scripts/fixExifs.js";
+import {Classification} from "../../database/models/ClassificationModel.js";
+import {Label} from "../../database/models/LabelModel.js";
+import {Glossary} from "../../database/models/GlossaryModel.js";
+import {Place} from "../../database/models/PlaceModel.js";
+import {loadExif} from "./exif.js";
 
 const {Op} = sequelize;
 const console = new Clog("PhotosModule");
@@ -741,13 +744,16 @@ export default class PhotosModule extends ApiModule {
             } else {
                 if (!await Auth.checkRequest(req)) return res.sendStatus(401);
             }
-            let item = await getMediaById(id);
+            let item = await Media.findOne({
+                where: {id},
+                include: [
+                    {model: Classification, include: [Label, Glossary]},
+                    {model: Location, include: [Place]},
+                ],
+                attributes: ['id', 'type', 'subType', 'filename', 'width', 'height', 'durationMs', 'bytes', 'createDateString', 'exif'],
+            });
             if (item === null)
                 return res.sendStatus(404);
-            delete item.vector;
-            delete item.vectorA;
-            delete item.vectorB;
-            delete item.vectorC;
             res.send(item);
         });
 
@@ -780,13 +786,16 @@ export default class PhotosModule extends ApiModule {
             res.sendFile(file, {acceptRanges: true});
         });
 
-        console.log("Initializing geocoder");
-        console.time("Init geocoder");
-        await geocode({latitude: 50, longitude: 5});
-        console.log("Initialized geocoder");
-        console.timeEnd("Init geocoder");
-        await watchAndSynchronize()
-        console.log("Watching and synchronizing Photos");
+        // console.log("Initializing geocoder");
+        // console.time("Init geocoder");
+        // await geocode({latitude: 50, longitude: 5});
+        // console.log("Initialized geocoder");
+        // console.timeEnd("Init geocoder");
+        // await watchAndSynchronize()
+        // console.log("Watching and synchronizing Photos");
+
+        let exif = await loadExif(path.join(config.media, 'PXL_20210831_233655099.mp4'));
+        console.log('exif for PXL_20210831_233655099.mp4', exif);
 
         // await fixExifs();
     }
