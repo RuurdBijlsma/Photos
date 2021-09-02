@@ -786,17 +786,17 @@ export default class PhotosModule extends ApiModule {
             res.sendFile(file, {acceptRanges: true});
         });
 
-        // console.log("Initializing geocoder");
-        // console.time("Init geocoder");
-        // await geocode({latitude: 50, longitude: 5});
-        // console.log("Initialized geocoder");
-        // console.timeEnd("Init geocoder");
-        // await watchAndSynchronize()
-        // console.log("Watching and synchronizing Photos");
+        console.log("Initializing geocoder");
+        console.time("Init geocoder");
+        await geocode({latitude: 50, longitude: 5});
+        console.log("Initialized geocoder");
+        console.timeEnd("Init geocoder");
+        await watchAndSynchronize()
+        console.log("Watching and synchronizing Photos");
 
-        let exif = await probeVideo(path.join(config.media, 'PXL_20210831_233655099.mp4'));
-        console.log('exif for PXL_20210831_233655099.mp4', exif);
+        // let exif = await probeVideo(path.join(config.media, 'PXL_20210831_233655099.mp4'));
+        // console.log('exif for PXL_20210831_233655099.mp4', exif);
 
-        // await fixExifs();
+        await fixExifs();
     }
 }
