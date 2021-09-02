@@ -1,9 +1,9 @@
 import dotenv from 'dotenv';
+
+dotenv.config();
 import ApiController from "./Controller.js";
 import Commander from 'commander';
 import pJson from '../package.json'
-
-dotenv.config();
 
 Commander
     .version(pJson.version)
