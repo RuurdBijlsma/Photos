@@ -35,7 +35,7 @@ import {Classification} from "../../database/models/ClassificationModel.js";
 import {Label} from "../../database/models/LabelModel.js";
 import {Glossary} from "../../database/models/GlossaryModel.js";
 import {Place} from "../../database/models/PlaceModel.js";
-import {loadExif} from "./exif.js";
+import {loadExif, probeVideo} from "./exif.js";
 
 const {Op} = sequelize;
 const console = new Clog("PhotosModule");
@@ -794,7 +794,7 @@ export default class PhotosModule extends ApiModule {
         // await watchAndSynchronize()
         // console.log("Watching and synchronizing Photos");
 
-        let exif = await loadExif(path.join(config.media, 'PXL_20210831_233655099.mp4'));
+        let exif = await probeVideo(path.join(config.media, 'PXL_20210831_233655099.mp4'));
         console.log('exif for PXL_20210831_233655099.mp4', exif);
 
         // await fixExifs();
