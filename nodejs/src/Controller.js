@@ -1,3 +1,4 @@
+import dotenv from 'dotenv';
 import express from 'express';
 import http from "http";
 import bodyParser from "body-parser";
@@ -10,6 +11,7 @@ import fileUpload from "express-fileupload";
 import {User} from "./database/models/UserModel.js";
 import bcrypt from "bcrypt";
 
+dotenv.config();
 const console = new Clog("Controller");
 
 class Controller {

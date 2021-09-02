@@ -1,3 +1,6 @@
+import dotenv from 'dotenv';
+
+dotenv.config();
 export default {
     get media() {
         return process.env.MEDIA_DIR ?? "../media/photos";

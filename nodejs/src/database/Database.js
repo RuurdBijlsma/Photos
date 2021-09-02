@@ -8,14 +8,9 @@ import config from "../config.js";
 import Clog from "../Clog.js";
 import DbInfo from "./DbInfo.js";
 import {LogSession} from "./models/LogSessionModel.js";
-import {Media} from "./models/MediaModel.js";
-import {Glossary} from "./models/GlossaryModel.js";
-import {Place} from "./models/PlaceModel.js";
-import {Label} from "./models/LabelModel.js";
-import {Classification} from "./models/ClassificationModel.js";
-import {Location} from "./models/LocationModel.js";
-import {Suggestion} from "./models/SuggestionModel.js";
+import dotenv from 'dotenv';
 
+dotenv.config();
 const console = new Clog("Database");
 
 class Database {
