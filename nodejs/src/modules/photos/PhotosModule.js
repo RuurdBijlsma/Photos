@@ -35,6 +35,7 @@ import {Classification} from "../../database/models/ClassificationModel.js";
 import {Label} from "../../database/models/LabelModel.js";
 import {Glossary} from "../../database/models/GlossaryModel.js";
 import {Place} from "../../database/models/PlaceModel.js";
+import {fixExifs} from "./scripts/fixExifs";
 // import {fixExifs} from "./scripts/fixExifs.js";
 
 const {Op} = sequelize;
