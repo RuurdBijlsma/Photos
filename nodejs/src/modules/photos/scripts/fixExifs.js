@@ -1,16 +1,16 @@
-import dotenv from 'dotenv';
-
-dotenv.config();
+// import dotenv from 'dotenv';
+//
+// dotenv.config();
 
 import {Media} from "../../../database/models/MediaModel.js";
 import path from "path";
 import config from '../../../config.js'
 import {getExif, probeVideo} from "../exif.js";
 
-import Database from "../../../database/Database.js";
-
-await Database.initDb();
-await fixExifs();
+// import Database from "../../../database/Database.js";
+//
+// await Database.initDb();
+// await fixExifs();
 
 export async function fixExifs() {
     const startOffset = 0;
