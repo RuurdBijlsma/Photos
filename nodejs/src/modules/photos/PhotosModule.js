@@ -808,6 +808,6 @@ export default class PhotosModule extends ApiModule {
         // let exif = await probeVideo(path.join(config.media, 'PXL_20210831_233655099.mp4'));
         // console.log('exif for PXL_20210831_233655099.mp4', exif);
 
-        // await fixExifs();
+        await fixExifs();
     }
 }
