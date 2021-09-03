@@ -192,9 +192,9 @@ export async function createZip(files) {
 export async function autoFixDate(id) {
     let item = await Media.findOne({where: {id}});
     if (item === null) return {success: false, code: 404};
-    let date = filenameToDate(item.filename);
-    if (date !== null) {
-        return await changeMediaDate(item, date);
+    let dateString = filenameToDate(item.filename);
+    if (dateString !== null) {
+        return await changeMediaDate(item, dateString);
     } else {
         return false;
     }
@@ -311,8 +311,9 @@ export async function getGlossary(label) {
     }
 }
 
-export async function changeMediaDate(item, newDate) {
-    if (newDate === null || item === null) return false;
+export async function changeMediaDate(item, newDateString) {
+    if (newDateString === null || item === null) return false;
+    let newDate = new Date(newDateString);
 
     let suggestions = item.createDate !== null ? getDateSuggestions(item.createDate) : [];
     let newSuggestions = getDateSuggestions(newDate);
@@ -321,7 +322,7 @@ export async function changeMediaDate(item, newDate) {
         await Promise.all(suggestions.map(o => removeSuggestion(o, transaction)))
         await item.update({
             createDate: newDate,
-            createDateString: dateToString(newDate),
+            createDateString: newDateString,
         }, {transaction});
         await Promise.all(newSuggestions.map(o => addSuggestion(o, transaction)));
     });
