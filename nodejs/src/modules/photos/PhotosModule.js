@@ -35,7 +35,7 @@ import {Classification} from "../../database/models/ClassificationModel.js";
 import {Label} from "../../database/models/LabelModel.js";
 import {Glossary} from "../../database/models/GlossaryModel.js";
 import {Place} from "../../database/models/PlaceModel.js";
-import {fixExifs} from "./scripts/fixExifs.js";
+// import {fixExifs} from "./scripts/fixExifs.js";
 
 const {Op} = sequelize;
 const console = new Clog("PhotosModule");
@@ -737,21 +737,32 @@ export default class PhotosModule extends ApiModule {
         app.post('/photos/:id', async (req, res) => {
             const id = req.params.id;
             if (!id)
-                return res.sendStatus(401);
+                return res.sendStatus(400);
+            let fullLoad = false;
             if (req.body.albumId) {
                 let ids = await Auth.checkAlbumAuth(req, [id]);
-                if (ids.length === 0) return res.sendStatus(401);
+                if (ids.length > 0)
+                    fullLoad = true;
             } else {
-                if (!await Auth.checkRequest(req)) return res.sendStatus(401);
+                if (await Auth.checkRequest(req))
+                    fullLoad = true;
             }
-            let item = await Media.findOne({
-                where: {id},
-                include: [
-                    {model: Classification, include: [Label, Glossary]},
-                    {model: Location, include: [Place]},
-                ],
-                attributes: ['id', 'type', 'subType', 'filename', 'width', 'height', 'durationMs', 'bytes', 'createDateString', 'exif'],
-            });
+            let item;
+            if (fullLoad) {
+                item = await Media.findOne({
+                    where: {id},
+                    include: [
+                        {model: Classification, include: [Label, Glossary]},
+                        {model: Location, include: [Place]},
+                    ],
+                    attributes: ['id', 'type', 'subType', 'filename', 'width', 'height', 'durationMs', 'bytes', 'createDateString', 'exif'],
+                });
+            } else {
+                item = await Media.findOne({
+                    where: {id},
+                    attributes: ['id', 'type', 'subType', 'filename', 'width', 'height', 'durationMs', 'bytes', 'createDateString'],
+                });
+            }
             if (item === null)
                 return res.sendStatus(404);
             res.send(item);

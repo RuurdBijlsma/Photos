@@ -38,14 +38,14 @@ export async function fixExifs() {
                     }
                     console.log(item.id, item.filename, metadata.createDate);
                     await item.update({
-                        subType: metadata.subType,
-                        width: metadata.width,
-                        height: metadata.height,
-                        durationMs: metadata.duration,
-                        bytes: metadata.size,
+                        // subType: metadata.subType,
+                        // width: metadata.width,
+                        // height: metadata.height,
+                        // durationMs: metadata.duration,
+                        // bytes: metadata.size,
                         createDateString: metadata.createDate,
                         createDate: new Date(metadata.createDate),
-                        exif: metadata.exif,
+                        // exif: metadata.exif,
                     });
                     resolve();
                 })();
