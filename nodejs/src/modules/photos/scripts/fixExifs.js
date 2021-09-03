@@ -13,7 +13,7 @@ import {getExif, probeVideo} from "../exif.js";
 // await fixExifs();
 
 export async function fixExifs() {
-    const startOffset = 1680;
+    const startOffset = 0;
     console.log('start offset', startOffset);
 
     let count = (await Media.count({where: {type: 'video'}})) - startOffset;
