@@ -13,7 +13,7 @@ import {getExif, probeVideo} from "../exif.js";
 // await fixExifs();
 
 export async function fixExifs() {
-    const startOffset = 0;
+    const startOffset = 1680;
     console.log('start offset', startOffset);
 
     let count = (await Media.count({where: {type: 'video'}})) - startOffset;
@@ -35,20 +35,20 @@ export async function fixExifs() {
                 } else {
                     metadata = await probeVideo(filePath);
                 }
+                console.log(item.filename, metadata.createDate);
+                await item.update({
+                    // subType: metadata.subType,
+                    // width: metadata.width,
+                    // height: metadata.height,
+                    // durationMs: metadata.duration,
+                    // bytes: metadata.size,
+                    createDateString: metadata.createDate,
+                    createDate: new Date(metadata.createDate),
+                    // exif: metadata.exif,
+                });
             } catch (e) {
                 console.warn("FIX EXIFS ERROR", e);
             }
-            console.log(item.filename, metadata.createDate);
-            await item.update({
-                // subType: metadata.subType,
-                // width: metadata.width,
-                // height: metadata.height,
-                // durationMs: metadata.duration,
-                // bytes: metadata.size,
-                createDateString: metadata.createDate,
-                createDate: new Date(metadata.createDate),
-                // exif: metadata.exif,
-            });
         }
         console.log(`Progress [${i + batchSize + startOffset} / ${count}]`);
     }
