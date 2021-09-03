@@ -1,8 +1,5 @@
 # Dockerfile
-
 FROM node:buster-slim
-WORKDIR /nodejs
-COPY . .
 
 # Install dependencies via apt
 RUN apt-get update && \
@@ -22,6 +19,8 @@ RUN wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-k
 RUN apt-get update && \
     apt-get install -y postgresql-client-13
 
+WORKDIR /nodejs
+COPY . .
 RUN npm install
 EXPOSE 3000
 CMD [ "npm", "start" ]
