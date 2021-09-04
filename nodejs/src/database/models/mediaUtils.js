@@ -591,6 +591,7 @@ export async function addSuggestion(obj, transaction) {
     let [item, created] = await Suggestion.findOrCreate({
         where: {text}, defaults: {
             type,
+            data: obj.data ?? null,
             vector: sequelize.fn('to_tsvector', 'english', text),
             count: 1,
         },

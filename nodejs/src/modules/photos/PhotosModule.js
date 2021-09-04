@@ -6,13 +6,14 @@ import config from "../../config.js";
 import path from "path";
 import mime from 'mime-types'
 import {
+    addSuggestion,
     autoFixDate,
     changeMediaDate, createZip, deleteFile, dropAndReprocess, getAlbums,
     getBoundingBox, getGlossary,
     getMonthPhotos,
     getPhotoMonths, getPhotosForMonth, getPhotosPerDayMonth,
     getRandomLabels,
-    getRandomLocations, reprocess,
+    getRandomLocations, removeSuggestion, reprocess,
     searchMediaRanked, uploadFile
 } from "../../database/models/mediaUtils.js";
 import express from "express";
@@ -66,11 +67,17 @@ export default class PhotosModule extends ApiModule {
 
             let album;
             if (success) {
-                album = await Album.create({
-                    id: await getToken(20),
-                    name,
-                });
-                await album.addMedia(foundMedias);
+                try {
+                    await Database.db.transaction({}, async transaction => {
+                        album = await Album.create({
+                            id: await getToken(20),
+                            name,
+                        });
+                        await album.addMedia(foundMedias);
+                    });
+                } catch (e) {
+
+                }
             }
 
             res.send({albumId: album?.id ?? null, successes, success});
@@ -107,16 +114,33 @@ export default class PhotosModule extends ApiModule {
 
         app.post('/photos/renameAlbum', async (req, res) => {
             if (!await Auth.checkRequest(req)) return res.sendStatus(401);
-            let album = await Album.findOne({where: {id: req.body.id}});
-            await album.update({name: req.body.name});
-            res.send(true);
+            try {
+                await Database.db.transaction({}, async transaction => {
+                    let album = await Album.findOne({where: {id: req.body.id}, transaction});
+                    await removeSuggestion({type: 'album', text: album.name}, transaction);
+                    await album.update({name: req.body.name}, {transaction});
+                    await addSuggestion({type: 'album', text: req.body.name, data: req.body.id}, transaction);
+                });
+                res.send(true);
+            } catch (e) {
+                console.warn('rename album error', e);
+                res.sendStatus(500);
+            }
         });
 
         app.post('/photos/deleteAlbum', async (req, res) => {
             if (!await Auth.checkRequest(req)) return res.sendStatus(401);
-            let album = await Album.findOne({where: {id: req.body.id}});
-            await album.destroy();
-            res.send(true);
+            try {
+                await Database.db.transaction({}, async transaction => {
+                    let album = await Album.findOne({where: {id: req.body.id}, transaction});
+                    await removeSuggestion({type: 'album', text: album.name}, transaction);
+                    await album.destroy({transaction});
+                });
+                res.send(true);
+            } catch (e) {
+                console.warn('delete album error', e);
+                res.sendStatus(500);
+            }
         });
 
         app.post('/photos/removeFromAlbum', async (req, res) => {
@@ -156,18 +180,21 @@ export default class PhotosModule extends ApiModule {
             if (!await Auth.checkRequest(req)) return res.sendStatus(401);
             if (typeof req.body.name !== 'string')
                 return res.sendStatus(400);
-
             try {
-                let album = await Album.create({
-                    id: await getToken(20),
-                    name: req.body.name,
+                await Database.db.transaction({}, async transaction => {
+                    let album = await Album.create({
+                        id: await getToken(20),
+                        name: req.body.name,
+                    }, {transaction});
+                    await addSuggestion({type: 'album', text: req.body.name, data: album.id}, transaction);
+                    let ids = req.body.ids;
+                    if (Array.isArray(ids))
+                        await album.addMedia(await Media.findAll({
+                            where: {id: {[Op.in]: ids}},
+                            transaction,
+                        }), {transaction})
+                    res.send({id: album.id});
                 });
-                let ids = req.body.ids;
-                if (Array.isArray(ids))
-                    await album.addMedia(await Media.findAll({
-                        where: {id: {[Op.in]: ids}}
-                    }))
-                res.send({id: album.id});
             } catch (e) {
                 console.warn('createAlbum', e);
                 res.sendStatus(500);
@@ -681,7 +708,7 @@ export default class PhotosModule extends ApiModule {
                 where: {text: {[Op.iLike]: `%${query}%`,},},
                 order: [['count', 'DESC']],
                 limit: 10,
-                attributes: ['text', 'count', 'type'],
+                attributes: ['text', 'count', 'data', 'type'],
             }));
         });
 

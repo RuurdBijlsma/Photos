@@ -19,6 +19,10 @@ export function initSuggestion(sequelize) {
             type: DataTypes.STRING,
             allowNull: false,
         },
+        data:{
+            type: DataTypes.STRING,
+            allowNull: true,
+        },
         count: {
             type: DataTypes.INTEGER,
             defaultValue: 0,
@@ -39,6 +43,7 @@ export function initSuggestion(sequelize) {
                 using: 'gin',
                 operator: 'tsvector_ops',
             },
+            {unique: false, fields: ['data']},
             {unique: false, fields: ['type']},
             {unique: false, fields: ['count']},
         ],
