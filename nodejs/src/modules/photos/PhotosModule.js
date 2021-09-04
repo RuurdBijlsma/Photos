@@ -706,7 +706,10 @@ export default class PhotosModule extends ApiModule {
 
             res.send(await Suggestion.findAll({
                 where: {text: {[Op.iLike]: `%${query}%`,},},
-                order: [['count', 'DESC']],
+                order: [
+                    [sequelize.literal("type='album'"), 'DESC'],
+                    ['count', 'DESC'],
+                ],
                 limit: 10,
                 attributes: ['text', 'count', 'data', 'type'],
             }));
