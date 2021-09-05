@@ -15,6 +15,10 @@ export function initAlbum(sequelize) {
             type: DataTypes.STRING,
             allowNull: false,
         },
+        cover: {
+            type: DataTypes.STRING,
+            allowNull: false,
+        },
     }, {
         sequelize,
         indexes: [

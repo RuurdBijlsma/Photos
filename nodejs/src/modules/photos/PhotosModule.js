@@ -8,13 +8,13 @@ import mime from 'mime-types'
 import {
     addSuggestion,
     autoFixDate,
-    changeMediaDate, createZip, deleteFile, dropAndReprocess, getAlbums,
+    changeMediaDate, createZip, deleteFile, dropAndReprocess,
     getBoundingBox, getGlossary,
     getMonthPhotos,
     getPhotoMonths, getPhotosForMonth, getPhotosPerDayMonth,
     getRandomLabels,
-    getRandomLocations, removeSuggestion, reprocess,
-    searchMediaRanked, uploadFile
+    getRandomLocations, injectAlbumCounts, removeSuggestion, reprocess,
+    searchMediaRanked, setDefaultAlbumCover, uploadFile
 } from "../../database/models/mediaUtils.js";
 import express from "express";
 import geocode from "./reverse-geocode.js";
@@ -153,6 +153,9 @@ export default class PhotosModule extends ApiModule {
                 await album.removeMedia(await Media.findAll({
                     where: {id: {[Op.in]: ids}}
                 }));
+                if (ids.includes(album.cover)) {
+                    await setDefaultAlbumCover(album);
+                }
                 res.send(true);
             } catch (e) {
                 console.warn('remove from album', e);
@@ -176,18 +179,34 @@ export default class PhotosModule extends ApiModule {
             }
         });
 
+        app.post('/photos/setAlbumCover', async (req, res) => {
+            if (!await Auth.checkRequest(req)) return res.sendStatus(401);
+            try {
+                let album = await Album.findOne({where: {id: req.body.id}});
+                await album.update({
+                    cover: req.body.cover,
+                });
+                res.send(true);
+            } catch (e) {
+                console.warn('setAlbumCover', e);
+                res.sendStatus(500);
+            }
+        });
+
         app.post('/photos/createAlbum', async (req, res) => {
             if (!await Auth.checkRequest(req)) return res.sendStatus(401);
             if (typeof req.body.name !== 'string')
                 return res.sendStatus(400);
             try {
                 await Database.db.transaction({}, async transaction => {
+                    let ids = req.body.ids;
+                    let cover = Array.isArray(ids) && ids.length > 0 ? ids[Math.floor(ids.length / 2)] : '';
                     let album = await Album.create({
                         id: await getToken(20),
                         name: req.body.name,
+                        cover,
                     }, {transaction});
                     await addSuggestion({type: 'album', text: req.body.name, data: album.id}, transaction);
-                    let ids = req.body.ids;
                     if (Array.isArray(ids))
                         await album.addMedia(await Media.findAll({
                             where: {id: {[Op.in]: ids}},
@@ -203,7 +222,11 @@ export default class PhotosModule extends ApiModule {
 
         app.post('/photos/getAlbums', async (req, res) => {
             if (!await Auth.checkRequest(req)) return res.sendStatus(401);
-            res.send(await getAlbums());
+            let albums = await Album.findAll({
+                limit: req.body.limit ?? 500,
+                offset: req.body.offset ?? 0,
+            });
+            res.send(await injectAlbumCounts(albums));
         });
 
         app.get('/photos/album/:id', async (req, res) => {
@@ -783,9 +806,12 @@ export default class PhotosModule extends ApiModule {
                     include: [
                         {model: Classification, include: [Label, Glossary]},
                         {model: Location, include: [Place]},
+                        {model: Album},
                     ],
                     attributes: ['id', 'type', 'subType', 'filename', 'width', 'height', 'durationMs', 'bytes', 'createDateString', 'exif'],
                 });
+                let albums = await injectAlbumCounts(item.Albums);
+                item = {...item.toJSON(), Albums: albums};
             } else {
                 item = await Media.findOne({
                     where: {id},

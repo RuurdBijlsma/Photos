@@ -73,6 +73,25 @@ export async function initTables(db) {
     Album.belongsToMany(Media, {through: {model: AlbumMedia, unique: false}});
 }
 
+export async function injectAlbumCounts(albums) {
+    let counts = await Promise.all(albums.map(album => Database.db.query(`
+                        select count(*)
+                        from "AlbumMedia"
+                        where "AlbumId" = $1
+                    `, {
+        bind: [album.id],
+        type: sequelize.QueryTypes.SELECT,
+    })));
+    let result = [];
+    for (let i = 0; i < albums.length; i++) {
+        result.push({
+            ...albums[i].toJSON(),
+            count: counts[i]?.[0]?.count,
+        });
+    }
+    return result;
+}
+
 export async function getAlbums() {
     return await Database.db.query(`
         WITH summary AS (
@@ -740,6 +759,23 @@ export async function insertMedia(data, transaction = null) {
         throw new Error(err);
         // do something with the err.
     }
+}
+
+export async function setDefaultAlbumCover(album) {
+    let newCover = await Database.db.query(`
+                        select "MediumId"
+                        from "AlbumMedia"
+                        where "AlbumId" = $1
+                        offset (
+                            select count(*) / 2
+                            from "AlbumMedia"
+                            where "AlbumId" = $1
+                        ) limit 1
+                    `, {bind: [album.id], type: sequelize.QueryTypes.SELECT});
+    await album.update({
+        cover: newCover?.[0]?.MediumId ?? '',
+    });
+    return album;
 }
 
 async function swapWidthAndHeightOnPortraitPhotos() {
