@@ -1,5 +1,5 @@
 # Dockerfile
-FROM node:buster-slim
+FROM node:16-buster-slim
 
 # Install dependencies via apt
 RUN apt-get update && \

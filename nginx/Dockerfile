@@ -1,5 +1,5 @@
 # Dockerfile
-FROM node:buster-slim as build-stage
+FROM node:16-buster-slim as build-stage
 WORKDIR /frontend
 COPY ./frontend/. .
 COPY ./env/. ./src/env/.
