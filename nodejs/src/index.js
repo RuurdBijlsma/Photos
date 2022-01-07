@@ -1,6 +1,6 @@
 import ApiController from "./Controller.js";
 import Commander from 'commander';
-import pJson from '../package.json'
+import pJson from '../package.json' assert {type: 'json'}
 
 Commander
     .version(pJson.version)
