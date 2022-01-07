@@ -372,9 +372,9 @@ export async function getMonthPhotos(year, month) {
 
 export async function getPhotoMonths() {
     return await Database.db.query(`
-        select extract(year from "createDate")                       as year,
-               extract(month from "createDate")                      as month,
-               count(*)::INT                                         as count
+        select extract(year from "createDate")::INT  as year,
+               extract(month from "createDate")::INT as month,
+               count(*)::INT                         as count
         from "Media"
         where "createDate" is not null
         group by year, month

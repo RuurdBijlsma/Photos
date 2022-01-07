@@ -678,7 +678,8 @@ export default class PhotosModule extends ApiModule {
 
         app.post('/photos/months', async (req, res) => {
             if (!await Auth.checkRequest(req)) return res.sendStatus(401);
-            res.send(await getPhotoMonths());
+            let result = await getPhotoMonths();
+            res.send(result);
         });
 
         app.post('/photos/list', async (req, res) => {
