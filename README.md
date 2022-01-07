@@ -47,6 +47,10 @@ Possible search features
 
 ![f](https://github.com/ruurdbijlsma/Photos/blob/master/.gh/place-search.png?raw=true)
 
+### Import albums from Google Photos
+
+![f](https://github.com/ruurdbijlsma/Photos/blob/master/.gh/import.png?raw=true)
+
 ### Dark theme
 
 ![f](https://github.com/ruurdbijlsma/Photos/blob/master/.gh/home-dark.png?raw=true)
