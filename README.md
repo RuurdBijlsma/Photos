@@ -41,7 +41,7 @@ Possible search features
 * Place taken (country, province, municipality, city)
 * Date taken
 * Filename
-* Filetype.
+* Filetype
 
 ![f](https://github.com/ruurdbijlsma/Photos/blob/master/.gh/thing-search.png?raw=true)
 

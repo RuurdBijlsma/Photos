@@ -8,13 +8,24 @@ import mime from 'mime-types'
 import {
     addSuggestion,
     autoFixDate,
-    changeMediaDate, createZip, deleteFile, dropAndReprocess,
-    getBoundingBox, getGlossary,
+    changeMediaDate,
+    createZip,
+    deleteFile,
+    dropAndReprocess,
+    getBoundingBox,
+    getGlossary,
     getMonthPhotos,
-    getPhotoMonths, getPhotosForMonth, getPhotosPerDayMonth,
+    getPhotoMonths,
+    getPhotosForMonth,
+    getPhotosPerDayMonth,
     getRandomLabels,
-    getRandomLocations, injectAlbumCounts, removeSuggestion, reprocess,
-    searchMediaRanked, setDefaultAlbumCover, uploadFile
+    getRandomLocations,
+    injectAlbumCounts,
+    removeSuggestion,
+    reprocess,
+    searchMediaRanked,
+    setDefaultAlbumCover,
+    uploadFile
 } from "../../database/models/mediaUtils.js";
 import express from "express";
 import geocode from "./reverse-geocode.js";
@@ -56,7 +67,8 @@ export default class PhotosModule extends ApiModule {
             if (!await Auth.checkRequest(req)) return res.sendStatus(401);
             let filenames = req.body.filenames;
             let name = req.body.name;
-            if (typeof name !== 'string' || !Array.isArray(filenames))
+            const coverFilename = req.body.coverFilename;
+            if (typeof name !== 'string' || !Array.isArray(filenames) || typeof coverFilename !== 'string')
                 return res.sendStatus(400);
             let medias = await Promise.all(
                 filenames.map(filename => Media.findOne({where: {filename}}))
@@ -67,16 +79,25 @@ export default class PhotosModule extends ApiModule {
 
             let album;
             if (success) {
+                let coverMedia = foundMedias.find(m => m.filename === coverFilename);
+                let cover;
+                if (coverMedia) {
+                    cover = coverMedia.id;
+                } else {
+                    const ids = foundMedias.map(m => m.id);
+                    cover = Array.isArray(ids) && ids.length > 0 ? ids[Math.floor(ids.length / 2)] : '';
+                }
                 try {
                     await Database.db.transaction({}, async transaction => {
                         album = await Album.create({
                             id: await getToken(20),
                             name,
+                            cover,
                         });
                         await album.addMedia(foundMedias);
                     });
                 } catch (e) {
-
+                    console.warn("Couldn't create album during importAlbum", e);
                 }
             }
 
