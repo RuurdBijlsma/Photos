@@ -3,6 +3,7 @@
 version: '3.8'
 services:
   postgres:
+    restart: unless-stopped
     container_name: postgres
     image: postgres:14
     environment:
@@ -16,6 +17,7 @@ services:
       - photos-db:/var/lib/postgresql/data
 
   photos:
+    restart: unless-stopped
     container_name: photos
     build:
       context: ./nodejs
@@ -45,6 +47,7 @@ services:
       - ${BACKUPS_DIR}:/backups
 
   nginx:
+    restart: unless-stopped
     container_name: nginx
     build:
       context: ./nginx
