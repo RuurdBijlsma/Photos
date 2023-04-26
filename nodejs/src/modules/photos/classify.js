@@ -11,8 +11,8 @@ const wordnet = new WordNet();
 let model, labels, syns;
 
 async function initClassifier() {
-    labels = await fs.promises.readFile('./res/classifier/labels.txt').then(f => f.toString().split(EOL));
-    syns = await fs.promises.readFile('./res/classifier/syns.txt').then(f => f.toString().split(EOL));
+    labels = await fs.promises.readFile('./res/classifier/labels.txt').then(f => f.toString().split("\n"));
+    syns = await fs.promises.readFile('./res/classifier/syns.txt').then(f => f.toString().split("\n"));
 
     // https://tfhub.dev/google/imagenet/inception_resnet_v2/classification/5
     let modelPath = path.resolve('./res/classifier/inceptionresnet/model.json');
@@ -85,6 +85,7 @@ async function getLabelWord(idx) {
         let glossaries = hierarchy.map(w => ({text: w.glossary, level: w.index}));
         return {labels, glossaries};
     } catch (e) {
+        console.warn("get classification label error: ", e);
         return {labels: [labels[idx]], glossaries: []};
     }
 }
