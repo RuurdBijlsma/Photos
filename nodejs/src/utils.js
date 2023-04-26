@@ -3,7 +3,8 @@ import fs from "fs";
 import os from "os";
 
 export const freeGb = os.freemem() / 1000000000;
-export const batchSize = Math.min(Math.max(1, Math.ceil(freeGb)), 30);
+// export const batchSize = Math.min(Math.max(1, Math.ceil(freeGb)), 30);
+export const batchSize = 1;
 export const months = ['January', 'February', 'March', 'April', 'May', 'June',
     'July', 'August', 'September', 'October', 'November', 'December'];
 export const shortMonths = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];

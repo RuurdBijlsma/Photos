@@ -1,4 +1,3 @@
-import exif from "exif";
 import parseDMS from "parse-dms";
 import ffmpeg from './promise-ffmpeg.js'
 import fs from "fs";
@@ -12,10 +11,11 @@ import {temp} from "./watchAndSynchonize.js";
 import {exec} from "child_process";
 import Clog from '../../Clog.js'
 import getExifModule from "get-exif";
+import exif from 'node-exif'
+
+const ExifImage = exif.ExifImage;
 
 const console = new Clog('exif');
-
-const {ExifImage} = exif;
 
 export async function transferExif(sourceFile, destinationFile) {
     console.log(`Transferring exif from ${sourceFile} to ${destinationFile}`);
