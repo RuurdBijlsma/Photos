@@ -48,7 +48,6 @@ class Controller {
             });
             console.log("Created new user");
         }
-
         this.setRoutes();
 
         server.listen(port, () =>

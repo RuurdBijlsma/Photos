@@ -1,13 +1,13 @@
-import {initUser} from "./models/UserModel.js";
-import {initTables} from "./models/mediaUtils.js";
+import { initUser } from "./models/UserModel.js";
+import { initTables } from "./models/mediaUtils.js";
 import path from "path";
-import {exec} from "child_process";
-import {Sequelize} from "sequelize";
-import {checkFileExists} from "../utils.js";
+import { exec } from "child_process";
+import { Sequelize } from "sequelize";
+import { checkFileExists } from "../utils.js";
 import config from "../config.js";
 import Clog from "../Clog.js";
 import DbInfo from "./DbInfo.js";
-import {LogSession} from "./models/LogSessionModel.js";
+import { LogSession } from "./models/LogSessionModel.js";
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -58,10 +58,10 @@ class Database {
                         return reject(error);
                     }
                 }).on('close',
-                () => {
-                    console.log("Backup complete");
-                    resolve();
-                });
+                    () => {
+                        console.log("Backup complete");
+                        resolve();
+                    });
         });
     }
 
@@ -106,11 +106,11 @@ class Database {
                         return resolve(false);
                     }
                 }).on('close',
-                () => {
-                    console.log("Restore complete");
-                    process.exit(0);
-                    resolve(true);
-                }), 1000);
+                    () => {
+                        console.log("Restore complete");
+                        process.exit(0);
+                        resolve(true);
+                    }), 1000);
         });
     }
 
@@ -142,8 +142,11 @@ class Database {
                     ssl: this.dbConfig.ssl,
                 },
                 pool: {
-                    acquire: 20000,
+                    acquire: 10000,
                 },
+                dialectOptions: {
+                    appName: 'photos_server'
+                }
             });
         await this.setDb(db);
         return db;
