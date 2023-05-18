@@ -20,6 +20,7 @@ nodejs/res/thumbnails
 nodejs/res/geonames/*
 !nodejs/res/geonames/geocode_files_will_dump_here
 
+.vscode/*
 .idea
 files
 secrets.json
