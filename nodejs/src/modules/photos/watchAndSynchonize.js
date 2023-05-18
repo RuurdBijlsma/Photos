@@ -52,7 +52,10 @@ export async function watchAndSynchronize() {
     // else return console.warn("NOT WATCHING AND SYNCHRONIZING ON WINDOWS");
 
     console.log("Watching", config.media);
+    global.dontWatch = false;
     fs.watch(config.media, async (eventType, filename) => {
+        console.log("Watch fire! global.dontWatch = ", global.dontWatch);
+        if(global.dontWatch) return;
         if (eventType === 'rename') {
             try {
                 let changedFile = path.join(config.media, filename);

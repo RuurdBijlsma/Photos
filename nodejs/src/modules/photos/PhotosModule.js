@@ -1,7 +1,7 @@
 import ApiModule from "../../ApiModule.js";
-import {processMedia, watchAndSynchronize} from "./watchAndSynchonize.js";
+import { processMedia, watchAndSynchronize } from "./watchAndSynchonize.js";
 import Clog from "../../Clog.js";
-import {Media} from "../../database/models/MediaModel.js";
+import { Media } from "../../database/models/MediaModel.js";
 import config from "../../config.js";
 import path from "path";
 import mime from 'mime-types'
@@ -31,24 +31,24 @@ import express from "express";
 import geocode from "./reverse-geocode.js";
 import Auth from "../../database/Auth.js";
 import sequelize from "sequelize";
-import {Suggestion} from "../../database/models/SuggestionModel.js";
+import { Suggestion } from "../../database/models/SuggestionModel.js";
 import Database from "../../database/Database.js";
-import {Location} from "../../database/models/LocationModel.js";
-import {Blocked} from "../../database/models/BlockedModel.js";
-import {batchSize, checkFileExists, getToken, isDate} from "../../utils.js";
-import {Log} from "../../database/models/LogModel.js";
+import { Location } from "../../database/models/LocationModel.js";
+import { Blocked } from "../../database/models/BlockedModel.js";
+import { batchSize, checkFileExists, getToken, isDate } from "../../utils.js";
+import { Log } from "../../database/models/LogModel.js";
 import DbInfo from "../../database/DbInfo.js";
-import {rotateImage} from "./transcode.js";
+import { rotateImage } from "./transcode.js";
 import fs from "fs";
-import {Album} from "../../database/models/AlbumModel.js";
-import {google} from "googleapis";
+import { Album } from "../../database/models/AlbumModel.js";
+import { google } from "googleapis";
 import Photos from "googlephotos";
-import {Classification} from "../../database/models/ClassificationModel.js";
-import {Label} from "../../database/models/LabelModel.js";
-import {Glossary} from "../../database/models/GlossaryModel.js";
-import {Place} from "../../database/models/PlaceModel.js";
+import { Classification } from "../../database/models/ClassificationModel.js";
+import { Label } from "../../database/models/LabelModel.js";
+import { Glossary } from "../../database/models/GlossaryModel.js";
+import { Place } from "../../database/models/PlaceModel.js";
 
-const {Op} = sequelize;
+const { Op } = sequelize;
 const console = new Clog("PhotosModule");
 
 export default class PhotosModule extends ApiModule {
@@ -71,7 +71,7 @@ export default class PhotosModule extends ApiModule {
             if (typeof name !== 'string' || !Array.isArray(filenames) || typeof coverFilename !== 'string')
                 return res.sendStatus(400);
             let medias = await Promise.all(
-                filenames.map(filename => Media.findOne({where: {filename}}))
+                filenames.map(filename => Media.findOne({ where: { filename } }))
             );
             let foundMedias = medias.filter(m => !!m);
             let successes = medias.map(m => +!!m);
@@ -101,7 +101,7 @@ export default class PhotosModule extends ApiModule {
                 }
             }
 
-            res.send({albumId: album?.id ?? null, successes, success});
+            res.send({ albumId: album?.id ?? null, successes, success });
         });
 
         app.post('/photos/googleAuthTokens', async (req, res) => {
@@ -109,7 +109,7 @@ export default class PhotosModule extends ApiModule {
             const oauth2Client = this.googleAuths[req.body.clientId];
 
             try {
-                const {tokens} = await oauth2Client.getToken(req.body.code);
+                const { tokens } = await oauth2Client.getToken(req.body.code);
                 oauth2Client.setCredentials(tokens);
                 res.send(tokens);
             } catch (e) {
@@ -130,17 +130,17 @@ export default class PhotosModule extends ApiModule {
                 scope: scopes,
             });
 
-            res.send({url});
+            res.send({ url });
         });
 
         app.post('/photos/renameAlbum', async (req, res) => {
             if (!await Auth.checkRequest(req)) return res.sendStatus(401);
             try {
                 await Database.db.transaction({}, async transaction => {
-                    let album = await Album.findOne({where: {id: req.body.id}, transaction});
-                    await removeSuggestion({type: 'album', text: album.name}, transaction);
-                    await album.update({name: req.body.name}, {transaction});
-                    await addSuggestion({type: 'album', text: req.body.name, data: req.body.id}, transaction);
+                    let album = await Album.findOne({ where: { id: req.body.id }, transaction });
+                    await removeSuggestion({ type: 'album', text: album.name }, transaction);
+                    await album.update({ name: req.body.name }, { transaction });
+                    await addSuggestion({ type: 'album', text: req.body.name, data: req.body.id }, transaction);
                 });
                 res.send(true);
             } catch (e) {
@@ -153,9 +153,9 @@ export default class PhotosModule extends ApiModule {
             if (!await Auth.checkRequest(req)) return res.sendStatus(401);
             try {
                 await Database.db.transaction({}, async transaction => {
-                    let album = await Album.findOne({where: {id: req.body.id}, transaction});
-                    await removeSuggestion({type: 'album', text: album.name}, transaction);
-                    await album.destroy({transaction});
+                    let album = await Album.findOne({ where: { id: req.body.id }, transaction });
+                    await removeSuggestion({ type: 'album', text: album.name }, transaction);
+                    await album.destroy({ transaction });
                 });
                 res.send(true);
             } catch (e) {
@@ -169,10 +169,10 @@ export default class PhotosModule extends ApiModule {
             let ids = req.body.ids;
             if (!Array.isArray(ids)) return res.sendStatus(400);
             try {
-                let album = await Album.findOne({where: {id: req.body.id}});
+                let album = await Album.findOne({ where: { id: req.body.id } });
                 if (album === null) return res.sendStatus(404);
                 await album.removeMedia(await Media.findAll({
-                    where: {id: {[Op.in]: ids}}
+                    where: { id: { [Op.in]: ids } }
                 }));
                 if (ids.includes(album.cover)) {
                     await setDefaultAlbumCover(album);
@@ -187,11 +187,11 @@ export default class PhotosModule extends ApiModule {
         app.post('/photos/addToAlbum', async (req, res) => {
             if (!await Auth.checkRequest(req)) return res.sendStatus(401);
             try {
-                let album = await Album.findOne({where: {id: req.body.id}});
+                let album = await Album.findOne({ where: { id: req.body.id } });
                 let ids = req.body.ids;
                 if (!Array.isArray(ids)) return res.sendStatus(400);
                 await album.addMedia(await Media.findAll({
-                    where: {id: {[Op.in]: ids}}
+                    where: { id: { [Op.in]: ids } }
                 }));
                 res.send(true);
             } catch (e) {
@@ -203,7 +203,7 @@ export default class PhotosModule extends ApiModule {
         app.post('/photos/setAlbumCover', async (req, res) => {
             if (!await Auth.checkRequest(req)) return res.sendStatus(401);
             try {
-                let album = await Album.findOne({where: {id: req.body.id}});
+                let album = await Album.findOne({ where: { id: req.body.id } });
                 await album.update({
                     cover: req.body.cover,
                 });
@@ -226,14 +226,14 @@ export default class PhotosModule extends ApiModule {
                         id: await getToken(20),
                         name: req.body.name,
                         cover,
-                    }, {transaction});
-                    await addSuggestion({type: 'album', text: req.body.name, data: album.id}, transaction);
+                    }, { transaction });
+                    await addSuggestion({ type: 'album', text: req.body.name, data: album.id }, transaction);
                     if (Array.isArray(ids))
                         await album.addMedia(await Media.findAll({
-                            where: {id: {[Op.in]: ids}},
+                            where: { id: { [Op.in]: ids } },
                             transaction,
-                        }), {transaction})
-                    res.send({id: album.id});
+                        }), { transaction })
+                    res.send({ id: album.id });
                 });
             } catch (e) {
                 console.warn('createAlbum', e);
@@ -269,7 +269,7 @@ export default class PhotosModule extends ApiModule {
             }
             try {
                 let result = await Album.findOne({
-                    where: {id: req.params.id},
+                    where: { id: req.params.id },
                     include: [{
                         model: Media,
                         attributes: ['id', 'type', 'subType', 'durationMs', 'createDateString', 'width', 'height'],
@@ -312,13 +312,13 @@ export default class PhotosModule extends ApiModule {
 
         app.post('/photos/clearErrors', async (req, res) => {
             if (!await Auth.checkRequest(req)) return res.sendStatus(401);
-            await Blocked.destroy({where: {reason: 'error'}});
+            await Blocked.destroy({ where: { reason: 'error' } });
             res.send(true);
         });
 
         app.post('/photos/clearTrash', async (req, res) => {
             if (!await Auth.checkRequest(req)) return res.sendStatus(401);
-            await Blocked.destroy({where: {reason: 'deleted'}});
+            await Blocked.destroy({ where: { reason: 'deleted' } });
             res.send(true);
         });
 
@@ -329,7 +329,7 @@ export default class PhotosModule extends ApiModule {
             if (typeof id !== 'string' || typeof angle !== "number" || typeof saveCopy !== "boolean")
                 return res.status(400).send('Angle, id or saveCopy in body are wrong.');
             if (!await Auth.checkRequest(req)) return res.sendStatus(401);
-            let media = await Media.findOne({where: {id}});
+            let media = await Media.findOne({ where: { id } });
             if (media === null) return res.sendStatus(404);
 
             let newFileName = media.filePath;
@@ -341,6 +341,7 @@ export default class PhotosModule extends ApiModule {
                     newFileName = `${baseFile}(${i++})${ext}`;
                 } while (await checkFileExists(path.join(config.media, newFileName)));
             }
+            global.dontWatch = true;
             try {
                 let success = await rotateImage(path.join(config.media, media.filePath), angle, path.join(config.media, newFileName));
                 if (success) {
@@ -348,14 +349,16 @@ export default class PhotosModule extends ApiModule {
                         await processMedia(path.join(config.media, newFileName)) :
                         await dropAndReprocess(id, path.join(config.media, newFileName));
                     if (newId === false)
-                        return res.send({success: false, id: null});
-                    res.send({success: true, id: newId});
+                        return res.send({ success: false, id: null });
+                    res.send({ success: true, id: newId });
                 } else {
-                    res.send({success: false, id: null});
+                    res.send({ success: false, id: null });
                 }
             } catch (e) {
                 console.warn(`Couldn't rotate image ${media.filePath}`, e.message);
-                res.send({success: false, id: null});
+                res.send({ success: false, id: null });
+            } finally {
+                global.dontWatch = false;
             }
         });
 
@@ -378,7 +381,7 @@ export default class PhotosModule extends ApiModule {
             console.log('Receiving file upload');
             let authenticated;
             try {
-                let {email, password} = req.body;
+                let { email, password } = req.body;
                 authenticated = await Auth.check(email, password);
             } catch (e) {
                 authenticated = false;
@@ -397,7 +400,7 @@ export default class PhotosModule extends ApiModule {
                     console.warn('upload error', e);
                 }
             }
-            res.send({success: true, results});
+            res.send({ success: true, results });
         });
 
         app.post('/photos/mapboxToken', async (req, res) => {
@@ -410,7 +413,7 @@ export default class PhotosModule extends ApiModule {
             if (typeof req.body.token !== 'string') return res.sendStatus(400);
             let user = await Auth.checkRequest(req);
             if (!user) return res.sendStatus(401);
-            await user.update({mapboxToken: req.body.token});
+            await user.update({ mapboxToken: req.body.token });
             res.send(true);
         });
 
@@ -425,10 +428,10 @@ export default class PhotosModule extends ApiModule {
             }
 
             let items = await Media.findAll({
-                where: {id: {[Op.in]: ids}}
+                where: { id: { [Op.in]: ids } }
             });
             let zipId = await createZip(items.map(i => path.join(config.media, i.filePath)));
-            res.send({zipId});
+            res.send({ zipId });
         });
 
         app.post('/photos/batchDelete', async (req, res) => {
@@ -449,7 +452,7 @@ export default class PhotosModule extends ApiModule {
             }
             let success = results.every(r => r.success);
 
-            res.send({success, results});
+            res.send({ success, results });
         });
 
         app.post('/photos/batchFixDate', async (req, res) => {
@@ -463,14 +466,14 @@ export default class PhotosModule extends ApiModule {
                 let slice = ids.slice(i, i + batchSize);
                 console.log(`Fixing dates [${i}-${Math.min(ids.length, i + batchSize)} / ${ids.length}]`);
                 try {
-                    results.push(...await Promise.all(slice.map(autoFixDate)).then(s => s.map(success => ({success}))));
+                    results.push(...await Promise.all(slice.map(autoFixDate)).then(s => s.map(success => ({ success }))));
                 } catch (e) {
                     console.warn('Fixing dates error', e);
                 }
             }
             let success = results.every(r => r.success);
 
-            res.send({success, results});
+            res.send({ success, results });
         });
 
         app.post('/photos/batchReprocess', async (req, res) => {
@@ -491,7 +494,7 @@ export default class PhotosModule extends ApiModule {
             }
             let success = results.every(r => r.success);
 
-            res.send({success, results});
+            res.send({ success, results });
         });
 
         app.post('/photos/deleteItem/:id', async (req, res) => {
@@ -513,7 +516,7 @@ export default class PhotosModule extends ApiModule {
             const id = req.params.id;
             if (typeof id !== 'string') return res.sendStatus(400);
             if (!await Auth.checkRequest(req)) return res.sendStatus(401);
-            let item = await Media.findOne({where: {id}});
+            let item = await Media.findOne({ where: { id } });
             if (item === null) return res.sendStatus(404);
 
             let date = new Date(req.body.date);
@@ -534,7 +537,7 @@ export default class PhotosModule extends ApiModule {
             try {
                 let result = await reprocess(id);
                 if (result.code) return res.sendStatus(result.code);
-                res.send({id: result.id});
+                res.send({ id: result.id });
             } catch (e) {
                 res.sendStatus(500);
             }
@@ -550,7 +553,7 @@ export default class PhotosModule extends ApiModule {
             let result = await Database.db.query(`
                 select min(latitude) as minlat, max(latitude) maxlat, min(longitude) minlng, max(longitude) maxlng
                 from "Locations"
-            `, {type: sequelize.QueryTypes.SELECT});
+            `, { type: sequelize.QueryTypes.SELECT });
             if (Array.isArray(result) && result.length > 0)
                 res.send(result[0])
             else
@@ -569,13 +572,13 @@ export default class PhotosModule extends ApiModule {
                   and text != 'device'
                 order by rcount desc
                 limit 1
-           `, {type: sequelize.QueryTypes.SELECT});
+           `, { type: sequelize.QueryTypes.SELECT });
             res.send(result?.[0]);
         });
 
         app.post('/photos/photosInBounds', async (req, res) => {
             try {
-                let {minLat, maxLat, minLng, maxLng, startDate, endDate} = req.body;
+                let { minLat, maxLat, minLng, maxLng, startDate, endDate } = req.body;
                 startDate = new Date(startDate);
                 endDate = new Date(endDate);
                 let whereSpread = {};
@@ -638,11 +641,11 @@ export default class PhotosModule extends ApiModule {
             if (!await Auth.checkRequest(req)) return res.sendStatus(401);
 
             let result = await Suggestion.findOne({
-                where: {type: 'place', text: {[Op.iLike]: `${place}`,},},
+                where: { type: 'place', text: { [Op.iLike]: `${place}`, }, },
                 attributes: ['text'],
             })
 
-            res.send({isPlace: result !== null, name: result?.text ?? null});
+            res.send({ isPlace: result !== null, name: result?.text ?? null });
         });
 
         app.post('/photos/defineLabel/:label', async (req, res) => {
@@ -651,11 +654,11 @@ export default class PhotosModule extends ApiModule {
             if (!await Auth.checkRequest(req)) return res.sendStatus(401);
 
             let result = await Suggestion.findOne({
-                where: {type: 'label', text: label},
+                where: { type: 'label', text: label },
                 attributes: ['text'],
             });
             if (result === null)
-                return res.send({isLabel: false, glossary: null});
+                return res.send({ isLabel: false, glossary: null });
             res.send(getGlossary(label));
         });
 
@@ -663,12 +666,12 @@ export default class PhotosModule extends ApiModule {
             const filePath = req.body.filePath;
             if (typeof filePath !== 'string') return res.sendStatus(400);
             if (!await Auth.checkRequest(req)) return res.sendStatus(401);
-            let item = await Blocked.findOne({where: {filePath}});
+            let item = await Blocked.findOne({ where: { filePath } });
             if (item !== null)
                 await item.destroy();
             try {
                 let result = await processMedia(path.join(config.media, filePath));
-                res.send({success: result !== false, id: result});
+                res.send({ success: result !== false, id: result });
             } catch (e) {
                 res.sendStatus(500);
             }
@@ -726,7 +729,7 @@ export default class PhotosModule extends ApiModule {
             let now = +new Date();
             const refreshEvery = 1000 * 60 * 5;// 15 minutes
             if (!this.randomLocations || this.randomLocations.date + refreshEvery < now) {
-                this.randomLocations = {date: now, locations: getRandomLocations(15)};
+                this.randomLocations = { date: now, locations: getRandomLocations(15) };
             }
             let locations = await this.randomLocations.locations;
             res.send(locations);
@@ -737,7 +740,7 @@ export default class PhotosModule extends ApiModule {
             let now = +new Date();
             const refreshEvery = 1000 * 60 * 5;// 15 minutes
             if (!this.randomLabels || this.randomLabels.date + refreshEvery < now) {
-                this.randomLabels = {date: now, labels: getRandomLabels(15)};
+                this.randomLabels = { date: now, labels: getRandomLabels(15) };
             }
             let labels = await this.randomLabels.labels;
             res.send(labels);
@@ -750,7 +753,7 @@ export default class PhotosModule extends ApiModule {
             query = query.split(' ').filter(n => n.length > 0).join(' ');
 
             res.send(await Suggestion.findAll({
-                where: {text: {[Op.iLike]: `%${query}%`,},},
+                where: { text: { [Op.iLike]: `%${query}%`, }, },
                 order: [
                     [sequelize.literal("type='album'"), 'DESC'],
                     ['count', 'DESC'],
@@ -767,10 +770,10 @@ export default class PhotosModule extends ApiModule {
             const subTypes = ['portrait', 'vr', 'slomo', 'animation'];
 
             let dateMeta = isDate(query);
-            let meta = subTypes.includes(query) ? {type: 'subType'} :
-                dateMeta.type !== 'none' ? {type: 'date'} :
+            let meta = subTypes.includes(query) ? { type: 'subType' } :
+                dateMeta.type !== 'none' ? { type: 'date' } :
                     await Suggestion.findOne({
-                        where: {text: {[Op.iLike]: `${query}`}},
+                        where: { text: { [Op.iLike]: `${query}` } },
                         attributes: ['text', 'type'],
                     });
             let type = null, info = null;
@@ -780,7 +783,7 @@ export default class PhotosModule extends ApiModule {
                     info = meta.text;
                     console.log(info);
                 } else if (meta.type === 'label') {
-                    let {isLabel, glossary} = await getGlossary(query);
+                    let { isLabel, glossary } = await getGlossary(query);
                     if (isLabel) {
                         info = glossary;
                         type = 'label';
@@ -792,7 +795,7 @@ export default class PhotosModule extends ApiModule {
 
             let results;
             if (type === 'subType') {
-                results = await Media.findAll({where: {subType: query}});
+                results = await Media.findAll({ where: { subType: query } });
             } else if (type === 'date') {
                 if (dateMeta.type === 'month') {
                     results = await getPhotosForMonth(dateMeta.month);
@@ -805,7 +808,7 @@ export default class PhotosModule extends ApiModule {
                     includedFields: ['id', 'type', 'subType', 'durationMs', 'createDateString', 'width', 'height'],
                 });
             }
-            res.send({results, type, info});
+            res.send({ results, type, info });
         });
 
         app.post('/photos/:id', async (req, res) => {
@@ -824,19 +827,19 @@ export default class PhotosModule extends ApiModule {
             let item;
             if (fullLoad) {
                 item = await Media.findOne({
-                    where: {id},
+                    where: { id },
                     include: [
-                        {model: Classification, include: [Label, Glossary]},
-                        {model: Location, include: [Place]},
-                        {model: Album},
+                        { model: Classification, include: [Label, Glossary] },
+                        { model: Location, include: [Place] },
+                        { model: Album },
                     ],
                     attributes: ['id', 'type', 'subType', 'filename', 'width', 'height', 'durationMs', 'bytes', 'createDateString', 'exif'],
                 });
                 let albums = await injectAlbumCounts(item.Albums);
-                item = {...item.toJSON(), Albums: albums};
+                item = { ...item.toJSON(), Albums: albums };
             } else {
                 item = await Media.findOne({
-                    where: {id},
+                    where: { id },
                     attributes: ['id', 'type', 'subType', 'filename', 'width', 'height', 'durationMs', 'bytes', 'createDateString'],
                 });
             }
@@ -847,7 +850,7 @@ export default class PhotosModule extends ApiModule {
 
         app.get('/photos/blocked/:id', async (req, res) => {
             const id = req.params.id;
-            let item = await Blocked.findOne({where: {id}});
+            let item = await Blocked.findOne({ where: { id } });
             if (item === null)
                 return res.sendStatus(404);
             let file = path.resolve(path.join(config.media, item.filePath));
@@ -856,14 +859,14 @@ export default class PhotosModule extends ApiModule {
                 res.contentType(mimeType);
             }
             if (await checkFileExists(file))
-                res.sendFile(file, {acceptRanges: true});
+                res.sendFile(file, { acceptRanges: true });
             else
                 res.sendStatus(404);
         });
 
         app.get('/photos/full/:id', async (req, res) => {
             const id = req.params.id;
-            let item = await Media.findOne({where: {id}});
+            let item = await Media.findOne({ where: { id } });
             if (item === null)
                 return res.sendStatus(404);
             let file = path.resolve(path.join(config.media, item.filePath));
@@ -871,12 +874,12 @@ export default class PhotosModule extends ApiModule {
                 let mimeType = mime.lookup(path.extname(item.filename));
                 res.contentType(mimeType);
             }
-            res.sendFile(file, {acceptRanges: true});
+            res.sendFile(file, { acceptRanges: true });
         });
 
         console.log("Initializing geocoder");
         console.time("Init geocoder");
-        await geocode({latitude: 50, longitude: 5});
+        await geocode({ latitude: 50, longitude: 5 });
         console.log("Initialized geocoder");
         console.timeEnd("Init geocoder");
         await watchAndSynchronize()

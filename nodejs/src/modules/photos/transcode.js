@@ -3,7 +3,7 @@ import Clog from '../../Clog.js'
 import Canvas from "canvas";
 import {imageSize, transferExif} from "./exif.js";
 import fs from "fs";
-import { ExifImage } from "exif";
+import ExifImage from "exif";
 
 const {loadImage, createCanvas} = Canvas;
 const console = new Clog('transcode');
