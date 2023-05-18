@@ -118,13 +118,13 @@ export async function deleteOldLogs(cutoffDate = null) {
     const day = 1000 * 60 * 60 * 24;
     cutoffDate ??= new Date(Date.now() - day * 7);
     console.log("Deleting log sessions older than", cutoffDate);
-    await LogSession.destroy({
-        where: {
-            createdAt: {
-                [Op.lte]: cutoffDate,
-            },
-        },
-    });
+    // await LogSession.destroy({
+    //     where: {
+    //         createdAt: {
+    //             [Op.lte]: cutoffDate,
+    //         },
+    //     },
+    // });
     console.log("Done deleting log");
 }
 
