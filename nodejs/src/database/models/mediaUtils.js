@@ -125,6 +125,7 @@ export async function deleteOldLogs(cutoffDate = null) {
             },
         },
     });
+    console.log("Done deleting log");
 }
 
 export async function deleteOldZips(cutoffDate = null) {
