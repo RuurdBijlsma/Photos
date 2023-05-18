@@ -107,7 +107,6 @@ async function syncFiles() {
     // Find and remove all database entries that don't have an associated file
     let count = await Media.count();
     if (files.length !== count) {
-        console.log(`Removing some files, count: ${count}`)
         let names = files.map(f => path.basename(f));
         let toRemove = await Media.findAll({
             where: { filename: { [Op.notIn]: names, } }
