@@ -1,8 +1,9 @@
 import ffmpeg from "./promise-ffmpeg.js";
 import Clog from '../../Clog.js'
 import Canvas from "canvas";
-import {imageSize, loadExif, transferExif} from "./exif.js";
+import {imageSize, transferExif} from "./exif.js";
 import fs from "fs";
+import { ExifImage } from "exif";
 
 const {loadImage, createCanvas} = Canvas;
 const console = new Clog('transcode');
@@ -63,7 +64,7 @@ export async function resizeImage({input, orientation = 1, output, width = null,
 export async function rotateImage(image, radians, output) {
     let imgDim;
     try {
-        let data = await loadExif(image);
+        let data = await ExifImage(image);
         imgDim = await imageSize(image, data);
     } catch (e) {
         console.warn(`Can't rotate image ${image}!`, e.message);

@@ -116,20 +116,10 @@ export async function imageSize(filePath, exifData = null) {
     return null;
 }
 
-export async function loadExif(image) {
-    return new Promise((resolve, reject) => {
-        new ExifImage({image}, async (error, data) => {
-            if (error)
-                return reject(error);
-            resolve(data);
-        });
-    });
-}
-
 export async function getExif(image) {
     let data;
     try {
-        data = await loadExif(image);
+        data = await ExifImage(image);
     } catch (e) {
         let {size} = await fs.promises.stat(image);
         let createDate = await dateFromFile(image);
