@@ -128,6 +128,7 @@ export async function deleteOldLogs(cutoffDate = null) {
 }
 
 export async function deleteOldZips(cutoffDate = null) {
+    console.log("starting delete old zips")
     const day = 1000 * 60 * 60 * 24;
     cutoffDate ??= new Date(Date.now() - day * 7);
     console.log("Deleting zip downloads older than", cutoffDate);
