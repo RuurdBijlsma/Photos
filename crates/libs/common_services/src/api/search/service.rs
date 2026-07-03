@@ -127,10 +127,11 @@ pub async fn search_by_image(
     let candidate_limit = limit * 3 + 300;
     let k = 60.0f64;
 
-    let is_video_filter = match config.media_type {
-        SearchMediaType::Video => Some(true),
-        SearchMediaType::Photo => Some(false),
-        SearchMediaType::All => None,
+    let (is_video_filter, is_panorama_filter) = match config.media_type {
+        SearchMediaType::Video => (Some(true), Some(false)),
+        SearchMediaType::Photo => (Some(false), Some(false)),
+        SearchMediaType::Panorama => (Some(false), Some(true)),
+        SearchMediaType::All => (None, None),
     };
 
     let semantic_score_threshold = if config.sort_by == SearchSortBy::Relevancy {
@@ -168,6 +169,7 @@ pub async fn search_by_image(
               AND ($9::timestamptz IS NULL OR mi.taken_at_utc >= $9)
               AND ($10::timestamptz IS NULL OR mi.taken_at_utc <= $10)
               AND ($11::bool IS NULL OR mi.is_video = $11)
+              AND ($18::bool IS NULL OR mi.use_panorama_viewer = $18)
               AND (cardinality($12::text[]) = 0 OR EXISTS (
                   SELECT 1 FROM gps g JOIN location l ON g.location_id = l.id
                   WHERE g.media_item_id = mi.id AND l.country_code = ANY($12)
@@ -264,7 +266,8 @@ pub async fn search_by_image(
             sort_by_str,              // $14
             semantic_score_threshold, // $15
             config.all_faces_required, // $16
-            offset                     // $17
+            offset,                    // $17
+            is_panorama_filter         // $18
         )
             .fetch_all(pool)
             .await?;
@@ -284,6 +287,7 @@ pub async fn search_by_image(
                   AND ($5::timestamptz IS NULL OR mi.taken_at_utc >= $5)
                   AND ($6::timestamptz IS NULL OR mi.taken_at_utc <= $6)
                   AND ($7::bool IS NULL OR mi.is_video = $7)
+                  AND ($14::bool IS NULL OR mi.use_panorama_viewer = $14)
                   AND (cardinality($8::text[]) = 0 OR EXISTS (
                       SELECT 1 FROM gps g JOIN location l ON g.location_id = l.id
                       WHERE g.media_item_id = mi.id AND l.country_code = ANY($8)
@@ -342,7 +346,8 @@ pub async fn search_by_image(
             sort_by_str,               // $10
             semantic_score_threshold,  // $11
             config.all_faces_required, // $12
-            offset                     // $13
+            offset,                    // $13
+            is_panorama_filter,        // $14
         )
         .fetch_all(pool)
         .await?;

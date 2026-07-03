@@ -228,15 +228,15 @@
 * ✅ trash can (deleted=true) (in trash UI kan je echte delete doen)
 * ✅ settings page
   * ✅ contrast setting in theme
+* ✅ remove exif from full photo response
+* ✅ write thumbnails to cache folder and symlink to thumbnails folder?
 * password reset flow (email) (make mail optional)
 * nginx thumbnail hosting (optional maak setting voor Rust thumb hosting).
 * check of readme uitleg klopt met verse windows installatie & linux
 * better error if exiftool isnt there (worker wont work then)
 * improve speed of album/{id} endpoint
-* ✅ remove exif from full photo response
-* ✅ write thumbnails to cache folder and symlink to thumbnails folder?
 * rotate image by changing thumbnail orientation?
-* add photo search type: Panorama (use_panorama_viewer flag). Currently type=photo|video, add panorama
+* ✅ add photo search type: Panorama (use_panorama_viewer flag). Currently type=photo|video, add panorama
 
 # High level TODO:
 
