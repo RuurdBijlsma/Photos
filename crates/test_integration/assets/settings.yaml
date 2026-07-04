@@ -1,6 +1,6 @@
 ingest:
   media_folder: .
-  thumbnail_folder: .
+  app_data_folder: app_data
   enable_cache: false
 
   analyzer:

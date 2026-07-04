@@ -1147,7 +1147,6 @@ dependencies = [
  "color-eyre",
  "common_types",
  "criterion",
- "directories",
  "face_id",
  "fast_image_resize",
  "fastrand",
@@ -1184,7 +1183,6 @@ name = "common_types"
 version = "0.1.0"
 dependencies = [
  "face_id",
- "material-color-utils",
  "object_detector",
  "prost",
  "prost-build",
@@ -1864,15 +1862,6 @@ dependencies = [
  "block-buffer 0.11.0",
  "crypto-common 0.2.0-rc.5",
  "subtle",
-]
-
-[[package]]
-name = "directories"
-version = "6.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "16f5094c54661b38d03bd7e50df373292118db60b585c08a411c6d840017fe7d"
-dependencies = [
- "dirs-sys",
 ]
 
 [[package]]
@@ -7779,7 +7768,6 @@ dependencies = [
  "material-color-utils",
  "prost",
  "reqwest 0.13.2",
- "serde",
  "serde_json",
  "sqlx",
  "tempfile",
@@ -8839,7 +8827,6 @@ dependencies = [
  "app_state",
  "color-eyre",
  "common_services",
- "common_types",
  "notify",
  "sqlx",
  "tokio",
