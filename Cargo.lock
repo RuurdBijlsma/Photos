@@ -2671,6 +2671,7 @@ version = "0.1.0"
 dependencies = [
  "app_state",
  "color-eyre",
+ "dotenvy",
  "exiftool",
  "fast_image_resize",
  "image 0.25.10",
@@ -2682,9 +2683,11 @@ dependencies = [
  "rgb",
  "serde",
  "serde_json",
+ "sqlx",
  "temp-dir",
  "tokio",
  "tracing",
+ "tracing-subscriber",
  "walkdir",
 ]
 

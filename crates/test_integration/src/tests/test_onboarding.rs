@@ -103,6 +103,7 @@ pub async fn test_onboarding(context: &TestContext) -> Result<()> {
     Ok(())
 }
 
+#[allow(clippy::too_many_lines)]
 pub async fn test_start_processing(context: &TestContext) -> Result<()> {
     // 1. Login
     let token = login(context).await?;

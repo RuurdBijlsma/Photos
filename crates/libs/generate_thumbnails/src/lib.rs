@@ -42,7 +42,7 @@ mod photo;
 mod utils;
 mod video;
 
-use crate::motion_photo::generate_motion_thumbs;
+pub use crate::motion_photo::generate_motion_thumbs;
 use crate::pano::generate_pano_thumbs;
 use app_state::IngestSettings;
 use color_eyre::Result;
