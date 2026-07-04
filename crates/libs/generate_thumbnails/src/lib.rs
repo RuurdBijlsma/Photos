@@ -36,11 +36,13 @@
 //! - `thumbs_exist`: A utility function to check if all expected thumbnails for a file already exist.
 
 pub mod ffmpeg;
+mod motion_photo;
 mod pano;
 mod photo;
 mod utils;
 mod video;
 
+use crate::motion_photo::generate_motion_thumbs;
 use crate::pano::generate_pano_thumbs;
 use app_state::IngestSettings;
 use color_eyre::Result;
@@ -48,6 +50,13 @@ use color_eyre::eyre::bail;
 use std::path::Path;
 use temp_dir::TempDir;
 pub use utils::{copy_dir_contents, link_or_copy_dir_contents};
+
+#[derive(Clone, Debug, Default)]
+pub struct ThumbnailConfig {
+    pub generate_panorama_tiles: bool,
+    pub extract_motion_photo: bool,
+    pub orientation: i32,
+}
 
 /// Generates thumbnails for a given media file (image or video) based on the provided configuration.
 ///
@@ -69,8 +78,7 @@ pub async fn generate_thumbnails(
     file: &Path,
     thumb_sub_folder: &Path,
     pano_sub_folder: &Path,
-    use_panorama_viewer: bool,
-    orientation: i32,
+    config: ThumbnailConfig,
 ) -> Result<()> {
     let Some(sub_folder_name) = thumb_sub_folder
         .file_name()
@@ -92,15 +100,18 @@ pub async fn generate_thumbnails(
                 file,
                 temp_out_dir,
                 &ingestion.thumbnails,
-                orientation,
+                config.orientation,
             )?;
         } else {
             photo::generate_ffmpeg_photo_thumbnails(file, temp_out_dir, &ingestion.thumbnails)
                 .await?;
         }
 
-        if use_panorama_viewer {
+        if config.generate_panorama_tiles {
             generate_pano_thumbs(file, pano_sub_folder)?;
+        }
+        if config.extract_motion_photo {
+            generate_motion_thumbs(file, temp_out_dir)?;
         }
     } else if ingestion.is_video_file(file) {
         video::generate_video_thumbnails(file, temp_out_dir, &ingestion.thumbnails).await?;

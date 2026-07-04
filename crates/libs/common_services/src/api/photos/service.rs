@@ -95,6 +95,12 @@ pub async fn download_media_file(
         }?,
     };
 
+    let metadata = file
+        .metadata()
+        .await
+        .map_err(|e| Report::new(e).wrap_err("Failed to read file metadata"))?;
+    let file_size = metadata.len();
+
     // Streaming Response
     let stream = FramedRead::new(file, BytesCodec::new());
     let body = Body::from_stream(stream);
@@ -111,6 +117,11 @@ pub async fn download_media_file(
         .status(StatusCode::OK)
         .header(header::CONTENT_TYPE, mime_type.as_ref())
         .header(header::CONTENT_DISPOSITION, disposition_header)
+        .header(header::CONTENT_LENGTH, file_size)
+        .header(
+            header::CACHE_CONTROL,
+            "private, max-age=31536000, immutable",
+        )
         .body(body)
         .map_err(|e| Report::new(e).wrap_err("Failed to build response"))?)
 }

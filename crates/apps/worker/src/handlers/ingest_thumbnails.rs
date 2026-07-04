@@ -1,13 +1,11 @@
 use crate::context::WorkerContext;
 use crate::handlers::JobResult;
-use crate::handlers::common::cache::thumbnail_cache::{
-    get_thumbnail_cache, write_thumbnail_cache,
-};
+use crate::handlers::common::cache::thumbnail_cache::{get_thumbnail_cache, write_thumbnail_cache};
 use crate::jobs::management::is_job_cancelled;
 use color_eyre::{Result, eyre::eyre};
 use common_services::database::jobs::Job;
 use common_services::database::media_item_store::MediaItemStore;
-use generate_thumbnails::generate_thumbnails;
+use generate_thumbnails::{ThumbnailConfig, generate_thumbnails};
 use serde_json::Value;
 use sqlx::PgPool;
 use std::fs::File;
@@ -23,7 +21,10 @@ pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
     let media_root = &context.settings.ingest.media_root;
     let file_path = media_root.join(relative_path);
     let Some(row) = sqlx::query!(
-        "SELECT id, hash, orientation, use_panorama_viewer FROM media_item WHERE relative_path = $1",
+        "SELECT hash, media_item_id, use_panorama_viewer, orientation, mf.is_motion_photo
+        FROM media_item
+                 INNER JOIN media_features mf ON mf.media_item_id = media_item.id
+        WHERE relative_path = $1",
         relative_path
     )
         .fetch_optional(&context.pool)
@@ -39,9 +40,12 @@ pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
         context,
         &file_path,
         &row.hash,
-        &row.id,
-        row.use_panorama_viewer,
-        row.orientation,
+        &row.media_item_id,
+        ThumbnailConfig {
+            extract_motion_photo: row.is_motion_photo,
+            orientation: row.orientation,
+            generate_panorama_tiles: row.use_panorama_viewer,
+        },
     )
     .await?;
     if !file_path.exists() || is_job_cancelled(&context.pool, job.id).await? {
@@ -53,7 +57,7 @@ pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
         SET has_thumbnails = TRUE,
         updated_at = now()
         WHERE id = $1;",
-        &row.id
+        &row.media_item_id
     )
     .execute(&context.pool)
     .await?;
@@ -82,8 +86,7 @@ async fn process_thumbnails(
     file_path: &Path,
     file_hash: &str,
     media_item_id: &str,
-    use_panorama_viewer: bool,
-    orientation: i32,
+    thumbnail_config: ThumbnailConfig,
 ) -> Result<()> {
     let thumbnails_out_folder = context.settings.ingest.thumbnails_root.join(media_item_id);
     let pano_out_folder = context.settings.ingest.pano_root.join(media_item_id);
@@ -95,7 +98,7 @@ async fn process_thumbnails(
             file_hash,
             &thumbnails_out_folder,
             &pano_out_folder,
-            use_panorama_viewer,
+            thumbnail_config.generate_panorama_tiles,
         )
         .await?
     {
@@ -107,8 +110,7 @@ async fn process_thumbnails(
             file_path,
             &thumbnails_out_folder,
             &pano_out_folder,
-            use_panorama_viewer,
-            orientation,
+            thumbnail_config.clone(),
         )
         .await?;
 
@@ -119,13 +121,13 @@ async fn process_thumbnails(
                 file_hash,
                 &thumbnails_out_folder,
                 &pano_out_folder,
-                use_panorama_viewer,
+                thumbnail_config.generate_panorama_tiles,
             )
             .await?;
         }
     }
 
-    if use_panorama_viewer
+    if thumbnail_config.generate_panorama_tiles
         && let Err(e) = store_panorama_config(&context.pool, &pano_out_folder, media_item_id).await
     {
         warn!(

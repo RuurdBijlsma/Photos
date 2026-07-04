@@ -1,5 +1,5 @@
 use app_state::load_app_settings;
-use generate_thumbnails::generate_thumbnails;
+use generate_thumbnails::{ThumbnailConfig, generate_thumbnails};
 use std::fs;
 use std::path::Path;
 
@@ -11,7 +11,18 @@ async fn main() -> color_eyre::Result<()> {
     let out_folder = Path::new("test_out");
     fs::create_dir_all(out_folder)?;
     let settings = load_app_settings()?;
-    generate_thumbnails(&settings.ingest, file, out_folder, out_folder, false, 5).await?;
+    generate_thumbnails(
+        &settings.ingest,
+        file,
+        out_folder,
+        out_folder,
+        ThumbnailConfig {
+            orientation: 5,
+            extract_motion_photo: false,
+            generate_panorama_tiles: false,
+        },
+    )
+    .await?;
 
     Ok(())
 }
