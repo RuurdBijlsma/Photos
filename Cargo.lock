@@ -2671,6 +2671,7 @@ version = "0.1.0"
 dependencies = [
  "app_state",
  "color-eyre",
+ "exiftool",
  "fast_image_resize",
  "image 0.25.10",
  "imgref",

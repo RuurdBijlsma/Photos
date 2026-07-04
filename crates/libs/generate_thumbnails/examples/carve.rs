@@ -34,7 +34,7 @@ fn main() -> color_eyre::Result<()> {
         return Ok(());
     };
 
-    println!("Located embedded MP4 container starting at byte offset: {}", mp4_start_offset);
+    println!("Located embedded MP4 container starting at byte offset: {mp4_start_offset}");
 
     // 3. Slice the buffer from the start of the MP4 to the end of the file
     let video_bytes = &data[mp4_start_offset..];
@@ -74,12 +74,11 @@ fn find_embedded_mp4_start(data: &[u8]) -> Option<usize> {
             let brand = &data[i + 4..i + 8];
 
             // Validate that the brand consists of standard alphanumeric characters (e.g. isom, mp42, avc1)
-            if brand.iter().all(|&b| b.is_ascii_alphanumeric()) {
-                if i >= 4 {
+            if brand.iter().all(|&b| b.is_ascii_alphanumeric())
+                && i >= 4 {
                     // Back up 4 bytes to include the 32-bit big-endian size header of the ftyp box
                     return Some(i - 4);
                 }
-            }
         }
     }
     None

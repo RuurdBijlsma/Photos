@@ -12,6 +12,7 @@ use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
 use tracing::{debug, warn};
+use common_services::alert;
 
 pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
     let relative_path = job
@@ -27,8 +28,8 @@ pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
         WHERE relative_path = $1",
         relative_path
     )
-        .fetch_optional(&context.pool)
-        .await?
+    .fetch_optional(&context.pool)
+    .await?
     else {
         warn!("IngestThumbnail was called but no media_item row exists for {relative_path}");
         return Ok(JobResult::Cancelled);
@@ -105,7 +106,7 @@ async fn process_thumbnails(
         debug!("Using thumbnail cache for {:?}", file_path.file_name());
     } else {
         // Cache Miss: Generate
-        generate_thumbnails(
+        let result = generate_thumbnails(
             &context.settings.ingest,
             file_path,
             &thumbnails_out_folder,
@@ -113,6 +114,33 @@ async fn process_thumbnails(
             thumbnail_config.clone(),
         )
         .await?;
+
+        if !result.pano_success {
+            alert!("PANO FAILURE: {}", media_item_id);
+            sqlx::query!(
+                r"
+                UPDATE media_item
+                SET use_panorama_viewer = FALSE,
+                updated_at = now()
+                WHERE id = $1;",
+                &media_item_id
+            )
+            .execute(&context.pool)
+            .await?;
+        }
+
+        if !result.motion_success {
+            alert!("MOTION FAILURE: {}", media_item_id);
+            sqlx::query!(
+                r"
+                UPDATE media_features
+                SET is_motion_photo = FALSE
+                WHERE media_item_id = $1;",
+                &media_item_id
+            )
+            .execute(&context.pool)
+            .await?;
+        }
 
         // Write Cache
         if context.settings.ingest.enable_cache {

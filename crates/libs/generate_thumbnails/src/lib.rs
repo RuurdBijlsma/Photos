@@ -49,6 +49,7 @@ use color_eyre::Result;
 use color_eyre::eyre::bail;
 use std::path::Path;
 use temp_dir::TempDir;
+use tracing::warn;
 pub use utils::{copy_dir_contents, link_or_copy_dir_contents};
 
 #[derive(Clone, Debug, Default)]
@@ -56,6 +57,13 @@ pub struct ThumbnailConfig {
     pub generate_panorama_tiles: bool,
     pub extract_motion_photo: bool,
     pub orientation: i32,
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct ThumbnailOutput {
+    pub already_exists: bool,
+    pub pano_success: bool,
+    pub motion_success: bool,
 }
 
 /// Generates thumbnails for a given media file (image or video) based on the provided configuration.
@@ -79,7 +87,7 @@ pub async fn generate_thumbnails(
     thumb_sub_folder: &Path,
     pano_sub_folder: &Path,
     config: ThumbnailConfig,
-) -> Result<()> {
+) -> Result<ThumbnailOutput> {
     let Some(sub_folder_name) = thumb_sub_folder
         .file_name()
         .map(|s| s.to_string_lossy().to_string())
@@ -87,12 +95,22 @@ pub async fn generate_thumbnails(
         bail!("Thumbnail subfolder must have a name");
     };
 
+    // todo: thumbs_exist should include panorama and motion photo video
     if ingestion.thumbnails.recreate_if_exists && ingestion.thumbs_exist(file, &sub_folder_name)? {
-        return Ok(());
+        return Ok(ThumbnailOutput {
+            already_exists: true,
+            motion_success: false,
+            pano_success: false,
+        });
     }
 
     let temp_dir = TempDir::new()?;
     let temp_out_dir = temp_dir.path();
+    let mut output = ThumbnailOutput {
+        pano_success: true,
+        already_exists: false,
+        motion_success: true,
+    };
 
     if ingestion.is_photo_file(file) {
         if ingestion.thumbnails.thumbnail_extension == "avif" {
@@ -107,12 +125,16 @@ pub async fn generate_thumbnails(
                 .await?;
         }
 
-        if config.generate_panorama_tiles {
-            generate_pano_thumbs(file, pano_sub_folder)?;
-        }
-        if config.extract_motion_photo {
-            generate_motion_thumbs(file, temp_out_dir)?;
-        }
+        if config.generate_panorama_tiles
+            && let Err(e) = generate_pano_thumbs(file, pano_sub_folder) {
+                warn!("Failed to generate panorama for {}, {}", file.display(), e);
+                output.pano_success = false;
+            }
+        if config.extract_motion_photo
+            && let Err(e) = generate_motion_thumbs(file, temp_out_dir) {
+                warn!("Failed to generate motion photo video for {}, {}", file.display(), e);
+                output.motion_success = false;
+            }
     } else if ingestion.is_video_file(file) {
         video::generate_video_thumbnails(file, temp_out_dir, &ingestion.thumbnails).await?;
     }
@@ -120,5 +142,5 @@ pub async fn generate_thumbnails(
     utils::move_dir_contents(temp_out_dir, thumb_sub_folder).await?;
     temp_dir.cleanup()?;
 
-    Ok(())
+    Ok(output)
 }
