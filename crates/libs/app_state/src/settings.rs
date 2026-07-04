@@ -108,7 +108,13 @@ impl IngestSettings {
     /// # Errors
     ///
     /// This function's signature returns a Result, but the current implementation does not produce any errors.
-    pub fn thumbs_exist(&self, file: &Path, thumb_sub_folder: &str) -> Result<bool> {
+    pub fn thumbs_exist(
+        &self,
+        file: &Path,
+        thumb_sub_folder: &str,
+        required_pano_folder: Option<&Path>,
+        require_motion_photo: bool,
+    ) -> Result<bool> {
         let is_photo = self.is_photo_file(file);
         let is_video = self.is_video_file(file);
         let photo_thumb_ext = &self.thumbnails.thumbnail_extension;
@@ -136,6 +142,22 @@ impl IngestSettings {
             let thumb_file_path = thumb_dir.join(thumb_filename.clone());
             if !thumb_file_path.exists() {
                 return Ok(false);
+            }
+        }
+
+        if is_photo {
+            if require_motion_photo {
+                let motion_file = thumb_dir.join("motion.mp4");
+                if !motion_file.exists() {
+                    return Ok(false);
+                }
+            }
+
+            if let Some(pano_folder) = required_pano_folder {
+                let config_file = pano_folder.join("config.json");
+                if !config_file.exists() {
+                    return Ok(false);
+                }
             }
         }
 
@@ -168,7 +190,7 @@ impl IngestSettings {
             return Ok(false);
         };
         // media item exists, check thumbnails existence
-        let exist = self.thumbs_exist(file, &media_item_id)?;
+        let exist = self.thumbs_exist(file, &media_item_id, None, false)?;
         Ok(exist)
     }
 }

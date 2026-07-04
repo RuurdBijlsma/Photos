@@ -219,7 +219,10 @@ pub async fn test_start_processing(context: &TestContext) -> Result<()> {
             .await?;
         for item in &media_items {
             let path = context.settings.ingest.media_root.join(&item.relative_path);
-            let thumbs_exist = context.settings.ingest.thumbs_exist(&path, &item.id)?;
+            let thumbs_exist = context
+                .settings
+                .ingest
+                .thumbs_exist(&path, &item.id, None, false)?;
             assert!(thumbs_exist);
         }
     }

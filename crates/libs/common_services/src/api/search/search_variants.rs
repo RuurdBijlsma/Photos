@@ -348,19 +348,19 @@ pub async fn filter_only_search_media(
         ORDER BY mi.sort_timestamp DESC
         LIMIT $8 OFFSET $9
         "#,
-        user.id,                    // $1
-        config.start_date,          // $2
-        config.end_date,            // $3
-        is_video_filter,            // $4
-        &config.country_codes,      // $5
-        &config.person_ids,         // $6
-        config.all_faces_required,   // $7
-        limit,                      // $8
-        offset,                     // $9
-        is_panorama_filter,         // $10
+        user.id,                   // $1
+        config.start_date,         // $2
+        config.end_date,           // $3
+        is_video_filter,           // $4
+        &config.country_codes,     // $5
+        &config.person_ids,        // $6
+        config.all_faces_required, // $7
+        limit,                     // $8
+        offset,                    // $9
+        is_panorama_filter,        // $10
     )
-        .fetch_all(pool)
-        .await?;
+    .fetch_all(pool)
+    .await?;
 
     Ok(items)
 }

@@ -49,7 +49,7 @@ fn find_embedded_mp4_start(data: &[u8]) -> Option<usize> {
 pub fn generate_motion_thumbs(input_file: &Path, thumbnails_sub_folder: &Path) -> Result<bool> {
     let out_video = thumbnails_sub_folder.join("motion.mp4");
 
-    // 1. Companion file check (Apple Live Photo style: side-by-side video asset)
+    // Companion file check (Apple Live Photo style: side-by-side video asset)
     let companion_extensions = ["mov", "MOV", "mp4", "MP4"];
     for ext in &companion_extensions {
         let companion_path = input_file.with_extension(ext);
@@ -62,7 +62,7 @@ pub fn generate_motion_thumbs(input_file: &Path, thumbnails_sub_folder: &Path) -
     // Initialize the ExifTool stay-open wrapper
     let et = ExifTool::new()?;
 
-    // 2. Try extracting via MotionPhotoVideo (Google Pixel HEIC/JPEG standard)
+    // Try extracting via MotionPhotoVideo
     tracing::debug!("Attempting to extract video using MotionPhotoVideo tag...");
     if let Ok(video_bytes) = et.read_tag_binary(input_file, "MotionPhotoVideo") {
         if is_valid_video(&video_bytes) {
@@ -72,7 +72,7 @@ pub fn generate_motion_thumbs(input_file: &Path, thumbnails_sub_folder: &Path) -
         tracing::debug!("MotionPhotoVideo tag found but data was invalid or too short.");
     }
 
-    // 3. Try extracting via EmbeddedVideoFile (Samsung standard)
+    // Try extracting via EmbeddedVideoFile
     tracing::debug!("Attempting to extract video using EmbeddedVideoFile tag...");
     if let Ok(video_bytes) = et.read_tag_binary(input_file, "EmbeddedVideoFile") {
         if is_valid_video(&video_bytes) {
@@ -82,7 +82,7 @@ pub fn generate_motion_thumbs(input_file: &Path, thumbnails_sub_folder: &Path) -
         tracing::debug!("EmbeddedVideoFile tag found but data was invalid or too short.");
     }
 
-    // 4. Try extracting using legacy Google Pixel MicroVideoOffset
+    // Try extracting using legacy MicroVideoOffset
     tracing::debug!("Attempting to extract video using legacy MicroVideoOffset fallback...");
     if let Ok(offset_val) = et.read_tag::<u64>(input_file, "MicroVideoOffset", &[])
         && offset_val > 0
@@ -106,7 +106,7 @@ pub fn generate_motion_thumbs(input_file: &Path, thumbnails_sub_folder: &Path) -
         }
     }
 
-    // 5. Try scanning the raw file for the embedded ftyp boundary
+    // Try scanning the raw file for the embedded `ftyp` boundary
     tracing::debug!("Attempting to extract video by carving (scanning for 'ftyp')...");
     if let Ok(data) = std::fs::read(input_file)
         && let Some(mp4_start_offset) = find_embedded_mp4_start(&data)

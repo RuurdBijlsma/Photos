@@ -96,7 +96,9 @@ pub async fn generate_thumbnails(
     };
 
     // todo: thumbs_exist should include panorama and motion photo video
-    if ingestion.thumbnails.recreate_if_exists && ingestion.thumbs_exist(file, &sub_folder_name)? {
+    if !ingestion.thumbnails.recreate_if_exists
+        && ingestion.thumbs_exist(file, &sub_folder_name, Some(pano_sub_folder), true)?
+    {
         return Ok(ThumbnailOutput {
             already_exists: true,
             motion_success: false,
@@ -126,15 +128,21 @@ pub async fn generate_thumbnails(
         }
 
         if config.generate_panorama_tiles
-            && let Err(e) = generate_pano_thumbs(file, pano_sub_folder) {
-                warn!("Failed to generate panorama for {}, {}", file.display(), e);
-                output.pano_success = false;
-            }
+            && let Err(e) = generate_pano_thumbs(file, pano_sub_folder)
+        {
+            warn!("Failed to generate panorama for {}, {}", file.display(), e);
+            output.pano_success = false;
+        }
         if config.extract_motion_photo
-            && let Err(e) = generate_motion_thumbs(file, temp_out_dir) {
-                warn!("Failed to generate motion photo video for {}, {}", file.display(), e);
-                output.motion_success = false;
-            }
+            && let Err(e) = generate_motion_thumbs(file, temp_out_dir)
+        {
+            warn!(
+                "Failed to generate motion photo video for {}, {}",
+                file.display(),
+                e
+            );
+            output.motion_success = false;
+        }
     } else if ingestion.is_video_file(file) {
         video::generate_video_thumbnails(file, temp_out_dir, &ingestion.thumbnails).await?;
     }
