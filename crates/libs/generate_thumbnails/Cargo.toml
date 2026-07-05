@@ -18,7 +18,7 @@ rgb = "0.8"
 imgref = "1.12.0"
 walkdir = "2.5.0"
 libheif-rs = "2.7.0"
-panorama-tiler = "0.1.1"
+panorama-tiler = "0.1.2"
 tracing = "0.1.44"
 exiftool = "0.3.1"
 

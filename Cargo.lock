@@ -5017,9 +5017,9 @@ dependencies = [
 
 [[package]]
 name = "panorama-tiler"
-version = "0.1.1"
+version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c20a8f7486bec1eb3987b06b9e2de3a63e5436a26f640ca639f61a26885fc1cc"
+checksum = "e6667191fb9202fb3c5f04c1a49fc4b2fd6201e62d737201373e12c5d1303866"
 dependencies = [
  "fast_image_resize",
  "image 0.25.10",
