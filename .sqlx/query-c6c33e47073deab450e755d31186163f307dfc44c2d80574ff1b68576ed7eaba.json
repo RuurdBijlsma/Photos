@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE jobs\n        SET status = 'queued'::job_status,\n            attempts = 0,\n            scheduled_at = NOW(),\n            finished_at = NULL,\n            started_at = NULL,\n            last_error = NULL,\n            owner = NULL\n        WHERE id = $1 AND status IN ('failed'::job_status, 'done'::job_status, 'cancelled'::job_status)\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "c6c33e47073deab450e755d31186163f307dfc44c2d80574ff1b68576ed7eaba"
+}

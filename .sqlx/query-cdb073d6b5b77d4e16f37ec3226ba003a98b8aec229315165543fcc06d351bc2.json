@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO panorama_config (media_item_id, config)\n            VALUES ($1, $2)\n            ON CONFLICT (media_item_id)\n            DO UPDATE SET config = EXCLUDED.config\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Varchar",
+        "Jsonb"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "cdb073d6b5b77d4e16f37ec3226ba003a98b8aec229315165543fcc06d351bc2"
+}

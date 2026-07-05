@@ -1,0 +1,154 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            id,\n            relative_path,\n            user_id,\n            job_type AS \"job_type: JobType\",\n            payload,\n            priority,\n            status AS \"status: JobStatus\",\n            attempts,\n            dependency_attempts,\n            max_attempts,\n            owner,\n            started_at,\n            finished_at,\n            created_at,\n            scheduled_at,\n            last_heartbeat,\n            last_error\n        FROM jobs\n        WHERE user_id = $1\n          AND job_type IN ('ingest_metadata', 'ingest_thumbnails', 'ingest_analysis', 'ingest_llm')\n          AND (\n              (status = 'running'::job_status AND last_heartbeat >= NOW() - INTERVAL '1 minute 30 seconds')\n              OR (status = 'done'::job_status AND finished_at >= NOW() - INTERVAL '5 seconds')\n          )\n        ORDER BY started_at DESC NULLS LAST, finished_at DESC NULLS LAST\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "relative_path",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "user_id",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 3,
+        "name": "job_type: JobType",
+        "type_info": {
+          "Custom": {
+            "name": "job_type",
+            "kind": {
+              "Enum": [
+                "ingest_metadata",
+                "ingest_thumbnails",
+                "ingest_analysis",
+                "ingest_llm",
+                "remove",
+                "scan",
+                "clean_db",
+                "cluster_faces",
+                "cluster_photos",
+                "import_album_item",
+                "update_global_centroid",
+                "sync_thumbnails",
+                "delayed_scan",
+                "generate_daily_cards",
+                "calc_system_stats"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "payload",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 5,
+        "name": "priority",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 6,
+        "name": "status: JobStatus",
+        "type_info": {
+          "Custom": {
+            "name": "job_status",
+            "kind": {
+              "Enum": [
+                "queued",
+                "running",
+                "failed",
+                "done",
+                "cancelled"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "attempts",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 8,
+        "name": "dependency_attempts",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 9,
+        "name": "max_attempts",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 10,
+        "name": "owner",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 11,
+        "name": "started_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 12,
+        "name": "finished_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 13,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 14,
+        "name": "scheduled_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 15,
+        "name": "last_heartbeat",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 16,
+        "name": "last_error",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      true,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "86f5b162bbd16218713c83d81b8f84212c615d5cb580220c4c268333e9235243"
+}
