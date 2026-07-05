@@ -1,0 +1,80 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                SELECT m.id, m.width, m.height, m.is_video, m.use_panorama_viewer,\n                       g.latitude, g.longitude, m.duration_ms, m.taken_at_local, m.has_thumbnails\n                FROM media_item m\n                JOIN gps g ON m.id = g.media_item_id\n                WHERE m.user_id = $1 AND m.deleted = false\n                  AND g.latitude != 0.0 AND g.longitude != 0.0\n                ORDER BY\n                  (CASE\n                    WHEN $4::double precision = 0.0 THEN 1\n                    WHEN (sqrt(power((g.longitude - $3::double precision) * cos(radians($2::double precision)), 2) + power(g.latitude - $2::double precision, 2)) * 111.32) > $4::double precision THEN 1\n                    ELSE 0\n                  END) DESC,\n                  random()\n                LIMIT $5\n                ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 1,
+        "name": "width",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 2,
+        "name": "height",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 3,
+        "name": "is_video",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 4,
+        "name": "use_panorama_viewer",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 5,
+        "name": "latitude",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 6,
+        "name": "longitude",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 7,
+        "name": "duration_ms",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 8,
+        "name": "taken_at_local",
+        "type_info": "Timestamp"
+      },
+      {
+        "ordinal": 9,
+        "name": "has_thumbnails",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4",
+        "Float8",
+        "Float8",
+        "Float8",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "371e5d3d30b9681f9edce914f2c7698661dd9ca161f93da14de1b0d210d7f2c1"
+}
