@@ -41,6 +41,9 @@ pub async fn list_backups(cache_root: &Path, user_id: i32) -> Result<Vec<BackupI
 
 pub async fn backup_albums(pool: &PgPool, cache_root: &Path, user_id: i32) -> Result<(), AppError> {
     let albums = AlbumStore::list_by_user_id(pool, user_id).await?;
+    if albums.is_empty() {
+        return Ok(());
+    }
     let mut backups = Vec::new();
 
     for album in albums {
