@@ -1,3 +1,6 @@
+use app_state::constants::{
+    FACE_CLUSTERS_FOLDER, ON_DEMAND_THUMBNAIL_CACHE_FOLDER, PANO_FOLDER, THUMBNAILS_FOLDER,
+};
 use app_state::{AppSettings, database_url};
 use color_eyre::eyre::Result;
 use common_services::database::get_db_pool;
@@ -18,19 +21,25 @@ pub fn create_test_settings(
 
     // 2. Create temporary directories for media and thumbnails.
     let media_dir = TempDir::new()?;
-    let thumbnail_dir = TempDir::new()?;
+    let app_data_dir = TempDir::new()?;
+    let app_data_path = app_data_dir.path();
     let port = get_free_port();
     settings.api.port = u32::from(port);
     settings.api.public_url = format!("http://127.0.0.1:{port}");
     settings.ingest.media_root = media_dir.path().to_path_buf();
     settings.ingest.media_root_canon = media_dir.path().canonicalize()?;
-    settings.ingest.thumbnail_root = thumbnail_dir.path().to_path_buf();
+    settings.ingest.app_data_root = app_data_path.to_path_buf();
+    settings.ingest.face_clusters_root = app_data_path.join(FACE_CLUSTERS_FOLDER);
+    settings.ingest.pano_root = app_data_path.join(PANO_FOLDER);
+    settings.ingest.on_demand_thumbs_cache_root =
+        app_data_path.join(ON_DEMAND_THUMBNAIL_CACHE_FOLDER);
+    settings.ingest.thumbnails_root = app_data_path.join(THUMBNAILS_FOLDER);
 
     // 3. Update the database URL to point to our unique test database.
     let mut db_url = Url::parse(database_url())?;
     db_url.set_path(&format!("/{database_name}"));
 
-    Ok((settings, media_dir, thumbnail_dir, db_url.to_string()))
+    Ok((settings, media_dir, app_data_dir, db_url.to_string()))
 }
 
 pub async fn create_test_database(

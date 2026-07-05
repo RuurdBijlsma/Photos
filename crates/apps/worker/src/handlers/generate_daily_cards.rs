@@ -1,9 +1,9 @@
 use crate::context::WorkerContext;
 use crate::handlers::JobResult;
-use crate::handlers::daily_cards::DailyCardGenerator;
-use crate::handlers::daily_cards::cluster_card::ClusterCardGenerator;
-use crate::handlers::daily_cards::estimatr_card::LocationEstimatrCardGenerator;
-use crate::handlers::daily_cards::on_this_day_card::OnThisDayCardGenerator;
+use crate::handlers::common::daily_cards::DailyCardGenerator;
+use crate::handlers::common::daily_cards::cluster_card::ClusterCardGenerator;
+use crate::handlers::common::daily_cards::estimatr_card::LocationEstimatrCardGenerator;
+use crate::handlers::common::daily_cards::on_this_day_card::OnThisDayCardGenerator;
 use chrono::Utc;
 use color_eyre::Result;
 use common_services::database::jobs::Job;

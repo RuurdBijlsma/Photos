@@ -9,7 +9,6 @@ use axum_extra::headers::Range;
 use chrono::{DateTime, FixedOffset, NaiveDateTime, TimeZone, Utc};
 use color_eyre::Report;
 use color_eyre::eyre::eyre;
-use common_types::constants::ON_DEMAND_THUMBNAIL_CACHE_FOLDER;
 use exif::{In, Tag, Value};
 use fast_image_resize as fr;
 use http::{Response, StatusCode, header};
@@ -96,6 +95,12 @@ pub async fn download_media_file(
         }?,
     };
 
+    let metadata = file
+        .metadata()
+        .await
+        .map_err(|e| Report::new(e).wrap_err("Failed to read file metadata"))?;
+    let file_size = metadata.len();
+
     // Streaming Response
     let stream = FramedRead::new(file, BytesCodec::new());
     let body = Body::from_stream(stream);
@@ -112,6 +117,11 @@ pub async fn download_media_file(
         .status(StatusCode::OK)
         .header(header::CONTENT_TYPE, mime_type.as_ref())
         .header(header::CONTENT_DISPOSITION, disposition_header)
+        .header(header::CONTENT_LENGTH, file_size)
+        .header(
+            header::CACHE_CONTROL,
+            "private, max-age=31536000, immutable",
+        )
         .body(body)
         .map_err(|e| Report::new(e).wrap_err("Failed to build response"))?)
 }
@@ -122,9 +132,7 @@ pub async fn thumbnail_on_demand_cached(
     media_item_id: &str,
     ingest_settings: &IngestSettings,
 ) -> Result<Vec<u8>, AppError> {
-    let cache_dir = ingest_settings
-        .thumbnail_root
-        .join(ON_DEMAND_THUMBNAIL_CACHE_FOLDER);
+    let cache_dir = &ingest_settings.on_demand_thumbs_cache_root;
     let cache_filename = format!("{media_item_id}_{size}.jpg");
     let cache_path = cache_dir.join(&cache_filename);
 

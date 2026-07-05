@@ -8,7 +8,6 @@ use common_services::database::jobs::Job;
 use common_services::database::media_item_store::MediaItemStore;
 use common_services::database::person::ExistingFaceCluster;
 use common_services::utils::nice_id;
-use common_types::constants::FACE_CLUSTERS_FOLDER;
 use face_id::detector::BoundingBox;
 use face_id::helpers::extract_face_thumbnail;
 use generate_thumbnails::ffmpeg::FfmpegCommand;
@@ -141,12 +140,8 @@ async fn extract_and_save_cluster_thumbnail(
 
     let thumb = extract_face_thumbnail(&img, &bbox, PADDING_FACTOR, THUMBNAIL_SIZE);
 
-    let out_dir = context
-        .settings
-        .ingest
-        .thumbnail_root
-        .join(FACE_CLUSTERS_FOLDER);
-    tokio::fs::create_dir_all(&out_dir).await?;
+    let out_dir = &context.settings.ingest.face_clusters_root;
+    tokio::fs::create_dir_all(out_dir).await?;
 
     let out_path = out_dir.join(format!("{cluster_id}.webp"));
     thumb.save(out_path)?;

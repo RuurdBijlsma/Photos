@@ -1,4 +1,4 @@
-use crate::handlers::daily_cards::DailyCardGenerator;
+use crate::handlers::common::daily_cards::DailyCardGenerator;
 use app_state::AppSettings;
 use async_trait::async_trait;
 use chrono::Datelike;
@@ -77,7 +77,7 @@ impl DailyCardGenerator for OnThisDayCardGenerator {
 
             let items = sqlx::query!(
                 r#"
-                SELECT id, width, height, is_video, duration_ms, has_thumbnails, use_panorama_viewer as "is_panorama!", taken_at_local
+                SELECT id, width, height, is_video, duration_ms, has_thumbnails, use_panorama_viewer, taken_at_local
                 FROM media_item
                 WHERE user_id = $1 AND deleted = false
                   AND EXTRACT(MONTH FROM taken_at_local)::integer = $2
@@ -119,7 +119,7 @@ impl DailyCardGenerator for OnThisDayCardGenerator {
                         "isVideo": i.is_video,
                         "width": i.width,
                         "height": i.height,
-                        "isPanorama": i.is_panorama,
+                        "usePanoramaViewer": i.use_panorama_viewer,
                         "takenAtLocal": i.taken_at_local,
                     })
                 })

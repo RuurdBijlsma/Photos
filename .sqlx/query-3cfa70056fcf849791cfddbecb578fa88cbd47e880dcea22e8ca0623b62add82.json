@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO jobs (job_type, user_id, status)\n        VALUES ('scan'::job_type, $1, 'queued'::job_status)\n        ON CONFLICT DO NOTHING\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "3cfa70056fcf849791cfddbecb578fa88cbd47e880dcea22e8ca0623b62add82"
+}

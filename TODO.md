@@ -216,28 +216,34 @@
   * ✅ als thumb storage zelfde drive is als main storage, show 1 balk
   * ✅ anders 2 balkjes, een voor thumb storage, een voor main storage
 * ✅ doe quality stats weer in fast_analysis
+* ✅ user level job management
+  * ✅ ingest status
+    * ✅ user level global progress bar (3 progress bars?)
+    * ✅ per item list? net als immich
+    * ✅ failed ingest overview
+  * ✅ start Scan job for user
+* ✅ admin page
+  * ✅ jobs overview, inclusief manual job run
+  * ✅ overview of users: remove user, storage used per user
+* ✅ trash can (deleted=true) (in trash UI kan je echte delete doen)
+* ✅ settings page
+  * ✅ contrast setting in theme
+* ✅ remove exif from full photo response
+* ✅ write thumbnails to cache folder and symlink to thumbnails folder?
 * password reset flow (email) (make mail optional)
 * nginx thumbnail hosting (optional maak setting voor Rust thumb hosting).
 * check of readme uitleg klopt met verse windows installatie & linux
 * better error if exiftool isnt there (worker wont work then)
 * improve speed of album/{id} endpoint
+* rotate image by changing thumbnail orientation?
+* ✅ add photo search type: Panorama (use_panorama_viewer flag). Currently type=photo|video, add panorama
 
 # High level TODO:
 
-* ✅ trash can (deleted=true) (in trash UI kan je echte delete doen)
-* ✅ settings page
-  * ✅ contrast setting in theme
 * admin page
-  * ✅ overview of users: remove user, storage used per user
-  * server settings?
-  * restart server?
-  * uptime
-  * jobs overview, inclusief schedule and manual job run
+  * restart server? [for later]
   * backup (met export jsons / import?)
-* ingest overview page
-  * show status of ingest per media item, all 3 stages
-  * button to do a scan
-  * import albums from google photos
+* import albums from google photos
 * explore page
   * stats over je fotos?
   * most visited places

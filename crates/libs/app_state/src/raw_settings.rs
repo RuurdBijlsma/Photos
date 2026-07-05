@@ -17,7 +17,7 @@ pub struct RawSettings {
 #[derive(Debug, Deserialize, Clone)]
 pub struct RawIngestSettings {
     pub media_folder: PathBuf,
-    pub thumbnail_folder: PathBuf,
+    pub app_data_folder: PathBuf,
     pub enable_cache: bool,
     pub analyzer: AnalyzerSettings,
     pub file_detection: FileDetectionSettings,

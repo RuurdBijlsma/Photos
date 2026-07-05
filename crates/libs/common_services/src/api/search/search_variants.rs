@@ -165,10 +165,11 @@ pub async fn advanced_search_media(
     let candidate_limit = limit * 3 + 300;
     let k = 60.0f64;
 
-    let is_video_filter = match config.media_type {
-        SearchMediaType::Video => Some(true),
-        SearchMediaType::Photo => Some(false),
-        SearchMediaType::All => None,
+    let (is_video_filter, is_panorama_filter) = match config.media_type {
+        SearchMediaType::Video => (Some(true), Some(false)),
+        SearchMediaType::Photo => (Some(false), Some(false)),
+        SearchMediaType::Panorama => (Some(false), Some(true)),
+        SearchMediaType::All => (None, None),
     };
 
     let semantic_score_threshold = if config.sort_by == SearchSortBy::Relevancy {
@@ -195,6 +196,7 @@ pub async fn advanced_search_media(
               AND ($9::timestamptz IS NULL OR mi.taken_at_utc >= $9)
               AND ($10::timestamptz IS NULL OR mi.taken_at_utc <= $10)
               AND ($11::bool IS NULL OR mi.is_video = $11)
+              AND ($18::bool IS NULL OR mi.use_panorama_viewer = $18)
               AND (cardinality($12::text[]) = 0 OR EXISTS (
                   SELECT 1 FROM gps g JOIN location l ON g.location_id = l.id
                   WHERE g.media_item_id = mi.id AND l.country_code = ANY($12)
@@ -291,7 +293,8 @@ pub async fn advanced_search_media(
         sort_by_str,              // $14
         semantic_score_threshold, // $15
         config.all_faces_required, // $16
-        offset                     // $17
+        offset,                    // $17
+        is_panorama_filter        // $18
     )
         .fetch_all(pool)
         .await?;
@@ -307,10 +310,11 @@ pub async fn filter_only_search_media(
     let limit = config.limit.unwrap_or(100).min(500);
     let offset = config.offset.unwrap_or(0);
 
-    let is_video_filter = match config.media_type {
-        SearchMediaType::Video => Some(true),
-        SearchMediaType::Photo => Some(false),
-        SearchMediaType::All => None,
+    let (is_video_filter, is_panorama_filter) = match config.media_type {
+        SearchMediaType::Video => (Some(true), Some(false)),
+        SearchMediaType::Photo => (Some(false), Some(false)),
+        SearchMediaType::Panorama => (Some(false), Some(true)),
+        SearchMediaType::All => (None, None),
     };
 
     let items = sqlx::query_as!(
@@ -328,6 +332,7 @@ pub async fn filter_only_search_media(
           AND ($2::timestamptz IS NULL OR mi.taken_at_utc >= $2)
           AND ($3::timestamptz IS NULL OR mi.taken_at_utc <= $3)
           AND ($4::bool IS NULL OR mi.is_video = $4)
+          AND ($10::bool IS NULL OR mi.use_panorama_viewer = $10)
           AND (cardinality($5::text[]) = 0 OR EXISTS (
               SELECT 1 FROM gps g JOIN location l ON g.location_id = l.id
               WHERE g.media_item_id = mi.id AND l.country_code = ANY($5)
@@ -343,15 +348,16 @@ pub async fn filter_only_search_media(
         ORDER BY mi.sort_timestamp DESC
         LIMIT $8 OFFSET $9
         "#,
-        user.id,
-        config.start_date,
-        config.end_date,
-        is_video_filter,
-        &config.country_codes,
-        &config.person_ids,
-        config.all_faces_required,
-        limit,
-        offset,
+        user.id,                   // $1
+        config.start_date,         // $2
+        config.end_date,           // $3
+        is_video_filter,           // $4
+        &config.country_codes,     // $5
+        &config.person_ids,        // $6
+        config.all_faces_required, // $7
+        limit,                     // $8
+        offset,                    // $9
+        is_panorama_filter,        // $10
     )
     .fetch_all(pool)
     .await?;

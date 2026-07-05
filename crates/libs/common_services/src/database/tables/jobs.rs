@@ -1,3 +1,4 @@
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sqlx::Type;
 
@@ -15,8 +16,9 @@ pub struct Job {
     pub dependency_attempts: i32,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Type)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Type, Serialize, Deserialize)]
 #[sqlx(type_name = "job_type", rename_all = "snake_case")]
+#[serde(rename_all = "snake_case")]
 pub enum JobType {
     IngestMetadata,
     IngestThumbnails,
@@ -24,7 +26,7 @@ pub enum JobType {
     IngestLlm,
     Remove,
     Scan,
-    CleanDB,
+    CleanDb,
     DelayedScan,
     ClusterFaces,
     ClusterPhotos,
@@ -62,7 +64,7 @@ impl JobType {
                 }
             }
             Self::Remove => 0,
-            Self::CleanDB => 20,
+            Self::CleanDb => 20,
             Self::ImportAlbumItem => 25,
             Self::Scan => 70,
             // These can be done after ingest analysis is done
@@ -77,8 +79,9 @@ impl JobType {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Type)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Type, Serialize, Deserialize)]
 #[sqlx(type_name = "job_status", rename_all = "snake_case")]
+#[serde(rename_all = "snake_case")]
 pub enum JobStatus {
     Queued,
     Running,

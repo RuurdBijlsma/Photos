@@ -10,7 +10,7 @@ pub fn get_images_to_analyze(
     percentages: &[u64],
     override_image_size: Option<u64>,
 ) -> Vec<(i32, PathBuf)> {
-    let thumbnail_root = &context.settings.ingest.thumbnail_root;
+    let thumbnail_root = &context.settings.ingest.thumbnails_root;
     let thumb_dir = thumbnail_root.join(media_item_id);
 
     if context.settings.ingest.is_photo_file(file_path) {

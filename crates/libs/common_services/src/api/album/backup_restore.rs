@@ -1,7 +1,6 @@
 use crate::api::album::interfaces::{AlbumBackup, AlbumItemBackup, AlbumSort, BackupInfo};
 use crate::api::album::service::get_representative_thumbnail;
 use crate::api::app_error::AppError;
-use crate::caching::cache_root;
 use crate::database::album::album::AlbumRole;
 use crate::database::album_store::AlbumStore;
 use crate::database::{CreateAlbumPayload, UpdateField};
@@ -10,8 +9,8 @@ use sqlx::PgPool;
 use std::collections::HashMap;
 use std::path::Path;
 
-pub async fn list_backups(user_id: i32) -> Result<Vec<BackupInfo>, AppError> {
-    let backup_root = cache_root().join("albums").join(user_id.to_string());
+pub async fn list_backups(cache_root: &Path, user_id: i32) -> Result<Vec<BackupInfo>, AppError> {
+    let backup_root = cache_root.join("albums").join(user_id.to_string());
     let mut backups = Vec::new();
     if !backup_root.exists() {
         return Ok(backups);
@@ -40,7 +39,7 @@ pub async fn list_backups(user_id: i32) -> Result<Vec<BackupInfo>, AppError> {
     Ok(backups)
 }
 
-pub async fn backup_albums(pool: &PgPool, user_id: i32) -> Result<(), AppError> {
+pub async fn backup_albums(pool: &PgPool, cache_root: &Path, user_id: i32) -> Result<(), AppError> {
     let albums = AlbumStore::list_by_user_id(pool, user_id).await?;
     let mut backups = Vec::new();
 
@@ -66,7 +65,7 @@ pub async fn backup_albums(pool: &PgPool, user_id: i32) -> Result<(), AppError> 
         });
     }
 
-    let backup_root = cache_root().join("albums").join(user_id.to_string());
+    let backup_root = cache_root.join("albums").join(user_id.to_string());
     tokio::fs::create_dir_all(&backup_root).await?;
     let timestamp = Utc::now().format("%Y-%m-%d_%H-%M-%S").to_string();
     let backup_path = backup_root.join(format!("{timestamp}.json"));

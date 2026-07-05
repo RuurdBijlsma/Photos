@@ -1,0 +1,70 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            job_type AS \"job_type: JobType\",\n            status AS \"status: JobStatus\",\n            COUNT(*)::bigint AS \"count!\"\n        FROM jobs\n        WHERE user_id = $1\n          AND job_type IN ('ingest_metadata', 'ingest_thumbnails', 'ingest_analysis', 'ingest_llm')\n        GROUP BY job_type, status\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "job_type: JobType",
+        "type_info": {
+          "Custom": {
+            "name": "job_type",
+            "kind": {
+              "Enum": [
+                "ingest_metadata",
+                "ingest_thumbnails",
+                "ingest_analysis",
+                "ingest_llm",
+                "remove",
+                "scan",
+                "clean_db",
+                "cluster_faces",
+                "cluster_photos",
+                "import_album_item",
+                "update_global_centroid",
+                "sync_thumbnails",
+                "delayed_scan",
+                "generate_daily_cards",
+                "calc_system_stats"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "status: JobStatus",
+        "type_info": {
+          "Custom": {
+            "name": "job_status",
+            "kind": {
+              "Enum": [
+                "queued",
+                "running",
+                "failed",
+                "done",
+                "cancelled"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "count!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      null
+    ]
+  },
+  "hash": "7abc63dda558795c6a0c999175e3c988cbffcb5ad5126b556c17af5d5b0c0b93"
+}

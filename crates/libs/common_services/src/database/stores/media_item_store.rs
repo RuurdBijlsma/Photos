@@ -1,11 +1,10 @@
 use crate::database::media_item::camera_settings::CameraSettings;
 use crate::database::media_item::gps::Gps;
 use crate::database::media_item::location::Location;
-use crate::database::media_item::media_features::MediaFeatures;
+use crate::database::media_item::media_features::ReadMediaFeatures;
 use crate::database::media_item::media_item::{
     CreateFullMediaItem, FullMediaItem, FullMediaItemRow,
 };
-use crate::database::media_item::panorama::Panorama;
 use crate::database::media_item::time_details::TimeDetails;
 use crate::database::media_item::weather::Weather;
 use crate::database::structs::UpdateMediaItemPayload;
@@ -164,13 +163,13 @@ impl MediaItemStore {
                 AS "weather: Json<Weather>",
 
             (SELECT to_jsonb(d) FROM media_features d WHERE d.media_item_id = mi.id)
-                AS "media_features!: Json<MediaFeatures>",
+                AS "media_features!: Json<ReadMediaFeatures>",
 
             (SELECT to_jsonb(cd) FROM camera_settings cd WHERE cd.media_item_id = mi.id)
                 AS "camera_settings!: Json<CameraSettings>",
 
-            (SELECT to_jsonb(p) FROM panorama p WHERE p.media_item_id = mi.id)
-                AS "panorama!: Json<Panorama>"
+            (SELECT to_jsonb(p.config) FROM panorama_config p WHERE p.media_item_id = mi.id)
+                AS "panorama_config: Json<serde_json::Value>"
 
         FROM media_item mi
         LEFT JOIN visual_analyses va ON mi.id = va.media_item_id
@@ -206,6 +205,7 @@ impl MediaItemStore {
             || relative_path.to_string(),
             |f| f.to_string_lossy().to_string(),
         );
+        // It's getting stuck here somtimes? Why??
 
         // Insert into the main media_item table
         sqlx::query!(
@@ -238,8 +238,8 @@ impl MediaItemStore {
             media_item.timezone_offset_seconds,
             media_item.og_timezone_offset_seconds,
         )
-        .execute(&mut **tx)
-        .await?;
+            .execute(&mut **tx)
+            .await?;
 
         // Insert into related tables
         if let Some(gps_info) = &media_item.gps {
@@ -373,25 +373,6 @@ impl MediaItemStore {
         .execute(&mut **tx)
         .await?;
 
-        sqlx::query!(
-            r#"
-                INSERT INTO panorama (
-                    media_item_id, is_photosphere, projection_type, horizontal_fov_deg,
-                    vertical_fov_deg, center_yaw_deg, center_pitch_deg
-                )
-                VALUES ($1, $2, $3, $4, $5, $6, $7)
-                "#,
-            id,
-            media_item.panorama.is_photosphere,
-            media_item.panorama.projection_type,
-            media_item.panorama.horizontal_fov_deg,
-            media_item.panorama.vertical_fov_deg,
-            media_item.panorama.center_yaw_deg,
-            media_item.panorama.center_pitch_deg,
-        )
-        .execute(&mut **tx)
-        .await?;
-
         Ok(())
     }
 
@@ -476,8 +457,8 @@ impl MediaItemStore {
             payload.timezone_offset_seconds.value(),
             payload.use_panorama_viewer,
         )
-        .execute(executor)
-        .await?)
+            .execute(executor)
+            .await?)
     }
 
     pub async fn update_remote_user_id(
@@ -580,5 +561,26 @@ impl MediaItemStore {
             .collect();
 
         Ok(items)
+    }
+
+    pub async fn upsert_panorama_config(
+        executor: impl Executor<'_, Database = Postgres>,
+        media_item_id: &str,
+        config: &serde_json::Value,
+    ) -> Result<(), DbError> {
+        sqlx::query!(
+            r#"
+            INSERT INTO panorama_config (media_item_id, config)
+            VALUES ($1, $2)
+            ON CONFLICT (media_item_id)
+            DO UPDATE SET config = EXCLUDED.config
+            "#,
+            media_item_id,
+            config
+        )
+        .execute(executor)
+        .await?;
+
+        Ok(())
     }
 }

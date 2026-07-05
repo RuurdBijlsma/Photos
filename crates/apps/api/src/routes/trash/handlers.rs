@@ -37,7 +37,7 @@ pub async fn perma_delete_handler(
     Json(payload): Json<TrashBatchRequest>,
 ) -> Result<(), AppError> {
     let media_root = &context.settings.ingest.media_root;
-    let thumbnail_root = &context.settings.ingest.thumbnail_root;
+    let thumbnail_root = &context.settings.ingest.thumbnails_root;
 
     perma_delete_items(
         &context.pool,

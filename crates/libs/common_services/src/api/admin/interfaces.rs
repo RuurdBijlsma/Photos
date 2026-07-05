@@ -68,7 +68,7 @@ impl UnsupportedFilesResponse {
 #[serde(rename_all = "camelCase")]
 pub struct DiskResponse {
     pub media_folder: PathInfoResponse,
-    pub thumbnails_folder: PathInfoResponse,
+    pub app_data_folder: PathInfoResponse,
 }
 
 #[derive(Deserialize, Serialize)]

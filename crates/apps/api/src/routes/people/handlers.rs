@@ -1,4 +1,5 @@
 use crate::api_state::ApiContext;
+use app_state::constants::FACE_CLUSTERS_FOLDER;
 use axum::extract::{Path, State};
 use axum::response::{IntoResponse, Redirect};
 use axum::{Extension, Json};
@@ -9,7 +10,6 @@ use common_services::api::people::service::{
     get_all_people, get_person_photos, merge_person, unmerge_person, update_person,
 };
 use common_services::database::app_user::User;
-use common_types::constants::FACE_CLUSTERS_FOLDER;
 use common_types::pb::api::{FullPersonMediaResponse, ListPeopleResponse};
 use http::header::CACHE_CONTROL;
 use tracing::instrument;
@@ -83,8 +83,7 @@ pub async fn get_person_thumbnail_redirect_handler(
         .fetch_one(&context.pool)
         .await?
     };
-
-    let target_url = format!("/thumbnails/{FACE_CLUSTERS_FOLDER}/{cluster_id}.webp");
+    let target_url = format!("/{FACE_CLUSTERS_FOLDER}/{cluster_id}.webp");
     let headers = [(CACHE_CONTROL, "public, max-age=300")];
     Ok((headers, Redirect::temporary(&target_url)))
 }

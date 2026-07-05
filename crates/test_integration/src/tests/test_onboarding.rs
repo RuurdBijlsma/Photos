@@ -33,7 +33,7 @@ pub async fn test_onboarding(context: &TestContext) -> Result<()> {
     assert_eq!(response.status(), StatusCode::OK);
     let disk_info: DiskResponse = response.json().await?;
     assert!(disk_info.media_folder.read_access);
-    assert!(disk_info.thumbnails_folder.read_access);
+    assert!(disk_info.app_data_folder.read_access);
 
     // 3. List Folders (root)
     let response = client
@@ -103,6 +103,7 @@ pub async fn test_onboarding(context: &TestContext) -> Result<()> {
     Ok(())
 }
 
+#[allow(clippy::too_many_lines)]
 pub async fn test_start_processing(context: &TestContext) -> Result<()> {
     // 1. Login
     let token = login(context).await?;
@@ -219,7 +220,10 @@ pub async fn test_start_processing(context: &TestContext) -> Result<()> {
             .await?;
         for item in &media_items {
             let path = context.settings.ingest.media_root.join(&item.relative_path);
-            let thumbs_exist = context.settings.ingest.thumbs_exist(&path, &item.id)?;
+            let thumbs_exist = context
+                .settings
+                .ingest
+                .thumbs_exist(&path, &item.id, None, false)?;
             assert!(thumbs_exist);
         }
     }

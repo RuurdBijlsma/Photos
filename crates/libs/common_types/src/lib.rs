@@ -4,7 +4,6 @@
     clippy::missing_panics_doc,
     clippy::struct_excessive_bools
 )]
-pub mod constants;
 pub mod dev_constants;
 pub mod ml_analysis;
 pub mod pb;

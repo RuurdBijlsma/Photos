@@ -43,3 +43,8 @@ CREATE INDEX idx_jobs_user_id ON jobs (user_id);
 
 -- For monitoring/dashboarding that doesn't exist yet
 CREATE INDEX jobs_status_priority_idx ON jobs (status, priority, scheduled_at, created_at);
+
+-- For performance when filtering/sorting by job type or timestamp
+CREATE INDEX idx_jobs_job_type ON jobs (job_type);
+CREATE INDEX idx_jobs_created_at ON jobs (created_at DESC);
+CREATE INDEX idx_jobs_scheduled_at ON jobs (scheduled_at DESC);

@@ -1,0 +1,16 @@
+meta {
+  name: List User Jobs
+  type: http
+  seq: 10
+}
+
+get {
+  url: http://localhost:9475/jobs/ingest/overview
+  body: none
+  auth: inherit
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

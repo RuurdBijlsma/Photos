@@ -72,7 +72,7 @@ async fn enqueue_file_job(
         WatcherJobType::Remove => {
             common_services::api::photos::removal::delete_item_and_thumbnails(
                 pool,
-                &settings.thumbnail_root,
+                &settings.thumbnails_root,
                 relative_path,
             )
             .await?;

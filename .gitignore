@@ -2,6 +2,7 @@
 .idea
 .env
 /thumbnails
+/app_data
 .venv
 face_clusters_output
 photo_clusters_output
@@ -10,3 +11,4 @@ __pycache__
 test_out
 umap_output
 quality_test_output
+crates/test_integration/app_data

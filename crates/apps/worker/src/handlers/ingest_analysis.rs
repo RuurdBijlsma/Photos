@@ -1,6 +1,6 @@
 use crate::context::WorkerContext;
 use crate::handlers::JobResult;
-use crate::handlers::common::cache::{get_analysis_cache, write_analysis_cache};
+use crate::handlers::common::cache::analysis_cache::{get_analysis_cache, write_analysis_cache};
 use crate::handlers::common::utils::get_images_to_analyze;
 use crate::jobs::management::is_job_cancelled;
 use color_eyre::eyre::{Result, eyre};
@@ -68,14 +68,15 @@ async fn get_llm_data(
 ) -> Result<Vec<MLFastAnalysis>> {
     let file_hash = hash_file(file_path)?;
     if context.settings.ingest.enable_cache
-        && let Some(cached_analysis) = get_analysis_cache(&file_hash).await?
+        && let Some(cached_analysis) =
+            get_analysis_cache(&context.settings.ingest.cache_root, &file_hash).await?
     {
         debug!("Using analysis cache for {}", media_item_id);
         return Ok(cached_analysis);
     }
     let analyses = compute_analysis(context, file_path, media_item_id).await?;
     if context.settings.ingest.enable_cache {
-        write_analysis_cache(&file_hash, &analyses).await?;
+        write_analysis_cache(&context.settings.ingest.cache_root, &file_hash, &analyses).await?;
     }
 
     Ok(analyses)

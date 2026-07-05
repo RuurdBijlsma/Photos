@@ -9,7 +9,7 @@ common_types = { path = "../../libs/common_types" }
 common_services = { path = "../../libs/common_services" }
 generate_thumbnails = { path = "../../libs/generate_thumbnails" }
 ml_analysis = { path = "../../libs/ml_analysis" }
-media_analyzer = "0.9.0"
+media_analyzer = "0.10.0"
 sqlx = { version = "0.8.6", features = ["runtime-tokio-native-tls", "postgres", "chrono", "macros", "json", "uuid"] }
 tokio = { version = "1.47.1", features = ["full"] }
 color-eyre = "0.6.5"

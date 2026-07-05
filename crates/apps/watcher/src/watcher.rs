@@ -1,8 +1,8 @@
 use crate::handlers::{handle_create, handle_remove};
 use app_state::IngestSettings;
+use app_state::constants::ALBUM_IMPORT_FOLDER;
 use color_eyre::eyre::{Result, eyre};
 use common_services::alert;
-use common_types::constants::ALBUM_IMPORT_FOLDER;
 use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use sqlx::PgPool;
 use std::path::Component;

@@ -21,7 +21,7 @@ use common_services::database::app_user::User;
 pub async fn get_disk_response(
     State(ingestion): State<IngestSettings>,
 ) -> Result<Json<DiskResponse>, AppError> {
-    let disk_info = get_disks_info(&ingestion.media_root, &ingestion.thumbnail_root)?;
+    let disk_info = get_disks_info(&ingestion.media_root, &ingestion.app_data_root)?;
     Ok(Json(disk_info))
 }
 

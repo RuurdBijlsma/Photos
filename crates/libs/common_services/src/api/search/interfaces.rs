@@ -61,6 +61,7 @@ pub enum SearchMediaType {
     All,
     Photo,
     Video,
+    Panorama,
 }
 
 #[derive(Deserialize, Debug, Clone, Copy, PartialEq, Eq, Default)]

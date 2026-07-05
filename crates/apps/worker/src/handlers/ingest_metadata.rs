@@ -1,6 +1,6 @@
 use crate::context::WorkerContext;
 use crate::handlers::JobResult;
-use crate::handlers::common::cache::{get_ingest_cache, write_ingest_cache};
+use crate::handlers::common::cache::ingest_cache::{get_ingest_cache, write_ingest_cache};
 use crate::handlers::common::remote_user::get_or_create_remote_user;
 use crate::jobs::management::is_job_cancelled;
 use app_state::constants;
@@ -64,7 +64,8 @@ async fn get_media_info(
     file_hash: &str,
 ) -> Result<MediaMetadata> {
     if context.settings.ingest.enable_cache
-        && let Some(cached) = get_ingest_cache(file_hash).await?
+        && let Some(cached) =
+            get_ingest_cache(&context.settings.ingest.cache_root, file_hash).await?
     {
         debug!("Using ingest cache for {:?}", file_path.file_name());
         return Ok(cached);
@@ -75,7 +76,12 @@ async fn get_media_info(
         .await
         .wrap_err(file_path.to_string_lossy().to_string())?;
     if context.settings.ingest.enable_cache {
-        write_ingest_cache(file_hash, media_info.clone()).await?;
+        write_ingest_cache(
+            &context.settings.ingest.cache_root,
+            file_hash,
+            media_info.clone(),
+        )
+        .await?;
     }
     Ok(media_info)
 }

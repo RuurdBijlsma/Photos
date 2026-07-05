@@ -11,18 +11,9 @@ use common_services::api::auth::service::{create_user, generate_invite};
 use common_services::database::get_db_pool;
 use common_services::database::user_store::UserStore;
 use common_types::dev_constants::{EMAIL, PASSWORD, USERNAME};
-use tracing::Level;
-use tracing_subscriber::{EnvFilter, fmt};
-use worker::worker::create_worker;
 
 #[tokio::main]
 async fn main() -> color_eyre::Result<()> {
-    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| "info,ort=warn".into());
-    let subscriber = fmt::Subscriber::builder()
-        .with_max_level(Level::INFO)
-        .with_env_filter(filter)
-        .finish();
-    tracing::subscriber::set_global_default(subscriber)?;
     color_eyre::install()?;
 
     let settings = load_app_settings()?;
@@ -58,8 +49,10 @@ async fn main() -> color_eyre::Result<()> {
     )
     .await?;
     let user = admin_update_user_media_folder(&pool, &settings.ingest, user.id, "Ruurd").await?;
-    println!("Started processing, media folder: {:?}", user.media_folder);
-    create_worker(pool, settings, false, true).await?;
+    println!(
+        "Initiated processing, media folder: {:?}",
+        user.media_folder
+    );
 
     Ok(())
 }

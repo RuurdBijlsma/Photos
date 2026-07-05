@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                UPDATE media_item\n                SET use_panorama_viewer = FALSE,\n                updated_at = now()\n                WHERE id = $1;",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "3a928e5a5ccb752a63a2045ec78f52ceddc8f1791b36950bb13a1300621e7be2"
+}

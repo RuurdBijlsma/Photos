@@ -12,7 +12,9 @@ use tracing::{info, warn};
 /// Atomically claims the next available job from the queue.
 pub async fn claim_next_job(context: &WorkerContext) -> Result<Option<Job>> {
     let mut tx = context.pool.begin().await?;
-    let heartbeat_timeout_seconds = 300.;
+    // Heartbeat interval is 1 minute
+    // If job has last heartbeat at more than 150 seconds ago, worker is probably dead?
+    let heartbeat_timeout_seconds = 150.;
 
     let job = sqlx::query_as!(
         Job,

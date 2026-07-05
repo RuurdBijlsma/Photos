@@ -4,6 +4,7 @@ pub mod app_error;
 pub mod auth;
 pub mod camera;
 pub mod daily_cards;
+pub mod jobs;
 pub mod people;
 pub mod photos;
 pub mod s2s;

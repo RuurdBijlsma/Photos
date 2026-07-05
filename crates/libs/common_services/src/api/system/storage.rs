@@ -72,16 +72,16 @@ pub async fn get_storage_summary(
     .fetch_one(pool);
 
     let media_folder = settings.media_root.clone();
-    let thumbnail_folder = settings.thumbnail_root.clone();
+    let app_data_folder = settings.app_data_root.clone();
 
     // Use moka cache with TTL
     let cache = get_size_cache();
-    let (media_folder_size, thumbnail_folder_size) = cache
+    let (media_folder_size, app_data_folder_size) = cache
         .get_with("sizes_key".to_string(), async move {
             let res = tokio::task::spawn_blocking(move || {
                 let media = get_folder_size(&media_folder);
-                let thumb = get_folder_size(&thumbnail_folder);
-                (media, thumb)
+                let app_data = get_folder_size(&app_data_folder);
+                (media, app_data)
             })
             .await;
             res.unwrap_or((0, 0))
@@ -99,7 +99,7 @@ pub async fn get_storage_summary(
         blurry_potential_savings: blurry_row.blurry_potential_savings,
         blurry_item_count: blurry_row.blurry_item_count,
         media_folder_size_bytes: media_folder_size as i64,
-        thumbnail_folder_size_bytes: thumbnail_folder_size as i64,
+        app_data_folder_size_bytes: app_data_folder_size as i64,
     })
 }
 

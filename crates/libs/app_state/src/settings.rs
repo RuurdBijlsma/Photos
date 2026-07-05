@@ -1,3 +1,7 @@
+use crate::constants::{
+    CACHE_FOLDER, FACE_CLUSTERS_FOLDER, ON_DEMAND_THUMBNAIL_CACHE_FOLDER, PANO_FOLDER,
+    THUMBNAILS_FOLDER,
+};
 use crate::{
     AnalyzerSettings, ApiSettings, DailyCardsSettings, FileDetectionSettings, LoggingSettings,
     MakeRelativePath, RawSettings, SecretSettings, ThumbnailSettings,
@@ -22,7 +26,12 @@ pub struct AppSettings {
 pub struct IngestSettings {
     pub media_root: PathBuf,
     pub media_root_canon: PathBuf,
-    pub thumbnail_root: PathBuf,
+    pub app_data_root: PathBuf,
+    pub thumbnails_root: PathBuf,
+    pub on_demand_thumbs_cache_root: PathBuf,
+    pub cache_root: PathBuf,
+    pub pano_root: PathBuf,
+    pub face_clusters_root: PathBuf,
     pub enable_cache: bool,
     pub analyzer: AnalyzerSettings,
     pub file_detection: FileDetectionSettings,
@@ -31,19 +40,29 @@ pub struct IngestSettings {
 
 impl From<RawSettings> for AppSettings {
     fn from(raw: RawSettings) -> Self {
-        let thumbnail_root =
-            absolute(&raw.ingest.thumbnail_folder).expect("Invalid thumbnail_folder");
+        let app_data_root =
+            absolute(&raw.ingest.app_data_folder).expect("Invalid thumbnail_folder");
         let media_root = absolute(&raw.ingest.media_folder).expect("Invalid media_folder");
         let media_root_canon =
             canonicalize(&raw.ingest.media_folder).expect("Invalid media_folder");
+        let on_demand_thumbs_cache_root = app_data_root.join(ON_DEMAND_THUMBNAIL_CACHE_FOLDER);
+        let pano_root = app_data_root.join(PANO_FOLDER);
+        let cache_root = app_data_root.join(CACHE_FOLDER);
+        let face_clusters_root = app_data_root.join(FACE_CLUSTERS_FOLDER);
+        let thumbnails_root = app_data_root.join(THUMBNAILS_FOLDER);
         let ingest = IngestSettings {
             media_root_canon,
             media_root,
-            thumbnail_root,
+            app_data_root,
             enable_cache: raw.ingest.enable_cache,
             analyzer: raw.ingest.analyzer,
             file_detection: raw.ingest.file_detection,
             thumbnails: raw.ingest.thumbnails,
+            on_demand_thumbs_cache_root,
+            pano_root,
+            face_clusters_root,
+            thumbnails_root,
+            cache_root,
         };
 
         Self {
@@ -89,7 +108,13 @@ impl IngestSettings {
     /// # Errors
     ///
     /// This function's signature returns a Result, but the current implementation does not produce any errors.
-    pub fn thumbs_exist(&self, file: &Path, thumb_sub_folder: &str) -> Result<bool> {
+    pub fn thumbs_exist(
+        &self,
+        file: &Path,
+        thumb_sub_folder: &str,
+        required_pano_folder: Option<&Path>,
+        require_motion_photo: bool,
+    ) -> Result<bool> {
         let is_photo = self.is_photo_file(file);
         let is_video = self.is_video_file(file);
         let photo_thumb_ext = &self.thumbnails.thumbnail_extension;
@@ -112,11 +137,27 @@ impl IngestSettings {
             }
         }
 
-        let thumb_dir = self.thumbnail_root.join(thumb_sub_folder);
+        let thumb_dir = self.thumbnails_root.join(thumb_sub_folder);
         for thumb_filename in should_exist {
             let thumb_file_path = thumb_dir.join(thumb_filename.clone());
             if !thumb_file_path.exists() {
                 return Ok(false);
+            }
+        }
+
+        if is_photo {
+            if require_motion_photo {
+                let motion_file = thumb_dir.join("motion.mp4");
+                if !motion_file.exists() {
+                    return Ok(false);
+                }
+            }
+
+            if let Some(pano_folder) = required_pano_folder {
+                let config_file = pano_folder.join("config.json");
+                if !config_file.exists() {
+                    return Ok(false);
+                }
             }
         }
 
@@ -149,7 +190,7 @@ impl IngestSettings {
             return Ok(false);
         };
         // media item exists, check thumbnails existence
-        let exist = self.thumbs_exist(file, &media_item_id)?;
+        let exist = self.thumbs_exist(file, &media_item_id, None, false)?;
         Ok(exist)
     }
 }

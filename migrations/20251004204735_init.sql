@@ -99,7 +99,6 @@ ALTER TABLE app_user
 -- The following tables store optional, detailed metadata for a MediaItem.
 -- They use a one-to-one relationship where the primary key is also a foreign key
 -- referencing media_item.id. This keeps the main media_item table clean.
-
 CREATE TABLE gps
 (
     media_item_id     VARCHAR(10) PRIMARY KEY REFERENCES media_item (id) ON DELETE CASCADE,
@@ -108,6 +107,12 @@ CREATE TABLE gps
     longitude         DOUBLE PRECISION NOT NULL,
     altitude          DOUBLE PRECISION,
     compass_direction DOUBLE PRECISION
+);
+
+CREATE TABLE panorama_config
+(
+    media_item_id VARCHAR(10) PRIMARY KEY REFERENCES media_item (id) ON DELETE CASCADE,
+    config        JSONB NOT NULL
 );
 
 CREATE TABLE time
@@ -177,17 +182,6 @@ CREATE TABLE camera_settings
     digital_zoom_ratio    REAL,
     subject_distance      REAL,
     exposure_compensation REAL
-);
-
-CREATE TABLE panorama
-(
-    media_item_id      VARCHAR(10) PRIMARY KEY REFERENCES media_item (id) ON DELETE CASCADE,
-    is_photosphere     BOOLEAN NOT NULL,
-    projection_type    TEXT,
-    horizontal_fov_deg REAL,
-    vertical_fov_deg   REAL,
-    center_yaw_deg     REAL,
-    center_pitch_deg   REAL
 );
 
 -- Create indices for foreign keys and frequently queried columns for performance.

@@ -27,7 +27,6 @@ prost = "0.14.3"
 tokio-tungstenite = { version = "0.29.0", features = ["native-tls"] }
 futures-util = "0.3.31"
 material-color-utils = "0.1.3"
-serde = { version = "1.0.228", features = ["derive"] }
 
 [features]
 load-dynamic = ["api/load-dynamic", "worker/load-dynamic", "common_services/load-dynamic", "common_types/load-dynamic"]

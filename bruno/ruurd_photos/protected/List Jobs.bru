@@ -1,0 +1,25 @@
+meta {
+  name: List Jobs
+  type: http
+  seq: 9
+}
+
+get {
+  url: http://localhost:9475/jobs?sort=priority:asc&sort=scheduledAt:desc&filter=status:eq:done&filter=priority:lte:100&filter=job_type:eq:clean_db&limit=1
+  body: none
+  auth: inherit
+}
+
+params:query {
+  sort: priority:asc
+  sort: scheduledAt:desc
+  filter: status:eq:done
+  filter: priority:lte:100
+  filter: job_type:eq:clean_db
+  limit: 1
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

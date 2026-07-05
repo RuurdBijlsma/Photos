@@ -29,6 +29,5 @@ rayon = "1.12.0"
 load-dynamic = [
     "open_clip_inference/load-dynamic",
     "face_id/load-dynamic",
-    "common_types/load-dynamic",
     "object_detector/load-dynamic"
 ] # -> Load ONNXRuntime dynamically instead of statically

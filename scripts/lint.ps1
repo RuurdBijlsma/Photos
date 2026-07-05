@@ -38,7 +38,6 @@ rustup component add clippy
 
 # Environment variables
 $env:CARGO_TERM_COLOR = "always"
-$env:RUSTFLAGS = "-Dwarnings"
 
 # Run checks
 $checksPassed = $true

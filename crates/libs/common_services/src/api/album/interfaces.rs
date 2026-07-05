@@ -3,7 +3,6 @@ use crate::database::UpdateField;
 use crate::database::album::album::AlbumRole;
 use crate::database::media_item::camera_settings::CameraSettings;
 use crate::database::media_item::media_item::FullMediaItem;
-use crate::database::media_item::panorama::Panorama;
 use crate::database::media_item::time_details::TimeDetails;
 use crate::database::media_item::weather::Weather;
 use crate::database::visual_analysis::visual_analysis::ReadVisualAnalysis;
@@ -232,7 +231,6 @@ pub struct SharedMediaItem {
     pub weather: Option<Weather>,
     pub media_features: SharedMediaFeatures,
     pub camera_settings: CameraSettings,
-    pub panorama: Panorama,
     pub user_caption: Option<String>,
 }
 
@@ -255,7 +253,6 @@ impl From<FullMediaItem> for SharedMediaItem {
             time: item.time,
             weather: item.weather,
             camera_settings: item.camera_settings,
-            panorama: item.panorama,
             user_caption: item.user_caption,
             media_features: SharedMediaFeatures {
                 mime_type: item.media_features.mime_type,

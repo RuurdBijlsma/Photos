@@ -1,6 +1,6 @@
 #![allow(clippy::cast_precision_loss)]
 use app_state::load_app_settings;
-use generate_thumbnails::generate_thumbnails;
+use generate_thumbnails::{ThumbnailConfig, generate_thumbnails};
 use std::fs;
 use std::path::Path;
 use std::time::Instant;
@@ -41,7 +41,14 @@ async fn main() -> color_eyre::Result<()> {
 
             let out_folder = Path::new("test_out").join(&image_filename);
             fs::create_dir_all(&out_folder)?;
-            generate_thumbnails(&settings.ingest, image, &out_folder, 1).await?;
+            generate_thumbnails(
+                &settings.ingest,
+                image,
+                &out_folder,
+                &out_folder,
+                ThumbnailConfig::default(),
+            )
+            .await?;
             let elapsed = now.elapsed();
             times.push(elapsed.as_millis());
             println!(

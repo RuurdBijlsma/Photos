@@ -6,6 +6,7 @@ use axum::{Extension, Json};
 use axum_extra::protobuf::Protobuf;
 use common_services::api::album::backup_restore::{list_backups, restore_albums};
 
+use app_state::IngestSettings;
 use common_services::api::album::interfaces::{
     AcceptInviteRequest, AddCollaboratorRequest, AddMediaToAlbumRequest, BackupInfo,
     CheckInviteRequest, CreateAlbumRequest, GetSortedAlbumItemsRequest, ListAlbumsParam,
@@ -17,7 +18,6 @@ use common_services::api::album::service::{
     remove_collaborator, remove_media_from_album, reorder_media_items, update_album,
 };
 use common_services::api::app_error::AppError;
-use common_services::caching::cache_root;
 use common_services::database::album::album::{Album, AlbumSummary};
 use common_services::database::album::album_collaborator::AlbumCollaborator;
 use common_services::database::album_store::AlbumStore;
@@ -267,9 +267,10 @@ pub async fn get_album_media_item_handler(
 // ====================================== //
 
 pub async fn list_backups_handler(
+    State(settings): State<IngestSettings>,
     Extension(user): Extension<User>,
 ) -> Result<Json<Vec<BackupInfo>>, AppError> {
-    let backups = list_backups(user.id).await?;
+    let backups = list_backups(&settings.cache_root, user.id).await?;
     Ok(Json(backups))
 }
 
@@ -278,7 +279,10 @@ pub async fn restore_backup_handler(
     Extension(user): Extension<User>,
     Path(backup_filename): Path<String>,
 ) -> Result<(), AppError> {
-    let backup_path = cache_root()
+    let backup_path = context
+        .settings
+        .ingest
+        .cache_root
         .join("albums")
         .join(user.id.to_string())
         .join(backup_filename);

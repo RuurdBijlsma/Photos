@@ -1,4 +1,4 @@
-use crate::{AppConstants, AppSettings, RawSettings};
+use crate::{AppConstants, AppSettings, IngestSettings, RawSettings};
 use color_eyre::eyre::Result;
 use config::{Config, File};
 use std::path::Path;
@@ -25,10 +25,20 @@ pub fn load_settings_from_path(path: &Path, env_path: Option<&Path>) -> Result<A
 
     let raw_settings = builder.build()?.try_deserialize::<RawSettings>()?;
     let settings: AppSettings = raw_settings.into();
-
-    fs::create_dir_all(&settings.ingest.thumbnail_root).expect("Cannot create thumbnails folder");
+    init_app_data_folders(&settings.ingest);
 
     Ok(settings)
+}
+
+pub fn init_app_data_folders(settings: &IngestSettings) {
+    fs::create_dir_all(&settings.app_data_root).expect("Cannot create app_data_root folder");
+    fs::create_dir_all(&settings.thumbnails_root).expect("Cannot create thumbnails_root folder");
+    fs::create_dir_all(&settings.pano_root).expect("Cannot create pano_root folder");
+    fs::create_dir_all(&settings.cache_root).expect("Cannot create cache_root folder");
+    fs::create_dir_all(&settings.on_demand_thumbs_cache_root)
+        .expect("Cannot create on_demand_thumbs_cache_root folder");
+    fs::create_dir_all(&settings.face_clusters_root)
+        .expect("Cannot create face_clusters_root folder");
 }
 
 pub fn load_constants_from_path(path: &Path) -> Result<AppConstants> {

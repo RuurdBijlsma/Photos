@@ -6,7 +6,7 @@ use tokio::task::JoinHandle;
 pub fn start_heartbeat_loop(pool: &PgPool, job_id: i64) -> JoinHandle<()> {
     let pool_clone = pool.clone();
     tokio::spawn(async move {
-        let mut interval = tokio::time::interval(std::time::Duration::from_mins(2));
+        let mut interval = tokio::time::interval(std::time::Duration::from_mins(1));
         loop {
             interval.tick().await;
             let result = sqlx::query!(

@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n                SELECT m.id, m.width, m.height, m.is_video, m.use_panorama_viewer as \"is_panorama!\",\n                       g.latitude, g.longitude, m.duration_ms, m.taken_at_local, m.has_thumbnails\n                FROM media_item m\n                JOIN gps g ON m.id = g.media_item_id\n                WHERE m.user_id = $1 AND m.deleted = false\n                  AND g.latitude != 0.0 AND g.longitude != 0.0\n                ORDER BY\n                  (CASE\n                    WHEN $4::double precision = 0.0 THEN 1\n                    WHEN (sqrt(power((g.longitude - $3::double precision) * cos(radians($2::double precision)), 2) + power(g.latitude - $2::double precision, 2)) * 111.32) > $4::double precision THEN 1\n                    ELSE 0\n                  END) DESC,\n                  random()\n                LIMIT $5\n                ",
+  "query": "\n                SELECT m.id, m.width, m.height, m.is_video, m.use_panorama_viewer,\n                       g.latitude, g.longitude, m.duration_ms, m.taken_at_local, m.has_thumbnails\n                FROM media_item m\n                JOIN gps g ON m.id = g.media_item_id\n                WHERE m.user_id = $1 AND m.deleted = false\n                  AND g.latitude != 0.0 AND g.longitude != 0.0\n                ORDER BY\n                  (CASE\n                    WHEN $4::double precision = 0.0 THEN 1\n                    WHEN (sqrt(power((g.longitude - $3::double precision) * cos(radians($2::double precision)), 2) + power(g.latitude - $2::double precision, 2)) * 111.32) > $4::double precision THEN 1\n                    ELSE 0\n                  END) DESC,\n                  random()\n                LIMIT $5\n                ",
   "describe": {
     "columns": [
       {
@@ -25,7 +25,7 @@
       },
       {
         "ordinal": 4,
-        "name": "is_panorama!",
+        "name": "use_panorama_viewer",
         "type_info": "Bool"
       },
       {
@@ -76,5 +76,5 @@
       false
     ]
   },
-  "hash": "305b3720ae0ba623fff6c6c2fee617c23a61ca7fac4185bbebc4b561275aff4b"
+  "hash": "371e5d3d30b9681f9edce914f2c7698661dd9ca161f93da14de1b0d210d7f2c1"
 }

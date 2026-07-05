@@ -36,7 +36,7 @@ message SimpleTimelineItem {
   bool is_video = 2;
   bool has_thumbnails = 3;
   optional int32 duration_ms = 4;
-  float ratio = 6;
+  float ratio = 5;
 }
 
 // --- Album Specific ---
@@ -163,5 +163,5 @@ message StorageSummaryResponse {
   int64 blurry_potential_savings = 3;
   int32 blurry_item_count = 4;
   int64 media_folder_size_bytes = 5;
-  int64 thumbnail_folder_size_bytes = 6;
+  int64 app_data_folder_size_bytes = 6;
 }

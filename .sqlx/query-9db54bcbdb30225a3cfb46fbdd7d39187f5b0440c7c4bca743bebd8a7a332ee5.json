@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n                SELECT id, width, height, is_video, duration_ms, has_thumbnails, use_panorama_viewer as \"is_panorama!\", taken_at_local\n                FROM media_item\n                WHERE user_id = $1 AND deleted = false\n                  AND EXTRACT(MONTH FROM taken_at_local)::integer = $2\n                  AND EXTRACT(DAY FROM taken_at_local)::integer = $3\n                  AND EXTRACT(YEAR FROM taken_at_local)::integer = $4\n                ORDER BY sort_timestamp\n                ",
+  "query": "\n                SELECT id, width, height, is_video, duration_ms, has_thumbnails, use_panorama_viewer, taken_at_local\n                FROM media_item\n                WHERE user_id = $1 AND deleted = false\n                  AND EXTRACT(MONTH FROM taken_at_local)::integer = $2\n                  AND EXTRACT(DAY FROM taken_at_local)::integer = $3\n                  AND EXTRACT(YEAR FROM taken_at_local)::integer = $4\n                ORDER BY sort_timestamp\n                ",
   "describe": {
     "columns": [
       {
@@ -35,7 +35,7 @@
       },
       {
         "ordinal": 6,
-        "name": "is_panorama!",
+        "name": "use_panorama_viewer",
         "type_info": "Bool"
       },
       {
@@ -63,5 +63,5 @@
       false
     ]
   },
-  "hash": "5488a198e59ada6c686b4e05a43c18ff41992fe0656d49c9ba714a530cf44ea2"
+  "hash": "9db54bcbdb30225a3cfb46fbdd7d39187f5b0440c7c4bca743bebd8a7a332ee5"
 }

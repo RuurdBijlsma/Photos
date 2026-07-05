@@ -42,10 +42,10 @@ barn
 barndoor
 baseball field
 basement
-basketball court indoor
+indoor basketball court
 bathroom
-bazaar indoor
-bazaar outdoor
+indoor bazaar
+outdoor bazaar
 beach
 beach house
 beauty salon
@@ -59,9 +59,9 @@ boardwalk
 boat deck
 boathouse
 bookstore
-booth indoor
+booth
 botanical garden
-bow window indoor
+bow window
 bowling alley
 boxing ring
 bridge
@@ -69,7 +69,7 @@ building facade
 bullring
 burial chamber
 bus interior
-bus station indoor
+bus station
 butchers shop
 butte
 cabin outdoor
@@ -88,8 +88,8 @@ cemetery
 chalet
 chemistry lab
 childs room
-church indoor
-church outdoor
+In church
+At a church
 classroom
 clean room
 cliff
@@ -133,7 +133,7 @@ elevator shaft
 embassy
 engine room
 entrance hall
-escalator indoor
+escalator
 excavation
 fabric store
 farm
@@ -144,8 +144,8 @@ field road
 fire escape
 fire station
 fishpond
-flea market indoor
-florist shop indoor
+flea market
+florist shop
 food court
 football field
 forest broadleaf
@@ -154,21 +154,19 @@ forest road
 formal garden
 fountain
 galley
-garage indoor
-garage outdoor
+in the garage
 gas station
 gazebo exterior
-general store indoor
-general store outdoor
+At a general store
 gift shop
 glacier
 golf course
-greenhouse indoor
-greenhouse outdoor
+in a greenhouse
+at a greenhouse
 grotto
-gymnasium indoor
-hangar indoor
-hangar outdoor
+indoor gyman
+in a hangar
+at a hangar
 harbor
 hardware store
 hayfield
@@ -186,14 +184,13 @@ hunting lodge outdoor
 ice cream parlor
 ice floe
 ice shelf
-ice skating rink indoor
-ice skating rink outdoor
+ice skating rink
 iceberg
 igloo
 industrial area
 inn outdoor
 islet
-jacuzzi indoor
+jacuzzi
 jail cell
 japanese garden
 jewelry shop
@@ -210,8 +207,7 @@ laundromat
 lawn
 lecture room
 legislative chamber
-library indoor
-library outdoor
+library
 lighthouse
 living room
 loading dock
@@ -220,8 +216,8 @@ lock chamber
 locker room
 mansion
 manufactured home
-market indoor
-market outdoor
+indoor market
+outdoor market
 marsh
 martial arts gym
 mausoleum
@@ -233,9 +229,8 @@ motel
 mountain
 mountain path
 mountain snowy
-movie theater indoor
-museum indoor
-museum outdoor
+movie theater
+visiting a museum
 music studio
 natural history museum
 nursery
@@ -253,8 +248,7 @@ pagoda
 palace
 pantry
 park
-parking garage indoor
-parking garage outdoor
+parking garage
 parking lot
 pasture
 patio
@@ -272,7 +266,7 @@ plaza
 pond
 porch
 promenade
-pub indoor
+at the pub
 racecourse
 raceway
 raft
@@ -300,7 +294,7 @@ server room
 shed
 shoe shop
 shopfront
-shopping mall indoor
+indoor shopping mall
 shower
 ski resort
 ski slope
@@ -313,8 +307,7 @@ stable
 stadium baseball
 stadium football
 stadium soccer
-stage indoor
-stage outdoor
+the big stage
 staircase
 storage room
 street

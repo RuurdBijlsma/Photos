@@ -1,6 +1,6 @@
 ingest:
   media_folder: C:\Users\Ruurd\Pictures\media_dir
-  thumbnail_folder: thumbnails
+  app_data_folder: app_data
   enable_cache: true
 
   analyzer:

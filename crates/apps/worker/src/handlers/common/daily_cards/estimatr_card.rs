@@ -1,4 +1,4 @@
-use crate::handlers::daily_cards::DailyCardGenerator;
+use crate::handlers::common::daily_cards::DailyCardGenerator;
 use app_state::AppSettings;
 use async_trait::async_trait;
 use common_services::api::album::service::get_representative_thumbnail;
@@ -59,7 +59,7 @@ impl DailyCardGenerator for LocationEstimatrCardGenerator {
             // Select random media items with valid GPS, prioritizing those outside the exclusion zone.
             let mut items = sqlx::query!(
                 r#"
-                SELECT m.id, m.width, m.height, m.is_video, m.use_panorama_viewer as "is_panorama!",
+                SELECT m.id, m.width, m.height, m.is_video, m.use_panorama_viewer,
                        g.latitude, g.longitude, m.duration_ms, m.taken_at_local, m.has_thumbnails
                 FROM media_item m
                 JOIN gps g ON m.id = g.media_item_id
@@ -114,7 +114,7 @@ impl DailyCardGenerator for LocationEstimatrCardGenerator {
                             "isVideo": i.is_video,
                             "width": i.width,
                             "height": i.height,
-                            "isPanorama": i.is_panorama,
+                            "usePanoramaViewer": i.use_panorama_viewer,
                             "takenAtLocal": i.taken_at_local,
                         },
                         "latitude": i.latitude,
