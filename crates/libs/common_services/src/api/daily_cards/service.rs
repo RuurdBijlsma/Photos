@@ -75,6 +75,16 @@ pub async fn get_daily_cards(
         }
     }
 
+    // Sort returned cards:
+    // 1. on this day
+    // 2. location estimatr
+    // 3. the rest
+    returned_cards.sort_by_key(|card| match card.card_type.as_str() {
+        "on_this_day" => 0,
+        "estimatr" => 1,
+        _ => 2,
+    });
+
     // Mark all returned cards as shown = true
     if !returned_cards.is_empty() {
         let ids: Vec<i32> = returned_cards.iter().map(|c| c.id).collect();
