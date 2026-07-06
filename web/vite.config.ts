@@ -6,7 +6,7 @@ import vueJsx from '@vitejs/plugin-vue-jsx'
 import vueDevTools from 'vite-plugin-vue-devtools'
 import vuetify from 'vite-plugin-vuetify'
 
-const repoName = 'photos-frontend'
+const repoName = 'Photos'
 
 // https://vitejs.dev/config/
 export default defineConfig({

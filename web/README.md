@@ -1,20 +1,23 @@
 # Photos Frontend
 
-The web interface for **Ruurd Photos**, a self-hosted Google Photos alternative. Built with Vue 3, Vuetify, and
+The web interface for **Ruurd Photos**, a self-hosted Google Photos alternative. Built with Vue, Vuetify, and
 TypeScript.
 
 ## Features
 
-* **Timeline View:** High-performance virtual scrolling for photo grids organized by date.
+* **Timeline View:** All your media in a grid on the front-page, organized by date.
 * **Map View:** Geospatial visualization of your media library.
-* **Onboarding Wizard:** UI for setting up the server, picking storage folders, and scanning drives.
-* **Media Viewer:** Full-screen photo and video playback.
-* **Responsive Design:** Optimized for desktop and mobile web via Vuetify.
+* **Albums:** Organize your media in albums, you can share these albums to anyone.
+* **People:** People recognized in your photos, you can label them so they show up in searches, and you can browse all
+  photos of this person.
+* **Cameras:** Your media organized by which camera captured it.
+* **Search:** Smart search through your media, powered by machine learning.
+* **Memories:** The front page features cards like "On this day" highlighting photos and videos you took years ago, but
+  on the current date.
 
 ## Prerequisites
 
-* **[Ruurd Photos Backend](https://github.com/RuurdBijlsma/photos-backend)**: The frontend requires the API to be
-  running.
+* The frontend requires the server to be running.
 * Node
 * npm
 
@@ -23,8 +26,8 @@ TypeScript.
 ### 1. Clone the repo
 
 ```bash
-git clone https://github.com/RuurdBijlsma/photos-frontend.git
-cd photos-frontend
+git clone https://github.com/RuurdBijlsma/Photos.git
+cd Photos/web
 ```
 
 ### 2. Install dependencies
@@ -44,7 +47,7 @@ cp example.env .env
 Edit `.env` to point to your API URL (usually localhost if running locally):
 
 ```properties
-VITE_API_BASE_URL=http://localhost:3000
+VITE_API_BASE_URL=http://localhost:9475
 ```
 
 ---
@@ -83,19 +86,3 @@ npm run proto:gen
 
 * **Lint:** `npm run lint`
 * **Format:** `npm run lint:format`
-
----
-
-## Tech Stack
-
-* **Framework:** Vue 3 (Composition API)
-* **Build Tool:** Vite
-* **UI Library:** Vuetify
-* **State Management:** Pinia
-* **Routing:** Vue Router
-* **Language:** TypeScript
-* **Data Serialization:** Protocol Buffers
-
-# Demo dataset
-
-https://unsplash.com/data/lite/latest
