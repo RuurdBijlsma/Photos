@@ -7,6 +7,7 @@ import { usePeopleStore } from '@/scripts/stores/peopleStore.ts'
 import SimpleTimeline from '@/vues/components/timeline/simple-timeline/SimpleTimeline.vue'
 import peopleService from '@/scripts/services/peopleService.ts'
 import PersonNameDialog from '@/vues/components/rename-people/PersonNameDialog.vue'
+import { useRefreshFunction } from '@/scripts/composables/useRefreshFunction.ts'
 
 const theme = useTheme()
 const route = useRoute()
@@ -62,6 +63,12 @@ watch(
 watch(personResponse, () => {
   if (personResponse.value !== null) isInitialLoad.value = false
 })
+
+useRefreshFunction(
+  () => {
+    if (personId.value) peopleStore.fetchPersonMedia(personId.value)
+  },
+)
 </script>
 
 <template>

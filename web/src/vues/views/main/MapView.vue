@@ -11,6 +11,7 @@ import { useEventListener, useResizeObserver, useStorage, useThrottleFn } from '
 import type { MapPhotosResponse, SimpleTimelineItem } from '@/scripts/types/generated/timeline.ts'
 import SimpleTimeline from '@/vues/components/timeline/simple-timeline/SimpleTimeline.vue'
 import { useRoute } from 'vue-router'
+import { useRefreshFunction } from '@/scripts/composables/useRefreshFunction.ts'
 
 const route = useRoute()
 
@@ -156,15 +157,16 @@ useResizeObserver(outerLayoutEl, () => {
   sidebarWidth.value = resolvedSidebarWidth.value
 })
 
-// --- Data Loading ---
-mediaItemService.listMapPhotos().then((loadedPhotos) => {
+async function loadMediaItems() {
+  // --- Data Loading ---
+  const loadedPhotos = await mediaItemService.listMapPhotos()
   loadedPhotos.items.forEach((p, index) => {
     if (p.item?.id) {
       photoIdToOrder.set(p.item.id, index)
     }
   })
   mapPhotos.value = loadedPhotos
-})
+}
 
 function onMarkerSelected(data: EmitMarkerSelected) {
   selectedMarkerKey.value = data.key
@@ -174,6 +176,8 @@ function onClusterSelected(data: EmitClusterSelected) {
   selectedClusterItems.value = data.items
   selectedPopupItem.value = data.item
 }
+
+useRefreshFunction(() => loadMediaItems(), { immediate: true })
 </script>
 
 <template>

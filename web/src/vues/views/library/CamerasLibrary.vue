@@ -6,6 +6,7 @@ import GlowThumbnail from '@/vues/components/ui/GlowThumbnail.vue'
 import { useCameraStore } from '@/scripts/stores/cameraStore.ts'
 import { useStorage } from '@vueuse/core'
 import type { CameraInfo } from '@/scripts/types/generated/timeline.ts'
+import { useRefreshFunction } from '@/scripts/composables/useRefreshFunction.ts'
 
 const snackbarStore = useSnackbarsStore()
 const cameraStore = useCameraStore()
@@ -118,6 +119,8 @@ onMounted(() => {
 onUnmounted(() => {
   if (skeletonTimeout) clearTimeout(skeletonTimeout)
 })
+
+useRefreshFunction(() => loadCameras())
 </script>
 
 <template>

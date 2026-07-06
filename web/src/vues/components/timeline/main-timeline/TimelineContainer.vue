@@ -26,12 +26,15 @@ import { useViewPhotoStore } from '@/scripts/stores/timeline/viewPhotoStore.ts'
 import { useSettingStore } from '@/scripts/stores/settingsStore.ts'
 import DailyCardList from '@/vues/components/timeline/daily-cards/DailyCardList.vue'
 import { useDailyCardStore } from '@/scripts/stores/timeline/dailyCardStore.ts'
+import { useRefreshFunction } from '@/scripts/composables/useRefreshFunction.js'
+import { useRefreshStore } from '@/scripts/stores/refreshStore.ts'
 
 const timelineStore = useTimelineStore()
 const selectionStore = useSelectionStore()
 const viewPhotoStore = useViewPhotoStore()
 const settings = useSettingStore()
 const cardStore = useDailyCardStore()
+const refreshStore = useRefreshStore()
 const cards = computed(() => cardStore.todayCards)
 
 const dailyCardsHeight = computed(() => {
@@ -738,6 +741,16 @@ watch(
     timelineStore.pendingGoToTop = false
     if (scrollContainerEl.value) {
       scrollContainerEl.value.scrollTo({ top: 0, behavior: 'smooth' })
+    }
+  },
+  { immediate: true },
+)
+
+watch(
+  () => refreshStore.counter,
+  () => {
+    if (refreshStore.counter > 0) {
+      timelineStore.refresh()
     }
   },
   { immediate: true },

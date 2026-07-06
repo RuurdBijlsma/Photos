@@ -13,6 +13,7 @@ import type { StorageReviewItem } from '@/scripts/types/generated/timeline.ts'
 import { useBinStore } from '@/scripts/stores/binStore.ts'
 import { useViewPhotoStore } from '@/scripts/stores/timeline/viewPhotoStore.ts'
 import StorageReviewCard from '@/vues/components/ui/StorageReviewCard.vue'
+import { useRefreshFunction } from '@/scripts/composables/useRefreshFunction.ts'
 
 const route = useRoute()
 const dialogStore = useDialogStore()
@@ -200,6 +201,7 @@ useResizeObserver(scrollContainer, (entries) => {
 
 watch(mode, loadItems)
 onMounted(loadItems)
+useRefreshFunction(() => loadItems())
 </script>
 
 <template>

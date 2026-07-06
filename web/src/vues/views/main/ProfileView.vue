@@ -10,6 +10,7 @@ import type { UserProfile } from '@/scripts/types/api/user.ts'
 import { useDate } from 'vuetify'
 import { usePeopleStore } from '@/scripts/stores/peopleStore.ts'
 import peopleService from '@/scripts/services/peopleService.ts'
+import { useRefreshFunction } from '@/scripts/composables/useRefreshFunction.ts'
 
 const authStore = useAuthStore()
 const snackbars = useSnackbarsStore()
@@ -134,6 +135,8 @@ const statCards = computed(() => [
     color: 'info',
   },
 ])
+
+useRefreshFunction(() => loadProfile())
 </script>
 
 <template>
