@@ -26,7 +26,6 @@ import { useViewPhotoStore } from '@/scripts/stores/timeline/viewPhotoStore.ts'
 import { useSettingStore } from '@/scripts/stores/settingsStore.ts'
 import DailyCardList from '@/vues/components/timeline/daily-cards/DailyCardList.vue'
 import { useDailyCardStore } from '@/scripts/stores/timeline/dailyCardStore.ts'
-import { useRefreshFunction } from '@/scripts/composables/useRefreshFunction.js'
 import { useRefreshStore } from '@/scripts/stores/refreshStore.ts'
 
 const timelineStore = useTimelineStore()
@@ -377,7 +376,7 @@ function offsetScrollToMediaId(
 ) {
   let offsetTop = gridLayout.value[index]?.offsetTop
   if (offsetTop !== undefined && scrollContainerEl.value) {
-    if (offsetTop < 100) offsetTop = 0
+    if (offsetTop < dailyCardsHeight.value + 100) offsetTop = 0
     console.log({ offset })
     scrollContainerEl.value.scrollTo({ top: offsetTop + (offset ?? 0), behavior: behavior })
   }
@@ -672,7 +671,9 @@ watch(
         const viewportBottom = viewportTop + containerSize.value.height
         const rowTop = row.firstOfTheMonth ? row.offsetTop - ROW_HEADER_HEIGHT : row.offsetTop
         const rowBottom = row.offsetTop + row.height
-        const isFullyInViewport = rowTop >= viewportTop && rowBottom <= viewportBottom
+        const doNothingMargin = settings.timelineRowHeight * 0.5
+        const isFullyInViewport =
+          rowTop >= viewportTop - doNothingMargin && rowBottom <= viewportBottom + doNothingMargin
         if (isFullyInViewport) return
       }
 
@@ -740,7 +741,11 @@ watch(
     if (!timelineStore.pendingGoToTop) return
     timelineStore.pendingGoToTop = false
     if (scrollContainerEl.value) {
-      scrollContainerEl.value.scrollTo({ top: 0, behavior: 'smooth' })
+      if (scrollContainerEl.value.scrollTop === 0) {
+        timelineStore.refresh()
+      } else {
+        scrollContainerEl.value.scrollTo({ top: 0, behavior: 'smooth' })
+      }
     }
   },
   { immediate: true },
@@ -1058,7 +1063,7 @@ if (!timelineStore.isInitialized) timelineStore.initialize()
   background-color: rgba(var(--v-theme-secondary), 0.2);
 }
 
-/* ── Empty state ─────────────────────────────────────────── */
+/* ── Empty state ────────────────────────────────────────── */
 .empty-state {
   position: absolute;
   inset: 0;

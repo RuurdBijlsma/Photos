@@ -44,7 +44,7 @@ function startResize() {
 }
 
 function timelineToTop() {
-  timelineStore.refresh().then(() => timelineStore.scrollToTop())
+  timelineStore.scrollToTop()
 }
 
 requestIdleCallback(() => {
