@@ -211,6 +211,7 @@
 * Fix build assets
 * replace logo with new log
 * make option to keep background image permanently, or something like set image as background image on kebab menu in viewphoto?
+* make option to stream original video file? Just use on demand endpoint, this would be highest quality available. List "original" as quality option or something in viewer
 * make generic refresh thing, call it when moving item to bin
   * For example, refreshStore or something, which has a refreshCounter. If you're on a page you can watch that counter, if it changes, then refresh the content of the page.
   * This way if you delete something from /search, or from /person, or from /camera, etc. it can refresh the page and remove the deleted item from view

@@ -1,19 +1,27 @@
-name: CI
+name: Rust CI
 
 on:
   push:
     branches: [ main ]
+    paths:
+      - 'server/**'
+      - '.github/workflows/server-quality.yml'
   pull_request:
     branches: [ main ]
+    paths:
+      - 'server/**'
+      - '.github/workflows/server-quality.yml'
 
 env:
   CARGO_TERM_COLOR: always
   SQLX_OFFLINE: true
 
 jobs:
-  build-and-test:
+  rust-clippy-build:
     runs-on: ubuntu-26.04
-
+    defaults:
+      run:
+        working-directory: ./server
     steps:
       - uses: actions/checkout@v5
 
@@ -24,6 +32,8 @@ jobs:
 
       - name: Rust Cache
         uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "server -> target"
 
       - name: Cache and install system dependencies
         uses: awalsh128/cache-apt-pkgs-action@latest
