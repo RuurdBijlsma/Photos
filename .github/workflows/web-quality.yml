@@ -1,0 +1,41 @@
+name: Quality Checks
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'web/**'
+      - '.github/workflows/web-quality.yml'
+
+jobs:
+  lint-prettier-type-check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./web
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '23'
+          cache: 'npm'
+          cache-dependency-path: 'web/package-lock.json'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run oxlint
+        run: npm run lint:oxlint
+
+      - name: Run eslint
+        run: npm run lint:eslint
+
+      - name: Run build
+        run: npm run build
+
+      - name: Run prettier check
+        run: npm run prettier:check

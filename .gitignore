@@ -1,1 +1,7 @@
 .idea
+server/target
+server/app_data
+server/crates/test_integration/app_data
+
+web/node_modules
+web/dist
