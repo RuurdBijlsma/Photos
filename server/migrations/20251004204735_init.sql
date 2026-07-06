@@ -202,7 +202,7 @@ CREATE INDEX idx_media_item_search_lookup ON media_item (user_id, deleted, id);
 
 -- For /timeline/ids
 CREATE INDEX idx_media_item_ids_timeline
-    ON media_item (user_id, sort_timestamp DESC) INCLUDE (id)
+    ON media_item (user_id, sort_timestamp DESC, id DESC)
     WHERE deleted = false;
 
 -- For /timeline/ratios
@@ -210,7 +210,8 @@ CREATE INDEX idx_media_item_user_month_order_partial
     ON media_item (
                    user_id,
                    month_id,
-                   sort_timestamp DESC
+                   sort_timestamp DESC,
+                   id DESC
         ) INCLUDE (width, height)
     WHERE deleted = false;
 

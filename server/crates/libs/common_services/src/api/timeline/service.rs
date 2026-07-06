@@ -20,7 +20,7 @@ pub async fn get_timeline_ratios(
         SELECT
             month_id::TEXT as month_id,
             COUNT(*)::INT AS count,
-            array_agg(width::real / height::real ORDER BY sort_timestamp {0}) AS ratios
+            array_agg(width::real / height::real ORDER BY sort_timestamp {0}, id {0}) AS ratios
         FROM media_item
         WHERE user_id = $1
           AND deleted = false
@@ -46,7 +46,7 @@ pub async fn get_timeline_ids(
 ) -> Result<Vec<String>, AppError> {
     let sql = format!(
         r"
-        SELECT COALESCE(array_agg(id ORDER BY sort_timestamp {}), '{{}}')
+        SELECT COALESCE(array_agg(id ORDER BY sort_timestamp {0}, id {0}), '{{}}')
         FROM media_item
         WHERE user_id = $1 AND deleted = false
         ",
@@ -83,7 +83,7 @@ pub async fn get_photos_by_month(
             AND deleted = false
             AND month_id = ANY($2)
         ORDER BY
-            sort_timestamp {}
+            sort_timestamp {0}, id {0}
         ",
         sort_direction.as_sql()
     );

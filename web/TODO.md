@@ -219,3 +219,4 @@
   * Remove existing refresh logic for timeline and make timeline use the refreshCounter store
 * ✅ leave ViewPhoto -> timeline, the scroll to where i was in the photo viewer is bad
 * click op Photos in navbar scrollt nu weird
+* superweird: op initial load staan de Nederland EU borden in andere volgorde dan wanneer je refresht

@@ -38,7 +38,7 @@ export const useBinStore = defineStore('bin', () => {
     requestIdleCallback(() => {
       albumStore.fetchUserAlbums().then()
       peopleStore.fetchPeople().then()
-      selectionStore.deselectAll().then()
+      selectionStore.deselectAll(true).then()
       refreshStore.counter++
     })
   }

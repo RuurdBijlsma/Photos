@@ -73,6 +73,10 @@ export const useTimelineStore = defineStore('timeline', () => {
 
     try {
       const response = await timelineService.getMediaByMonths(monthIds)
+      const debugMonth = response.months.filter((m) => m.monthId === '2026-04-01')
+      if (debugMonth.length === 1) {
+        console.log('DEBUG MONTH RESPONSE', debugMonth[0])
+      }
       for (const { monthId, items } of response.months) {
         monthItems.value.set(monthId, items)
       }
