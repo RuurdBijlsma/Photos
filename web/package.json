@@ -1,0 +1,58 @@
+{
+  "name": "photos-frontend",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": "^20.19.0 || >=22.12.0"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "run-p lint:type-check \"build-only {@}\" --",
+    "preview": "vite preview",
+    "build-only": "vite build",
+    "lint:type-check": "vue-tsc --build",
+    "lint:oxlint": "oxlint . --fix -D correctness --ignore-path .gitignore",
+    "lint:eslint": "eslint . --fix",
+    "lint:format": "prettier --write src/",
+    "lint": "run-s lint:*",
+    "prettier:check": "prettier --check src/",
+    "proto:gen": "protoc --plugin=protoc-gen-ts_proto=.\\node_modules\\.bin\\protoc-gen-ts_proto.cmd --ts_proto_out=./src/scripts/types/generated --ts_proto_opt=esModuleInterop=true --proto_path=./src/proto src/proto/timeline.proto"
+  },
+  "dependencies": {
+    "@mdi/font": "^7.4.47",
+    "@tanstack/vue-virtual": "^3.13.23",
+    "@vueuse/core": "^14.2.1",
+    "axios": "^1.16.0",
+    "maplibre-gl": "^5.24.0",
+    "pannellum": "^2.5.7",
+    "pinia": "^3.0.4",
+    "vite-plugin-vuetify": "^2.1.3",
+    "vue": "^3.5.31",
+    "vue-router": "^5.0.4",
+    "vuetify": "^4.1.2"
+  },
+  "devDependencies": {
+    "@prettier/plugin-oxc": "^0.1.3",
+    "@tsconfig/node22": "^22.0.2",
+    "@types/node": "^22.18.6",
+    "@vitejs/plugin-vue": "^6.0.5",
+    "@vitejs/plugin-vue-jsx": "^5.1.5",
+    "@vue/eslint-config-prettier": "^10.2.0",
+    "@vue/eslint-config-typescript": "^14.7.0",
+    "@vue/tsconfig": "^0.9.1",
+    "eslint": "^10.1.0",
+    "eslint-plugin-oxlint": "~1.57.0",
+    "eslint-plugin-vue": "~10.8.0",
+    "jiti": "^2.6.1",
+    "npm-run-all2": "^8.0.4",
+    "oxlint": "~1.57.0",
+    "playwright": "^1.61.0",
+    "prettier": "3.8.1",
+    "ts-proto": "^2.11.6",
+    "typescript": "~6.0.2",
+    "vite": "npm:rolldown-vite@latest",
+    "vite-plugin-vue-devtools": "^8.1.1",
+    "vue-tsc": "^3.2.6"
+  }
+}

@@ -1,0 +1,167 @@
+syntax = "proto3";
+
+package api;
+
+// --- Main Timeline (Main library view) ---
+message TimelineRatiosResponse {
+  repeated TimelineMonthRatios months = 1;
+}
+
+message TimelineMonthRatios {
+  string month_id = 1;
+  int32 count = 2;
+  repeated float ratios = 3;
+}
+
+message TimelineItemsResponse {
+  repeated TimelineMonthItems months = 1;
+}
+
+message TimelineMonthItems {
+  string month_id = 1;
+  repeated TimelineItem items = 2;
+}
+
+message TimelineItem {
+  string id = 1;
+  bool is_video = 2;
+  bool has_thumbnails = 3;
+  optional int32 duration_ms = 4;
+  string timestamp = 5;
+}
+
+// --- Simple timeline ---
+message SimpleTimelineItem {
+  string id = 1;
+  bool is_video = 2;
+  bool has_thumbnails = 3;
+  optional int32 duration_ms = 4;
+  float ratio = 5;
+}
+
+// --- Album Specific ---
+message FullAlbumMediaResponse {
+  AlbumInfo album = 1;
+  repeated SimpleTimelineItem items = 2;
+}
+
+message OrderedMediaResponse {
+  repeated SimpleTimelineItem items = 1;
+}
+
+message CollaboratorSummary {
+  int64 id = 1;
+  int32 user_id = 2;
+  string name = 3;
+  string role = 4;
+  optional string avatar_id = 5;
+}
+
+message AlbumInfo {
+  string id = 1;
+  string name = 2;
+  optional string description = 3;
+  bool is_public = 4;
+  int32 owner_id = 5;
+  string created_at = 6;
+  string sort_mode = 7;
+  optional string thumbnail_id = 8;
+  optional string first_date = 9;
+  optional string last_date = 10;
+  repeated CollaboratorSummary collaborators = 11;
+}
+
+// --- Search
+message SearchResponse {
+  repeated SimpleTimelineItem items = 1;
+  optional string session_id = 2;
+}
+
+enum SuggestionType {
+  SEARCH = 0;
+  ALBUM = 1;
+  PERSON = 2;
+}
+
+message SearchSuggestion {
+  string text = 1;
+  SuggestionType suggestion_type = 2;
+  optional string id = 3;
+}
+
+message SearchSuggestionsResponse {
+  repeated SearchSuggestion suggestions = 1;
+}
+
+// --- Person
+message PersonInfo {
+  string id = 1;
+  optional string name = 2;
+  int32 photo_count = 3;
+  optional string face_thumb_id = 4;
+  repeated string face_cluster_ids = 5;
+}
+
+message ListPeopleResponse {
+  repeated PersonInfo people = 1;
+}
+
+message FullPersonMediaResponse {
+  PersonInfo person = 1;
+  repeated SimpleTimelineItem items = 2;
+}
+
+// --- Camera
+message CameraInfo {
+  string make = 1;
+  string model = 2;
+  int32 photo_count = 3;
+  string thumbnail_id = 4;
+}
+
+message ListCameraResponse {
+  repeated CameraInfo cameras = 1;
+}
+
+message FullCameraPhotosResponse {
+  CameraInfo camera = 1;
+  repeated SimpleTimelineItem items = 2;
+}
+
+// --- Map specific ---
+message MapPhotoItem {
+  double latitude = 1;
+  double longitude = 2;
+  SimpleTimelineItem item = 3;
+}
+
+message MapPhotosResponse {
+  repeated MapPhotoItem items = 1;
+}
+
+// --- Storage review ---
+message StorageReviewItem {
+  string id = 1;
+  bool is_video = 2;
+  bool has_thumbnails = 3;
+  optional int32 duration_ms = 4;
+  float ratio = 5;
+  int64 size_bytes = 6;
+  string taken_at_local = 7;
+  string filename = 8;
+  optional float weighted_score = 9;
+}
+
+message StorageReviewResponse {
+  repeated StorageReviewItem items = 1;
+  int64 total_size = 2;
+}
+
+message StorageSummaryResponse {
+  int64 large_potential_savings = 1;
+  int32 large_item_count = 2;
+  int64 blurry_potential_savings = 3;
+  int32 blurry_item_count = 4;
+  int64 media_folder_size_bytes = 5;
+  int64 app_data_folder_size_bytes = 6;
+}
