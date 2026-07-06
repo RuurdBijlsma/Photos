@@ -1,6 +1,6 @@
 {
-  "name": "photos-frontend",
-  "version": "0.0.0",
+  "name": "ruurd-photos",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
   "engines": {
