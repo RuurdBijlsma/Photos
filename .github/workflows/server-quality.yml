@@ -1,4 +1,4 @@
-name: CI
+name: Rust CI
 
 on:
   push:
@@ -17,7 +17,7 @@ env:
   SQLX_OFFLINE: true
 
 jobs:
-  build-and-test:
+  rust-clippy-build:
     runs-on: ubuntu-26.04
     defaults:
       run:
