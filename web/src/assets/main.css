@@ -1,0 +1,83 @@
+@import url('vuetify/styles');
+
+:root {
+  --font-size-big: 24px;
+  --font-size-normal: 16px;
+  --font-size-small: 11px;
+}
+
+html {
+  overflow-y: auto !important;
+  font-family: 'Montserrat', sans-serif !important;
+  font-optical-sizing: auto;
+  font-weight: 400;
+  font-style: normal;
+}
+
+html,
+body {
+  background-color: #101010 !important;
+}
+
+* {
+  user-select: none;
+}
+
+::-moz-selection {
+  color: rgb(var(--v-theme-on-tertiary));
+  background: rgb(var(--v-theme-tertiary));
+}
+
+::selection {
+  color: rgb(var(--v-theme-on-tertiary));
+  background: rgb(var(--v-theme-tertiary));
+}
+
+/* Width and height of the scrollbar */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+/* Background of the scrollbar track */
+::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+}
+
+/* Scrollbar handle (thumb) */
+::-webkit-scrollbar-thumb {
+  background-color: rgba(var(--v-theme-primary), 0.5);
+  border-radius: 10px;
+}
+
+/* Handle on hover */
+::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(var(--v-theme-primary), 0.8);
+}
+
+.font-mono {
+  font-family: 'Roboto Mono', monospace;
+}
+
+.lower-opacity {
+  opacity: 0.7;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin: 5px 0;
+}
+
+/*Fix time picker style*/
+.v-time-picker-clock,
+.v-time-picker-controls__time__field .v-field {
+  background-color: rgba(var(--v-theme-primary), 0.1);
+}
+
+/* Don't use harsh white for v-switch label*/
+.v-selection-control .v-label {
+  color: rgb(var(--v-theme-on-surface-variant));
+}
