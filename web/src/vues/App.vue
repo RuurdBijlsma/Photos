@@ -5,11 +5,45 @@ import { useSettingStore } from '@/scripts/stores/settingsStore.ts'
 import { watch } from 'vue'
 import DialogQueue from '@/vues/components/DialogQueue.vue'
 import { useThemeStore } from '@/scripts/stores/themeStore.ts'
+import { useSnackbarsStore } from '@/scripts/stores/snackbarStore.ts'
+import { useRegisterSW } from 'virtual:pwa-register/vue'
 
 const settings = useSettingStore()
 const themeStore = useThemeStore()
+const snackbarsStore = useSnackbarsStore()
 
 themeStore.initThemeSync()
+
+// Register the Service Worker and destructure status states
+const { offlineReady, needRefresh, updateServiceWorker } = useRegisterSW()
+
+// Watch for the offline-ready event (cache initialized)
+watch(offlineReady, (ready) => {
+  if (ready) {
+    snackbarsStore.success('App is ready to work offline.')
+  }
+})
+
+// Watch for update availability (new files detected on server)
+watch(needRefresh, (refresh) => {
+  if (refresh) {
+    // Using the direct enqueue function to set a timeout of 0,
+    // keeping the update notification persistent until resolved.
+    snackbarsStore.enqueue({
+      message: 'New version available. Reload to update.',
+      color: 'info',
+      icon: 'mdi-refresh',
+      timeout: 0,
+      action: {
+        label: 'Reload',
+        onClick: () => {
+          updateServiceWorker(true)
+        },
+        hideOnClick: true,
+      },
+    })
+  }
+})
 
 watch(
   () => settings.useBackdropBlur,
