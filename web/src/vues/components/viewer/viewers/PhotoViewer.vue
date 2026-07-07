@@ -1,12 +1,14 @@
 <script setup lang="ts">
-import { ref, computed, watch, onUnmounted, nextTick, defineAsyncComponent } from 'vue'
+import { computed, defineAsyncComponent, nextTick, onUnmounted, ref, watch } from 'vue'
 import { useSettingStore } from '@/scripts/stores/settingsStore.ts'
 import { useMediaItemStore } from '@/scripts/stores/timeline/mediaItemStore.ts'
 import { useViewPhotoStore } from '@/scripts/stores/timeline/viewPhotoStore.ts'
 import mediaItemService from '@/scripts/services/mediaItemService.ts'
 import axios from 'axios'
-import { useTimeoutFn, useEventListener, useRafFn } from '@vueuse/core'
+import { useEventListener, useRafFn, useTimeoutFn } from '@vueuse/core'
 import apiClient from '@/scripts/services/api.ts'
+
+// todo: if top of image and bottom of image are both within viewport, then dont allow panning vertically, I.e., lock the image vertically centered. This is relevant with wide panoramas
 
 const PanoramaViewer = defineAsyncComponent(
   () => import('@/vues/components/viewer/components/PanoramaViewer.vue'),
