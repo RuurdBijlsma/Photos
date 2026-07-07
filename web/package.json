@@ -52,6 +52,7 @@
     "ts-proto": "^2.11.6",
     "typescript": "~6.0.2",
     "vite": "npm:rolldown-vite@latest",
+    "vite-plugin-pwa": "^1.3.0",
     "vite-plugin-vue-devtools": "^8.1.1",
     "vue-tsc": "^3.2.6"
   }
