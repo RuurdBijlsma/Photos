@@ -439,6 +439,8 @@ useEventListener(window, 'keydown', handleKeyDown)
                 min="0"
                 max="1"
                 step="0.05"
+                thumb-size="15"
+                track-size="3"
                 hide-details
                 density="compact"
               />
@@ -618,10 +620,11 @@ body.backdrop-blur .control-island:hover {
 
 .volume-container:hover .volume-slider-wrapper,
 .volume-container:focus-within .volume-slider-wrapper {
-  width: 80px;
+  width: 96px;
   opacity: 1;
   pointer-events: auto;
-  margin-left: 8px;
+  margin-left: 0;
+  padding-left: 8px;
 }
 
 .volume-slider {
@@ -661,5 +664,9 @@ body.backdrop-blur .control-island:hover {
 
 :deep(.volume-slider .v-slider-thumb__ripple) {
   color: rgba(var(--fg), 0.3) !important;
+}
+
+:deep(.volume-slider .v-slider-thumb--focused .v-slider-thumb__surface::before) {
+  opacity: 0;
 }
 </style>
