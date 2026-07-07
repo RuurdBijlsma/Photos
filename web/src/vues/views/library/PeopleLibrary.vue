@@ -8,6 +8,7 @@ import type { PersonInfo } from '@/scripts/types/generated/timeline.ts'
 import { useDialogStore } from '@/scripts/stores/dialogStore.ts'
 import PersonNameDialog from '@/vues/components/rename-people/PersonNameDialog.vue'
 import MergePersonDialog from '@/vues/components/rename-people/MergePersonDialog.vue'
+import { useRefreshFunction } from '@/scripts/composables/useRefreshFunction.ts'
 
 const theme = useTheme()
 const peopleStore = usePeopleStore()
@@ -132,7 +133,7 @@ function onMergeConfirmed() {
   mergeDialogTarget.value = null
 }
 
-peopleStore.fetchPeople()
+useRefreshFunction(() => peopleStore.fetchPeople(), { immediate: true })
 </script>
 
 <template>

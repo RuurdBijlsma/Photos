@@ -11,6 +11,7 @@ import { useDialogStore } from '@/scripts/stores/dialogStore.ts'
 import { useAlbumStore } from '@/scripts/stores/albumStore.ts'
 import { useAuthStore } from '@/scripts/stores/authStore.ts'
 import { useStorage } from '@vueuse/core'
+import { useRefreshFunction } from '@/scripts/composables/useRefreshFunction.ts'
 
 const snackbarStore = useSnackbarsStore()
 const authStore = useAuthStore()
@@ -160,6 +161,7 @@ async function leaveAlbum(albumId: string) {
 onMounted(() => {
   loadAlbums()
 })
+useRefreshFunction(() => loadAlbums())
 
 onUnmounted(() => {
   // Prevent memory leaks / UI state issues if the component mounts/unmounts quickly

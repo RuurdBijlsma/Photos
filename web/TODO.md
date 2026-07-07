@@ -188,7 +188,7 @@
 * ✅ daily card thumbnails arent avif???
 * on login redirect to where you were
 * improve messaging when you load the website and the server is off
-* make func to refresh frontpage, call it after onboarding is done after 10s, then every 5s;
+* ✅ make func to refresh frontpage, call it after onboarding is done after 10s, then every 5s;
 * view-option (like gmail), split view: if you single click a photo it opens in a right half of the window pane. Only
   works with enough screen width (desktop).
 * don't allow user to go to /onboarding if onboarding is done already.
@@ -208,15 +208,15 @@
 * ✅ loading indicator als je album maakt
 * ✅ [BUG] negative query is not sending full query (i type orange, it sends "or" in the request payload)
 * ✅ [BUG] timeline is slow again? fps (wait for all thumbnails to process before checking)
+* ✅ make generic refresh thing, call it when moving item to bin
+    * ✅ For example, refreshStore or something, which has a refreshCounter. If you're on a page you can watch that counter, if it changes, then refresh the content of the page.
+    * ✅ This way if you delete something from /search, or from /person, or from /camera, etc. it can refresh the page and remove the deleted item from view
+    * ✅ on "move to bin", increment refresh counter in refreshStore
+    * ✅ Remove existing refresh logic for timeline and make timeline use the refreshCounter store
+* ✅ leave ViewPhoto -> timeline, the scroll to where i was in the photo viewer is bad
+* ✅ click op Photos in navbar scrollt nu weird
+* ✅ superweird: op initial load staan de Nederland EU borden in andere volgorde dan wanneer je refresht
 * Fix build assets
-* replace logo with new log
+* replace logo with new logo
 * make option to keep background image permanently, or something like set image as background image on kebab menu in viewphoto?
 * make option to stream original video file? Just use on demand endpoint, this would be highest quality available. List "original" as quality option or something in viewer
-* make generic refresh thing, call it when moving item to bin
-  * For example, refreshStore or something, which has a refreshCounter. If you're on a page you can watch that counter, if it changes, then refresh the content of the page.
-  * This way if you delete something from /search, or from /person, or from /camera, etc. it can refresh the page and remove the deleted item from view
-  * on "move to bin", increment refresh counter in refreshStore
-  * Remove existing refresh logic for timeline and make timeline use the refreshCounter store
-* leave ViewPhoto -> timeline, the scroll to where i was in the photo viewer is bad
-  * possible workaround, dont scroll if i didnt next/prev more than 5 photos?
-  * root cause fix: fix the height calculation of the timeline grid

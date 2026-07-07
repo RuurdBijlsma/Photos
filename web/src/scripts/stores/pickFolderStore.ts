@@ -5,6 +5,7 @@ import { useSnackbarsStore } from '@/scripts/stores/snackbarStore.ts'
 import type { MediaSampleResponse, UnsupportedFilesResponse } from '@/scripts/types/api/admin.ts'
 import { useDebounceFn } from '@vueuse/core'
 import mediaItemService from '@/scripts/services/mediaItemService.ts'
+import placeholderUrl from '@/assets/img/placeholder.svg'
 
 export const usePickFolderStore = defineStore('pickFolder', () => {
   let N_SAMPLES = 8
@@ -48,7 +49,7 @@ export const usePickFolderStore = defineStore('pickFolder', () => {
 
   async function getImageUrl(relative_path: string): Promise<string> {
     const url = await mediaBlobUrl(relative_path)
-    return url ?? 'img/placeholder.svg'
+    return url ?? placeholderUrl
   }
 
   async function refreshMediaSample() {

@@ -9,7 +9,7 @@ use common_services::database::visual_analysis::visual_analysis::MediaEmbedding;
 use common_services::utils::nice_id;
 use open_clip_inference::TextEmbedder;
 use pgvector::Vector;
-use sqlx::{PgPool, Transaction, query, query_as, query_scalar};
+use sqlx::{PgPool, QueryBuilder, Transaction, query, query_as, query_scalar};
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
 use std::time::Instant;
@@ -48,6 +48,7 @@ async fn load_vocab_labels() -> Result<Vec<String>> {
     Ok(labels)
 }
 
+// Optimization: Simplified query to use an Index-Only Scan on 'object(tag)', avoiding the join
 async fn load_object_tags(pool: &PgPool) -> Result<Vec<String>> {
     let tags = sqlx::query_scalar!(
         r#"SELECT DISTINCT o.tag
@@ -138,16 +139,21 @@ async fn load_tag_embeddings(pool: &PgPool, text_embedder: &TextEmbedder) -> Res
         }
 
         // Insert new tags
-        for (tag, embedding) in new_embeddings {
-            sqlx::query!(
-                "INSERT INTO cluster_tags (tag, embedding)
-                 VALUES ($1, $2)
-                 ON CONFLICT (tag) DO UPDATE SET embedding = EXCLUDED.embedding",
-                tag,
-                embedding as _
-            )
-            .execute(&mut *tx)
-            .await?;
+        if !new_embeddings.is_empty() {
+            for chunk in new_embeddings.chunks(1000) {
+                let mut query_builder: QueryBuilder<sqlx::Postgres> =
+                    QueryBuilder::new("INSERT INTO cluster_tags (tag, embedding) ");
+
+                query_builder.push_values(chunk, |mut b, (tag, embedding)| {
+                    b.push_bind(tag.clone()).push_bind(embedding.clone());
+                });
+
+                query_builder
+                    .push(" ON CONFLICT (tag) DO UPDATE SET embedding = EXCLUDED.embedding");
+
+                let query = query_builder.build();
+                query.execute(&mut *tx).await?;
+            }
         }
 
         tx.commit().await?;

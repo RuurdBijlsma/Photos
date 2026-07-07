@@ -4,6 +4,8 @@ import { computed, ref } from 'vue'
 import mediaItemService from '@/scripts/services/mediaItemService.ts'
 import { getThumbnailHeight } from '@/scripts/utils.ts'
 import { useTheme } from 'vuetify/framework'
+import albumNoThumbDark from '@/assets/img/album-no-thumb-dark.png'
+import albumNoThumb from '@/assets/img/album-no-thumb.png'
 
 const theme = useTheme()
 
@@ -25,8 +27,8 @@ const useOnDemandThumb = ref(false)
 const thumbHeight = computed(() => getThumbnailHeight(props.height ?? 480))
 const primaryThumb = computed(() => {
   if (props.mediaItemId === null) {
-    if (theme.current.value.dark) return 'img/album-no-thumb-dark.png'
-    else return 'img/album-no-thumb.png'
+    if (theme.current.value.dark) return albumNoThumbDark
+    else return albumNoThumb
   }
   return mediaItemService.getPhotoThumbnail(
     props.mediaItemId,

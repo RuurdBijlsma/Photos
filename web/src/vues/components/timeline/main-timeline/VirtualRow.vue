@@ -34,7 +34,7 @@ const monthItems = computed(() => timelineStore.monthItems.get(props.item.monthI
       }"
       class="virtual-scroll-row"
       :style="{
-        height: `${Math.round(item.height)}px`,
+        height: `${item.height}px`,
         width: `${containerWidth}px`,
         marginBottom: item.lastOfTheMonth ? '0px' : `${itemGap}px`,
       }"
@@ -44,7 +44,7 @@ const monthItems = computed(() => timelineStore.monthItems.get(props.item.monthI
           v-for="mediaItem in item.items"
           :key="mediaItem.index"
           :width="Math.round(mediaItem.ratio * item.height)"
-          :height="Math.round(item.height)"
+          :height="item.height"
           :thumbnail-size="item.thumbnailSize"
           :media-item="monthItems[mediaItem.index]"
           :is-scrolling-fast="isScrollingFast"
@@ -56,7 +56,7 @@ const monthItems = computed(() => timelineStore.monthItems.get(props.item.monthI
           v-for="mediaItem in item.items"
           :key="mediaItem.index"
           :width="Math.round(mediaItem.ratio * item.height)"
-          :height="Math.round(item.height)"
+          :height="item.height"
           :thumbnail-size="item.thumbnailSize"
           :media-item="monthItems[mediaItem.index]"
           :is-scrolling-fast="isScrollingFast"

@@ -4,6 +4,7 @@ import { computed, ref, useTemplateRef, watch } from 'vue'
 import { useCameraStore } from '@/scripts/stores/cameraStore.ts'
 // eslint-disable-next-line
 import SimpleTimeline from '@/vues/components/timeline/simple-timeline/SimpleTimeline.vue'
+import { useRefreshFunction } from '@/scripts/composables/useRefreshFunction.ts'
 
 const route = useRoute()
 const simpleTimeline = useTemplateRef('simpleTimeline')
@@ -49,6 +50,7 @@ watch(
   },
   { immediate: true },
 )
+useRefreshFunction(() => cameraStore.fetchCameraMedia(cameraMake.value, cameraModel.value, false))
 </script>
 
 <template>

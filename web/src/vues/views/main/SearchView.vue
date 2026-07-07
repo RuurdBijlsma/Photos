@@ -8,6 +8,7 @@ import SearchFilterMenu from '@/vues/components/ui/SearchFilterMenu.vue'
 import searchService from '@/scripts/services/searchService.ts'
 import { MONTHS } from '@/scripts/constants.ts'
 import { useSearchStore } from '@/scripts/stores/searchStore.ts'
+import { useRefreshFunction } from '@/scripts/composables/useRefreshFunction.ts'
 
 const snackStore = useSnackbarsStore()
 const searchStore = useSearchStore()
@@ -192,6 +193,8 @@ onUnmounted(() => {
 watch([() => route.query, () => searchStore.searchImage], () => executeSearch(false), {
   immediate: true,
 })
+
+useRefreshFunction(() => executeSearch(false))
 </script>
 
 <template>

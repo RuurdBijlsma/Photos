@@ -19,6 +19,7 @@ import userService from '@/scripts/services/userService.ts'
 import type { SmallUser } from '@/scripts/types/api/user.ts'
 import { useAuthStore } from '@/scripts/stores/authStore.ts'
 import { copyToClipboard } from '@/scripts/utils.ts'
+import { useRefreshFunction } from '@/scripts/composables/useRefreshFunction.ts'
 
 const route = useRoute()
 const router = useRouter()
@@ -416,6 +417,10 @@ watch(
 watch(collabMenuOpen, () => {
   if (!collabMenuOpen.value) return
   fetchUserList()
+})
+
+useRefreshFunction(() => {
+  if (id.value) albumStore.fetchAlbumMedia(id.value, false)
 })
 </script>
 

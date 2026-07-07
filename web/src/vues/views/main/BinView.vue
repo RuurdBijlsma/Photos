@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
 import { useBinStore } from '@/scripts/stores/binStore.ts'
 import SimpleTimeline from '@/vues/components/timeline/simple-timeline/SimpleTimeline.vue'
 import { useSystemStore } from '@/scripts/stores/systemStore.ts'
+import { useRefreshFunction } from '@/scripts/composables/useRefreshFunction'
 
 const binStore = useBinStore()
 const systemStore = useSystemStore()
@@ -13,9 +13,7 @@ async function emptyBin() {
   await binStore.hardDeleteItems(ids)
 }
 
-onMounted(() => {
-  binStore.fetchBin()
-})
+useRefreshFunction(() => binStore.fetchBin(), { immediate: true })
 </script>
 
 <template>

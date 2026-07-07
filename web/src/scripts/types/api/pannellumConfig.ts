@@ -27,7 +27,7 @@ export interface PannellumConfig {
   strings?: Record<string, string>
 
   /**
-   * Specifies a base path to load the images from.
+   * Specifies a base path to load the img from.
    */
   basePath?: string
 
@@ -284,7 +284,7 @@ export interface PannellumConfig {
   // Cubemap specific options
   /**
    * An array of URLs for the six cube faces: front, right, back, left, up, down.
-   * Partial cubemap images may be specified by giving null instead of a URL.
+   * Partial cubemap img may be specified by giving null instead of a URL.
    */
   cubeMap?: [
     string | null, // front

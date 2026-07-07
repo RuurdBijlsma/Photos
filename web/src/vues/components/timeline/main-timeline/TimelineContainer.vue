@@ -25,11 +25,20 @@ import { useRoute, useRouter } from 'vue-router'
 import { useViewPhotoStore } from '@/scripts/stores/timeline/viewPhotoStore.ts'
 import { useSettingStore } from '@/scripts/stores/settingsStore.ts'
 import DailyCardList from '@/vues/components/timeline/daily-cards/DailyCardList.vue'
+import { useDailyCardStore } from '@/scripts/stores/timeline/dailyCardStore.ts'
+import { useRefreshStore } from '@/scripts/stores/refreshStore.ts'
 
 const timelineStore = useTimelineStore()
 const selectionStore = useSelectionStore()
 const viewPhotoStore = useViewPhotoStore()
 const settings = useSettingStore()
+const cardStore = useDailyCardStore()
+const refreshStore = useRefreshStore()
+const cards = computed(() => cardStore.todayCards)
+
+const dailyCardsHeight = computed(() => {
+  return timelineStore.monthRatios.length > 0 && cards.value && cards.value.length > 0 ? 300 : 0
+})
 const route = useRoute()
 const router = useRouter()
 
@@ -72,6 +81,7 @@ const virtualizerOptions = computed(() => ({
   overscan: 5,
   paddingEnd: 20,
   getItemKey: (index: number) => gridLayout.value[index]?.key || index,
+  scrollMargin: dailyCardsHeight.value,
 }))
 
 const rowVirtualizer = useVirtualizer(virtualizerOptions)
@@ -171,6 +181,7 @@ function calculateLayout(
   monthRatios: TimelineMonthRatios[],
   containerWidth: number,
   sort: 'desc' | 'asc',
+  gridOffsetTop = 0,
 ) {
   if (monthRatios.length === 0 || containerWidth === 0)
     return { rows: [], scrollMonths: [], scrollYears: [], totalHeight: 0 }
@@ -178,7 +189,7 @@ function calculateLayout(
   const monthScrollLabels: MonthScrollLabel[] = []
   const yearScrollLabels: YearScrollLabel[] = []
   let activeYear: YearScrollLabel | null = null
-  let offsetTop = 0
+  let offsetTop = gridOffsetTop
 
   for (const { monthId, ratios } of monthRatios) {
     const year = +monthId.substring(0, 4)
@@ -211,7 +222,7 @@ function calculateLayout(
           (containerWidth - gapSize) / itemsWidth,
           MAX_SIZE_MULTIPLIER,
         )
-        const rowHeight = settings.timelineRowHeight * sizeMultiplier
+        const rowHeight = Math.round(settings.timelineRowHeight * sizeMultiplier)
         const lastOfTheMonth = i === ratios.length - 1
         layoutRows.push({
           items: rowItems,
@@ -233,7 +244,7 @@ function calculateLayout(
         firstOfTheMonth = false
         rowItems = []
         itemsWidth = 0
-        offsetTop += Math.round(rowHeight)
+        offsetTop += rowHeight
         if (!lastOfTheMonth) offsetTop += ITEM_GAP
       }
     }
@@ -244,7 +255,7 @@ function calculateLayout(
       if (itemsWidth * sizeMultiplier < containerWidth) {
         sizeMultiplier = 1
       }
-      const rowHeight = settings.timelineRowHeight * sizeMultiplier
+      const rowHeight = Math.round(settings.timelineRowHeight * sizeMultiplier)
       layoutRows.push({
         items: rowItems,
         height: rowHeight,
@@ -262,7 +273,7 @@ function calculateLayout(
           offsetTop,
         })
       }
-      offsetTop += Math.round(rowHeight)
+      offsetTop += rowHeight
     }
   }
 
@@ -365,7 +376,7 @@ function offsetScrollToMediaId(
 ) {
   let offsetTop = gridLayout.value[index]?.offsetTop
   if (offsetTop !== undefined && scrollContainerEl.value) {
-    if (offsetTop < 100) offsetTop = 0
+    if (offsetTop < dailyCardsHeight.value + 100) offsetTop = 0
     console.log({ offset })
     scrollContainerEl.value.scrollTo({ top: offsetTop + (offset ?? 0), behavior: behavior })
   }
@@ -565,13 +576,19 @@ watch(
 )
 
 watch(
-  [() => timelineStore.monthRatios, containerSize, () => settings.timelineRowHeight],
+  [
+    () => timelineStore.monthRatios,
+    containerSize,
+    () => settings.timelineRowHeight,
+    dailyCardsHeight,
+  ],
   ([, oldSize], [, newSize]) => {
     const now = performance.now()
     const { rows, scrollYears, scrollMonths, totalHeight } = calculateLayout(
       timelineStore.monthRatios,
       containerSize.value.width,
       'desc',
+      dailyCardsHeight.value,
     )
     console.log('calculateLayout', performance.now() - now, 'ms')
     scrollLabels.value = {
@@ -654,7 +671,9 @@ watch(
         const viewportBottom = viewportTop + containerSize.value.height
         const rowTop = row.firstOfTheMonth ? row.offsetTop - ROW_HEADER_HEIGHT : row.offsetTop
         const rowBottom = row.offsetTop + row.height
-        const isFullyInViewport = rowTop >= viewportTop && rowBottom <= viewportBottom
+        const doNothingMargin = settings.timelineRowHeight * 0.5
+        const isFullyInViewport =
+          rowTop >= viewportTop - doNothingMargin && rowBottom <= viewportBottom + doNothingMargin
         if (isFullyInViewport) return
       }
 
@@ -722,7 +741,21 @@ watch(
     if (!timelineStore.pendingGoToTop) return
     timelineStore.pendingGoToTop = false
     if (scrollContainerEl.value) {
-      scrollContainerEl.value.scrollTo({ top: 0, behavior: 'smooth' })
+      if (scrollContainerEl.value.scrollTop === 0) {
+        timelineStore.refresh()
+      } else {
+        scrollContainerEl.value.scrollTo({ top: 0, behavior: 'smooth' })
+      }
+    }
+  },
+  { immediate: true },
+)
+
+watch(
+  () => refreshStore.counter,
+  () => {
+    if (refreshStore.counter > 0) {
+      timelineStore.refresh()
     }
   },
   { immediate: true },
@@ -780,7 +813,7 @@ if (!timelineStore.isInitialized) timelineStore.initialize()
               top: 0,
               left: 0,
               width: '100%',
-              transform: `translateY(${virtualRow.start}px)`,
+              transform: `translateY(${virtualRow.start - dailyCardsHeight}px)`,
             }"
           >
             <virtual-row
@@ -1030,7 +1063,7 @@ if (!timelineStore.isInitialized) timelineStore.initialize()
   background-color: rgba(var(--v-theme-secondary), 0.2);
 }
 
-/* ── Empty state ─────────────────────────────────────────── */
+/* ── Empty state ────────────────────────────────────────── */
 .empty-state {
   position: absolute;
   inset: 0;

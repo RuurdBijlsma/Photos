@@ -9,9 +9,10 @@ import mediaItemService from '@/scripts/services/mediaItemService.ts'
 import type { ThemeVariant } from '@/scripts/constants.ts'
 import { useThrottleFn } from '@vueuse/core'
 import type { RandomPhotoResponse } from '@/scripts/types/api/photos.ts'
+import etnaUrl from '@/assets/img/etna.jpg'
 
 const BG_CACHE_KEY = 'cachedBackgroundData'
-export const DEFAULT_BG_URL = '/img/etna.jpg'
+export const DEFAULT_BG_URL = etnaUrl
 
 type CachedBackgroundData = {
   url: string

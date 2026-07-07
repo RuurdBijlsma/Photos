@@ -7,6 +7,7 @@ import storageService from '@/scripts/services/storageService.ts'
 import type { StorageSummaryResponse } from '@/scripts/types/generated/timeline.ts'
 import { useSnackbarsStore } from '@/scripts/stores/snackbarStore.ts'
 import BigStorageOverview from '@/vues/components/ui/BigStorageOverview.vue'
+import { useRefreshFunction } from '@/scripts/composables/useRefreshFunction.ts'
 
 const systemStore = useSystemStore()
 const snackbarStore = useSnackbarsStore()
@@ -55,6 +56,7 @@ async function loadSummary() {
 }
 
 onMounted(loadSummary)
+useRefreshFunction(() => loadSummary())
 </script>
 
 <template>

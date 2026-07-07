@@ -7,6 +7,8 @@ import { useDialogStore } from '@/scripts/stores/dialogStore.ts'
 import { useRouter } from 'vue-router'
 import type { UpdatePersonRequest } from '@/scripts/types/api/people.ts'
 import { useObjStorage } from '@/scripts/utils.ts'
+import personNoThumb from '@/assets/img/person-no-thumb.png'
+import personNoThumbDark from '@/assets/img/person-no-thumb-dark.png'
 
 export const usePeopleStore = defineStore('people', () => {
   const snackbarStore = useSnackbarsStore()
@@ -108,7 +110,7 @@ export const usePeopleStore = defineStore('people', () => {
     const clusterId = person.faceThumbId ?? person.faceClusterIds[0]
     const url = peopleService.getFaceThumbnail(clusterId)
     if (url === '') {
-      return isDark ? `/img/person-no-thumb-dark.png` : `/img/person-no-thumb.png`
+      return isDark ? personNoThumbDark : personNoThumb
     }
     return url
   }

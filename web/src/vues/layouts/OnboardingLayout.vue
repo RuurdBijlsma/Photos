@@ -41,7 +41,7 @@ withDefaults(
 }
 
 .big-image {
-  background-image: url('img/app-no-bg-1024.png');
+  background-image: url('@/assets/img/app-no-bg-1024.png');
   width: 100px;
   height: 100px;
   background-size: 90%;

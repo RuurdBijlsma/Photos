@@ -110,16 +110,13 @@ export function isLikelyJwt(token: string): boolean {
 
 export function getWeatherIcon(condition: string, isDaytime: boolean): string {
   const icon = WEATHER_ICONS[condition]
+  let iconName = 'cloudy_day_night.svg'
 
-  if (!icon) {
-    return 'cloudy_day_night.svg'
+  if (icon) {
+    iconName = typeof icon === 'string' ? icon : isDaytime ? icon.day : icon.night
   }
 
-  if (typeof icon === 'string') {
-    return icon
-  }
-
-  return isDaytime ? icon.day : icon.night
+  return new URL(`../assets/img/weather/${iconName}`, import.meta.url).href
 }
 
 export function makeDateTimeString(date: Date) {
