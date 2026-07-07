@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
-import { useStorage, useEventListener } from '@vueuse/core'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { useEventListener, useStorage } from '@vueuse/core'
 import { useMediaItemStore } from '@/scripts/stores/timeline/mediaItemStore.ts'
 import mediaItemService from '@/scripts/services/mediaItemService.ts'
 import { VIDEO_SIZES } from '@/scripts/constants.ts'
@@ -63,11 +63,16 @@ const sortedVideoSizes = [...VIDEO_SIZES].sort((a, b) => b - a)
 
 const currentQuality = computed<number | string>({
   get() {
+    if (!hasThumbnails.value) {
+      if (isSourceAvailable.value) {
+        return 'source'
+      }
+      return defaultQuality
+    }
     if (savedQuality.value === 'source') {
       if (isSourceAvailable.value) {
         return 'source'
       }
-      // Fallback to highest pre-generated resolution if source streaming is unavailable
       return sortedVideoSizes[0] ?? defaultQuality
     }
     const numQuality = Number(savedQuality.value)
@@ -502,15 +507,17 @@ useEventListener(window, 'keydown', handleKeyDown)
                 </v-list-item-title>
               </v-list-item>
 
-              <v-list-item
-                v-for="size in sortedVideoSizes"
-                :key="size"
-                :value="size"
-                @click="onQualitySelect(size)"
-                :active="currentQuality === size"
-              >
-                <v-list-item-title class="menu-text">{{ size }}p</v-list-item-title>
-              </v-list-item>
+              <template v-if="hasThumbnails">
+                <v-list-item
+                  v-for="size in sortedVideoSizes"
+                  :key="size"
+                  :value="size"
+                  @click="onQualitySelect(size)"
+                  :active="currentQuality === size"
+                >
+                  <v-list-item-title class="menu-text">{{ size }}p</v-list-item-title>
+                </v-list-item>
+              </template>
             </v-list>
           </v-menu>
           <v-btn v-else variant="plain" icon="mdi-cog-outline" rounded="xl" disabled />
