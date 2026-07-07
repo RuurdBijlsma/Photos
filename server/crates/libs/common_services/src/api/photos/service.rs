@@ -23,6 +23,7 @@ use tokio::fs::File;
 use tokio::io::{AsyncReadExt, AsyncSeekExt};
 use tokio::{fs, task};
 use tokio_util::codec::{BytesCodec, FramedRead};
+use tokio_util::io::ReaderStream;
 use tracing::{debug, warn};
 
 /// Securely streams a validated media file to the client after performing authorization checks.
@@ -351,10 +352,9 @@ pub async fn stream_video_file(
         return Err(AppError::NotFound(media_item_id.to_owned()));
     };
     let media_path = ingest_settings.media_root.join(&rel_path);
-
     let mut file = File::open(&media_path)
         .await
-        .map_err(|_| AppError::Forbidden("Denied".to_owned()))?;
+        .map_err(|_| AppError::Internal(eyre!("Failed to open vide file")))?;
     let metadata = file
         .metadata()
         .await
@@ -397,13 +397,20 @@ pub async fn stream_video_file(
         .await
         .map_err(|e| eyre!("Can't seek in video file {e}"))?;
 
+    // streaming chunks
     let reader = file.take(content_length);
-    let stream = FramedRead::new(reader, BytesCodec::new());
+    let stream = ReaderStream::new(reader);
     let body = Body::from_stream(stream);
 
+    let mime_type = mime_guess::from_path(&media_path).first_or_octet_stream();
+
     let mut response = Response::builder()
-        .header(header::CONTENT_TYPE, "video/mp4")
-        .header(header::ACCEPT_RANGES, "bytes");
+        .header(header::CONTENT_TYPE, mime_type.as_ref())
+        .header(header::ACCEPT_RANGES, "bytes")
+        .header(
+            header::CACHE_CONTROL,
+            "private, max-age=31536000, immutable",
+        );
 
     if is_partial {
         response = response.status(StatusCode::PARTIAL_CONTENT).header(
