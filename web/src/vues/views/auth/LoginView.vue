@@ -184,7 +184,7 @@ async function login() {
 }
 
 .big-image {
-  background-image: url('@/assets/img/app-no-bg-1024.png');
+  background-image: url('@/assets/img/logo/transparent/512.png');
   width: 100%;
   height: 100%;
   background-size: 80%;

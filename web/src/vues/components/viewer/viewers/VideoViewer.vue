@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
-import { useStorage, useEventListener } from '@vueuse/core'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { useEventListener, useStorage } from '@vueuse/core'
 import { useMediaItemStore } from '@/scripts/stores/timeline/mediaItemStore.ts'
 import mediaItemService from '@/scripts/services/mediaItemService.ts'
 import { VIDEO_SIZES } from '@/scripts/constants.ts'
-import { getVideoHeight, toHms } from '@/scripts/utils.ts'
+import { getVideoHeight, toHms, useObjStorage } from '@/scripts/utils.ts'
 import VideoProgressSlider from '@/vues/components/viewer/components/VideoProgressSlider.vue'
 
 const props = withDefaults(
@@ -42,43 +42,81 @@ const isMuted = useStorage<boolean>('video-player-muted', false)
 // Fullscreen State
 const isFullscreen = ref(false)
 
-// Quality State (Persisted with useStorage)
-const defaultQuality = getVideoHeight(screen.height)
-const savedQuality = useStorage<number>('video-player-quality', defaultQuality)
-const sortedVideoSizes = [...VIDEO_SIZES].sort((a, b) => b - a)
-
-const currentQuality = computed({
-  get() {
-    if (VIDEO_SIZES.includes(savedQuality.value)) {
-      return savedQuality.value
-    }
-    return defaultQuality
-  },
-  set(val: number) {
-    savedQuality.value = val
-  },
-})
-
 // Fetch metadata from the Pinia store if it is missing
 const fullImage = computed(() => mediaItemStore.mediaItems.get(props.mediaItemId))
 const hasThumbnails = computed(() => fullImage.value?.has_thumbnails ?? true)
 
+const isSourceAvailable = computed(() => {
+  const mimeType = fullImage.value?.media_features?.mime_type
+  return isVideoStreamable(mimeType)
+})
+
+const sourceHeight = computed(() => {
+  if (!fullImage.value) return 0
+  return Math.min(fullImage.value.width, fullImage.value.height)
+})
+
+// Quality State (Persisted with useStorage)
+const defaultQuality = getVideoHeight(screen.height)
+const savedQuality = useObjStorage<number | string>('video-player-quality', defaultQuality)
+const sortedVideoSizes = [...VIDEO_SIZES].sort((a, b) => b - a)
+
+const currentQuality = computed<number | string>({
+  get() {
+    if (!hasThumbnails.value) {
+      if (isSourceAvailable.value) {
+        return 'source'
+      }
+      return defaultQuality
+    }
+    if (savedQuality.value === 'source') {
+      if (isSourceAvailable.value) {
+        return 'source'
+      }
+      return sortedVideoSizes[0] ?? defaultQuality
+    }
+    const numQuality = Number(savedQuality.value)
+    if (VIDEO_SIZES.includes(numQuality)) {
+      return numQuality
+    }
+    return defaultQuality
+  },
+  set(val: number | string) {
+    savedQuality.value = val
+  },
+})
+
 // Computed video source URL based on quality and thumbnail generation availability
 const videoUrl = computed(() => {
+  if (currentQuality.value === 'source') {
+    return mediaItemService.getVideo(props.mediaItemId, 0, true)
+  }
   const onDemand = !hasThumbnails.value
-  return mediaItemService.getVideo(props.mediaItemId, currentQuality.value, onDemand)
+  return mediaItemService.getVideo(props.mediaItemId, currentQuality.value as number, onDemand)
 })
 
 // Keep track of the position and play state to restore across source swaps
 const timeToRestore = ref<number | null>(null)
 const isPlayingOnQualityChange = ref<boolean | null>(null)
 
-function onQualitySelect(size: number) {
+function onQualitySelect(size: number | string) {
   if (videoRef.value) {
     timeToRestore.value = videoRef.value.currentTime
     isPlayingOnQualityChange.value = !videoRef.value.paused
   }
   currentQuality.value = size
+}
+
+// Native browser-streamable support check
+function isVideoStreamable(mimeType?: string): boolean {
+  if (!mimeType) return false
+  const lower = mimeType.toLowerCase()
+  return (
+    lower === 'video/mp4' ||
+    lower === 'video/webm' ||
+    lower === 'video/ogg' ||
+    lower === 'video/quicktime'
+  )
 }
 
 // Triggers the temporary play/pause animation overlay in the middle of the screen
@@ -439,6 +477,8 @@ useEventListener(window, 'keydown', handleKeyDown)
                 min="0"
                 max="1"
                 step="0.05"
+                thumb-size="15"
+                track-size="3"
                 hide-details
                 density="compact"
               />
@@ -451,20 +491,33 @@ useEventListener(window, 'keydown', handleKeyDown)
         <!-- Right Island Capsule -->
         <div class="control-island right-island">
           <!-- Quality Selector Menu -->
-          <v-menu v-if="hasThumbnails" location="top center">
+          <v-menu v-if="hasThumbnails || isSourceAvailable" location="top center">
             <template v-slot:activator="{ props }">
               <v-btn variant="plain" icon="mdi-cog-outline" rounded="xl" v-bind="props" />
             </template>
             <v-list class="quality-menu-list">
               <v-list-item
-                v-for="size in sortedVideoSizes"
-                :key="size"
-                :value="size"
-                @click="onQualitySelect(size)"
-                :active="currentQuality === size"
+                v-if="isSourceAvailable"
+                value="source"
+                @click="onQualitySelect('source')"
+                :active="currentQuality === 'source'"
               >
-                <v-list-item-title class="menu-text">{{ size }}p</v-list-item-title>
+                <v-list-item-title class="menu-text">
+                  {{ sourceHeight }}p <span class="source-label">(source)</span>
+                </v-list-item-title>
               </v-list-item>
+
+              <template v-if="hasThumbnails">
+                <v-list-item
+                  v-for="size in sortedVideoSizes"
+                  :key="size"
+                  :value="size"
+                  @click="onQualitySelect(size)"
+                  :active="currentQuality === size"
+                >
+                  <v-list-item-title class="menu-text">{{ size }}p</v-list-item-title>
+                </v-list-item>
+              </template>
             </v-list>
           </v-menu>
           <v-btn v-else variant="plain" icon="mdi-cog-outline" rounded="xl" disabled />
@@ -618,10 +671,11 @@ body.backdrop-blur .control-island:hover {
 
 .volume-container:hover .volume-slider-wrapper,
 .volume-container:focus-within .volume-slider-wrapper {
-  width: 80px;
+  width: 96px;
   opacity: 1;
   pointer-events: auto;
-  margin-left: 8px;
+  margin-left: 0;
+  padding-left: 8px;
 }
 
 .volume-slider {
@@ -644,6 +698,13 @@ body.backdrop-blur .control-island:hover {
   font-weight: 500;
 }
 
+.source-label {
+  opacity: 0.6;
+  font-size: 0.85em;
+  font-weight: 400;
+  margin-left: 4px;
+}
+
 /* Custom Grayscale / Color-Neutral overrides for remaining Sliders (Decoupled) */
 
 /* Volume Slider Customization */
@@ -661,5 +722,9 @@ body.backdrop-blur .control-island:hover {
 
 :deep(.volume-slider .v-slider-thumb__ripple) {
   color: rgba(var(--fg), 0.3) !important;
+}
+
+:deep(.volume-slider .v-slider-thumb--focused .v-slider-thumb__surface::before) {
+  opacity: 0;
 }
 </style>
