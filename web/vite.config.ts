@@ -28,7 +28,7 @@ export default defineConfig({
       manifest: {
         name: 'Ruurd Photos',
         short_name: 'Photos',
-        description: 'A web application for photos',
+        description: 'Manage your photos and videos',
         theme_color: '#101010',
         background_color: '#101010',
         display: 'standalone',
