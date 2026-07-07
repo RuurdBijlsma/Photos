@@ -7,12 +7,17 @@ import MapDateFilter from '@/vues/components/map/MapDateFilter.vue'
 import mediaItemService from '@/scripts/services/mediaItemService.ts'
 import { getThumbnailHeight, getVideoHeight } from '@/scripts/utils.ts'
 import { useDebounceFn, useStorage } from '@vueuse/core'
+import libertyMapThumb from '@/assets/img/map-thumb/LIBERTY.png'
+import darkColorfulMapThumb from '@/assets/img/map-thumb/DARK_COLORFUL.png'
+import satelliteMapThumb from '@/assets/img/map-thumb/SATELLITE.png'
+import terrainMapThumb from '@/assets/img/map-thumb/TERRAIN.png'
+import watercolorMapThumb from '@/assets/img/map-thumb/WATERCOLOR.png'
 import type {
   MapPhotoItem,
   MapPhotosResponse,
   SimpleTimelineItem,
 } from '@/scripts/types/generated/timeline.ts'
-import { useRouter, useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 
 // Tweakable visual configuration for the map representation
 const HEATMAP_CONFIG = {
@@ -74,11 +79,11 @@ const HEATMAP_CONFIG = {
 }
 
 const MAP_STYLES = [
-  { key: 'LIBERTY', label: 'Light Map', thumb: 'img/map-thumb/LIBERTY.png' },
-  { key: 'SATELLITE', label: 'Satellite', thumb: 'img/map-thumb/SATELLITE.png' },
-  { key: 'TERRAIN', label: 'Terrain', thumb: 'img/map-thumb/TERRAIN.png' },
-  { key: 'WATERCOLOR', label: 'Watercolor', thumb: 'img/map-thumb/WATERCOLOR.png' },
-  { key: 'DARK_COLORFUL', label: 'Dark Map', thumb: 'img/map-thumb/DARK_COLORFUL.png' },
+  { key: 'LIBERTY', label: 'Light Map', thumb: libertyMapThumb },
+  { key: 'SATELLITE', label: 'Satellite', thumb: satelliteMapThumb },
+  { key: 'TERRAIN', label: 'Terrain', thumb: terrainMapThumb },
+  { key: 'WATERCOLOR', label: 'Watercolor', thumb: watercolorMapThumb },
+  { key: 'DARK_COLORFUL', label: 'Dark Map', thumb: darkColorfulMapThumb },
 ] as const
 
 const DEFAULT_MAP_OPTIONS = {

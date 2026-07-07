@@ -226,7 +226,7 @@ watch(
 watch(
   () => props.mediaItemId,
   () => {
-    // Reset zoom & pan when switching images
+    // Reset zoom & pan when switching img
     scale.value = 1
     translateX.value = 0
     translateY.value = 0

@@ -13,7 +13,7 @@ defineProps<{
       v-if="weatherInfo.condition && weatherInfo.is_daytime"
       :alt="`Icon for ${weatherInfo.condition} weather`"
       height="40"
-      :src="`/img/weather/${getWeatherIcon(weatherInfo.condition, weatherInfo.is_daytime)}`"
+      :src="getWeatherIcon(weatherInfo.condition, weatherInfo.is_daytime)"
     />
     <span v-if="weatherInfo.temperature">
       <span class="temperature">{{ weatherInfo.temperature }}</span

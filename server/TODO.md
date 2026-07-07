@@ -230,13 +230,13 @@
   * ✅ contrast setting in theme
 * ✅ remove exif from full photo response
 * ✅ write thumbnails to cache folder and symlink to thumbnails folder?
+* ✅ add photo search type: Panorama (use_panorama_viewer flag). Currently type=photo|video, add panorama
 * password reset flow (email) (make mail optional)
 * nginx thumbnail hosting (optional maak setting voor Rust thumb hosting).
 * check of readme uitleg klopt met verse windows installatie & linux
 * better error if exiftool isnt there (worker wont work then)
 * improve speed of album/{id} endpoint
 * rotate image by changing thumbnail orientation?
-* ✅ add photo search type: Panorama (use_panorama_viewer flag). Currently type=photo|video, add panorama
 
 # High level TODO:
 
@@ -250,9 +250,8 @@
   * sort by all kinds of fields (temp, altitude, lat/lon extremes, wind, shutter speed)
   * photo distribution/histogram by day of  year, grouped by month/week?
   * zelfde voor time of day?
-* photo viewer page
-  * implement different viewers
+* ✅ photo viewer page
+  * ✅ implement different viewers
   * find similar fotos view, misschien  een expandable ding in de info panel?
 * photo upload feature
-* disallow having root as user media folder if going with multiple users
 * email password reset?
