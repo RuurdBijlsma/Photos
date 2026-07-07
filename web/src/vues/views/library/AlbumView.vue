@@ -419,11 +419,9 @@ watch(collabMenuOpen, () => {
   fetchUserList()
 })
 
-useRefreshFunction(
-  () => {
-    if (id.value) albumStore.fetchAlbumMedia(id.value, false)
-  }
-)
+useRefreshFunction(() => {
+  if (id.value) albumStore.fetchAlbumMedia(id.value, false)
+})
 </script>
 
 <template>

@@ -64,11 +64,9 @@ watch(personResponse, () => {
   if (personResponse.value !== null) isInitialLoad.value = false
 })
 
-useRefreshFunction(
-  () => {
-    if (personId.value) peopleStore.fetchPersonMedia(personId.value)
-  },
-)
+useRefreshFunction(() => {
+  if (personId.value) peopleStore.fetchPersonMedia(personId.value)
+})
 </script>
 
 <template>
