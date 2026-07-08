@@ -222,7 +222,7 @@
 * ✅ replace logo with new logo
 * ✅ make option to stream original video file? Just use on demand endpoint, this would be highest quality available.
   List "original" as quality option or something in viewer
-* make option to keep background image permanently, or something like set image as background image on kebab menu in
+* ✅ make option to keep background image permanently, or something like set image as background image on kebab menu in
   viewphoto?
 * when loading video, it seems to load 480p in the videoviewer first, then swap to source quality. This causes flicker.
   Noticeable when api is responding not so fast.
