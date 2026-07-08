@@ -48,7 +48,7 @@ const hasFilters = computed(() => {
 })
 
 const isFilterOnlyBrowse = computed(
-  () => !query.value && hasFilters.value && !searchStore.searchImage,
+  () => !query.value && hasFilters.value && !searchStore.searchImage && !isSimilarSearch.value,
 )
 const isEmptySearch = computed(
   () => !query.value && !hasFilters.value && !searchStore.searchImage && !isSimilarSearch.value,
