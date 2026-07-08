@@ -119,15 +119,18 @@ export function getWeatherIcon(condition: string, isDaytime: boolean): string {
   return new URL(`../assets/img/weather/${iconName}`, import.meta.url).href
 }
 
+export function makeTimeString(date: Date) {
+  const hours = String(date.getHours())
+  const minutes = String(date.getMinutes()).padStart(2, '0')
+  return `${hours}:${minutes}`
+}
+
 export function makeDateTimeString(date: Date) {
   const day = date.getDate()
   const month = date.toLocaleString('en-GB', { month: 'long' })
   const year = date.getFullYear()
 
-  const hours = String(date.getHours()).padStart(2, '0')
-  const minutes = String(date.getMinutes()).padStart(2, '0')
-
-  return `${day} ${month} ${year} at ${hours}:${minutes}`
+  return `${day} ${month} ${year} at ${makeTimeString(date)}`
 }
 
 export function makeLocationString(location: Location, components = 2) {
