@@ -63,22 +63,19 @@ const sortedVideoSizes = [...VIDEO_SIZES].sort((a, b) => b - a)
 
 const currentQuality = computed<number | string>({
   get() {
-    if (!hasThumbnails.value) {
-      if (isSourceAvailable.value) {
-        return 'source'
-      }
-      return defaultQuality
+    const saved = savedQuality.value
+    if (!fullImage.value) {
+      // If metadata is not loaded yet, assume the saved quality is available
+      return saved || defaultQuality
     }
-    if (savedQuality.value === 'source') {
-      if (isSourceAvailable.value) {
-        return 'source'
-      }
-      return sortedVideoSizes[0] ?? defaultQuality
+    console.log(1)
+    if (!hasThumbnails.value) return 'source'
+    if (saved === 'source') {
+      if (isSourceAvailable.value) return 'source'
+      return sortedVideoSizes[0]
     }
-    const numQuality = Number(savedQuality.value)
-    if (VIDEO_SIZES.includes(numQuality)) {
-      return numQuality
-    }
+    const numQuality = Number(saved)
+    if (VIDEO_SIZES.includes(numQuality)) return numQuality
     return defaultQuality
   },
   set(val: number | string) {
