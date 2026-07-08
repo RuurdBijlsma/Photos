@@ -136,6 +136,7 @@ pub async fn get_search_by_image_results(
             session_id,
         }),
         to_search_config(&context.settings.ingest.analyzer.search, params),
+        vec![],
     )
     .await?;
     Ok(Protobuf(SearchResponse {
@@ -162,6 +163,7 @@ pub async fn get_search_by_image_uuid(
             session_id,
         }),
         to_search_config(&context.settings.ingest.analyzer.search, params),
+        vec![],
     )
     .await?;
     Ok(Protobuf(SearchResponse {

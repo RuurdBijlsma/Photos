@@ -1,7 +1,7 @@
 use crate::api::app_error::AppError;
 use crate::api::search::cache::{get_cached_image_embedding, get_cached_text_embedding};
 use crate::api::search::interfaces::{
-    SearchFilterRanges, SearchImage, SearchMediaConfig, SearchMediaType, SearchSortBy, VisionQuery,
+    SearchFilterRanges, SearchMediaConfig, SearchMediaType, SearchSortBy, VisionQuery,
 };
 use crate::api::search::search_variants::{
     advanced_search_media, basic_search_media, filter_only_search_media,
@@ -87,6 +87,7 @@ pub async fn search_by_media_items(
         query,
         VisionQuery::Embedding(avg_embedding),
         config,
+        media_item_ids.to_vec(),
     )
     .await
 }
@@ -100,6 +101,7 @@ pub async fn search_by_image(
     query: Option<String>,
     img: VisionQuery,
     config: SearchMediaConfig,
+    exclude_ids: Vec<String>,
 ) -> Result<Vec<SimpleTimelineItem>, AppError> {
     // 1. Spawn vision embedding (CPU-bound / blocking task)
     let pool_clone = pool.clone();
@@ -234,6 +236,7 @@ pub async fn search_by_image(
                   JOIN person p ON fc.person_id = p.id
                   WHERE va.media_item_id = mi.id AND p.id = ANY($13)
               ) >= (CASE WHEN $16 THEN cardinality($13) ELSE 1 END))
+              AND (cardinality($19::text[]) = 0 OR NOT (mi.id = ANY($19)))
         ),
         fts AS (
             SELECT
@@ -319,7 +322,8 @@ pub async fn search_by_image(
             semantic_score_threshold, // $15
             config.all_faces_required, // $16
             offset,                    // $17
-            is_panorama_filter         // $18
+            is_panorama_filter,        // $18
+            &exclude_ids,       // $19
         )
             .fetch_all(pool)
             .await?;
@@ -352,6 +356,7 @@ pub async fn search_by_image(
                       JOIN person p ON fc.person_id = p.id
                       WHERE va.media_item_id = mi.id AND p.id = ANY($9)
                   ) >= (CASE WHEN $12 THEN cardinality($9) ELSE 1 END))
+                  AND (cardinality($15::text[]) = 0 OR NOT (mi.id = ANY($15)))
             ),
             vec AS (
                 SELECT DISTINCT ON (media_item_id)
@@ -400,6 +405,7 @@ pub async fn search_by_image(
             config.all_faces_required, // $12
             offset,                    // $13
             is_panorama_filter,        // $14
+            &exclude_ids,              // $15
         )
         .fetch_all(pool)
         .await?;

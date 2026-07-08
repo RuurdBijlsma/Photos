@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onUnmounted, ref, watch } from 'vue'
 import { useSnackbarsStore } from '@/scripts/stores/snackbarStore.ts'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import type { SimpleTimelineItem } from '@/scripts/types/generated/timeline.ts'
 import SimpleTimeline from '@/vues/components/timeline/simple-timeline/SimpleTimeline.vue'
 import SearchFilterMenu from '@/vues/components/ui/SearchFilterMenu.vue'
@@ -9,10 +9,13 @@ import searchService from '@/scripts/services/searchService.ts'
 import { MONTHS } from '@/scripts/constants.ts'
 import { useSearchStore } from '@/scripts/stores/searchStore.ts'
 import { useRefreshFunction } from '@/scripts/composables/useRefreshFunction.ts'
+import ThumbnailImg from '@/vues/components/ui/ThumbnailImg.vue'
+import { getThumbnailHeight } from '@/scripts/utils.ts'
 
 const snackStore = useSnackbarsStore()
 const searchStore = useSearchStore()
 const route = useRoute()
+const router = useRouter()
 
 const results = ref<SimpleTimelineItem[]>([])
 const loading = ref(false)
@@ -30,6 +33,9 @@ let activeAbortController: AbortController | null = null
 // URL Source of Truth Computations
 const query = computed(() => (route.query.query as string) || '')
 
+const isSimilarSearch = computed(() => route.query.mode === 'similar' && !!route.query.ids)
+const similarIds = computed(() => ((route.query.ids as string) || '').split(',').filter(Boolean))
+
 const hasFilters = computed(() => {
   return (
     !!route.query.countries ||
@@ -44,7 +50,9 @@ const hasFilters = computed(() => {
 const isFilterOnlyBrowse = computed(
   () => !query.value && hasFilters.value && !searchStore.searchImage,
 )
-const isEmptySearch = computed(() => !query.value && !hasFilters.value && !searchStore.searchImage)
+const isEmptySearch = computed(
+  () => !query.value && !hasFilters.value && !searchStore.searchImage && !isSimilarSearch.value,
+)
 
 // Date Range ISO Helper
 function urlParamToISO(param: string | undefined, endOfMonth = false): string | undefined {
@@ -77,7 +85,6 @@ function getSearchParams(isLoadMore: boolean) {
     if (loadingMore.value || !hasMore.value) return
     loadingMore.value = true
   } else {
-    // Removed the guard preventing execution when already loading to allow updates to override
     offset.value = 0
     hasMore.value = true
     if (loadingTimer) clearTimeout(loadingTimer)
@@ -103,8 +110,8 @@ function getSearchParams(isLoadMore: boolean) {
 }
 
 async function executeSearch(isLoadMore = false) {
-  // If we are not performing an image search, verify that we actually have a text query or active filters.
-  if (!searchStore.searchImage && !query.value && !hasFilters.value) {
+  // Verify that we actually have a text query, active filters, an image, or a similar items query.
+  if (!searchStore.searchImage && !query.value && !hasFilters.value && !isSimilarSearch.value) {
     results.value = []
     return
   }
@@ -142,6 +149,15 @@ async function executeSearch(isLoadMore = false) {
       }
       items = response.items
       console.log('[IMAGE] SearchPage results', response)
+    } else if (isSimilarSearch.value) {
+      // Execute Similar Search
+      const response = await searchService.searchByMediaItems(
+        similarIds.value,
+        searchParams,
+        signal,
+      )
+      items = response.items
+      console.log('[SIMILAR] SearchPage results', items)
     } else {
       // Execute Text/Filter Search with Cache Check
       const key = JSON.stringify(searchParams)
@@ -185,6 +201,13 @@ async function executeSearch(isLoadMore = false) {
   }
 }
 
+function clearSimilarSearch() {
+  const nextQuery = { ...route.query }
+  delete nextQuery.mode
+  delete nextQuery.ids
+  router.push({ path: '/search', query: nextQuery })
+}
+
 onUnmounted(() => {
   if (loadingTimer) clearTimeout(loadingTimer)
   if (activeAbortController) activeAbortController.abort()
@@ -222,12 +245,47 @@ useRefreshFunction(() => executeSearch(false))
             alt="Search image"
           />
         </template>
+        <template v-else-if="isSimilarSearch">
+          Similar to {{ similarIds.length }} item{{ similarIds.length > 1 ? 's' : '' }}
+        </template>
         <template v-else-if="hasFilters">Filtered results</template>
         <template v-else>Search</template>
       </h2>
       <v-spacer />
       <search-filter-menu />
     </div>
+
+    <!-- Similar Previews Section -->
+    <div v-if="isSimilarSearch" class="similar-previews-section px-5 mb-4">
+      <div class="d-flex align-center flex-wrap gap-2">
+        <div v-for="itemId in similarIds.slice(0, 8)" :key="itemId" class="preview-card">
+          <thumbnail-img
+            :media-item-id="itemId"
+            :height="getThumbnailHeight(65)"
+            :width="65"
+            cover
+            class="preview-thumbnail"
+          />
+        </div>
+        <v-avatar
+          v-if="similarIds.length > 8"
+          color="surface-container-high"
+          size="65"
+          class="ml-1 text-subtitle-2 font-weight-bold"
+        >
+          +{{ similarIds.length - 8 }}
+        </v-avatar>
+        <v-btn
+          icon="mdi-close"
+          variant="text"
+          size="small"
+          class="ml-2"
+          @click="clearSimilarSearch"
+          v-tooltip="'Clear similarity search'"
+        />
+      </div>
+    </div>
+
     <div class="search-margin"></div>
     <div v-if="isEmptySearch && !showLoadingUI && results.length === 0" class="search-empty-state">
       <v-icon icon="mdi-magnify" size="100" class="mb-4 search-empty-icon" />
@@ -236,8 +294,11 @@ useRefreshFunction(() => executeSearch(false))
     </div>
     <div class="loading-indicator" v-if="showLoadingUI">
       <h2 class="search-summary">
-        Searching for "<span class="query-span">{{ query }}</span
-        >"...
+        <template v-if="isSimilarSearch"> Searching for similar images... </template>
+        <template v-else>
+          Searching for "<span class="query-span">{{ query }}</span
+          >"...
+        </template>
       </h2>
       <v-progress-circular class="mt-6" :size="70" indeterminate />
     </div>
@@ -328,5 +389,31 @@ useRefreshFunction(() => executeSearch(false))
 
 .search-empty-icon {
   opacity: 0.2;
+}
+
+.similar-previews-section {
+  display: flex;
+  flex-direction: column;
+}
+
+.gap-2 {
+  gap: 8px;
+}
+
+.preview-card {
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid rgba(var(--v-theme-on-surface), 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 65px;
+  width: 65px;
+}
+
+.preview-thumbnail {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 </style>

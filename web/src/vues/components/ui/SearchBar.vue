@@ -315,6 +315,8 @@ function handleSubmit(isManual = true) {
   const nextQuery = { ...route.query }
   if (trimmed) {
     nextQuery.query = trimmed
+    delete nextQuery.mode
+    delete nextQuery.ids
   } else {
     delete nextQuery.query
   }

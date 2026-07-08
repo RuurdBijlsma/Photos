@@ -7,6 +7,8 @@ import { useProfileStore } from '@/scripts/stores/profileStore.ts'
 import { useAuthStore } from '@/scripts/stores/authStore.ts'
 import { useBinStore } from '@/scripts/stores/binStore.ts'
 import { useSystemStore } from '@/scripts/stores/systemStore.ts'
+import { useRouter } from 'vue-router'
+import { computed } from 'vue'
 
 withDefaults(
   defineProps<{
@@ -25,6 +27,7 @@ const selectionStore = useSelectionStore()
 const albumStore = useAlbumStore()
 const authStore = useAuthStore()
 const binStore = useBinStore()
+const router = useRouter()
 
 async function setProfilePic() {
   if (selectionStore.selection.size !== 1) return
@@ -41,6 +44,10 @@ async function setAlbumCover(albumId: string) {
     albumStore.fetchUserAlbums()
   })
 }
+
+const searchSimilarUrl = computed(() => {
+  return `/search?mode=similar&ids=${[...selectionStore.selection].join(',')}`
+})
 </script>
 
 <template>
@@ -89,6 +96,10 @@ async function setAlbumCover(albumId: string) {
             <v-list-item v-if="selectionStore.selection.size === 1" @click="setProfilePic">
               <v-list-item-title>Set as profile picture</v-list-item-title>
             </v-list-item>
+            <v-list-item :to="searchSimilarUrl">
+              <v-list-item-title>Find similar images</v-list-item-title>
+            </v-list-item>
+            <!-- Album specific list items -->
             <template v-if="context && context.album">
               <v-divider />
               <v-list-subheader>Album</v-list-subheader>

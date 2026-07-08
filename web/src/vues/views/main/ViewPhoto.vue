@@ -368,7 +368,7 @@ watch(isVideo, () => {
               <v-btn rounded="xl" icon="mdi-dots-horizontal" variant="plain" v-bind="props" />
             </template>
             <v-list>
-              <v-list-item>Hiiii</v-list-item>
+              <v-list-item :to="`/search?mode=similar&ids=${id}`">Find similar images</v-list-item>
             </v-list>
           </v-menu>
         </template>
