@@ -6,11 +6,11 @@ use color_eyre::eyre;
 use common_services::api::app_error::AppError;
 use common_services::api::search::handler_utils::to_search_config;
 use common_services::api::search::interfaces::{
-    SearchFilterRanges, SearchImage, SearchParams, SearchSuggestionsParams,
+    SearchFilterRanges, SearchImage, SearchParams, SearchSuggestionsParams, VisionQuery,
 };
 use common_services::api::search::service::{
-    get_random_search_suggestion, get_search_suggestions, search_by_image, search_filter_ranges,
-    search_media,
+    get_random_search_suggestion, get_search_suggestions, search_by_image, search_by_media_items,
+    search_filter_ranges, search_media,
 };
 use common_services::database::app_user::User;
 use common_types::pb::api::{SearchResponse, SearchSuggestionsResponse};
@@ -131,10 +131,10 @@ pub async fn get_search_by_image_results(
         context.text_embedder,
         context.vision_embedder,
         params.clone().query,
-        SearchImage {
+        VisionQuery::Raw(SearchImage {
             image: Some(img),
             session_id,
-        },
+        }),
         to_search_config(&context.settings.ingest.analyzer.search, params),
     )
     .await?;
@@ -157,15 +157,43 @@ pub async fn get_search_by_image_uuid(
         context.text_embedder,
         context.vision_embedder,
         params.clone().query,
-        SearchImage {
+        VisionQuery::Raw(SearchImage {
             image: None,
             session_id,
-        },
+        }),
         to_search_config(&context.settings.ingest.analyzer.search, params),
     )
     .await?;
     Ok(Protobuf(SearchResponse {
         items,
         session_id: Some(session_id.to_string()),
+    }))
+}
+
+#[instrument(skip(context, user), err(Debug))]
+pub async fn get_search_by_media_items(
+    State(context): State<ApiContext>,
+    Extension(user): Extension<User>,
+    Path(media_item_ids): Path<String>,
+    Query(params): Query<SearchParams>,
+) -> Result<Protobuf<SearchResponse>, AppError> {
+    let media_item_ids = media_item_ids
+        .split(',')
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .collect::<Vec<String>>();
+    let items = search_by_media_items(
+        &user,
+        &context.pool,
+        context.text_embedder,
+        context.vision_embedder,
+        params.clone().query,
+        to_search_config(&context.settings.ingest.analyzer.search, params),
+        &media_item_ids,
+    )
+    .await?;
+    Ok(Protobuf(SearchResponse {
+        items,
+        session_id: None,
     }))
 }

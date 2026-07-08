@@ -1,7 +1,7 @@
 use crate::api::app_error::AppError;
 use crate::api::search::cache::{get_cached_image_embedding, get_cached_text_embedding};
 use crate::api::search::interfaces::{
-    SearchFilterRanges, SearchImage, SearchMediaConfig, SearchMediaType, SearchSortBy,
+    SearchFilterRanges, SearchImage, SearchMediaConfig, SearchMediaType, SearchSortBy, VisionQuery,
 };
 use crate::api::search::search_variants::{
     advanced_search_media, basic_search_media, filter_only_search_media,
@@ -44,6 +44,20 @@ pub async fn search_media(
     }
 }
 
+pub async fn search_by_media_items(
+    user: &User,
+    pool: &PgPool,
+    text_embedder: Arc<TextEmbedder>,
+    vision_embedder: Arc<VisionEmbedder>,
+    query: Option<String>,
+    config: SearchMediaConfig,
+    media_item_ids: &[String],
+) -> Result<Vec<SimpleTimelineItem>, AppError> {
+    // calculate mean embedding of media items (embeddings are in db already)
+    // pass to search_by_image and return result
+    todo!();
+}
+
 #[allow(clippy::too_many_lines)]
 pub async fn search_by_image(
     user: &User,
@@ -51,14 +65,19 @@ pub async fn search_by_image(
     text_embedder: Arc<TextEmbedder>,
     vision_embedder: Arc<VisionEmbedder>,
     query: Option<String>,
-    img: SearchImage,
+    img: VisionQuery,
     config: SearchMediaConfig,
 ) -> Result<Vec<SimpleTimelineItem>, AppError> {
     // 1. Spawn vision embedding (CPU-bound / blocking task)
     let pool_clone = pool.clone();
     let model_id_clone = config.embedder_model_id.clone();
     let image_task = tokio::spawn(async move {
-        get_cached_image_embedding(img, &model_id_clone, &pool_clone, vision_embedder).await
+        match img {
+            VisionQuery::Raw(img) => {
+                get_cached_image_embedding(img, &model_id_clone, &pool_clone, vision_embedder).await
+            }
+            VisionQuery::Embedding(vector) => Ok(vector),
+        }
     });
 
     // 2. Spawn optional text query embedding task
