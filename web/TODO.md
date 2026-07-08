@@ -224,7 +224,7 @@
   List "original" as quality option or something in viewer
 * ✅ make option to keep background image permanently, or something like set image as background image on kebab menu in
   viewphoto?
-* when loading video, it seems to load 480p in the videoviewer first, then swap to source quality. This causes flicker.
+* ✅ when loading video, it seems to load 480p in the videoviewer first, then swap to source quality. This causes flicker.
   Noticeable when api is responding not so fast.
 * playback speed options in video player?
 * in media info panel the time is shown wrong: should be 23:05, but is 23:5

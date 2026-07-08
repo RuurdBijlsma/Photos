@@ -39,6 +39,25 @@ let overlayTimeout: ReturnType<typeof setTimeout> | null = null
 const savedVolume = useStorage<number>('video-player-volume', 1.0)
 const isMuted = useStorage<boolean>('video-player-muted', false)
 
+// Playback Speed State (Persisted with useStorage)
+const savedPlaybackRate = useStorage<number>('video-player-playback-rate', 1.0)
+const playbackRates = [0.25, 0.5, 1.0, 1.25, 1.5, 2.0, 3.0]
+
+const currentPlaybackRate = computed<number>({
+  get() {
+    return savedPlaybackRate.value
+  },
+  set(val: number) {
+    savedPlaybackRate.value = val
+    if (videoRef.value) {
+      videoRef.value.playbackRate = val
+    }
+  },
+})
+
+// Settings Menu Open State
+const settingsMenuOpen = ref(false)
+
 // Fullscreen State
 const isFullscreen = ref(false)
 
@@ -102,6 +121,12 @@ function onQualitySelect(size: number | string) {
     isPlayingOnQualityChange.value = !videoRef.value.paused
   }
   currentQuality.value = size
+  settingsMenuOpen.value = false
+}
+
+function onPlaybackRateSelect(rate: number) {
+  currentPlaybackRate.value = rate
+  settingsMenuOpen.value = false
 }
 
 // Native browser-streamable support check
@@ -150,6 +175,7 @@ function onLoadedMetadata() {
       currentTime.value = timeToRestore.value
       timeToRestore.value = null
     }
+    videoRef.value.playbackRate = currentPlaybackRate.value
     updateBufferedProgress()
   }
 }
@@ -195,6 +221,7 @@ watch(
         } else {
           videoRef.value.pause()
         }
+        videoRef.value.playbackRate = currentPlaybackRate.value
 
         isPlayingOnQualityChange.value = null
       }
@@ -487,34 +514,81 @@ useEventListener(window, 'keydown', handleKeyDown)
 
         <!-- Right Island Capsule -->
         <div class="control-island right-island">
-          <!-- Quality Selector Menu -->
-          <v-menu v-if="hasThumbnails || isSourceAvailable" location="top center">
+          <!-- Quality & Speed Settings Menu -->
+          <v-menu
+            v-if="hasThumbnails || isSourceAvailable"
+            v-model="settingsMenuOpen"
+            location="top center"
+            :close-on-content-click="false"
+          >
             <template v-slot:activator="{ props }">
               <v-btn variant="plain" icon="mdi-cog-outline" rounded="xl" v-bind="props" />
             </template>
-            <v-list class="quality-menu-list">
-              <v-list-item
-                v-if="isSourceAvailable"
-                value="source"
-                @click="onQualitySelect('source')"
-                :active="currentQuality === 'source'"
-              >
-                <v-list-item-title class="menu-text">
-                  {{ sourceHeight }}p <span class="source-label">(source)</span>
-                </v-list-item-title>
-              </v-list-item>
+            <v-list class="settings-menu-list">
+              <!-- Submenu 1: Playback Speed -->
+              <v-menu location="left top" open-on-hover :close-on-content-click="true">
+                <template v-slot:activator="{ props: speedMenuProps }">
+                  <v-list-item v-bind="speedMenuProps" class="menu-item-with-chevron">
+                    <v-list-item-title class="menu-text">Playback speed</v-list-item-title>
+                    <template v-slot:append>
+                      <span class="current-setting-label">{{ currentPlaybackRate }}x</span>
+                      <v-icon icon="mdi-chevron-right" size="small" class="ml-1" />
+                    </template>
+                  </v-list-item>
+                </template>
+                <v-list class="submenu-list">
+                  <v-list-item
+                    v-for="rate in playbackRates"
+                    :key="rate"
+                    :value="rate"
+                    @click="onPlaybackRateSelect(rate)"
+                    :active="currentPlaybackRate === rate"
+                  >
+                    <v-list-item-title class="menu-text">{{ rate }}x</v-list-item-title>
+                  </v-list-item>
+                </v-list>
+              </v-menu>
 
-              <template v-if="hasThumbnails">
-                <v-list-item
-                  v-for="size in sortedVideoSizes"
-                  :key="size"
-                  :value="size"
-                  @click="onQualitySelect(size)"
-                  :active="currentQuality === size"
-                >
-                  <v-list-item-title class="menu-text">{{ size }}p</v-list-item-title>
-                </v-list-item>
-              </template>
+              <!-- Submenu 2: Quality -->
+              <v-menu location="left top" open-on-hover :close-on-content-click="true">
+                <template v-slot:activator="{ props: qualityMenuProps }">
+                  <v-list-item v-bind="qualityMenuProps" class="menu-item-with-chevron">
+                    <v-list-item-title class="menu-text">Quality</v-list-item-title>
+                    <template v-slot:append>
+                      <span class="current-setting-label">
+                        {{
+                          currentQuality === 'source' ? `${sourceHeight}p` : `${currentQuality}p`
+                        }}
+                      </span>
+                      <v-icon icon="mdi-chevron-right" size="small" class="ml-1" />
+                    </template>
+                  </v-list-item>
+                </template>
+                <v-list class="submenu-list">
+                  <v-list-item
+                    v-if="isSourceAvailable"
+                    value="source"
+                    @click="onQualitySelect('source')"
+                    :active="currentQuality === 'source'"
+                  >
+                    <v-list-item-title class="menu-text">
+                      {{ sourceHeight }}p <span class="source-label">(source)</span>
+                    </v-list-item-title>
+                  </v-list-item>
+
+                  <template v-if="hasThumbnails">
+                    <v-list-item
+                      v-for="size in sortedVideoSizes"
+                      :key="size"
+                      :value="size"
+                      @click="onQualitySelect(size)"
+                      :active="currentQuality === size"
+                    >
+                      <v-list-item-title class="menu-text">{{ size }}p</v-list-item-title>
+                    </v-list-item>
+                  </template>
+                </v-list>
+              </v-menu>
             </v-list>
           </v-menu>
           <v-btn v-else variant="plain" icon="mdi-cog-outline" rounded="xl" disabled />
@@ -690,9 +764,23 @@ body.backdrop-blur .control-island:hover {
   margin-right: 15px;
 }
 
+.settings-menu-list {
+  min-width: 220px;
+}
+
+.submenu-list {
+  min-width: 140px;
+}
+
 .menu-text {
   font-family: Jost, sans-serif;
   font-weight: 500;
+}
+
+.current-setting-label {
+  font-family: Jost, sans-serif;
+  font-size: 13px;
+  opacity: 0.6;
 }
 
 .source-label {
