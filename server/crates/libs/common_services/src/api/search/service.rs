@@ -7,6 +7,7 @@ use crate::api::search::search_variants::{
     advanced_search_media, basic_search_media, filter_only_search_media,
 };
 use crate::database::app_user::User;
+use color_eyre::eyre::eyre;
 use common_types::pb::api::{
     SearchSuggestion, SearchSuggestionsResponse, SimpleTimelineItem, SuggestionType,
 };
@@ -53,9 +54,41 @@ pub async fn search_by_media_items(
     config: SearchMediaConfig,
     media_item_ids: &[String],
 ) -> Result<Vec<SimpleTimelineItem>, AppError> {
-    // calculate mean embedding of media items (embeddings are in db already)
-    // pass to search_by_image and return result
-    todo!();
+    if media_item_ids.is_empty() {
+        return Ok(vec![]);
+    }
+
+    // Query the database to calculate the average embedding vector of the specified media items
+    let row = sqlx::query!(
+        r#"
+        SELECT AVG(embedding)::vector as "embedding: Vector"
+        FROM visual_analysis
+        WHERE user_id = $1 AND media_item_id = ANY($2) AND deleted = false
+        "#,
+        user.id,
+        media_item_ids
+    )
+    .fetch_one(pool)
+    .await?;
+
+    let avg_embedding = row
+        .embedding
+        .ok_or_else(|| {
+            AppError::Internal(eyre!("No embeddings found for the specified media items"))
+        })?
+        .to_vec();
+
+    // Perform search using the combined average vector
+    search_by_image(
+        user,
+        pool,
+        text_embedder,
+        vision_embedder,
+        query,
+        VisionQuery::Embedding(avg_embedding),
+        config,
+    )
+    .await
 }
 
 #[allow(clippy::too_many_lines)]
