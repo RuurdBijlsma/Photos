@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { shallowRef, triggerRef } from 'vue'
+import { ref, shallowRef, triggerRef } from 'vue'
 import type {
   FullMediaItem,
   MediaItemAlbumRef,
@@ -11,6 +11,7 @@ import { useSnackbarsStore } from '@/scripts/stores/snackbarStore.ts'
 import type { UpdateMediaItemRequest } from '@/scripts/types/api/mediaItem.ts'
 import albumService from '@/scripts/services/albumService.ts'
 import type { SharedMediaItem } from '@/scripts/types/api/album.ts'
+import { downloadMediaItemById } from '@/scripts/utils.ts'
 
 export const useMediaItemStore = defineStore('mediaItem', () => {
   const snackbarStore = useSnackbarsStore()
@@ -20,6 +21,7 @@ export const useMediaItemStore = defineStore('mediaItem', () => {
   const mediaItemPromises = new Map<string, Promise<AxiosResponse<MediaItemWithAlbums>>>()
   const sharedMediaItems = shallowRef(new Map<string, SharedMediaItem>())
   const sharedMediaItemPromises = new Map<string, Promise<AxiosResponse<SharedMediaItem>>>()
+  const downloadingIds = ref<Set<string>>(new Set())
 
   async function updateMediaItem(mediaItemId: string, itemDetails: UpdateMediaItemRequest) {
     try {
@@ -72,14 +74,36 @@ export const useMediaItemStore = defineStore('mediaItem', () => {
     return mediaItemAlbums.value.get(id)
   }
 
+  async function downloadItem(id: string) {
+    const fullItem = mediaItems.value.get(id)
+    if (downloadingIds.value.has(id)) return
+    downloadingIds.value.add(id)
+    try {
+      await downloadMediaItemById(id, fullItem?.filename)
+    } catch (e) {
+      snackbarStore.error('Could not download item', e)
+    } finally {
+      downloadingIds.value.delete(id)
+    }
+  }
+
+  async function multiDownloadItems(ids: string[]) {
+    for (const id of ids) {
+      downloadItem(id).then()
+    }
+  }
+
   return {
     mediaItems,
     mediaItemAlbums,
     sharedMediaItems,
+    downloadingIds,
 
     fetchSharedMediaItem,
     fetchMediaItem,
     updateMediaItem,
     getAlbumsForMediaItem,
+    downloadItem,
+    multiDownloadItems,
   }
 })
