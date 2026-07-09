@@ -26,7 +26,7 @@ impl Write for ChannelWriter {
         // Bounded channel will block here if the client stream is slow,
         // providing native backpressure [1].
         match self.tx.blocking_send(Ok(bytes)) {
-            Ok(_) => Ok(buf.len()),
+            Ok(()) => Ok(buf.len()),
             Err(_) => Err(IoError::new(
                 ErrorKind::ConnectionAborted,
                 "Zipping aborted: downstream receiver dropped.",
@@ -51,7 +51,7 @@ pub async fn download_zip_stream_handler(
     Extension(user): Extension<User>,
     Query(params): Query<ZipDownloadParams>,
 ) -> Result<impl IntoResponse, AppError> {
-    let ids: Vec<String> = params.ids.split(',').map(|s| s.to_string()).collect();
+    let ids: Vec<String> = params.ids.split(',').map(std::string::ToString::to_string).collect();
     if ids.is_empty() {
         return Err(AppError::BadRequest("No media IDs provided".to_string()));
     }
@@ -59,12 +59,11 @@ pub async fn download_zip_stream_handler(
     // Resolve file names and paths while verifying owner authorization
     let mut files_to_zip = Vec::new();
     for id in &ids {
-        if let Some(item) = MediaItemStore::find_by_id(&context.pool, id).await? {
-            if item.user_id == user.id {
+        if let Some(item) = MediaItemStore::find_by_id(&context.pool, id).await?
+            && item.user_id == user.id {
                 let full_path = context.settings.ingest.media_root.join(&item.relative_path);
                 files_to_zip.push((item.filename, full_path));
             }
-        }
     }
 
     if files_to_zip.is_empty() {
@@ -132,7 +131,7 @@ pub async fn download_zip_stream_handler(
         .header(header::CONTENT_TYPE, "application/zip")
         .header(
             header::CONTENT_DISPOSITION,
-            format!("attachment; filename=\"{}\"", zip_filename),
+            format!("attachment; filename=\"{zip_filename}\""),
         )
         .body(body)
         .map_err(|e| {
