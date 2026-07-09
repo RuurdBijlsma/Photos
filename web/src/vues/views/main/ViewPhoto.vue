@@ -16,6 +16,7 @@ import { useAuthStore } from '@/scripts/stores/authStore.ts'
 import { useTheme } from 'vuetify/framework'
 import { useDownloadStore } from '@/scripts/stores/downloadStore.ts'
 import { useBinStore } from '@/scripts/stores/binStore.ts'
+import { useProfileStore } from '@/scripts/stores/profileStore.ts'
 
 const props = withDefaults(
   defineProps<{
@@ -42,6 +43,7 @@ const viewPhotoStore = useViewPhotoStore()
 const dialogs = useDialogStore()
 const authStore = useAuthStore()
 const binStore = useBinStore()
+const profileStore = useProfileStore()
 
 const showRightButton = ref(false)
 const showLeftButton = ref(false)
@@ -409,6 +411,9 @@ watch(isVideo, () => {
             </template>
             <v-list>
               <v-list-item :to="`/search?mode=similar&ids=${id}`">Find similar images</v-list-item>
+              <v-list-item v-if="id" @click="profileStore.setProfilePic(id)">
+                Set as profile picture
+              </v-list-item>
             </v-list>
           </v-menu>
         </template>
