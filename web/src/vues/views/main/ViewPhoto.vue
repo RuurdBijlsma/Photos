@@ -17,6 +17,7 @@ import { useTheme } from 'vuetify/framework'
 import { useDownloadStore } from '@/scripts/stores/downloadStore.ts'
 import { useBinStore } from '@/scripts/stores/binStore.ts'
 import { useProfileStore } from '@/scripts/stores/profileStore.ts'
+import AddToAlbumCard from '@/vues/components/timeline/timeline-components/AddToAlbumCard.vue'
 
 const props = withDefaults(
   defineProps<{
@@ -53,6 +54,7 @@ const infoMenuOpen = ref(false)
 const optionsOpen = ref(false)
 const isZoomed = ref(false)
 const isPanoActive = ref(false)
+const showAddToAlbum = ref(false)
 
 const HIDE_TIMEOUT = 10
 const showUI = computed(() => hideSeconds.value > 0)
@@ -414,6 +416,19 @@ watch(isVideo, () => {
               <v-list-item v-if="id" @click="profileStore.setProfilePic(id)">
                 Set as profile picture
               </v-list-item>
+              <v-menu
+                v-if="id"
+                v-model="showAddToAlbum"
+                :close-on-content-click="false"
+                location="left"
+                :offset="[10, 94]"
+              >
+                <template v-slot:activator="{ props }">
+                  <v-list-item v-bind="props"> Add to album </v-list-item>
+                </template>
+
+                <add-to-album-card :ids-to-add="[id]" />
+              </v-menu>
             </v-list>
           </v-menu>
         </template>
