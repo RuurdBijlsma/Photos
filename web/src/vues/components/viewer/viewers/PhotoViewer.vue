@@ -489,19 +489,6 @@ function handleWheel(e: WheelEvent) {
   }
 }
 
-function handleDoubleClick(e: MouseEvent) {
-  if (props.disableEventCapture) return
-  if (e.button !== 0) return
-  if (scale.value > 1) {
-    scale.value = 1
-    translateX.value = 0
-    translateY.value = 0
-    setTransforming(false)
-  } else {
-    zoomToPoint(e.clientX, e.clientY, 3)
-  }
-}
-
 useEventListener(containerRef, 'wheel', handleWheel, { passive: false })
 </script>
 
@@ -529,7 +516,6 @@ useEventListener(containerRef, 'wheel', handleWheel, { passive: false })
       @pointermove="handlePointerMove"
       @pointerup="handlePointerUp"
       @pointercancel="handlePointerCancel"
-      @dblclick="handleDoubleClick"
     >
       <div class="image-wrapper" :style="transformStyle">
         <!-- Thumbnail layer at bottom -->
