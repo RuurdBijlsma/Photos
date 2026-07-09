@@ -7,9 +7,8 @@ import { useProfileStore } from '@/scripts/stores/profileStore.ts'
 import { useAuthStore } from '@/scripts/stores/authStore.ts'
 import { useBinStore } from '@/scripts/stores/binStore.ts'
 import { useSystemStore } from '@/scripts/stores/systemStore.ts'
-import { useRouter } from 'vue-router'
 import { computed } from 'vue'
-import { useMediaItemStore } from '@/scripts/stores/timeline/mediaItemStore.ts'
+import { useDownloadStore } from '@/scripts/stores/downloadStore.ts'
 
 withDefaults(
   defineProps<{
@@ -28,7 +27,7 @@ const selectionStore = useSelectionStore()
 const albumStore = useAlbumStore()
 const authStore = useAuthStore()
 const binStore = useBinStore()
-const mediaItemStore = useMediaItemStore()
+const downloadStore = useDownloadStore()
 
 async function setProfilePic() {
   if (selectionStore.selection.size !== 1) return
@@ -100,7 +99,7 @@ const searchSimilarUrl = computed(() => {
             <v-list-item :to="searchSimilarUrl">
               <v-list-item-title>Find similar images</v-list-item-title>
             </v-list-item>
-            <v-list-item @click="mediaItemStore.multiDownloadItems([...selectionStore.selection])">
+            <v-list-item @click="downloadStore.multiDownloadItems([...selectionStore.selection])">
               <v-list-item-title>Download</v-list-item-title>
             </v-list-item>
             <!-- Album specific list items -->

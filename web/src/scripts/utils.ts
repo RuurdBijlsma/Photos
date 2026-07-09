@@ -2,25 +2,20 @@ import { THUMBNAIL_SIZES, VIDEO_SIZES, WEATHER_ICONS } from '@/scripts/constants
 import { useSnackbarsStore } from '@/scripts/stores/snackbarStore.ts'
 import type { Location } from '@/scripts/types/api/fullPhoto.ts'
 import { type RemovableRef, StorageSerializers, useStorage } from '@vueuse/core'
-import mediaItemService from '@/scripts/services/mediaItemService.ts'
+import type { AxiosResponseHeaders, RawAxiosResponseHeaders } from 'axios'
 
-/**
- * Trigger a browser file download from an Axios blob response.
- * Extracts the filename from the Content-Disposition header when available,
- * falling back to the provided `fallbackFilename`.
- */
-export async function downloadMediaItemById(id: string, fallbackFilename?: string) {
-  const response = await mediaItemService.downloadMediaFileById(id)
-  let filename = fallbackFilename
-  const contentDisposition =
-    response.headers?.['content-disposition'] || response.headers?.['Content-Disposition']
+export function filenameFromHeaders(headers?: RawAxiosResponseHeaders | AxiosResponseHeaders) {
+  const contentDisposition = headers?.['content-disposition'] || headers?.['Content-Disposition']
   if (contentDisposition) {
-    const match = contentDisposition.match(/filename\*?=(?:UTF-8'')?['\"]?([^;\r\n\"']+)['\"]?/i)
+    const match = contentDisposition.match(/filename\*?=(?:UTF-8'')?['"]?([^;\r\n"']+)['"]?/i)
     if (match && match[1]) {
-      filename = decodeURIComponent(match[1])
+      return decodeURIComponent(match[1])
     }
   }
-  const url = window.URL.createObjectURL(response.data)
+}
+
+export function downloadBlob(blob: Blob, filename?: string) {
+  const url = window.URL.createObjectURL(blob)
   const link = document.createElement('a')
   link.href = url
   if (filename) link.download = filename
@@ -28,7 +23,6 @@ export async function downloadMediaItemById(id: string, fallbackFilename?: strin
   setTimeout(() => {
     window.URL.revokeObjectURL(url)
   }, 60000)
-  return link
 }
 
 export function prettyBytes(bytes: number, decimals = 2): string {

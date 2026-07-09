@@ -12,7 +12,7 @@ const props = defineProps<{
   isSelecting: boolean // Selection mode indicator
   isDownloading: boolean
   actionLoading: boolean
-  batchDownloading: boolean
+  zipDownloading: boolean
 }>()
 
 const emit = defineEmits(['toggle', 'download', 'delete'])
@@ -106,7 +106,7 @@ const roundedScore = computed(() =>
         <button
           type="button"
           class="action-btn download"
-          :disabled="isDownloading || batchDownloading"
+          :disabled="isDownloading || zipDownloading"
           title="Download original"
           @click="emit('download')"
         >
@@ -116,7 +116,7 @@ const roundedScore = computed(() =>
         <button
           type="button"
           class="action-btn delete"
-          :disabled="isDownloading || actionLoading || batchDownloading"
+          :disabled="isDownloading || actionLoading || zipDownloading"
           title="Move to bin"
           @click="emit('delete')"
         >

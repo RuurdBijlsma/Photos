@@ -14,6 +14,7 @@ import { makeDateTimeString, makeLocationString } from '@/scripts/utils.ts'
 import { useDialogStore } from '@/scripts/stores/dialogStore.ts'
 import { useAuthStore } from '@/scripts/stores/authStore.ts'
 import { useTheme } from 'vuetify/framework'
+import { useDownloadStore } from '@/scripts/stores/downloadStore.ts'
 
 const props = withDefaults(
   defineProps<{
@@ -32,6 +33,7 @@ const route = useRoute()
 const router = useRouter()
 const theme = useTheme()
 const mediaItemStore = useMediaItemStore()
+const downloadStore = useDownloadStore()
 const timelineStore = useTimelineStore()
 const settings = useSettingStore()
 const selectionStore = useSelectionStore()
@@ -354,8 +356,8 @@ watch(isVideo, () => {
           <v-btn
             rounded="xl"
             v-if="id"
-            :loading="mediaItemStore.downloadingIds.has(id)"
-            @click="mediaItemStore.downloadItem(id)"
+            :loading="downloadStore.downloadingIds.has(id)"
+            @click="downloadStore.downloadItem(id)"
             icon="mdi-cloud-download-outline"
             variant="plain"
             v-tooltip="{ text: 'Download', location: 'bottom', attach: true, width: 140 }"

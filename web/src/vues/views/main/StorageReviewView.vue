@@ -13,19 +13,18 @@ import { useBinStore } from '@/scripts/stores/binStore.ts'
 import { useViewPhotoStore } from '@/scripts/stores/timeline/viewPhotoStore.ts'
 import StorageReviewCard from '@/vues/components/ui/StorageReviewCard.vue'
 import { useRefreshFunction } from '@/scripts/composables/useRefreshFunction.ts'
-import { useMediaItemStore } from '@/scripts/stores/timeline/mediaItemStore.ts'
+import { useDownloadStore } from '@/scripts/stores/downloadStore.ts'
 
 const route = useRoute()
 const dialogStore = useDialogStore()
 const snackbarStore = useSnackbarsStore()
 const binStore = useBinStore()
 const viewPhotoStore = useViewPhotoStore()
-const mediaItemStore = useMediaItemStore()
+const downloadStore = useDownloadStore()
 
 const items = ref<StorageReviewItem[]>([])
 const loading = ref(false)
 const actionLoading = ref(false)
-const batchDownloading = ref(false)
 const selected = ref<Set<string>>(new Set())
 const scrollContainer = useTemplateRef('scrollContainer')
 const containerWidth = ref(0)
@@ -111,21 +110,8 @@ async function loadItems() {
 }
 
 async function downloadSelected() {
-  // Evaluated on demand instead of inside an active computed watcher
   const targetItems = items.value.filter((item) => selected.value.has(item.id))
-  if (batchDownloading.value || targetItems.length === 0) return
-  batchDownloading.value = true
-  snackbarStore.enqueue({
-    message: `Preparing ${targetItems.length} download${targetItems.length === 1 ? '' : 's'}`,
-    icon: 'mdi-download-outline',
-  })
-  try {
-    for (const item of targetItems) {
-      await mediaItemStore.downloadItem(item.id)
-    }
-  } finally {
-    batchDownloading.value = false
-  }
+  await downloadStore.multiDownloadItems(targetItems.map((t) => t.id))
 }
 
 async function deleteItems(ids: string[]) {
@@ -194,7 +180,7 @@ useRefreshFunction(() => loadItems())
               rounded="xl"
               class="text-none delete-btn"
               :loading="actionLoading"
-              :disabled="selected.size === 0 || batchDownloading"
+              :disabled="selected.size === 0 || downloadStore.anyDownloading"
               @click="deleteItems([...selected])"
             >
               Delete
@@ -206,8 +192,8 @@ useRefreshFunction(() => loadItems())
               prepend-icon="mdi-download-outline"
               rounded="xl"
               class="text-none stable-btn"
-              :loading="batchDownloading"
-              :disabled="actionLoading || mediaItemStore.downloadingIds.size > 0"
+              :loading="downloadStore.anyDownloading"
+              :disabled="actionLoading || downloadStore.downloadingIds.size > 0"
               @click="downloadSelected"
             >
               Download
@@ -267,11 +253,11 @@ useRefreshFunction(() => loadItems())
               :tile-width="tileWidth"
               :is-selected="selected.has(item.id)"
               :is-selecting="selected.size > 0"
-              :is-downloading="mediaItemStore.downloadingIds.has(item.id)"
+              :is-downloading="downloadStore.downloadingIds.has(item.id)"
               :action-loading="actionLoading"
-              :batch-downloading="batchDownloading"
+              :zip-downloading="downloadStore.zipDownloading"
               @toggle="toggleItem(item.id)"
-              @download="mediaItemStore.downloadItem(item.id)"
+              @download="downloadStore.downloadItem(item.id)"
               @delete="deleteItems([item.id])"
             />
           </div>

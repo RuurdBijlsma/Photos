@@ -75,6 +75,13 @@ const mediaItemService = {
     })
   },
 
+  downloadMediaZip(ids: string[]): Promise<AxiosResponse<Blob>> {
+    return apiClient.get<Blob>('/photos/download/zip', {
+      params: { ids: ids.join(',') },
+      responseType: 'blob',
+    })
+  },
+
   getMotionVideo(id: string | null | undefined): string {
     if (id === null || id === undefined) return ''
     const baseUrl = apiClient.defaults.baseURL
