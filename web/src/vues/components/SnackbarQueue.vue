@@ -139,8 +139,7 @@ const onMouseLeave = (id: string) => store.resumeTimeout(id)
 .snackbar-queue-container {
   position: fixed;
   bottom: 24px;
-  left: 50%;
-  transform: translateX(-50%);
+  right: 60px;
   z-index: 6000;
   pointer-events: none;
   width: 100%;

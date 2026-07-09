@@ -14,7 +14,7 @@ export interface Snack {
   id: string
   message: string
   icon?: string
-  color: 'success' | 'info' | 'warning' | 'error' | 'surface-variant' | string
+  color: 'success' | 'info' | 'warning' | 'error' | 'surface-container-high' | string
   timeout: number
   action?: SnackAction
   error?: Error
@@ -64,7 +64,7 @@ export const useSnackbarsStore = defineStore('snackbars', () => {
     const snack: Snack = {
       id,
       message: options.message,
-      color: options.color || 'surface-variant',
+      color: options.color || 'surface-container-high',
       timeout: options.timeout ?? defaultTimeout,
       action: options.action,
       icon: options.icon,
