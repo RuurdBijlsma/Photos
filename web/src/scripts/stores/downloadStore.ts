@@ -34,9 +34,12 @@ export const useDownloadStore = defineStore('download', () => {
       return
     }
     zipDownloading.value = true
-    snackbarStore.enqueue({
+    const snackId = snackbarStore.enqueue({
       message: `Preparing ZIP download for ${ids.length} items...`,
       icon: 'mdi-zip-box-outline',
+      dismissable: false,
+      loading: true,
+      timeout: 0,
     })
 
     try {
@@ -46,7 +49,14 @@ export const useDownloadStore = defineStore('download', () => {
         filenameFromHeaders(response.headers) ??
         `photos_${new Date().toISOString().slice(0, 10)}.zip`
       downloadBlob(response.data, filename)
+      snackbarStore.update(snackId, {
+        dismissable: true,
+        loading: false,
+        message: 'Zipping complete',
+        timeout: 5000,
+      })
     } catch (e) {
+      snackbarStore.remove(snackId)
       snackbarStore.error('Could not download ZIP archive', e)
     } finally {
       zipDownloading.value = false

@@ -41,11 +41,16 @@ const onMouseLeave = (id: string) => store.resumeTimeout(id)
     >
       <v-alert
         :color="snack.color"
-        :icon="snack.icon || false"
+        :icon="snack.loading ? false : snack.icon || false"
         variant="flat"
         rounded="pill"
         class="snack-alert"
       >
+        <!-- Loading Spinner Prepend -->
+        <template v-if="snack.loading" #prepend>
+          <v-progress-circular indeterminate size="20" width="2" class="mr-2" />
+        </template>
+
         <div class="snack-content-wrapper">
           <div class="snack-message">
             {{ snack.message }}
@@ -70,8 +75,9 @@ const onMouseLeave = (id: string) => store.resumeTimeout(id)
               rounded
               variant="tonal"
             />
-            <!-- Dismiss Button -->
+            <!-- Dismiss Button (hidden if dismissable is false) -->
             <v-btn
+              v-if="snack.dismissable !== false"
               icon="mdi-close"
               variant="text"
               density="comfortable"
@@ -90,7 +96,7 @@ const onMouseLeave = (id: string) => store.resumeTimeout(id)
     <v-card v-if="selectedSnack && selectedSnack.error">
       <v-toolbar color="error" density="compact">
         <v-toolbar-title class="text-subtitle-1">
-          {{ selectedSnack.error || 'Error Details' }}
+          {{ selectedSnack.error.message || 'Error Details' }}
         </v-toolbar-title>
         <v-spacer />
         <v-btn icon="mdi-close" @click="dialog = false" />
@@ -130,10 +136,6 @@ const onMouseLeave = (id: string) => store.resumeTimeout(id)
 </template>
 
 <style scoped>
-/*
-  Container: Fixed at bottom-center.
-  Pointer events none allows clicking through the empty space
-*/
 .snackbar-queue-container {
   position: fixed;
   bottom: 24px;
@@ -145,12 +147,12 @@ const onMouseLeave = (id: string) => store.resumeTimeout(id)
   max-width: 500px;
   padding: 0 16px;
   display: flex;
-  flex-direction: column-reverse; /* Newest notifications stack at the bottom, older ones slide up */
+  flex-direction: column-reverse;
   gap: 8px;
 }
 
 .snack-wrapper {
-  pointer-events: auto; /* Re-enable clicks on the specific alert elements */
+  pointer-events: auto;
   width: 100%;
   transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
 }
@@ -160,12 +162,10 @@ const onMouseLeave = (id: string) => store.resumeTimeout(id)
   border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity)) !important;
 }
 
-/* Ensure Vuetify's layout contents expand horizontally to fill alert */
 .snack-alert :deep(.v-alert__content) {
   width: 100%;
 }
 
-/* Flex layout inside alert message container */
 .snack-content-wrapper {
   display: flex;
   align-items: center;
@@ -188,8 +188,6 @@ const onMouseLeave = (id: string) => store.resumeTimeout(id)
   flex-shrink: 0;
 }
 
-/* --- Transition Animations --- */
-
 .snack-enter-from {
   opacity: 0;
   transform: translateY(30px) scale(0.9);
@@ -200,7 +198,6 @@ const onMouseLeave = (id: string) => store.resumeTimeout(id)
   transform: translateY(-20px) scale(0.9);
 }
 
-/* Absolute position layout rules for the disappearing item so remaining items slide up smoothly */
 .snack-leave-active {
   position: absolute !important;
   left: 16px;
@@ -212,7 +209,6 @@ const onMouseLeave = (id: string) => store.resumeTimeout(id)
   transition: transform 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
 }
 
-/* Error Dialog Stack Trace styles */
 .stack-trace {
   font-family: monospace;
   white-space: pre-wrap;
