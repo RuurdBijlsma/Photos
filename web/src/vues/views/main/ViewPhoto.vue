@@ -14,6 +14,8 @@ import { makeDateTimeString, makeLocationString } from '@/scripts/utils.ts'
 import { useDialogStore } from '@/scripts/stores/dialogStore.ts'
 import { useAuthStore } from '@/scripts/stores/authStore.ts'
 import { useTheme } from 'vuetify/framework'
+import { useSnackbarsStore } from '@/scripts/stores/snackbarStore.ts'
+import mediaItemService from '@/scripts/services/mediaItemService.ts'
 
 const props = withDefaults(
   defineProps<{
@@ -38,6 +40,7 @@ const selectionStore = useSelectionStore()
 const viewPhotoStore = useViewPhotoStore()
 const dialogs = useDialogStore()
 const authStore = useAuthStore()
+const snackbarStore = useSnackbarsStore()
 
 const showRightButton = ref(false)
 const showLeftButton = ref(false)
@@ -47,6 +50,7 @@ const infoMenuOpen = ref(false)
 const optionsOpen = ref(false)
 const isZoomed = ref(false)
 const isPanoActive = ref(false)
+const downloading = ref(false)
 
 const showUI = computed(() => hideSeconds.value > 0)
 const hideTimer = setInterval(() => {
@@ -145,6 +149,33 @@ async function initialize() {
   }
   if (id.value !== loadingId) return
   console.log('FULL MEDIA ITEM', fullImage.value)
+}
+
+async function downloadCurrentItem() {
+  if (!id.value || downloading.value) return
+  downloading.value = true
+  try {
+    const response = await mediaItemService.downloadMediaFileById(id.value)
+    let filename = fullImage.value?.filename ?? 'download'
+    const contentDisposition =
+      response.headers?.['content-disposition'] || response.headers?.['Content-Disposition']
+    if (contentDisposition) {
+      const match = contentDisposition.match(/filename\*?=(?:UTF-8'')?['"]?([^;\r\n"']+)['"]?/i)
+      if (match && match[1]) {
+        filename = decodeURIComponent(match[1])
+      }
+    }
+    const url = window.URL.createObjectURL(response.data)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = filename
+    link.click()
+    window.URL.revokeObjectURL(url)
+  } catch (e) {
+    snackbarStore.error('Could not download item', e)
+  } finally {
+    downloading.value = false
+  }
 }
 
 function toggleSelected() {
@@ -353,6 +384,8 @@ watch(isVideo, () => {
           />
           <v-btn
             rounded="xl"
+            :loading="downloading"
+            @click="downloadCurrentItem"
             icon="mdi-cloud-download-outline"
             variant="plain"
             v-tooltip="{ text: 'Download', location: 'bottom', attach: true, width: 140 }"
