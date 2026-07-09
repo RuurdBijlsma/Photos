@@ -50,19 +50,25 @@ const optionsOpen = ref(false)
 const isZoomed = ref(false)
 const isPanoActive = ref(false)
 
+const HIDE_TIMEOUT = 10
 const showUI = computed(() => hideSeconds.value > 0)
 const hideTimer = setInterval(() => {
   hideSeconds.value--
   if (infoMenuOpen.value || optionsOpen.value) {
-    hideSeconds.value = 10
+    hideSeconds.value = HIDE_TIMEOUT
   }
 }, 1000)
 
 useEventListener(document, 'mousemove', () => {
-  hideSeconds.value = 10
+  hideSeconds.value = HIDE_TIMEOUT
 })
 useEventListener(document, 'click', () => {
-  hideSeconds.value = 10
+  hideSeconds.value = HIDE_TIMEOUT
+})
+useEventListener(document, 'mouseleave', () => {
+  if (!infoMenuOpen.value && !optionsOpen.value) {
+    hideSeconds.value = 0
+  }
 })
 
 const id = computed(() => {

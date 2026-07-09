@@ -413,6 +413,10 @@ function handleKeyDown(e: KeyboardEvent) {
         stepFrame(1)
       }
       break
+    case 'f11':
+      e.preventDefault()
+      toggleFullscreen()
+      break
   }
 }
 

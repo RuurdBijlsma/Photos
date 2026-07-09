@@ -73,7 +73,7 @@ const avoidSnackbarBottom = computed(() => {
         icon="mdi-close"
         variant="plain"
         density="compact"
-        v-tooltip:top="'Deselect all'"
+        v-tooltip:top="'Deselect'"
         @click="selectionStore.deselectAll"
       />
       <v-btn
