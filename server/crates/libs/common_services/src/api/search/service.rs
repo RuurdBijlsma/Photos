@@ -92,7 +92,7 @@ pub async fn search_by_media_items(
     .await
 }
 
-#[allow(clippy::too_many_lines)]
+#[allow(clippy::too_many_lines, clippy::too_many_arguments)]
 pub async fn search_by_image(
     user: &User,
     pool: &PgPool,
