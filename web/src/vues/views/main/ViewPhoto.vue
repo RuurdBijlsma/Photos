@@ -15,6 +15,7 @@ import { useDialogStore } from '@/scripts/stores/dialogStore.ts'
 import { useAuthStore } from '@/scripts/stores/authStore.ts'
 import { useTheme } from 'vuetify/framework'
 import { useDownloadStore } from '@/scripts/stores/downloadStore.ts'
+import { useBinStore } from '@/scripts/stores/binStore.ts'
 
 const props = withDefaults(
   defineProps<{
@@ -40,6 +41,7 @@ const selectionStore = useSelectionStore()
 const viewPhotoStore = useViewPhotoStore()
 const dialogs = useDialogStore()
 const authStore = useAuthStore()
+const binStore = useBinStore()
 
 const showRightButton = ref(false)
 const showLeftButton = ref(false)
@@ -182,6 +184,30 @@ function prefetchMediaItem(mediaItemId: string) {
   } else if (albumId.value) {
     mediaItemStore.fetchSharedMediaItem(albumId.value, mediaItemId)
   }
+}
+
+async function moveToBin() {
+  const onDeleteMoveToId = nextId.value ?? prevId.value
+
+  const binId = id.value
+  if (!binId) return
+  await binStore.softDeleteItems([binId])
+  if (onDeleteMoveToId) {
+    await router.replace({
+      path: `${viewPhotoStore.viewLink}${onDeleteMoveToId}`,
+      query: route.query,
+    })
+  } else {
+    await router.push(parentLocation.value)
+  }
+}
+
+function goNext() {
+  router.replace({ path: `${viewPhotoStore.viewLink}${nextId.value}`, query: route.query })
+}
+
+function goPrev() {
+  router.replace({ path: `${viewPhotoStore.viewLink}${prevId.value}`, query: route.query })
 }
 
 onBeforeUnmount(() => clearInterval(hideTimer))
@@ -372,6 +398,9 @@ watch(isVideo, () => {
             rounded="xl"
             icon="mdi-trash-can-outline"
             variant="plain"
+            v-if="id"
+            @click="moveToBin()"
+            :loading="binStore.softDeleteLoading"
             v-tooltip="{ text: 'Move to bin', location: 'bottom', attach: true, width: 140 }"
           />
           <v-menu v-model="optionsOpen">
@@ -389,7 +418,7 @@ watch(isVideo, () => {
       v-if="prevId !== null"
       class="prev-area"
       :class="{ 'zoomed-nav': isZoomed || isPanoActive }"
-      @click="router.replace({ path: `${viewPhotoStore.viewLink}${prevId}`, query: route.query })"
+      @click="goPrev()"
       @mouseenter="showLeftButton = true"
       @mouseleave="showLeftButton = false"
     >
@@ -406,7 +435,7 @@ watch(isVideo, () => {
       v-if="nextId !== null"
       class="next-area"
       :class="{ 'zoomed-nav': isZoomed || isPanoActive }"
-      @click="router.replace({ path: `${viewPhotoStore.viewLink}${nextId}`, query: route.query })"
+      @click="goNext()"
       @mouseenter="showRightButton = true"
       @mouseleave="showRightButton = false"
     >

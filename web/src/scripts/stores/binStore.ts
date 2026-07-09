@@ -52,10 +52,8 @@ export const useBinStore = defineStore('bin', () => {
         message: `${ids.length} item${ids.length === 1 ? '' : 's'} moved to bin`,
         icon: 'mdi-delete',
         action: {
-          label: 'Bin',
-          onClick: () => {
-            router.push({ path: '/bin' })
-          },
+          label: 'Undo',
+          onClick: () => restoreItems(ids),
         },
       })
       callForRefresh()
