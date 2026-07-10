@@ -1,31 +1,22 @@
 import type { AxiosResponse } from 'axios'
 import apiClient from './api.ts'
-import type {
-  Tokens,
-  User,
-  LoginUser,
-  CreateUser,
-  RefreshTokenPayload,
-  UserInvite,
-} from '@/scripts/types/api/auth.ts'
+import type { User, LoginUser, CreateUser, UserInvite } from '@/scripts/types/api/auth.ts'
 
-// This service is a collection of functions that map to your /auth endpoints
 const authService = {
-  // We use generics to tell Axios what `response.data` will look like
   register(data: CreateUser): Promise<AxiosResponse<User>> {
     return apiClient.post<User>('/auth/register', data)
   },
 
-  login(data: LoginUser): Promise<AxiosResponse<Tokens>> {
-    return apiClient.post<Tokens>('/auth/login', data)
+  login(data: LoginUser): Promise<AxiosResponse<void>> {
+    return apiClient.post<void>('/auth/login', data)
   },
 
-  logout(data: RefreshTokenPayload): Promise<AxiosResponse<void>> {
-    return apiClient.post<void>('/auth/logout', data)
+  logout(): Promise<AxiosResponse<void>> {
+    return apiClient.post<void>('/auth/logout')
   },
 
-  refreshSession(data: RefreshTokenPayload): Promise<AxiosResponse<Tokens>> {
-    return apiClient.post<Tokens>('/auth/refresh', data)
+  refreshSession(): Promise<AxiosResponse<void>> {
+    return apiClient.post<void>('/auth/refresh')
   },
 
   getMe(): Promise<AxiosResponse<User>> {

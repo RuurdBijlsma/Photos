@@ -116,6 +116,7 @@ pub struct ApiSettings {
     pub port: u32,
     pub allowed_origins: Vec<String>,
     pub public_url: String,
+    pub cookie_secure: bool,
     pub rate_limiting: RateLimitingSettings,
 }
 

@@ -1,5 +1,5 @@
 use crate::api_state::ApiContext;
-use crate::auth::middlewares::common::{decode_token, extract_context, extract_token};
+use crate::auth::middlewares::common::{decode_token, extract_context, extract_access_token};
 use axum::{
     extract::{FromRequestParts, State},
     http::request::Parts,
@@ -19,7 +19,7 @@ where
     type Rejection = AuthError;
 
     async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
-        let token = extract_token(parts)?;
+        let token = extract_access_token(parts)?;
         let context = extract_context(parts, state).await?;
         let claims = decode_token(&token, &context.settings.secrets.jwt)?;
         let user = UserStore::find_by_id(&context.pool, claims.sub)

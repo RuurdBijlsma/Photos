@@ -1,6 +1,5 @@
 use crate::api_state::ApiContext;
-use crate::timeline::websocket::handle_timeline_socket;
-use axum::extract::{Query, State, WebSocketUpgrade};
+use axum::extract::{Query, State};
 use axum::{Extension, Json};
 use axum_extra::protobuf::Protobuf;
 use chrono::NaiveDate;
@@ -65,16 +64,4 @@ pub async fn get_photos_by_month_handler(
 
     let photos = get_photos_by_month(&user, &context.pool, &month_ids, params.sort).await?;
     Ok(Protobuf(photos))
-}
-
-/// Real-time timeline updates via WebSocket.
-///
-/// Requires `Sec-WebSocket-Protocol: access_token, <YOUR_JWT>` header.
-pub async fn timeline_websocket_handler(
-    ws: WebSocketUpgrade,
-    State(context): State<ApiContext>,
-    Extension(user): Extension<User>,
-) -> axum::response::Response {
-    ws.protocols(["access_token"])
-        .on_upgrade(move |socket| handle_timeline_socket(socket, context, user))
 }

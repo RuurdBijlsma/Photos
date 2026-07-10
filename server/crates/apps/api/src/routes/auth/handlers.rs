@@ -1,12 +1,11 @@
 //! This module defines the HTTP handlers for authentication-related routes.
 
 use crate::api_state::ApiContext;
+use axum::response::{IntoResponse, Response};
 use axum::{Extension, Json, extract::State, http::StatusCode};
 
 use common_services::api::app_error::AppError;
-use common_services::api::auth::interfaces::{
-    CreateUser, GenerateInvitePayload, LoginUser, RefreshTokenPayload, Tokens,
-};
+use common_services::api::auth::interfaces::{CreateUser, GenerateInvitePayload, LoginUser};
 use common_services::api::auth::service::{
     authenticate_user, create_access_token, create_user, generate_invite, logout_user,
     refresh_tokens, store_refresh_token,
@@ -15,36 +14,60 @@ use common_services::api::auth::token::generate_refresh_token_parts;
 use common_services::database::app_user::{User, UserInvite};
 use tracing::instrument;
 
-/// Handles user login and returns a new set of tokens.
-///
-/// # Errors
-///
-/// Returns `AppError` if the user credentials are invalid or if there's a
-/// problem creating or storing the tokens.
+/// Formats standard `HttpOnly` cookie properties consistently.
+#[must_use]
+pub fn make_cookie(name: &str, value: &str, max_age_secs: Option<i64>, secure: bool) -> String {
+    let mut cookie = format!("{name}={value}; HttpOnly; Path=/; SameSite=Lax");
+    if secure {
+        cookie.push_str("; Secure");
+    }
+    if let Some(max_age) = max_age_secs {
+        cookie.push_str(&format!("; Max-Age={max_age}"));
+    }
+    cookie
+}
+
+/// Handles user login and returns secure HTTP-only cookies.
 #[instrument(skip(context, payload), err(Debug))]
 pub async fn login(
     State(context): State<ApiContext>,
     Json(payload): Json<LoginUser>,
-) -> Result<Json<Tokens>, AppError> {
+) -> Result<Response, AppError> {
     let user = authenticate_user(&context.pool, &payload.email, &payload.password).await?;
-    let (access_token, expiry) =
+    let (access_token, _expiry) =
         create_access_token(&context.settings.secrets.jwt, user.id, user.role)?;
     let token_parts = generate_refresh_token_parts()?;
     store_refresh_token(&context.pool, user.id, &token_parts).await?;
 
-    Ok(Json(Tokens {
-        expiry,
-        access_token,
-        refresh_token: token_parts.raw_token,
-    }))
+    let secure = context.settings.api.cookie_secure;
+    let access_exp = app_state::constants().auth.access_token_expiry_minutes * 60;
+    let refresh_exp = app_state::constants().auth.refresh_token_expiry_days * 24 * 3600;
+
+    let access_cookie = make_cookie("access_token", &access_token, Some(access_exp), secure);
+    let refresh_cookie = make_cookie(
+        "refresh_token",
+        &token_parts.raw_token,
+        Some(refresh_exp),
+        secure,
+    );
+
+    let mut response = StatusCode::OK.into_response();
+    let headers = response.headers_mut();
+    headers.append(
+        http::header::SET_COOKIE,
+        http::HeaderValue::from_str(&access_cookie)
+            .map_err(|_| AppError::Unauthorized("Access cookie missing".to_owned()))?,
+    );
+    headers.append(
+        http::header::SET_COOKIE,
+        http::HeaderValue::from_str(&refresh_cookie)
+            .map_err(|_| AppError::Unauthorized("Access cookie missing".to_owned()))?,
+    );
+
+    Ok(response)
 }
 
 /// Handles the registration of a new user.
-///
-/// # Errors
-///
-/// Returns `AppError` if a user with the provided email already exists or
-/// if a database error occurs during user creation.
 #[instrument(skip(context, payload), err(Debug))]
 pub async fn register(
     State(context): State<ApiContext>,
@@ -54,41 +77,84 @@ pub async fn register(
     Ok(Json(user))
 }
 
-/// Handles refreshing the session using a valid refresh token.
-///
-/// # Errors
-///
-/// Returns `AppError` if the refresh token is invalid, expired, or not found in the database.
-#[instrument(skip(context, payload), err(Debug))]
+/// Handles refreshing the session using a valid refresh token cookie.
+#[instrument(skip(context, parts), err(Debug))]
 pub async fn refresh_session(
     State(context): State<ApiContext>,
-    Json(payload): Json<RefreshTokenPayload>,
-) -> Result<Json<Tokens>, AppError> {
-    refresh_tokens(
-        &context.pool,
-        &context.settings.secrets.jwt,
-        &payload.refresh_token,
-    )
-    .await
+    parts: http::request::Parts,
+) -> Result<Response, AppError> {
+    let refresh_token =
+        crate::auth::middlewares::common::extract_cookie_value(&parts, "refresh_token")
+            .ok_or_else(|| AppError::Unauthorized("Refresh token missing".to_owned()))?;
+
+    let tokens =
+        refresh_tokens(&context.pool, &context.settings.secrets.jwt, &refresh_token).await?;
+
+    let secure = context.settings.api.cookie_secure;
+    let access_exp = app_state::constants().auth.access_token_expiry_minutes * 60;
+    let refresh_exp = app_state::constants().auth.refresh_token_expiry_days * 24 * 3600;
+
+    let access_cookie = make_cookie(
+        "access_token",
+        &tokens.access_token,
+        Some(access_exp),
+        secure,
+    );
+    let refresh_cookie = make_cookie(
+        "refresh_token",
+        &tokens.refresh_token,
+        Some(refresh_exp),
+        secure,
+    );
+
+    let mut response = StatusCode::OK.into_response();
+    let headers = response.headers_mut();
+    headers.append(
+        http::header::SET_COOKIE,
+        http::HeaderValue::from_str(&access_cookie)
+            .map_err(|_| AppError::Unauthorized("Access cookie missing".to_owned()))?,
+    );
+    headers.append(
+        http::header::SET_COOKIE,
+        http::HeaderValue::from_str(&refresh_cookie)
+            .map_err(|_| AppError::Unauthorized("Access cookie missing".to_owned()))?,
+    );
+
+    Ok(response)
 }
 
-/// Handles user logout by invalidating the provided refresh token.
-///
-/// # Errors
-///
-/// Returns `AppError` if the refresh token is invalid or could not be found.
+/// Handles user logout by invalidating the refresh token and clearing cookies.
 pub async fn logout(
     State(context): State<ApiContext>,
-    Json(payload): Json<RefreshTokenPayload>,
-) -> Result<StatusCode, AppError> {
-    logout_user(&context.pool, &payload.refresh_token).await
+    parts: http::request::Parts,
+) -> Result<Response, AppError> {
+    if let Some(refresh_token) =
+        crate::auth::middlewares::common::extract_cookie_value(&parts, "refresh_token")
+    {
+        let _ = logout_user(&context.pool, &refresh_token).await;
+    }
+
+    let secure = context.settings.api.cookie_secure;
+    let access_cookie = make_cookie("access_token", "", Some(0), secure);
+    let refresh_cookie = make_cookie("refresh_token", "", Some(0), secure);
+
+    let mut response = StatusCode::NO_CONTENT.into_response();
+    let headers = response.headers_mut();
+    headers.append(
+        http::header::SET_COOKIE,
+        http::HeaderValue::from_str(&access_cookie)
+            .map_err(|_| AppError::Unauthorized("Access cookie missing".to_owned()))?,
+    );
+    headers.append(
+        http::header::SET_COOKIE,
+        http::HeaderValue::from_str(&refresh_cookie)
+            .map_err(|_| AppError::Unauthorized("Refresh cookie missing".to_owned()))?,
+    );
+
+    Ok(response)
 }
 
 /// Get current user info.
-///
-/// # Errors
-///
-/// Returns `AppError` if the refresh token is invalid or could not be found.
 pub async fn get_me(Extension(user): Extension<User>) -> Result<Json<User>, StatusCode> {
     Ok(Json(user))
 }

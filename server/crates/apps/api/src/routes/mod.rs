@@ -25,7 +25,6 @@ use crate::api_state::ApiContext;
 use crate::auth::middlewares::optional_user::OptionalUser;
 use crate::auth::middlewares::require_role::require_role;
 use crate::auth::middlewares::user::ApiUser;
-use crate::auth::middlewares::websocket::WsUser;
 use crate::auth::router::{auth_admin_routes, auth_protected_router, auth_public_router};
 use crate::camera::router::camera_protected_router;
 use crate::daily_cards::router::daily_cards_protected_router;
@@ -37,7 +36,7 @@ use crate::search::router::search_protected_router;
 use crate::storage::router::storage_protected_router;
 use crate::system::router::system_protected_router;
 use crate::theme::router::theme_protected_router;
-use crate::timeline::router::{timeline_protected_router, timeline_websocket_router};
+use crate::timeline::router::{timeline_protected_router};
 use crate::trash::router::trash_protected_router;
 use app_state::RateLimitingSettings;
 use axum::Router;
@@ -48,7 +47,6 @@ use common_services::database::app_user::UserRole;
 pub fn create_router(api_state: ApiContext) -> Router {
     Router::new()
         .merge(public_routes(&api_state.settings.api.rate_limiting))
-        .merge(websocket_routes(api_state.clone()))
         .merge(protected_routes(api_state.clone()))
         .merge(auth_optional_routes(api_state.clone()))
         .merge(admin_routes(api_state.clone()))
@@ -62,13 +60,6 @@ fn public_routes(rate_limiting: &RateLimitingSettings) -> Router<ApiContext> {
         .merge(s2s_public_router())
         .merge(people_public_router())
         .merge(photos_public_router())
-}
-
-// New WebSocket Route Group
-fn websocket_routes(api_state: ApiContext) -> Router<ApiContext> {
-    Router::new()
-        .merge(timeline_websocket_router())
-        .route_layer(from_extractor_with_state::<WsUser, ApiContext>(api_state))
 }
 
 fn auth_optional_routes(api_state: ApiContext) -> Router<ApiContext> {

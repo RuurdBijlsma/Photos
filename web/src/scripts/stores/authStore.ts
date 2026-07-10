@@ -1,10 +1,10 @@
 import { computed, ref, type Ref, watch } from 'vue'
 import { defineStore } from 'pinia'
 import authService from '@/scripts/services/authService.ts'
-import type { CreateUser, LoginUser, Tokens, User } from '@/scripts/types/api/auth.ts'
+import type { CreateUser, LoginUser, User } from '@/scripts/types/api/auth.ts'
 import { useRouter } from 'vue-router'
 import { useSystemStore } from '@/scripts/stores/systemStore.ts'
-import { useIntervalFn, useStorage } from '@vueuse/core'
+import { useIntervalFn } from '@vueuse/core'
 import { useObjStorage } from '@/scripts/utils.ts'
 
 type AuthStatus = 'idle' | 'loading' | 'error' | 'success'
@@ -14,52 +14,24 @@ export const useAuthStore = defineStore('auth', () => {
 
   // --- STATE ---
   const user = useObjStorage<User | null>('authUser', null)
-  const accessToken = useStorage<string | null>('accessToken', null)
-  const refreshToken = useStorage<string | null>('refreshToken', null)
-  const expiry = useStorage<number | null>('expiry', null)
   const status: Ref<AuthStatus> = ref('idle')
   const router = useRouter()
 
   // --- GETTERS ---
-  const isAuthenticated = computed(() => !!accessToken.value && !!user.value)
+  const isAuthenticated = computed(() => !!user.value)
   const isAdmin = computed(() => user.value?.role === 'admin')
 
   // --- ACTIONS ---
 
   /**
-   * Internal helper to manage token state and persistence.
-   */
-  function setTokens(newAccessToken: string, newRefreshToken: string, newExpiry: number) {
-    accessToken.value = newAccessToken
-    refreshToken.value = newRefreshToken
-    expiry.value = newExpiry
-  }
-
-  /**
-   * Refreshes the access token using the refresh token.
-   * If successful, it updates the tokens in the store and returns them.
+   * Refreshes the access token using the HttpOnly refresh token cookie.
    * If it fails, it will trigger a logout and throw an error.
    */
-  async function refreshTokens(): Promise<Tokens> {
-    if (!refreshToken.value) {
-      console.warn('[no refresh token available] call logout()')
-      await logout(false)
-      throw new Error('No refresh token available.')
-    }
+  async function refreshTokens(): Promise<void> {
     try {
-      const response = await authService.refreshSession({ refreshToken: refreshToken.value })
-      const {
-        accessToken: newAccessToken,
-        refreshToken: newRefreshToken,
-        expiry: newExpiry,
-      } = response.data
-      setTokens(newAccessToken, newRefreshToken, newExpiry)
-
+      await authService.refreshSession()
       requestIdleCallback(fetchCurrentUser)
-
-      return response.data
     } catch (error) {
-      // If refresh fails, log the user out completely
       console.warn('[refresh errored] call logout()', error)
       await logout()
       throw error
@@ -77,7 +49,7 @@ export const useAuthStore = defineStore('auth', () => {
   )
 
   watch(
-    () => isAuthenticated,
+    () => isAuthenticated.value,
     (val) => {
       if (val) {
         resumeFetchingStats()
@@ -90,26 +62,23 @@ export const useAuthStore = defineStore('auth', () => {
   async function onAuthenticated() {
     await systemStore.fetchStats()
     resumeFetchingStats()
-    // Configured background polling via useIntervalFn
   }
 
   /**
-   * Fetches the current user's data using the access token.
+   * Fetches the current user's data using the access token cookie.
    */
   async function fetchCurrentUser() {
-    if (!accessToken.value) return
     const response = await authService.getMe()
     user.value = response.data
   }
 
   /**
-   * Logs the user in, fetches tokens, and gets user data.
+   * Logs the user in, sets state, and gets user data.
    */
   async function login(credentials: LoginUser) {
     status.value = 'loading'
     try {
-      const response = await authService.login(credentials)
-      setTokens(response.data.accessToken, response.data.refreshToken, response.data.expiry)
+      await authService.login(credentials)
       await fetchCurrentUser()
       status.value = 'success'
     } catch (error) {
@@ -140,19 +109,14 @@ export const useAuthStore = defineStore('auth', () => {
    * Logs the user out, clears all auth state, and redirects.
    */
   async function logout(redirect = true) {
-    if (refreshToken.value) {
-      try {
-        await authService.logout({ refreshToken: refreshToken.value })
-      } catch (err) {
-        console.warn('Logout API call failed, but logging out client-side anyway.', err)
-      }
+    try {
+      await authService.logout()
+    } catch (err) {
+      console.warn('Logout API call failed, but logging out client-side anyway.', err)
     }
 
     // Reset all state
     user.value = null
-    accessToken.value = null
-    refreshToken.value = null
-    expiry.value = null
     localStorage.removeItem('dailyCardsByDate')
     localStorage.removeItem('dailyCompletedCards')
 
@@ -171,8 +135,6 @@ export const useAuthStore = defineStore('auth', () => {
   // --- RETURN ---
   return {
     user,
-    accessToken,
-    refreshToken,
     status,
     isAuthenticated,
     isAdmin,

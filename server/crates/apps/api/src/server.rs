@@ -9,13 +9,12 @@
 )]
 use crate::api_state::ApiContext;
 use crate::create_router;
-use crate::timeline::websocket::create_media_item_transmitter;
 use app_state::AppSettings;
 use app_state::constants::HOSTED_FOLDER;
 use axum::routing::get_service;
 use color_eyre::Result;
 use common_services::s2s_client::S2SClient;
-use http::{HeaderValue, header};
+use http::{HeaderValue, Method, header};
 use open_clip_inference::{TextEmbedder, VisionEmbedder};
 use reqwest::Client;
 use sqlx::PgPool;
@@ -24,7 +23,6 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use tasks::task_runner::init_task_scheduler;
 use tower_http::compression::CompressionLayer;
-use tower_http::cors;
 use tower_http::cors::CorsLayer;
 use tower_http::sensitive_headers::SetSensitiveRequestHeadersLayer;
 use tower_http::services::ServeDir;
@@ -51,7 +49,6 @@ pub async fn serve(pool: PgPool, settings: AppSettings, run_task_scheduler: bool
         pool: pool.clone(),
         s2s_client: S2SClient::new(Client::new()),
         settings: settings.clone(),
-        timeline_broadcaster: create_media_item_transmitter(&pool)?,
         text_embedder: Arc::new(text_embedder),
         vision_embedder: Arc::new(vision_embedder),
     };
@@ -72,8 +69,16 @@ pub async fn serve(pool: PgPool, settings: AppSettings, run_task_scheduler: bool
 
     let cors = CorsLayer::new()
         .expose_headers([header::CONTENT_DISPOSITION])
-        .allow_methods(cors::Any)
+        .allow_methods([
+            Method::GET,
+            Method::POST,
+            Method::PUT,
+            Method::DELETE,
+            Method::PATCH,
+            Method::OPTIONS,
+        ])
         .allow_origin(allowed_origins)
+        .allow_credentials(true)
         .allow_headers([
             header::AUTHORIZATION,
             header::CONTENT_TYPE,
