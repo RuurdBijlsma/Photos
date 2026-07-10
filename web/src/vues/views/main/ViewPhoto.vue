@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useRoute, useRouter } from 'vue-router'
-import { computed, onBeforeUnmount, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useSettingStore } from '@/scripts/stores/settingsStore.ts'
 import { useMediaItemStore } from '@/scripts/stores/timeline/mediaItemStore.ts'
 import { useSelectionStore } from '@/scripts/stores/timeline/selectionStore.ts'
@@ -9,7 +9,12 @@ import MediaViewer from '@/vues/components/viewer/MediaViewer.vue'
 import { TimelineItem } from '@/scripts/types/generated/timeline.ts'
 import { useTimelineStore } from '@/scripts/stores/timeline/timelineStore.ts'
 import MediaInfoPanel from '@/vues/components/viewer/components/MediaInfoPanel.vue'
-import { copyToClipboard, makeDateTimeString, makeLocationString } from '@/scripts/utils.ts'
+import {
+  copyToClipboard,
+  isMobileDevice,
+  makeDateTimeString,
+  makeLocationString,
+} from '@/scripts/utils.ts'
 import { useDialogStore } from '@/scripts/stores/dialogStore.ts'
 import { useAuthStore } from '@/scripts/stores/authStore.ts'
 import { useTheme } from 'vuetify/framework'
@@ -18,6 +23,7 @@ import { useBinStore } from '@/scripts/stores/binStore.ts'
 import { useProfileStore } from '@/scripts/stores/profileStore.ts'
 import AddToAlbumCard from '@/vues/components/timeline/timeline-components/AddToAlbumCard.vue'
 import { useUiHider } from '@/scripts/composables/useUiHider.ts'
+import { navigatorShare } from '@/scripts/sharing.ts'
 
 const props = withDefaults(
   defineProps<{
@@ -54,6 +60,7 @@ const optionsOpen = ref(false)
 const isZoomed = ref(false)
 const isPanoActive = ref(false)
 const showAddToAlbum = ref(false)
+const isSharing = ref(false)
 
 const { showUI } = useUiHider(10, () => {
   return infoMenuOpen.value || optionsOpen.value
@@ -188,9 +195,20 @@ async function moveToBin() {
   }
 }
 
-function copyShareUrl() {
-  const shareUrl = `${window.location.origin}/share/${isVideo.value ? 'v' : 'p'}/${id.value}`
-  copyToClipboard(shareUrl)
+function shareMedia() {
+  const idShare = id.value
+  if (!idShare) return
+  if (isMobileDevice())
+    navigatorShare(
+      idShare,
+      isVideo.value,
+      fullImage.value?.has_thumbnails,
+      fullImage.value?.filename,
+    )
+  else {
+    const shareUrl = `${window.location.origin}/share/${isVideo.value ? 'v' : 'p'}/${id.value}`
+    copyToClipboard(shareUrl)
+  }
 }
 
 function goNext() {
@@ -365,7 +383,8 @@ watch(isVideo, () => {
         <template v-if="authStore.isAuthenticated">
           <v-btn
             rounded="xl"
-            @click="copyShareUrl"
+            @click="shareMedia"
+            :loading="isSharing"
             icon="mdi-share-variant-outline"
             variant="plain"
             v-tooltip="{ text: 'Share', location: 'bottom', attach: true, width: 140 }"

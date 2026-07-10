@@ -87,6 +87,13 @@ export const stringToColor = (
   return `hsl(${hue}, ${saturation}%, ${lightness}%)`
 }
 
+export function isMobileDevice(): boolean {
+  if (typeof navigator === 'undefined') {
+    return false
+  }
+  return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)
+}
+
 export async function copyToClipboard(text: string) {
   const snackbarStore = useSnackbarsStore()
   try {

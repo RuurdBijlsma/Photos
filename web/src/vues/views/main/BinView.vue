@@ -7,6 +7,8 @@ import { useRefreshFunction } from '@/scripts/composables/useRefreshFunction'
 const binStore = useBinStore()
 const systemStore = useSystemStore()
 
+// todo: videos zijn stuk hier want isVideo detectie in de ViewPhoto hier werkt niet
+
 async function emptyBin() {
   const ids = binStore.binItems.map((item) => item.id)
   if (ids.length === 0) return
