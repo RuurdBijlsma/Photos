@@ -79,10 +79,10 @@ const sourceHeight = computed(() => {
 
 // Quality State (Persisted with useStorage)
 const defaultQuality = getVideoHeight(screen.height)
-const savedQuality = useObjStorage<number | string>('video-player-quality', defaultQuality)
+const savedQuality = useObjStorage<number | 'source'>('video-player-quality', defaultQuality)
 const sortedVideoSizes = [...VIDEO_SIZES].sort((a, b) => b - a)
 
-const currentQuality = computed<number | string>({
+const currentQuality = computed<number | 'source'>({
   get() {
     const saved = savedQuality.value
     if (!fullImage.value) {
@@ -99,7 +99,7 @@ const currentQuality = computed<number | string>({
     if (VIDEO_SIZES.includes(numQuality)) return numQuality
     return defaultQuality
   },
-  set(val: number | string) {
+  set(val: number | 'source') {
     savedQuality.value = val
   },
 })
@@ -117,7 +117,7 @@ const videoUrl = computed(() => {
 const timeToRestore = ref<number | null>(null)
 const isPlayingOnQualityChange = ref<boolean | null>(null)
 
-function onQualitySelect(size: number | string) {
+function onQualitySelect(size: number | 'source') {
   if (videoRef.value) {
     timeToRestore.value = videoRef.value.currentTime
     isPlayingOnQualityChange.value = !videoRef.value.paused
@@ -438,7 +438,7 @@ useEventListener(window, 'keydown', handleKeyDown)
       class="video-element"
       :src="videoUrl"
       :muted="isMuted"
-      crossorigin="use-credentials"
+      :crossorigin="currentQuality === 'source' ? 'use-credentials' : undefined"
       loop
       playsinline
       @loadedmetadata="onLoadedMetadata"
