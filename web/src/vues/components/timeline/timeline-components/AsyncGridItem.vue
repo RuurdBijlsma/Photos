@@ -102,6 +102,7 @@ function selectItem(e: PointerEvent) {
         playsinline
         :width="width"
         :height="height"
+        :crossorigin="mediaItem?.hasThumbnails ? undefined : 'use-credentials'"
         :src="mediaItemService.getVideo(id, 480, !mediaItem?.hasThumbnails)"
       />
 

@@ -6,6 +6,7 @@ import mediaItemService from '@/scripts/services/mediaItemService.ts'
 import { VIDEO_SIZES } from '@/scripts/constants.ts'
 import { getVideoHeight, toHms, useObjStorage } from '@/scripts/utils.ts'
 import VideoProgressSlider from '@/vues/components/viewer/components/VideoProgressSlider.vue'
+import { useAuthStore } from '@/scripts/stores/authStore.ts'
 
 const props = withDefaults(
   defineProps<{
@@ -21,6 +22,7 @@ const props = withDefaults(
 // todo: if not authenticated (publically shared album) then don't allow source quality
 
 const mediaItemStore = useMediaItemStore()
+const authStore = useAuthStore()
 
 // Video Element Reference
 const videoRef = ref<HTMLVideoElement | null>(null)
@@ -68,6 +70,7 @@ const fullImage = computed(() => mediaItemStore.anyMediaItems.get(props.mediaIte
 const hasThumbnails = computed(() => fullImage.value?.has_thumbnails ?? true)
 
 const isSourceAvailable = computed(() => {
+  if (!authStore.isAuthenticated) return false
   const mimeType = fullImage.value?.media_features?.mime_type
   return isVideoStreamable(mimeType)
 })
@@ -89,11 +92,13 @@ const currentQuality = computed<number | 'source'>({
       // If metadata is not loaded yet, assume the saved quality is available
       return saved || defaultQuality
     }
-    console.log(1)
-    if (!hasThumbnails.value) return 'source'
-    if (saved === 'source') {
-      if (isSourceAvailable.value) return 'source'
-      return sortedVideoSizes[0]
+
+    if (authStore.isAuthenticated) {
+      if (!hasThumbnails.value) return 'source'
+      if (saved === 'source') {
+        if (isSourceAvailable.value) return 'source'
+        return sortedVideoSizes[0]
+      }
     }
     const numQuality = Number(saved)
     if (VIDEO_SIZES.includes(numQuality)) return numQuality
@@ -110,6 +115,9 @@ const videoUrl = computed(() => {
     return mediaItemService.getVideo(props.mediaItemId, 0, true)
   }
   const onDemand = !hasThumbnails.value
+  if (onDemand && !authStore.isAuthenticated) {
+    return null
+  }
   return mediaItemService.getVideo(props.mediaItemId, currentQuality.value as number, onDemand)
 })
 
@@ -434,6 +442,7 @@ useEventListener(window, 'keydown', handleKeyDown)
 <template>
   <div class="video-viewer">
     <video
+      v-if="videoUrl"
       ref="videoRef"
       class="video-element"
       :src="videoUrl"
@@ -449,6 +458,9 @@ useEventListener(window, 'keydown', handleKeyDown)
       @click="togglePlay(true)"
       @dblclick="toggleFullscreen"
     />
+    <div v-else class="still-processing">
+      <span>Video is still processing, check back later to watch it</span>
+    </div>
 
     <!-- Play/Pause Overlay Indication -->
     <div v-if="overlayAction" :key="overlayTrigger" class="play-pause-overlay">
@@ -618,6 +630,14 @@ useEventListener(window, 'keydown', handleKeyDown)
   width: 100%;
   height: 100%;
   object-fit: contain;
+}
+
+.still-processing {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  place-items: center;
+  place-content: center;
 }
 
 /* Play/Pause Center Indicator */
