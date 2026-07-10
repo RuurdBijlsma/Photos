@@ -50,7 +50,7 @@ let startY = 0
 let startTranslateX = 0
 let startTranslateY = 0
 
-const fullImage = computed(() => mediaItemStore.mediaItems.get(props.mediaItemId))
+const fullImage = computed(() => mediaItemStore.anyMediaItems.get(props.mediaItemId))
 const generatedThumbsAvailable = computed(() => fullImage.value?.has_thumbnails ?? true)
 
 // Panorama states

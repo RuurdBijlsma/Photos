@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { shallowRef, triggerRef } from 'vue'
+import { computed, shallowRef, triggerRef } from 'vue'
 import type {
   FullMediaItem,
   MediaItemAlbumRef,
@@ -11,15 +11,24 @@ import { useSnackbarsStore } from '@/scripts/stores/snackbarStore.ts'
 import type { UpdateMediaItemRequest } from '@/scripts/types/api/mediaItem.ts'
 import albumService from '@/scripts/services/albumService.ts'
 import type { SharedMediaItem } from '@/scripts/types/api/album.ts'
+import { useAuthStore } from '@/scripts/stores/authStore.ts'
 
 export const useMediaItemStore = defineStore('mediaItem', () => {
   const snackbarStore = useSnackbarsStore()
+  const authStore = useAuthStore()
 
   const mediaItems = shallowRef(new Map<string, FullMediaItem>())
   const mediaItemAlbums = shallowRef(new Map<string, MediaItemAlbumRef[]>())
   const mediaItemPromises = new Map<string, Promise<AxiosResponse<MediaItemWithAlbums>>>()
   const sharedMediaItems = shallowRef(new Map<string, SharedMediaItem>())
   const sharedMediaItemPromises = new Map<string, Promise<AxiosResponse<SharedMediaItem>>>()
+  const anyMediaItems = computed(() => {
+    if (authStore.isAuthenticated) {
+      return mediaItems.value
+    } else {
+      return sharedMediaItems.value
+    }
+  })
 
   async function updateMediaItem(mediaItemId: string, itemDetails: UpdateMediaItemRequest) {
     try {
@@ -81,5 +90,6 @@ export const useMediaItemStore = defineStore('mediaItem', () => {
     fetchMediaItem,
     updateMediaItem,
     getAlbumsForMediaItem,
+    anyMediaItems,
   }
 })

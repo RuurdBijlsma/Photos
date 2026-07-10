@@ -18,6 +18,8 @@ const props = withDefaults(
   },
 )
 
+// todo: if not authenticated (publically shared album) then don't allow source quality
+
 const mediaItemStore = useMediaItemStore()
 
 // Video Element Reference
@@ -62,7 +64,7 @@ const settingsMenuOpen = ref(false)
 const isFullscreen = ref(false)
 
 // Fetch metadata from the Pinia store if it is missing
-const fullImage = computed(() => mediaItemStore.mediaItems.get(props.mediaItemId))
+const fullImage = computed(() => mediaItemStore.anyMediaItems.get(props.mediaItemId))
 const hasThumbnails = computed(() => fullImage.value?.has_thumbnails ?? true)
 
 const isSourceAvailable = computed(() => {
@@ -179,21 +181,6 @@ function onLoadedMetadata() {
     updateBufferedProgress()
   }
 }
-
-// Watch for mediaItemId changes and fetch if not present in the current view context
-watch(
-  () => props.mediaItemId,
-  async (newId) => {
-    if (newId && !mediaItemStore.mediaItems.has(newId)) {
-      try {
-        await mediaItemStore.fetchMediaItem(newId)
-      } catch (e) {
-        console.error('Failed to fetch media item for video viewer:', e)
-      }
-    }
-  },
-  { immediate: true },
-)
 
 // Helper to trigger safe programmatic playback
 function playVideo() {
