@@ -8,9 +8,8 @@ import { useViewPhotoStore } from '@/scripts/stores/timeline/viewPhotoStore.ts'
 import MediaViewer from '@/vues/components/viewer/MediaViewer.vue'
 import { TimelineItem } from '@/scripts/types/generated/timeline.ts'
 import { useTimelineStore } from '@/scripts/stores/timeline/timelineStore.ts'
-import { useEventListener } from '@vueuse/core'
 import MediaInfoPanel from '@/vues/components/viewer/components/MediaInfoPanel.vue'
-import { makeDateTimeString, makeLocationString } from '@/scripts/utils.ts'
+import { copyToClipboard, makeDateTimeString, makeLocationString } from '@/scripts/utils.ts'
 import { useDialogStore } from '@/scripts/stores/dialogStore.ts'
 import { useAuthStore } from '@/scripts/stores/authStore.ts'
 import { useTheme } from 'vuetify/framework'
@@ -18,6 +17,7 @@ import { useDownloadStore } from '@/scripts/stores/downloadStore.ts'
 import { useBinStore } from '@/scripts/stores/binStore.ts'
 import { useProfileStore } from '@/scripts/stores/profileStore.ts'
 import AddToAlbumCard from '@/vues/components/timeline/timeline-components/AddToAlbumCard.vue'
+import { useUiHider } from '@/scripts/composables/useUiHider.ts'
 
 const props = withDefaults(
   defineProps<{
@@ -49,32 +49,14 @@ const profileStore = useProfileStore()
 const showRightButton = ref(false)
 const showLeftButton = ref(false)
 const persistentInfo = ref(false)
-const hideSeconds = ref(7)
 const infoMenuOpen = ref(false)
 const optionsOpen = ref(false)
 const isZoomed = ref(false)
 const isPanoActive = ref(false)
 const showAddToAlbum = ref(false)
 
-const HIDE_TIMEOUT = 10
-const showUI = computed(() => hideSeconds.value > 0)
-const hideTimer = setInterval(() => {
-  hideSeconds.value--
-  if (infoMenuOpen.value || optionsOpen.value) {
-    hideSeconds.value = HIDE_TIMEOUT
-  }
-}, 1000)
-
-useEventListener(document, 'mousemove', () => {
-  hideSeconds.value = HIDE_TIMEOUT
-})
-useEventListener(document, 'click', () => {
-  hideSeconds.value = HIDE_TIMEOUT
-})
-useEventListener(document, 'mouseleave', () => {
-  if (!infoMenuOpen.value && !optionsOpen.value) {
-    hideSeconds.value = 0
-  }
+const { showUI } = useUiHider(10, () => {
+  return infoMenuOpen.value || optionsOpen.value
 })
 
 const id = computed(() => {
@@ -206,6 +188,11 @@ async function moveToBin() {
   }
 }
 
+function copyShareUrl() {
+  const inviteUrl = `${window.location.origin}/share/${isVideo.value ? 'v' : 'p'}/${id.value}`
+  copyToClipboard(inviteUrl)
+}
+
 function goNext() {
   router.replace({ path: `${viewPhotoStore.viewLink}${nextId.value}`, query: route.query })
 }
@@ -213,8 +200,6 @@ function goNext() {
 function goPrev() {
   router.replace({ path: `${viewPhotoStore.viewLink}${prevId.value}`, query: route.query })
 }
-
-onBeforeUnmount(() => clearInterval(hideTimer))
 onMounted(() => document.addEventListener('keydown', handleKeyDown))
 onUnmounted(() => document.removeEventListener('keydown', handleKeyDown))
 
@@ -379,15 +364,10 @@ watch(isVideo, () => {
         <template v-if="authStore.isAuthenticated">
           <v-btn
             rounded="xl"
+            @click="copyShareUrl"
             icon="mdi-share-variant-outline"
             variant="plain"
             v-tooltip="{ text: 'Share', location: 'bottom', attach: true, width: 140 }"
-          />
-          <v-btn
-            rounded="xl"
-            icon="mdi-heart-outline"
-            variant="plain"
-            v-tooltip="{ text: 'Favourite', location: 'bottom', attach: true, width: 140 }"
           />
           <v-btn
             rounded="xl"

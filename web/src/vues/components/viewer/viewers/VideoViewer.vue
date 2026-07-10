@@ -13,9 +13,11 @@ const props = withDefaults(
     mediaItemId: string
     muted: boolean
     showUi?: boolean
+    autoplay?: boolean
   }>(),
   {
     showUi: true,
+    autoplay: true,
   },
 )
 
@@ -423,7 +425,7 @@ const volumeIcon = computed(() => {
 
 onMounted(() => {
   document.addEventListener('fullscreenchange', onFullscreenChange)
-  if (videoRef.value && isPlaying.value === false) {
+  if (videoRef.value && isPlaying.value === false && props.autoplay) {
     playVideo()
   }
 })

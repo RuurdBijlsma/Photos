@@ -14,6 +14,7 @@ defineProps<{
   mediaItemId: string
   muted: boolean
   showUi?: boolean
+  autoplay?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -32,7 +33,13 @@ const emit = defineEmits<{
       @zoom-change="emit('zoom-change', $event)"
       @pano-active="emit('pano-active', $event)"
     />
-    <video-viewer :media-item-id="mediaItemId" v-else :muted="muted" :show-ui="showUi" />
+    <video-viewer
+      :media-item-id="mediaItemId"
+      v-else
+      :muted="muted"
+      :show-ui="showUi"
+      :autoplay="autoplay"
+    />
   </div>
 </template>
 

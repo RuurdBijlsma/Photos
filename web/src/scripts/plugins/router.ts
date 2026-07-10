@@ -29,6 +29,12 @@ const router = createRouter({
           ],
         },
         {
+          path: 'share/:isVideo/:mediaId',
+          name: 'share',
+          meta: { requiresAuth: false },
+          component: () => import('@/vues/views/main/ShareView.vue'),
+        },
+        {
           path: 'daily/:cardId',
           name: 'daily-card-viewer',
           component: () => import('@/vues/components/timeline/daily-cards/DailyViewer.vue'),
