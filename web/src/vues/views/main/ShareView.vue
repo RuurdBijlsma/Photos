@@ -29,6 +29,7 @@ const { showUI } = useUiHider(5)
       :is-video="isVideo"
       :media-item-id="id"
       :muted="false"
+      :elemental-fullscreen="true"
     />
     <div v-else>Incorrect URL</div>
   </main-layout-container>

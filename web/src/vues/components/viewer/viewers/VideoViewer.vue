@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, useTemplateRef, watch } from 'vue'
 import { useEventListener, useStorage } from '@vueuse/core'
 import { useMediaItemStore } from '@/scripts/stores/timeline/mediaItemStore.ts'
 import mediaItemService from '@/scripts/services/mediaItemService.ts'
@@ -14,6 +14,7 @@ const props = withDefaults(
     muted: boolean
     showUi?: boolean
     autoplay?: boolean
+    elementalFullscreen: boolean
   }>(),
   {
     showUi: true,
@@ -21,13 +22,12 @@ const props = withDefaults(
   },
 )
 
-// todo: if not authenticated (publically shared album) then don't allow source quality
-
 const mediaItemStore = useMediaItemStore()
 const authStore = useAuthStore()
 
 // Video Element Reference
-const videoRef = ref<HTMLVideoElement | null>(null)
+const videoEl = useTemplateRef('videoElement')
+const videoContainerEl = useTemplateRef('videoViewer')
 const fps = computed(() => fullImage.value?.media_features?.video_fps || 30)
 
 // Playback States
@@ -47,7 +47,7 @@ const isMuted = useStorage<boolean>('video-player-muted', false)
 
 // Playback Speed State (Persisted with useStorage)
 const savedPlaybackRate = useStorage<number>('video-player-playback-rate', 1.0)
-const playbackRates = [0.25, 0.5, 1.0, 1.25, 1.5, 2.0, 3.0]
+const playbackRates = [3.0, 2.0, 1.5, 1.0, 0.5, 0.25]
 
 const currentPlaybackRate = computed<number>({
   get() {
@@ -55,8 +55,8 @@ const currentPlaybackRate = computed<number>({
   },
   set(val: number) {
     savedPlaybackRate.value = val
-    if (videoRef.value) {
-      videoRef.value.playbackRate = val
+    if (videoEl.value) {
+      videoEl.value.playbackRate = val
     }
   },
 })
@@ -128,9 +128,9 @@ const timeToRestore = ref<number | null>(null)
 const isPlayingOnQualityChange = ref<boolean | null>(null)
 
 function onQualitySelect(size: number | 'source') {
-  if (videoRef.value) {
-    timeToRestore.value = videoRef.value.currentTime
-    isPlayingOnQualityChange.value = !videoRef.value.paused
+  if (videoEl.value) {
+    timeToRestore.value = videoEl.value.currentTime
+    isPlayingOnQualityChange.value = !videoEl.value.paused
   }
   currentQuality.value = size
   settingsMenuOpen.value = false
@@ -166,8 +166,8 @@ function triggerOverlay(action: 'play' | 'pause') {
 
 // Queries current media buffering intervals directly from the browser instance
 function updateBufferedProgress() {
-  if (videoRef.value) {
-    const b = videoRef.value.buffered
+  if (videoEl.value) {
+    const b = videoEl.value.buffered
     const ranges: Array<{ start: number; end: number }> = []
     for (let i = 0; i < b.length; i++) {
       ranges.push({
@@ -180,22 +180,22 @@ function updateBufferedProgress() {
 }
 
 function onLoadedMetadata() {
-  if (videoRef.value) {
-    duration.value = videoRef.value.duration || 0
+  if (videoEl.value) {
+    duration.value = videoEl.value.duration || 0
     if (timeToRestore.value !== null) {
-      videoRef.value.currentTime = timeToRestore.value
+      videoEl.value.currentTime = timeToRestore.value
       currentTime.value = timeToRestore.value
       timeToRestore.value = null
     }
-    videoRef.value.playbackRate = currentPlaybackRate.value
+    videoEl.value.playbackRate = currentPlaybackRate.value
     updateBufferedProgress()
   }
 }
 
 // Helper to trigger safe programmatic playback
 function playVideo() {
-  if (videoRef.value) {
-    videoRef.value.play().catch((err) => {
+  if (videoEl.value) {
+    videoEl.value.play().catch((err) => {
       console.warn('Playback failed or was blocked by browser:', err)
     })
   }
@@ -207,18 +207,18 @@ watch(
   () => {
     bufferedRanges.value = [] // Reset buffering indicator layout
     nextTick(() => {
-      if (videoRef.value) {
+      if (videoEl.value) {
         const shouldPlay =
           isPlayingOnQualityChange.value !== null ? isPlayingOnQualityChange.value : true
 
-        videoRef.value.load()
+        videoEl.value.load()
 
         if (shouldPlay) {
           playVideo()
         } else {
-          videoRef.value.pause()
+          videoEl.value.pause()
         }
-        videoRef.value.playbackRate = currentPlaybackRate.value
+        videoEl.value.playbackRate = currentPlaybackRate.value
 
         isPlayingOnQualityChange.value = null
       }
@@ -231,9 +231,9 @@ watch(
 watch(
   [savedVolume, isMuted],
   () => {
-    if (videoRef.value) {
-      videoRef.value.volume = savedVolume.value
-      videoRef.value.muted = isMuted.value
+    if (videoEl.value) {
+      videoEl.value.volume = savedVolume.value
+      videoEl.value.muted = isMuted.value
     }
   },
   { immediate: true },
@@ -252,8 +252,8 @@ watch(
 let animationFrameId: number | null = null
 
 function updateProgressSmoothly() {
-  if (videoRef.value && !videoRef.value.paused) {
-    currentTime.value = videoRef.value.currentTime
+  if (videoEl.value && !videoEl.value.paused) {
+    currentTime.value = videoEl.value.currentTime
     updateBufferedProgress()
     animationFrameId = requestAnimationFrame(updateProgressSmoothly)
   }
@@ -276,8 +276,8 @@ function onPause() {
 
 // Fallback listener for captures while paused
 function onTimeUpdate() {
-  if (videoRef.value && videoRef.value.paused) {
-    currentTime.value = videoRef.value.currentTime
+  if (videoEl.value && videoEl.value.paused) {
+    currentTime.value = videoEl.value.currentTime
   }
   updateBufferedProgress()
 }
@@ -288,39 +288,39 @@ function onProgress() {
 
 // Playback Controls
 function togglePlay(showOverlay = false) {
-  if (!videoRef.value) return
-  if (videoRef.value.paused) {
+  if (!videoEl.value) return
+  if (videoEl.value.paused) {
     playVideo()
     if (showOverlay) triggerOverlay('play')
   } else {
-    videoRef.value.pause()
+    videoEl.value.pause()
     if (showOverlay) triggerOverlay('pause')
   }
 }
 
 // Seeking Control Helpers
 function seekBy(seconds: number) {
-  if (!videoRef.value) return
-  let target = videoRef.value.currentTime + seconds
+  if (!videoEl.value) return
+  let target = videoEl.value.currentTime + seconds
   if (target < 0) target = 0
   if (target > duration.value) target = duration.value
-  videoRef.value.currentTime = target
+  videoEl.value.currentTime = target
   currentTime.value = target
 }
 
 function stepFrame(direction: number) {
-  if (!videoRef.value) return
+  if (!videoEl.value) return
   const frameDuration = 1 / fps.value
-  let target = videoRef.value.currentTime + direction * frameDuration
+  let target = videoEl.value.currentTime + direction * frameDuration
   if (target < 0) target = 0
   if (target > duration.value) target = duration.value
-  videoRef.value.currentTime = target
+  videoEl.value.currentTime = target
   currentTime.value = target
 }
 
 function onSeekInput(val: number) {
-  if (videoRef.value) {
-    videoRef.value.currentTime = val
+  if (videoEl.value) {
+    videoEl.value.currentTime = val
     currentTime.value = val
   }
 }
@@ -350,9 +350,16 @@ function adjustVolume(amount: number) {
 // Fullscreen API Handling (Syncs state on browser escape/system fullscreen change)
 function toggleFullscreen() {
   if (!document.fullscreenElement) {
-    document.documentElement.requestFullscreen().catch((err) => {
-      console.error('Failed to enter fullscreen mode:', err)
-    })
+    console.log('elemental', props.elementalFullscreen, videoContainerEl.value)
+    if (props.elementalFullscreen && videoContainerEl.value) {
+      videoContainerEl.value.requestFullscreen().catch((err) => {
+        console.error('Failed to enter fullscreen mode:', err)
+      })
+    } else {
+      document.documentElement.requestFullscreen().catch((err) => {
+        console.error('Failed to enter fullscreen mode:', err)
+      })
+    }
   } else {
     document.exitFullscreen()
   }
@@ -399,13 +406,13 @@ function handleKeyDown(e: KeyboardEvent) {
       toggleFullscreen()
       break
     case ',':
-      if (videoRef.value?.paused) {
+      if (videoEl.value?.paused) {
         e.preventDefault()
         stepFrame(-1)
       }
       break
     case '.':
-      if (videoRef.value?.paused) {
+      if (videoEl.value?.paused) {
         e.preventDefault()
         stepFrame(1)
       }
@@ -425,7 +432,7 @@ const volumeIcon = computed(() => {
 
 onMounted(() => {
   document.addEventListener('fullscreenchange', onFullscreenChange)
-  if (videoRef.value && isPlaying.value === false && props.autoplay) {
+  if (videoEl.value && isPlaying.value === false && props.autoplay) {
     playVideo()
   }
 })
@@ -442,10 +449,10 @@ useEventListener(window, 'keydown', handleKeyDown)
 </script>
 
 <template>
-  <div class="video-viewer">
+  <div class="video-viewer" ref="videoViewer">
     <video
       v-if="videoUrl"
-      ref="videoRef"
+      ref="videoElement"
       class="video-element"
       :src="videoUrl"
       :muted="isMuted"
@@ -521,6 +528,7 @@ useEventListener(window, 'keydown', handleKeyDown)
         <div class="control-island right-island">
           <!-- Quality & Speed Settings Menu -->
           <v-menu
+            :attach="elementalFullscreen && isFullscreen"
             v-if="hasThumbnails || isSourceAvailable"
             v-model="settingsMenuOpen"
             location="top center"
@@ -531,7 +539,12 @@ useEventListener(window, 'keydown', handleKeyDown)
             </template>
             <v-list class="settings-menu-list">
               <!-- Submenu 1: Playback Speed -->
-              <v-menu location="left top" open-on-hover :close-on-content-click="true">
+              <v-menu
+                location="left top"
+                open-on-hover
+                :close-on-content-click="true"
+                :attach="elementalFullscreen && isFullscreen"
+              >
                 <template v-slot:activator="{ props: speedMenuProps }">
                   <v-list-item v-bind="speedMenuProps" class="menu-item-with-chevron">
                     <v-list-item-title class="menu-text">Playback speed</v-list-item-title>
@@ -555,7 +568,12 @@ useEventListener(window, 'keydown', handleKeyDown)
               </v-menu>
 
               <!-- Submenu 2: Quality -->
-              <v-menu location="left top" open-on-hover :close-on-content-click="true">
+              <v-menu
+                location="left top"
+                open-on-hover
+                :close-on-content-click="true"
+                :attach="elementalFullscreen && isFullscreen"
+              >
                 <template v-slot:activator="{ props: qualityMenuProps }">
                   <v-list-item v-bind="qualityMenuProps" class="menu-item-with-chevron">
                     <v-list-item-title class="menu-text">Quality</v-list-item-title>

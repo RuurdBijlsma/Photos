@@ -248,6 +248,7 @@ watch(isVideo, () => {
       class="photo-viewer"
       @zoom-change="isZoomed = $event"
       @pano-active="isPanoActive = $event"
+      :elemental-fullscreen="false"
     />
     <div class="top-bar">
       <div class="left-buttons">

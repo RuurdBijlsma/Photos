@@ -15,6 +15,7 @@ defineProps<{
   muted: boolean
   showUi?: boolean
   autoplay?: boolean
+  elementalFullscreen: boolean
 }>()
 
 const emit = defineEmits<{
@@ -35,6 +36,7 @@ const emit = defineEmits<{
     />
     <video-viewer
       :media-item-id="mediaItemId"
+      :elemental-fullscreen="elementalFullscreen"
       v-else
       :muted="muted"
       :show-ui="showUi"
