@@ -6,7 +6,7 @@ import { useAuthStore } from '@/scripts/stores/authStore.ts'
 import { useTimelineStore } from '@/scripts/stores/timeline/timelineStore.ts'
 
 const ViewPhoto = () => import('@/vues/views/main/ViewPhoto.vue')
-
+// todo: set <title> based on which page you're viewing
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [

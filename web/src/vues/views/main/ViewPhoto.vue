@@ -189,8 +189,8 @@ async function moveToBin() {
 }
 
 function copyShareUrl() {
-  const inviteUrl = `${window.location.origin}/share/${isVideo.value ? 'v' : 'p'}/${id.value}`
-  copyToClipboard(inviteUrl)
+  const shareUrl = `${window.location.origin}/share/${isVideo.value ? 'v' : 'p'}/${id.value}`
+  copyToClipboard(shareUrl)
 }
 
 function goNext() {
