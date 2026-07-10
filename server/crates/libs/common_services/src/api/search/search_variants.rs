@@ -1,7 +1,6 @@
 use crate::api::app_error::AppError;
 use crate::api::search::cache::get_cached_text_embedding;
 use crate::api::search::interfaces::{SearchMediaConfig, SearchMediaType, SearchSortBy};
-use crate::database::app_user::User;
 use common_types::pb::api::SimpleTimelineItem;
 use open_clip_inference::TextEmbedder;
 use pgvector::Vector;
@@ -9,7 +8,7 @@ use sqlx::PgPool;
 use std::sync::Arc;
 
 pub async fn basic_search_media(
-    user: &User,
+    user_id:i32,
     pool: &PgPool,
     embedder: Arc<TextEmbedder>,
     query: &str,
@@ -99,7 +98,7 @@ pub async fn basic_search_media(
         LIMIT $5 OFFSET $10
          "#,
         query,                 // $1
-        user.id,               // $2
+        user_id,               // $2
         vector_param as _,     // $3
         candidate_limit,       // $4
         limit,                 // $5
@@ -117,7 +116,7 @@ pub async fn basic_search_media(
 
 #[allow(clippy::too_many_lines)]
 pub async fn advanced_search_media(
-    user: &User,
+    user_id:i32,
     pool: &PgPool,
     embedder: Arc<TextEmbedder>,
     query: &str,
@@ -278,7 +277,7 @@ pub async fn advanced_search_media(
         LIMIT $5 OFFSET $17
          "#,
         fts_query,                // $1
-        user.id,                  // $2
+        user_id,                  // $2
         vector_param as _,        // $3
         candidate_limit,          // $4
         limit,                    // $5
@@ -303,7 +302,7 @@ pub async fn advanced_search_media(
 }
 
 pub async fn filter_only_search_media(
-    user: &User,
+    user_id:i32,
     pool: &PgPool,
     config: SearchMediaConfig,
 ) -> Result<Vec<SimpleTimelineItem>, AppError> {
@@ -348,7 +347,7 @@ pub async fn filter_only_search_media(
         ORDER BY mi.sort_timestamp DESC
         LIMIT $8 OFFSET $9
         "#,
-        user.id,                   // $1
+        user_id,                   // $1
         config.start_date,         // $2
         config.end_date,           // $3
         is_video_filter,           // $4

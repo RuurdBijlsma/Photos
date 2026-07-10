@@ -20,6 +20,7 @@ pub fn photos_protected_router() -> Router<ApiContext> {
         )
         .route("/photos/download", get(download_full_file_by_rel_path))
         .route("/photos/download/zip", get(download_zip_stream_handler))
+        .route("/photos/{media_item_id}/video", get(stream_video_handler))
 }
 
 pub fn photos_public_router() -> Router<ApiContext> {
@@ -28,5 +29,4 @@ pub fn photos_public_router() -> Router<ApiContext> {
             "/photos/{media_item_id}/thumbnail",
             get(get_photo_thumbnail),
         )
-        .route("/photos/{media_item_id}/video", get(stream_video_handler))
 }

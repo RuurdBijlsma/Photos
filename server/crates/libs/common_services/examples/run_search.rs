@@ -31,7 +31,7 @@ async fn main() -> color_eyre::Result<()> {
     let embedder = Arc::new(embedder);
     loop {
         let search_results = search_media(
-            &user,
+            user.id,
             &pool,
             embedder.clone(),
             Some("cat".to_owned()),

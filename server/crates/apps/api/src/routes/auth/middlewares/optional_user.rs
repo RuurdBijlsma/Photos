@@ -5,11 +5,10 @@ use axum::{
     http::request::Parts,
 };
 use common_services::api::auth::error::AuthError;
-use common_services::database::app_user::User;
-use common_services::database::user_store::UserStore;
+use crate::auth::middlewares::user::ApiUser;
 
 #[derive(Clone, Debug)]
-pub struct OptionalUser(pub Option<User>);
+pub struct OptionalUser(pub Option<ApiUser>);
 
 impl<S> FromRequestParts<S> for OptionalUser
 where
@@ -23,9 +22,11 @@ where
             Ok(token) => {
                 let context = extract_context(parts, state).await?;
                 let claims = decode_token(&token, &context.settings.secrets.jwt)?;
-                let user = UserStore::find_by_id(&context.pool, claims.sub)
-                    .await?
-                    .ok_or(AuthError::UserNotFound)?;
+                let user = ApiUser {
+                    expiry: claims.exp,
+                    id: claims.sub,
+                    role: claims.role,
+                };
                 parts.extensions.insert(Self(Some(user.clone())));
                 Ok(Self(Some(user)))
             }

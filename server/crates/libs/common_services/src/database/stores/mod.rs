@@ -5,3 +5,4 @@ pub mod media_item_store;
 pub mod person_store;
 pub mod user_store;
 pub mod visual_analysis_store;
+pub mod cached_store;

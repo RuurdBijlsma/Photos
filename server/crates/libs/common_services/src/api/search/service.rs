@@ -6,7 +6,6 @@ use crate::api::search::interfaces::{
 use crate::api::search::search_variants::{
     advanced_search_media, basic_search_media, filter_only_search_media,
 };
-use crate::database::app_user::User;
 use color_eyre::eyre::eyre;
 use common_types::pb::api::{
     SearchSuggestion, SearchSuggestionsResponse, SimpleTimelineItem, SuggestionType,
@@ -17,7 +16,7 @@ use sqlx::PgPool;
 use std::sync::Arc;
 
 pub async fn search_media(
-    user: &User,
+    user_id: i32,
     pool: &PgPool,
     embedder: Arc<TextEmbedder>,
     query: Option<String>,
@@ -26,7 +25,7 @@ pub async fn search_media(
     let query = query.unwrap_or_default();
     if query.trim().is_empty() {
         if has_active_filters(&config) {
-            return filter_only_search_media(user, pool, config).await;
+            return filter_only_search_media(user_id, pool, config).await;
         }
         return Ok(vec![]);
     }
@@ -39,14 +38,14 @@ pub async fn search_media(
         && config.person_ids.is_empty()
         && config.country_codes.is_empty()
     {
-        basic_search_media(user, pool, embedder, &query, config).await
+        basic_search_media(user_id, pool, embedder, &query, config).await
     } else {
-        advanced_search_media(user, pool, embedder, &query, config).await
+        advanced_search_media(user_id, pool, embedder, &query, config).await
     }
 }
 
 pub async fn search_by_media_items(
-    user: &User,
+    user_id: i32,
     pool: &PgPool,
     text_embedder: Arc<TextEmbedder>,
     vision_embedder: Arc<VisionEmbedder>,
@@ -65,7 +64,7 @@ pub async fn search_by_media_items(
         FROM visual_analysis
         WHERE user_id = $1 AND media_item_id = ANY($2) AND deleted = false
         "#,
-        user.id,
+        user_id,
         media_item_ids
     )
     .fetch_one(pool)
@@ -80,7 +79,7 @@ pub async fn search_by_media_items(
 
     // Perform search using the combined average vector
     search_by_image(
-        user,
+        user_id,
         pool,
         text_embedder,
         vision_embedder,
@@ -94,7 +93,7 @@ pub async fn search_by_media_items(
 
 #[allow(clippy::too_many_lines, clippy::too_many_arguments)]
 pub async fn search_by_image(
-    user: &User,
+    user_id: i32,
     pool: &PgPool,
     text_embedder: Arc<TextEmbedder>,
     vision_embedder: Arc<VisionEmbedder>,
@@ -306,7 +305,7 @@ pub async fn search_by_image(
         LIMIT $5 OFFSET $17
              "#,
             fts_query,                // $1
-            user.id,                  // $2
+            user_id,                  // $2
             vector_param as _,        // $3
             candidate_limit,          // $4
             limit,                    // $5
@@ -391,7 +390,7 @@ pub async fn search_by_image(
                 mi.sort_timestamp DESC
             LIMIT $4 OFFSET $13
             "#,
-            user.id,                   // $1
+            user_id,                   // $1
             vector_param as _,         // $2
             candidate_limit as i32,    // $3
             limit,                     // $4
@@ -415,7 +414,7 @@ pub async fn search_by_image(
 }
 
 pub async fn search_filter_ranges(
-    user: &User,
+    user_id: i32,
     pool: &PgPool,
 ) -> Result<SearchFilterRanges, AppError> {
     let months_task = sqlx::query!(
@@ -426,7 +425,7 @@ pub async fn search_filter_ranges(
           AND deleted = false
         ORDER BY month_id
         "#,
-        user.id
+        user_id
     )
     .fetch_all(pool);
     let countries_task = sqlx::query!(
@@ -438,7 +437,7 @@ pub async fn search_filter_ranges(
         WHERE mi.user_id = $1 AND mi.deleted = false
         ORDER BY l.country_name
         "#,
-        user.id
+        user_id
     )
     .fetch_all(pool);
     let people_task = sqlx::query!(
@@ -448,7 +447,7 @@ pub async fn search_filter_ranges(
         WHERE user_id = $1 AND name IS NOT NULL AND name != ''
         ORDER BY name
         "#,
-        user.id
+        user_id
     )
     .fetch_all(pool);
 
@@ -481,7 +480,7 @@ fn has_active_filters(config: &SearchMediaConfig) -> bool {
 }
 
 pub async fn get_search_suggestions(
-    user: &User,
+    user_id: i32,
     pool: &PgPool,
     query: &str,
     limit: Option<i64>,
@@ -562,7 +561,7 @@ pub async fn get_search_suggestions(
         ORDER BY (CASE WHEN "type!" = 'ALBUM' THEN 0 ELSE (CASE WHEN "type!" = 'PERSON' THEN 1 ELSE 2 END) END), "photo_count!" DESC, suggestion ASC
         LIMIT $3
         "#,
-        user.id,
+        user_id,
         ilike_query,
         limit as i32
     )
@@ -586,7 +585,7 @@ pub async fn get_search_suggestions(
 }
 
 pub async fn get_random_search_suggestion(
-    user: &User,
+    user_id:i32,
     pool: &PgPool,
 ) -> Result<Option<String>, AppError> {
     let rows = sqlx::query!(
@@ -676,7 +675,7 @@ pub async fn get_random_search_suggestion(
         -- This endpoint doesn't have to be fast anyway
         LIMIT 500
         "#,
-        user.id
+        user_id
     )
     .fetch_all(pool)
     .await?;

@@ -1,6 +1,7 @@
 //! This module defines the HTTP handlers for the initial application onboarding process.
 
 use crate::api_state::ApiContext;
+use crate::auth::middlewares::user::ApiUser;
 use app_state::IngestSettings;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
@@ -15,7 +16,6 @@ use common_services::api::admin::service::{
     list_admin_users,
 };
 use common_services::api::app_error::AppError;
-use common_services::database::app_user::User;
 
 /// Retrieves information about the configured media and thumbnail disks.
 pub async fn get_disk_response(
@@ -90,7 +90,7 @@ pub async fn update_user_media_folder_handler(
 /// Deletes a user account.
 pub async fn delete_user_handler(
     State(context): State<ApiContext>,
-    Extension(current_user): Extension<User>,
+    Extension(current_user): Extension<ApiUser>,
     Path(target_user_id): Path<i32>,
 ) -> Result<StatusCode, AppError> {
     admin_delete_user(&context.pool, target_user_id, current_user.id).await?;

@@ -8,8 +8,8 @@ use common_services::api::timeline::interfaces::{GetMediaByMonthParams, Timeline
 use common_services::api::timeline::service::{
     get_photos_by_month, get_timeline_ids, get_timeline_ratios,
 };
-use common_services::database::app_user::User;
 use common_types::pb::api::{TimelineItemsResponse, TimelineRatiosResponse};
+use crate::auth::middlewares::user::ApiUser;
 
 /// Get a timeline of all media ratios, grouped by month.
 ///
@@ -18,10 +18,10 @@ use common_types::pb::api::{TimelineItemsResponse, TimelineRatiosResponse};
 /// Returns a `AppError` if the database query fails.
 pub async fn get_timeline_ratios_handler(
     State(context): State<ApiContext>,
-    Extension(user): Extension<User>,
+    Extension(user): Extension<ApiUser>,
     Query(params): Query<TimelineParams>,
 ) -> Result<Protobuf<TimelineRatiosResponse>, AppError> {
-    let timeline = get_timeline_ratios(&user, &context.pool, params.sort).await?;
+    let timeline = get_timeline_ratios(user.id, &context.pool, params.sort).await?;
     Ok(Protobuf(timeline))
 }
 
@@ -32,10 +32,10 @@ pub async fn get_timeline_ratios_handler(
 /// Returns a `AppError` if the database query fails.
 pub async fn get_timeline_ids_handler(
     State(context): State<ApiContext>,
-    Extension(user): Extension<User>,
+    Extension(user): Extension<ApiUser>,
     Query(params): Query<TimelineParams>,
 ) -> Result<Json<Vec<String>>, AppError> {
-    let timeline = get_timeline_ids(&user, &context.pool, params.sort).await?;
+    let timeline = get_timeline_ids(user.id, &context.pool, params.sort).await?;
     Ok(Json(timeline))
 }
 
@@ -46,7 +46,7 @@ pub async fn get_timeline_ids_handler(
 /// Returns a `AppError` if the database query fails.
 pub async fn get_photos_by_month_handler(
     State(context): State<ApiContext>,
-    Extension(user): Extension<User>,
+    Extension(user): Extension<ApiUser>,
     Query(params): Query<GetMediaByMonthParams>,
 ) -> Result<Protobuf<TimelineItemsResponse>, AppError> {
     let month_ids = params
@@ -62,6 +62,6 @@ pub async fn get_photos_by_month_handler(
             )
         })?;
 
-    let photos = get_photos_by_month(&user, &context.pool, &month_ids, params.sort).await?;
+    let photos = get_photos_by_month(user.id, &context.pool, &month_ids, params.sort).await?;
     Ok(Protobuf(photos))
 }

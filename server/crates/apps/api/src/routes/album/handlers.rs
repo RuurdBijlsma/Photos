@@ -21,9 +21,9 @@ use common_services::api::app_error::AppError;
 use common_services::database::album::album::{Album, AlbumSummary};
 use common_services::database::album::album_collaborator::AlbumCollaborator;
 use common_services::database::album_store::AlbumStore;
-use common_services::database::app_user::User;
 use common_types::pb::api::{FullAlbumMediaResponse, OrderedMediaResponse};
 use tracing::instrument;
+use crate::auth::middlewares::user::ApiUser;
 
 /// Create a new album.
 ///
@@ -31,7 +31,7 @@ use tracing::instrument;
 #[instrument(skip(context, user, payload), err(Debug))]
 pub async fn create_album_handler(
     State(context): State<ApiContext>,
-    Extension(user): Extension<User>,
+    Extension(user): Extension<ApiUser>,
     Json(payload): Json<CreateAlbumRequest>,
 ) -> Result<(StatusCode, Json<Album>), AppError> {
     let album = create_album(
@@ -53,7 +53,7 @@ pub async fn create_album_handler(
 pub async fn get_user_albums_handler(
     State(context): State<ApiContext>,
     Query(query): Query<ListAlbumsParam>,
-    Extension(user): Extension<User>,
+    Extension(user): Extension<ApiUser>,
 ) -> Result<Json<Vec<Album>>, AppError> {
     let albums = AlbumStore::list_with_count_by_user_id(
         &context.pool,
@@ -70,7 +70,7 @@ pub async fn get_user_albums_handler(
 /// Allows updating the name and/or description. The user must be the album owner.
 pub async fn update_album_handler(
     State(context): State<ApiContext>,
-    Extension(user): Extension<User>,
+    Extension(user): Extension<ApiUser>,
     Path(album_id): Path<String>,
     Json(payload): Json<UpdateAlbumRequest>,
 ) -> Result<Json<Album>, AppError> {
@@ -89,7 +89,7 @@ pub async fn update_album_handler(
 
 pub async fn delete_album_handler(
     State(context): State<ApiContext>,
-    Extension(user): Extension<User>,
+    Extension(user): Extension<ApiUser>,
     Path(album_id): Path<String>,
 ) -> Result<(), AppError> {
     delete_album(&context.pool, &album_id, user.id).await?;
@@ -102,7 +102,7 @@ pub async fn delete_album_handler(
 #[instrument(skip(context, user), err(Debug))]
 pub async fn add_media_to_album_handler(
     State(context): State<ApiContext>,
-    Extension(user): Extension<User>,
+    Extension(user): Extension<ApiUser>,
     Path(album_id): Path<String>,
     Json(payload): Json<AddMediaToAlbumRequest>,
 ) -> Result<StatusCode, AppError> {
@@ -115,7 +115,7 @@ pub async fn add_media_to_album_handler(
 /// The user must be an owner or contributor of the album.
 pub async fn remove_media_from_album_handler(
     State(context): State<ApiContext>,
-    Extension(user): Extension<User>,
+    Extension(user): Extension<ApiUser>,
     Path((album_id, media_item_ids)): Path<(String, String)>,
 ) -> Result<StatusCode, AppError> {
     let media_item_ids = media_item_ids
@@ -132,7 +132,7 @@ pub async fn remove_media_from_album_handler(
 /// The inviting user must be the album owner.
 pub async fn add_collaborator_handler(
     State(context): State<ApiContext>,
-    Extension(user): Extension<User>,
+    Extension(user): Extension<ApiUser>,
     Path(album_id): Path<String>,
     Json(payload): Json<AddCollaboratorRequest>,
 ) -> Result<Json<AlbumCollaborator>, AppError> {
@@ -152,7 +152,7 @@ pub async fn add_collaborator_handler(
 /// The user performing the action must be the album owner. The owner cannot be removed.
 pub async fn remove_collaborator_handler(
     State(context): State<ApiContext>,
-    Extension(user): Extension<User>,
+    Extension(user): Extension<ApiUser>,
     Path((album_id, user_id)): Path<(String, i64)>,
 ) -> Result<StatusCode, AppError> {
     remove_collaborator(&context.pool, &album_id, user_id, user.id).await?;
@@ -162,7 +162,7 @@ pub async fn remove_collaborator_handler(
 #[instrument(skip(context, user), err(Debug))]
 pub async fn get_sorted_album_items_handler(
     State(context): State<ApiContext>,
-    Extension(user): Extension<User>,
+    Extension(user): Extension<ApiUser>,
     Path(album_id): Path<String>,
     Query(request): Query<GetSortedAlbumItemsRequest>,
 ) -> Result<Protobuf<OrderedMediaResponse>, AppError> {
@@ -174,7 +174,7 @@ pub async fn get_sorted_album_items_handler(
 #[instrument(skip(context, user), err(Debug))]
 pub async fn reorder_media_handler(
     State(context): State<ApiContext>,
-    Extension(user): Extension<User>,
+    Extension(user): Extension<ApiUser>,
     Path(album_id): Path<String>,
     Json(payload): Json<ReorderMediaRequest>,
 ) -> Result<(), AppError> {
@@ -194,7 +194,7 @@ pub async fn reorder_media_handler(
 /// The inviting user must be the album owner. The generated token has a configurable expiry time.
 pub async fn generate_invite_handler(
     State(context): State<ApiContext>,
-    Extension(user): Extension<User>,
+    Extension(user): Extension<ApiUser>,
     Path(album_id): Path<String>,
 ) -> Result<Json<String>, AppError> {
     let token = generate_invite(
@@ -203,7 +203,6 @@ pub async fn generate_invite_handler(
         context.settings.secrets.jwt,
         &album_id,
         user.id,
-        &user.name,
     )
     .await?;
     Ok(Json(token))
@@ -226,7 +225,7 @@ pub async fn check_invite_handler(
 /// from the remote server.
 pub async fn accept_invite_handler(
     State(context): State<ApiContext>,
-    Extension(user): Extension<User>,
+    Extension(user): Extension<ApiUser>,
     Json(payload): Json<AcceptInviteRequest>,
 ) -> Result<Json<Album>, AppError> {
     let album = accept_invite(
@@ -268,7 +267,7 @@ pub async fn get_album_media_item_handler(
 
 pub async fn list_backups_handler(
     State(settings): State<IngestSettings>,
-    Extension(user): Extension<User>,
+    Extension(user): Extension<ApiUser>,
 ) -> Result<Json<Vec<BackupInfo>>, AppError> {
     let backups = list_backups(&settings.cache_root, user.id).await?;
     Ok(Json(backups))
@@ -276,7 +275,7 @@ pub async fn list_backups_handler(
 
 pub async fn restore_backup_handler(
     State(context): State<ApiContext>,
-    Extension(user): Extension<User>,
+    Extension(user): Extension<ApiUser>,
     Path(backup_filename): Path<String>,
 ) -> Result<(), AppError> {
     let backup_path = context

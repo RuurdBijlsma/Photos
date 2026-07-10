@@ -1,4 +1,5 @@
 use crate::api_state::ApiContext;
+use crate::auth::middlewares::user::ApiUser;
 use app_state::constants::FACE_CLUSTERS_FOLDER;
 use axum::extract::{Path, State};
 use axum::response::{IntoResponse, Redirect};
@@ -9,7 +10,6 @@ use common_services::api::people::interfaces::{MergePersonRequest, UpdatePersonR
 use common_services::api::people::service::{
     get_all_people, get_person_photos, merge_person, unmerge_person, update_person,
 };
-use common_services::database::app_user::User;
 use common_types::pb::api::{FullPersonMediaResponse, ListPeopleResponse};
 use http::header::CACHE_CONTROL;
 use tracing::instrument;
@@ -17,7 +17,7 @@ use tracing::instrument;
 #[instrument(skip(context, user), err(Debug))]
 pub async fn list_people_handler(
     State(context): State<ApiContext>,
-    Extension(user): Extension<User>,
+    Extension(user): Extension<ApiUser>,
 ) -> Result<Protobuf<ListPeopleResponse>, AppError> {
     let result = get_all_people(&context.pool, user.id).await?;
     Ok(Protobuf(result))
@@ -26,7 +26,7 @@ pub async fn list_people_handler(
 #[instrument(skip(context, user), err(Debug))]
 pub async fn update_person_handler(
     State(context): State<ApiContext>,
-    Extension(user): Extension<User>,
+    Extension(user): Extension<ApiUser>,
     Path(person_id): Path<String>,
     Json(payload): Json<UpdatePersonRequest>,
 ) -> Result<(), AppError> {
@@ -37,7 +37,7 @@ pub async fn update_person_handler(
 #[instrument(skip(context, user), err(Debug))]
 pub async fn merge_person_handler(
     State(context): State<ApiContext>,
-    Extension(user): Extension<User>,
+    Extension(user): Extension<ApiUser>,
     Path(person_id): Path<String>,
     Json(payload): Json<MergePersonRequest>,
 ) -> Result<(), AppError> {
@@ -48,7 +48,7 @@ pub async fn merge_person_handler(
 #[instrument(skip(context, user), err(Debug))]
 pub async fn unmerge_person_handler(
     State(context): State<ApiContext>,
-    Extension(user): Extension<User>,
+    Extension(user): Extension<ApiUser>,
     Path(person_id): Path<String>,
 ) -> Result<(), AppError> {
     unmerge_person(&context.pool, &person_id, user.id).await?;
@@ -58,7 +58,7 @@ pub async fn unmerge_person_handler(
 #[instrument(skip(context, user), err(Debug))]
 pub async fn get_person_photos_handler(
     State(context): State<ApiContext>,
-    Extension(user): Extension<User>,
+    Extension(user): Extension<ApiUser>,
     Path(person_id): Path<String>,
 ) -> Result<Protobuf<FullPersonMediaResponse>, AppError> {
     let result = get_person_photos(&context.pool, &person_id, user.id).await?;
@@ -91,7 +91,7 @@ pub async fn get_person_thumbnail_redirect_handler(
 #[instrument(skip(context, user), err(Debug))]
 pub async fn get_person_media_item_id(
     State(context): State<ApiContext>,
-    Extension(user): Extension<User>,
+    Extension(user): Extension<ApiUser>,
     Path(person_id): Path<String>,
 ) -> Result<Json<String>, AppError> {
     let Some(result) = sqlx::query_scalar!(

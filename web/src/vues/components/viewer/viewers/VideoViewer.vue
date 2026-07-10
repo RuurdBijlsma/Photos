@@ -446,12 +446,12 @@ useEventListener(window, 'keydown', handleKeyDown)
 
 <template>
   <div class="video-viewer">
-    <!-- Video element (stretches to fill page while maintaining aspect ratio) -->
     <video
       ref="videoRef"
       class="video-element"
       :src="videoUrl"
       :muted="isMuted"
+      crossorigin="use-credentials"
       loop
       playsinline
       @loadedmetadata="onLoadedMetadata"

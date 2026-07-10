@@ -1,4 +1,5 @@
 use crate::api_state::ApiContext;
+use crate::auth::middlewares::user::ApiUser;
 use axum::extract::{Query, State};
 use axum::{Extension, Json};
 use chrono::NaiveDate;
@@ -7,13 +8,12 @@ use common_services::api::daily_cards::interfaces::{
     DailyCardResponse, DailyCardsQueryParams, ValidateMediaRequest,
 };
 use common_services::api::daily_cards::service::{get_daily_cards, validate_media_items};
-use common_services::database::app_user::User;
 use tracing::instrument;
 
 #[instrument(skip(context, user), err(Debug))]
 pub async fn get_daily_cards_handler(
     State(context): State<ApiContext>,
-    Extension(user): Extension<User>,
+    Extension(user): Extension<ApiUser>,
     Query(params): Query<DailyCardsQueryParams>,
 ) -> Result<Json<Vec<DailyCardResponse>>, AppError> {
     let target_date = match params.date {
@@ -30,7 +30,7 @@ pub async fn get_daily_cards_handler(
 #[instrument(skip(context, user), err(Debug))]
 pub async fn validate_media_handler(
     State(context): State<ApiContext>,
-    Extension(user): Extension<User>,
+    Extension(user): Extension<ApiUser>,
     Json(payload): Json<ValidateMediaRequest>,
 ) -> Result<Json<Vec<String>>, AppError> {
     let result = validate_media_items(&context.pool, user.id, &payload.media_item_ids).await?;

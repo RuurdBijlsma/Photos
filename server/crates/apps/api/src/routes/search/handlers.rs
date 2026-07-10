@@ -12,12 +12,12 @@ use common_services::api::search::service::{
     get_random_search_suggestion, get_search_suggestions, search_by_image, search_by_media_items,
     search_filter_ranges, search_media,
 };
-use common_services::database::app_user::User;
 use common_types::pb::api::{SearchResponse, SearchSuggestionsResponse};
 use image::ImageReader;
 use std::io::Cursor;
 use tracing::instrument;
 use uuid::Uuid;
+use crate::auth::middlewares::user::ApiUser;
 
 /// Get a timeline of all media ratios, grouped by month.
 ///
@@ -27,11 +27,11 @@ use uuid::Uuid;
 #[instrument(skip(context, user), err(Debug))]
 pub async fn get_search_results(
     State(context): State<ApiContext>,
-    Extension(user): Extension<User>,
+    Extension(user): Extension<ApiUser>,
     Query(params): Query<SearchParams>,
 ) -> Result<Protobuf<SearchResponse>, AppError> {
     let items = search_media(
-        &user,
+        user.id,
         &context.pool,
         context.text_embedder,
         params.clone().query,
@@ -47,35 +47,35 @@ pub async fn get_search_results(
 #[instrument(skip(context, user), err(Debug))]
 pub async fn get_search_suggestions_handler(
     State(context): State<ApiContext>,
-    Extension(user): Extension<User>,
+    Extension(user): Extension<ApiUser>,
     Query(params): Query<SearchSuggestionsParams>,
 ) -> Result<Protobuf<SearchSuggestionsResponse>, AppError> {
-    let result = get_search_suggestions(&user, &context.pool, &params.query, params.limit).await?;
+    let result = get_search_suggestions(user.id, &context.pool, &params.query, params.limit).await?;
     Ok(Protobuf(result))
 }
 
 #[instrument(skip(context, user), err(Debug))]
 pub async fn get_random_search_suggestion_handler(
     State(context): State<ApiContext>,
-    Extension(user): Extension<User>,
+    Extension(user): Extension<ApiUser>,
 ) -> Result<String, AppError> {
-    let result = get_random_search_suggestion(&user, &context.pool).await?;
+    let result = get_random_search_suggestion(user.id, &context.pool).await?;
     Ok(result.unwrap_or_default())
 }
 
 #[instrument(skip(context, user), err(Debug))]
 pub async fn get_search_filter_ranges(
     State(context): State<ApiContext>,
-    Extension(user): Extension<User>,
+    Extension(user): Extension<ApiUser>,
 ) -> Result<Json<SearchFilterRanges>, AppError> {
-    let result = search_filter_ranges(&user, &context.pool).await?;
+    let result = search_filter_ranges(user.id, &context.pool).await?;
     Ok(Json(result))
 }
 
 #[instrument(skip(context, user, multipart), err(Debug))]
 pub async fn get_search_by_image_results(
     State(context): State<ApiContext>,
-    Extension(user): Extension<User>,
+    Extension(user): Extension<ApiUser>,
     Query(params): Query<SearchParams>,
     mut multipart: Multipart,
 ) -> Result<Protobuf<SearchResponse>, AppError> {
@@ -126,7 +126,7 @@ pub async fn get_search_by_image_results(
     let session_id = Uuid::new_v4();
 
     let items = search_by_image(
-        &user,
+        user.id,
         &context.pool,
         context.text_embedder,
         context.vision_embedder,
@@ -148,12 +148,12 @@ pub async fn get_search_by_image_results(
 #[instrument(skip(context, user), err(Debug))]
 pub async fn get_search_by_image_uuid(
     State(context): State<ApiContext>,
-    Extension(user): Extension<User>,
+    Extension(user): Extension<ApiUser>,
     Path(session_id): Path<Uuid>,
     Query(params): Query<SearchParams>,
 ) -> Result<Protobuf<SearchResponse>, AppError> {
     let items = search_by_image(
-        &user,
+        user.id,
         &context.pool,
         context.text_embedder,
         context.vision_embedder,
@@ -175,7 +175,7 @@ pub async fn get_search_by_image_uuid(
 #[instrument(skip(context, user), err(Debug))]
 pub async fn get_search_by_media_items(
     State(context): State<ApiContext>,
-    Extension(user): Extension<User>,
+    Extension(user): Extension<ApiUser>,
     Path(media_item_ids): Path<String>,
     Query(params): Query<SearchParams>,
 ) -> Result<Protobuf<SearchResponse>, AppError> {
@@ -185,7 +185,7 @@ pub async fn get_search_by_media_items(
         .filter(|s| !s.is_empty())
         .collect::<Vec<String>>();
     let items = search_by_media_items(
-        &user,
+        user.id,
         &context.pool,
         context.text_embedder,
         context.vision_embedder,

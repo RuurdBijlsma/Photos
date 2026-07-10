@@ -1,16 +1,16 @@
 use crate::api_state::ApiContext;
+use crate::auth::middlewares::user::ApiUser;
 use axum::extract::{Path, State};
 use axum::{Extension, Json};
 use common_services::api::app_error::AppError;
 use common_services::api::user::interfaces::{SmallUser, UpdateUserProfileRequest, UserProfile};
 use common_services::api::user::service::{get_user_profile, update_user_profile};
-use common_services::database::app_user::User;
 use common_services::database::user_store::UserStore;
 
 /// Fetch the profile data and library statistics for any user.
 pub async fn get_user_profile_handler(
     State(ctx): State<ApiContext>,
-    Extension(user): Extension<User>,
+    Extension(user): Extension<ApiUser>,
     Path(user_id): Path<i32>,
 ) -> Result<Json<UserProfile>, AppError> {
     let profile = get_user_profile(&ctx.pool, user.id, user_id).await?;
@@ -20,7 +20,7 @@ pub async fn get_user_profile_handler(
 /// Update the current authenticated user's settings.
 pub async fn update_my_profile(
     State(ctx): State<ApiContext>,
-    Extension(user): Extension<User>,
+    Extension(user): Extension<ApiUser>,
     Json(payload): Json<UpdateUserProfileRequest>,
 ) -> Result<Json<UserProfile>, AppError> {
     let profile = update_user_profile(&ctx.pool, user.id, payload.name, payload.avatar_id).await?;

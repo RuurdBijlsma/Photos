@@ -1,10 +1,10 @@
 use crate::api::app_error::AppError;
 use crate::api::user::interfaces::{UserProfile, UserStats};
 use crate::database::UpdateField::Value;
-use crate::database::app_user::UserRole;
+use crate::database::app_user::{User, UserRole};
 use crate::database::user_store::UserStore;
 use crate::database::{UpdateField, UpdateUserPayload};
-use sqlx::PgPool;
+use sqlx::{Executor, PgPool, Postgres};
 
 pub async fn get_user_profile(
     pool: &PgPool,
@@ -106,4 +106,13 @@ pub async fn update_user_profile(
         avatar_id: user.avatar_id,
         stats,
     })
+}
+
+pub async fn find_required_by_id(
+    executor: impl Executor<'_, Database = Postgres>,
+    user_id: i32,
+) -> Result<User, AppError> {
+    UserStore::find_by_id(executor, user_id)
+        .await?
+        .ok_or(AppError::NotFound(format!("User {user_id} not found")))
 }

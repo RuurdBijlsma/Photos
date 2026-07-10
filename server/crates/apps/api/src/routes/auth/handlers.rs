@@ -1,9 +1,7 @@
-//! This module defines the HTTP handlers for authentication-related routes.
-
 use crate::api_state::ApiContext;
+use crate::auth::middlewares::user::ApiUser;
 use axum::response::{IntoResponse, Response};
 use axum::{Extension, Json, extract::State, http::StatusCode};
-
 use common_services::api::app_error::AppError;
 use common_services::api::auth::interfaces::{CreateUser, GenerateInvitePayload, LoginUser};
 use common_services::api::auth::service::{
@@ -12,19 +10,21 @@ use common_services::api::auth::service::{
 };
 use common_services::api::auth::token::generate_refresh_token_parts;
 use common_services::database::app_user::{User, UserInvite};
+use common_services::database::user_store::UserStore;
+use sqlx::PgPool;
 use tracing::instrument;
 
 /// Formats standard `HttpOnly` cookie properties consistently.
 #[must_use]
 pub fn make_cookie(name: &str, value: &str, max_age_secs: Option<i64>, secure: bool) -> String {
-    let mut cookie = format!("{name}={value}; HttpOnly; Path=/; SameSite=Lax");
-    if secure {
-        cookie.push_str("; Secure");
-    }
-    if let Some(max_age) = max_age_secs {
-        cookie.push_str(&format!("; Max-Age={max_age}"));
-    }
-    cookie
+    let secure_str = if secure { "; Secure" } else { "" };
+
+    max_age_secs.map_or_else(
+        || format!("{name}={value}; HttpOnly; Path=/; SameSite=Lax{secure_str}"),
+        |max_age| {
+            format!("{name}={value}; HttpOnly; Path=/; SameSite=Lax{secure_str}; Max-Age={max_age}")
+        },
+    )
 }
 
 /// Handles user login and returns secure HTTP-only cookies.
@@ -155,8 +155,14 @@ pub async fn logout(
 }
 
 /// Get current user info.
-pub async fn get_me(Extension(user): Extension<User>) -> Result<Json<User>, StatusCode> {
-    Ok(Json(user))
+pub async fn get_me(
+    Extension(user): Extension<ApiUser>,
+    State(pool): State<PgPool>,
+) -> Result<Json<User>, AppError> {
+    let Some(user_info) = UserStore::find_by_id(&pool, user.id).await? else {
+        return Err(AppError::NotFound("User not found".to_owned()));
+    };
+    Ok(Json(user_info))
 }
 
 /// Generates a new user invite token.

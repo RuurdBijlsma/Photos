@@ -4,7 +4,6 @@ use axum::body::Bytes;
 use axum::extract::{Query, State};
 use axum::response::{IntoResponse, Response};
 use common_services::api::app_error::AppError;
-use common_services::database::app_user::User;
 use common_services::database::media_item_store::MediaItemStore;
 use http::{StatusCode, header};
 use std::fs::File;
@@ -12,6 +11,7 @@ use std::io::{Error as IoError, ErrorKind, Read, Result as IoResult, Write};
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 use tracing::instrument;
+use crate::auth::middlewares::user::ApiUser;
 
 struct ChannelWriter {
     tx: mpsc::Sender<Result<Bytes, IoError>>,
@@ -48,7 +48,7 @@ pub struct ZipDownloadParams {
 #[instrument(skip(context, user), err(Debug))]
 pub async fn download_zip_stream_handler(
     State(context): State<ApiContext>,
-    Extension(user): Extension<User>,
+    Extension(user): Extension<ApiUser>,
     Query(params): Query<ZipDownloadParams>,
 ) -> Result<impl IntoResponse, AppError> {
     let ids: Vec<String> = params.ids.split(',').map(std::string::ToString::to_string).collect();
