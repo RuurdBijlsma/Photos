@@ -9,8 +9,6 @@ import { useEventListener, useRafFn, useTimeoutFn } from '@vueuse/core'
 import apiClient from '@/scripts/services/api.ts'
 import type { PannellumConfig } from '@/scripts/types/api/pannellumConfig.ts'
 
-// todo: if top of image and bottom of image are both within viewport, then dont allow panning vertically, I.e., lock the image vertically centered. This is relevant with wide panoramas
-
 const PanoramaViewer = defineAsyncComponent(
   () => import('@/vues/components/viewer/components/PanoramaViewer.vue'),
 )
@@ -41,6 +39,7 @@ const scale = ref(1)
 const translateX = ref(0)
 const translateY = ref(0)
 const containerRef = ref<HTMLElement | null>(null)
+const thumbRef = ref<HTMLImageElement | null>(null)
 const baseUrl = apiClient.defaults.baseURL
 
 const activePointers = new Map<number, PointerEvent>()
@@ -350,21 +349,66 @@ function zoomToPoint(clientX: number, clientY: number, newScale: number) {
   }
 }
 
+function getImageAspectRatio(): number | null {
+  if (thumbRef.value && thumbRef.value.naturalWidth > 0 && thumbRef.value.naturalHeight > 0) {
+    return thumbRef.value.naturalWidth / thumbRef.value.naturalHeight
+  }
+  return null
+}
+
 function clampTranslations() {
   if (!containerRef.value) return
 
   const w = containerRef.value.clientWidth
   const h = containerRef.value.clientHeight
 
+  const aspectRatio = getImageAspectRatio()
+  const containerRatio = w / h
+
+  let drawnWidth = w
+  let drawnHeight = h
+
+  if (aspectRatio && aspectRatio > 0) {
+    if (aspectRatio > containerRatio) {
+      drawnWidth = w
+      drawnHeight = w / aspectRatio
+    } else {
+      drawnWidth = h * aspectRatio
+      drawnHeight = h
+    }
+  }
+
+  const paddingPx = scale.value < 1.4 ? 0 : scale.value * 40
+
+  // 1. Horizontal clamping
   if (scale.value <= 1) {
     translateX.value = 0
-    translateY.value = 0
-  } else {
-    const minX = w * (1 - scale.value)
-    const maxX = 0
-    const minY = h * (1 - scale.value)
-    const maxY = 0
+  } else if (drawnWidth * scale.value <= w) {
+    // Image is narrower than the viewport: Center it, but allow comfortable wiggle room
+    const center = (w / 2) * (1 - scale.value)
+    const minX = center - paddingPx
+    const maxX = center + paddingPx
     translateX.value = Math.max(minX, Math.min(maxX, translateX.value))
+  } else {
+    // Image is wider than the viewport: Allow panning, clamped with soft edge padding
+    const minX = w - paddingPx - ((w + drawnWidth) / 2) * scale.value
+    const maxX = paddingPx - ((w - drawnWidth) / 2) * scale.value
+    translateX.value = Math.max(minX, Math.min(maxX, translateX.value))
+  }
+
+  // 2. Vertical clamping
+  if (scale.value <= 1) {
+    translateY.value = 0
+  } else if (drawnHeight * scale.value <= h) {
+    // Image is shorter than the viewport: Center it, but allow comfortable wiggle room
+    const center = (h / 2) * (1 - scale.value)
+    const minY = center - paddingPx
+    const maxY = center + paddingPx
+    translateY.value = Math.max(minY, Math.min(maxY, translateY.value))
+  } else {
+    // Image is taller than the viewport: Allow panning, clamped with soft edge padding
+    const minY = h - paddingPx - ((h + drawnHeight) / 2) * scale.value
+    const maxY = paddingPx - ((h - drawnHeight) / 2) * scale.value
     translateY.value = Math.max(minY, Math.min(maxY, translateY.value))
   }
 }
@@ -524,9 +568,11 @@ useEventListener(containerRef, 'wheel', handleWheel, { passive: false })
       <div class="image-wrapper" :style="transformStyle">
         <!-- Thumbnail layer at bottom -->
         <img
+          ref="thumbRef"
           class="image-tag thumbnail-img"
           :src="imageUrl"
           alt="Thumbnail image"
+          @load="clampTranslations"
           @dragstart.prevent
         />
 
