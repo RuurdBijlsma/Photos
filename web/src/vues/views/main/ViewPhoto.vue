@@ -24,6 +24,7 @@ import { useProfileStore } from '@/scripts/stores/profileStore.ts'
 import AddToAlbumCard from '@/vues/components/timeline/timeline-components/AddToAlbumCard.vue'
 import { useUiHider } from '@/scripts/composables/useUiHider.ts'
 import { navigatorShare } from '@/scripts/sharing.ts'
+import PhotoGallery from '@/vues/components/viewer/components/PhotoGallery.vue'
 
 const props = withDefaults(
   defineProps<{
@@ -137,6 +138,11 @@ const timelineItem = computed<TimelineItem | undefined>(() => {
 const isVideo = computed<boolean>(
   () => fullImage.value?.is_video ?? timelineItem.value?.isVideo ?? false,
 )
+
+const currentItemRatio = computed<boolean>(() => {
+  if (fullImage.value) return fullImage.value.width / fullImage.value.height
+  return 1
+})
 
 async function initialize() {
   const loadingId = id.value
@@ -267,6 +273,12 @@ watch(isVideo, () => {
       @zoom-change="isZoomed = $event"
       @pano-active="isPanoActive = $event"
       :elemental-fullscreen="false"
+    />
+    <photo-gallery
+      class="photo-gallery"
+      :focus-id="id"
+      :queue="orderedIds"
+      :ratio="currentItemRatio"
     />
     <div class="top-bar">
       <div class="left-buttons">
@@ -494,12 +506,21 @@ watch(isVideo, () => {
 
 .photo-viewer {
   width: 100%;
-  height: 100%;
+  height: calc(100% - 100px);
   position: absolute;
   top: 0;
   left: 0;
   z-index: 1500;
   background-color: rgb(var(--bg));
+}
+
+.photo-gallery {
+  width: 100%;
+  height: 100px;
+  bottom: 0;
+  left: 0;
+  z-index: 1500;
+  position: absolute;
 }
 
 .top-bar {
