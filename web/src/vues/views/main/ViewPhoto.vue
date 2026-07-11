@@ -139,7 +139,7 @@ const isVideo = computed<boolean>(
   () => fullImage.value?.is_video ?? timelineItem.value?.isVideo ?? false,
 )
 
-const currentItemRatio = computed<boolean>(() => {
+const currentItemRatio = computed(() => {
   if (fullImage.value) return fullImage.value.width / fullImage.value.height
   return 1
 })
@@ -275,7 +275,9 @@ watch(isVideo, () => {
       :elemental-fullscreen="false"
     />
     <photo-gallery
+      :height="100"
       class="photo-gallery"
+      v-if="id"
       :focus-id="id"
       :queue="orderedIds"
       :ratio="currentItemRatio"
