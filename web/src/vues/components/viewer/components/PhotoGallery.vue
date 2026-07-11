@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, nextTick, useTemplateRef, watch, ref, onBeforeUnmount } from 'vue'
+import { computed, nextTick, useTemplateRef, watch, ref } from 'vue'
 import { useVirtualizer, type VirtualItem } from '@tanstack/vue-virtual'
+import { useTimeoutFn } from '@vueuse/core'
 import ThumbnailImg from '@/vues/components/ui/ThumbnailImg.vue'
 
 const props = defineProps<{
@@ -52,17 +53,21 @@ function getThumbStyle(virtualItem: VirtualItem) {
 let lastFocusIdChangeTime = 0
 let isRapid = false
 const RAPID_NAVIGATION_THRESHOLD = 180 // ms
-let deferTimeout: number | null = null
+
+const { start: startDefer, stop: stopDefer } = useTimeoutFn(
+  (newId: string) => {
+    activeFocusId.value = newId
+  },
+  100,
+  { immediate: false },
+)
 
 // 1. Listen for raw prop focus changes to gauge transition speeds and queue delays
 watch(
   () => props.focusId,
   (newId) => {
     if (!newId) return
-
-    if (deferTimeout) {
-      clearTimeout(deferTimeout)
-    }
+    stopDefer()
 
     const now = performance.now()
     const isInitial = lastFocusIdChangeTime === 0
@@ -73,11 +78,8 @@ watch(
       // Rapid skipping / loop: don't delay layout updates so it snaps instantly
       activeFocusId.value = newId
     } else {
-      // Single slow navigation: defer layout changes by 140ms
-      // to yield the main thread to MediaViewer's high-res loading scripting
-      deferTimeout = window.setTimeout(() => {
-        activeFocusId.value = newId
-      }, 100)
+      // Delay setting new focus id for 100ms to avoid lag spike during animation
+      startDefer(newId)
     }
   },
   { immediate: true },
@@ -111,12 +113,6 @@ watch(
   },
   { deep: true },
 )
-
-onBeforeUnmount(() => {
-  if (deferTimeout) {
-    clearTimeout(deferTimeout)
-  }
-})
 </script>
 
 <template>
@@ -178,9 +174,6 @@ onBeforeUnmount(() => {
   transition:
     width 0.5s cubic-bezier(0.25, 0.8, 0.25, 1),
     transform 0.5s cubic-bezier(0.25, 0.8, 0.25, 1);
-
-  /* FIXED: Remove "width" from layout-engine preparing optimizes.
-     Only transition transform on the compositor thread. */
   will-change: transform;
 }
 </style>
