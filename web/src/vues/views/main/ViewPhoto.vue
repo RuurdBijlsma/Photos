@@ -25,6 +25,7 @@ import AddToAlbumCard from '@/vues/components/timeline/timeline-components/AddTo
 import { useUiHider } from '@/scripts/composables/useUiHider.ts'
 import { navigatorShare } from '@/scripts/sharing.ts'
 import PhotoGallery from '@/vues/components/viewer/components/PhotoGallery.vue'
+import { useStorage } from '@vueuse/core'
 
 const props = withDefaults(
   defineProps<{
@@ -62,7 +63,8 @@ const isZoomed = ref(false)
 const isPanoActive = ref(false)
 const showAddToAlbum = ref(false)
 const isSharing = ref(false)
-const photoGalleryHeight = ref(100)
+const photoGalleryHeight = ref(500)
+const showGallery = useStorage('show-view-photo-gallery', false)
 
 const { showUI } = useUiHider(10, () => {
   return infoMenuOpen.value || optionsOpen.value
@@ -167,15 +169,19 @@ function handleKeyDown(e: KeyboardEvent) {
   if (dialogs.anyVisible) return
   if (e.key === 'ArrowLeft' && prevId.value) {
     e.preventDefault()
-    router.replace({ path: `${viewPhotoStore.viewLink}${prevId.value}`, query: route.query })
+    changeMediaItem(prevId.value)
   } else if (e.key === 'ArrowRight' && nextId.value) {
     e.preventDefault()
-    router.replace({ path: `${viewPhotoStore.viewLink}${nextId.value}`, query: route.query })
+    changeMediaItem(nextId.value)
   } else if (e.key === 'Escape') {
     e.preventDefault()
     e.stopPropagation()
     router.push(parentLocation.value)
   }
+}
+
+async function changeMediaItem(mediaItemId: string) {
+  await router.replace({ path: `${viewPhotoStore.viewLink}${mediaItemId}`, query: route.query })
 }
 
 function prefetchMediaItem(mediaItemId: string) {
@@ -193,10 +199,7 @@ async function moveToBin() {
   if (!binId) return
   await binStore.softDeleteItems([binId])
   if (onDeleteMoveToId) {
-    await router.replace({
-      path: `${viewPhotoStore.viewLink}${onDeleteMoveToId}`,
-      query: route.query,
-    })
+    changeMediaItem(onDeleteMoveToId)
   } else {
     await router.push(parentLocation.value)
   }
@@ -219,11 +222,11 @@ function shareMedia() {
 }
 
 function goNext() {
-  router.replace({ path: `${viewPhotoStore.viewLink}${nextId.value}`, query: route.query })
+  changeMediaItem(nextId.value)
 }
 
 function goPrev() {
-  router.replace({ path: `${viewPhotoStore.viewLink}${prevId.value}`, query: route.query })
+  changeMediaItem(prevId.value)
 }
 onMounted(() => document.addEventListener('keydown', handleKeyDown))
 onUnmounted(() => document.removeEventListener('keydown', handleKeyDown))
@@ -274,6 +277,9 @@ watch(isVideo, () => {
       @zoom-change="isZoomed = $event"
       @pano-active="isPanoActive = $event"
       :elemental-fullscreen="false"
+      :style="{
+        height: `calc(100% - ${showGallery ? photoGalleryHeight : 0}px)`,
+      }"
     />
     <photo-gallery
       :height="photoGalleryHeight"
@@ -281,10 +287,11 @@ watch(isVideo, () => {
         height: photoGalleryHeight + 'px',
       }"
       class="photo-gallery"
-      v-if="id"
+      v-if="showGallery && id"
       :focus-id="id"
       :queue="orderedIds"
       :ratio="currentItemRatio"
+      @change-focus="(id) => changeMediaItem(id)"
     />
     <div class="top-bar">
       <div class="left-buttons">
@@ -298,6 +305,7 @@ watch(isVideo, () => {
         <v-btn
           rounded="xl"
           icon="mdi-view-gallery-outline"
+          @click="showGallery = !showGallery"
           variant="plain"
           v-tooltip="{ text: 'Toggle gallery', location: 'bottom', attach: true, width: 140 }"
         />
@@ -512,7 +520,6 @@ watch(isVideo, () => {
 
 .photo-viewer {
   width: 100%;
-  height: calc(100% - v-bind(photoGalleryHeight) * 1px);
   position: absolute;
   top: 0;
   left: 0;

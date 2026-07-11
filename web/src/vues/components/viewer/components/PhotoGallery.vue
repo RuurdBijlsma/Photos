@@ -9,10 +9,11 @@ const props = defineProps<{
   queue: string[]
   height: number
 }>()
+const emit = defineEmits(['change-focus'])
 
 const scrollContainerEl = useTemplateRef<HTMLDivElement>('scrollContainer')
 const NON_FOCUS_RATIO = 0.5
-const PADDING = 2
+const PADDING = 5
 const GAP = 4
 const FOCUS_MARGIN = 10
 
@@ -46,21 +47,37 @@ function getThumbStyle(virtualItem: VirtualItem) {
   }
 }
 
-// Force virtualizer remeasurement and auto-center the current active item
+let lastFocusId = ''
+let lastFocusIdChangeTime = 0
+let isRapid = false
+const RAPID_NAVIGATION_THRESHOLD = 180 // ms
+
 watch(
   [() => props.focusId, () => props.ratio],
   ([newId]) => {
     if (!newId) return
+
+    virtualizer.value.measure()
     const index = props.queue.indexOf(newId)
-    if (index !== -1) {
-      virtualizer.value.measure()
-      nextTick(() => {
-        virtualizer.value.scrollToIndex(index, {
-          align: 'center',
-          behavior: 'smooth',
-        })
-      })
+    if (index === -1) return
+
+    // Only update navigation timestamps and recalculate rapid skipping
+    // when the active media item actually changes, ignoring ratio-only updates.
+    if (newId !== lastFocusId) {
+      const now = performance.now()
+      const isInitial = lastFocusIdChangeTime === 0
+      isRapid = isInitial || now - lastFocusIdChangeTime < RAPID_NAVIGATION_THRESHOLD
+      lastFocusIdChangeTime = now
+      lastFocusId = newId
     }
+
+    nextTick(() => {
+      console.log(isRapid ? 'auto' : 'smooth')
+      virtualizer.value.scrollToIndex(index, {
+        align: 'center',
+        behavior: isRapid ? 'auto' : 'smooth',
+      })
+    })
   },
   { immediate: true },
 )
@@ -83,6 +100,7 @@ watch(
       }"
     >
       <thumbnail-img
+        @click="emit('change-focus', queue[virtualItem.index]!)"
         v-for="virtualItem in virtualizer.getVirtualItems()"
         :key="virtualItem.key"
         :media-item-id="queue[virtualItem.index]!"
@@ -105,7 +123,6 @@ watch(
   overflow-y: hidden;
   position: relative;
   scrollbar-width: none;
-  background-color: red;
   padding: calc(v-bind(PADDING) * 1px);
   box-sizing: border-box;
 }
@@ -121,11 +138,18 @@ watch(
 }
 
 .gallery-thumb {
+  cursor: pointer;
   position: absolute;
   top: 0;
   left: 0;
   overflow: hidden;
   box-sizing: border-box;
   border-radius: calc((v-bind(height) * 1px) / 13);
+
+  /* Transition widths and absolute shifts smoothly on standard navigation */
+  transition:
+    width 0.5s cubic-bezier(0.25, 0.8, 0.25, 1),
+    transform 0.5s cubic-bezier(0.25, 0.8, 0.25, 1);
+  will-change: width, transform;
 }
 </style>
