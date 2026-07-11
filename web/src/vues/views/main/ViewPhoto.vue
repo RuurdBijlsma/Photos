@@ -62,6 +62,7 @@ const isZoomed = ref(false)
 const isPanoActive = ref(false)
 const showAddToAlbum = ref(false)
 const isSharing = ref(false)
+const photoGalleryHeight = ref(100)
 
 const { showUI } = useUiHider(10, () => {
   return infoMenuOpen.value || optionsOpen.value
@@ -275,7 +276,10 @@ watch(isVideo, () => {
       :elemental-fullscreen="false"
     />
     <photo-gallery
-      :height="100"
+      :height="photoGalleryHeight"
+      :style="{
+        height: photoGalleryHeight + 'px',
+      }"
       class="photo-gallery"
       v-if="id"
       :focus-id="id"
@@ -508,7 +512,7 @@ watch(isVideo, () => {
 
 .photo-viewer {
   width: 100%;
-  height: calc(100% - 100px);
+  height: calc(100% - v-bind(photoGalleryHeight) * 1px);
   position: absolute;
   top: 0;
   left: 0;
@@ -518,7 +522,6 @@ watch(isVideo, () => {
 
 .photo-gallery {
   width: 100%;
-  height: 100px;
   bottom: 0;
   left: 0;
   z-index: 1500;

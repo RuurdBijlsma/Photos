@@ -13,7 +13,7 @@ const props = defineProps<{
 const scrollContainerEl = useTemplateRef<HTMLDivElement>('scrollContainer')
 const NON_FOCUS_RATIO = 0.5
 const PADDING = 2
-const GAP = 2
+const GAP = 4
 const FOCUS_MARGIN = 10
 
 const virtualizerOptions = computed(() => ({
@@ -126,6 +126,6 @@ watch(
   left: 0;
   overflow: hidden;
   box-sizing: border-box;
-  border-radius: 4px;
+  border-radius: calc((v-bind(height) * 1px) / 13);
 }
 </style>
