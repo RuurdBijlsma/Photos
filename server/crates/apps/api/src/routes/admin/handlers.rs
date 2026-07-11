@@ -6,6 +6,7 @@ use app_state::IngestSettings;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::{Extension, Json};
+use sqlx::PgPool;
 use common_services::api::admin::interfaces::{
     AdminUserInfo, DiskResponse, FolderParams, MakeFolderBody, MediaSampleResponse,
     UnsupportedFilesResponse, UpdateUserMediaFolderBody,
@@ -89,10 +90,10 @@ pub async fn update_user_media_folder_handler(
 
 /// Deletes a user account.
 pub async fn delete_user_handler(
-    State(context): State<ApiContext>,
+    State(pool): State<PgPool>,
     Extension(current_user): Extension<ApiUser>,
     Path(target_user_id): Path<i32>,
 ) -> Result<StatusCode, AppError> {
-    admin_delete_user(&context.pool, target_user_id, current_user.id).await?;
+    admin_delete_user(&pool, target_user_id, current_user.id).await?;
     Ok(StatusCode::NO_CONTENT)
 }

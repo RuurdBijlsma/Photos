@@ -29,7 +29,7 @@ const router = createRouter({
           ],
         },
         {
-          path: 'share/:isVideo/:mediaId',
+          path: 'share/:viewerType/:mediaId',
           name: 'share',
           meta: { requiresAuth: false },
           component: () => import('@/vues/views/main/ShareView.vue'),

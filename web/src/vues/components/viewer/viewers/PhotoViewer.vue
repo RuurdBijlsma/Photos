@@ -7,6 +7,7 @@ import mediaItemService from '@/scripts/services/mediaItemService.ts'
 import axios from 'axios'
 import { useEventListener, useRafFn, useTimeoutFn } from '@vueuse/core'
 import apiClient from '@/scripts/services/api.ts'
+import type { PannellumConfig } from '@/scripts/types/api/pannellumConfig.ts'
 
 // todo: if top of image and bottom of image are both within viewport, then dont allow panning vertically, I.e., lock the image vertically centered. This is relevant with wide panoramas
 
@@ -19,6 +20,7 @@ const props = withDefaults(
     disableEventCapture: boolean
     mediaItemId: string
     showUi?: boolean
+    forcePano?: PannellumConfig | undefined
   }>(),
   {
     showUi: true,
@@ -54,8 +56,10 @@ const fullImage = computed(() => mediaItemStore.anyMediaItems.get(props.mediaIte
 const generatedThumbsAvailable = computed(() => fullImage.value?.has_thumbnails ?? true)
 
 // Panorama states
-const isPanorama = computed(() => fullImage.value?.use_panorama_viewer ?? false)
-const panoramaConfig = computed(() => fullImage.value?.panorama_config)
+const isPanorama = computed(
+  () => props.forcePano !== undefined || (fullImage.value?.use_panorama_viewer ?? false),
+)
+const panoramaConfig = computed(() => props.forcePano ?? fullImage.value?.panorama_config)
 const is3DMode = ref(false)
 
 // Phase 1: Immediate Thumbnail URL (1440p)

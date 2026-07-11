@@ -3,6 +3,7 @@ use crate::auth::middlewares::user::ApiUser;
 use axum::extract::State;
 use axum::{Extension, Json};
 use axum_extra::protobuf::Protobuf;
+use sqlx::PgPool;
 use common_services::api::app_error::AppError;
 use common_services::api::trash::interfaces::TrashBatchRequest;
 use common_services::api::trash::service::{
@@ -11,22 +12,22 @@ use common_services::api::trash::service::{
 use common_types::pb::api::OrderedMediaResponse;
 use tracing::instrument;
 
-#[instrument(skip(context, user), err(Debug))]
+#[instrument(skip(pool, user), err(Debug))]
 pub async fn get_trash_handler(
-    State(context): State<ApiContext>,
+    State(pool): State<PgPool>,
     Extension(user): Extension<ApiUser>,
 ) -> Result<Protobuf<OrderedMediaResponse>, AppError> {
-    let timeline = get_trash_items(&context.pool, user.id).await?;
+    let timeline = get_trash_items(&pool, user.id).await?;
     Ok(Protobuf(timeline))
 }
 
-#[instrument(skip(context, user), err(Debug))]
+#[instrument(skip(pool, user), err(Debug))]
 pub async fn soft_delete_handler(
-    State(context): State<ApiContext>,
+    State(pool): State<PgPool>,
     Extension(user): Extension<ApiUser>,
     Json(payload): Json<TrashBatchRequest>,
 ) -> Result<(), AppError> {
-    soft_delete_items(&context.pool, user.id, &payload.ids).await?;
+    soft_delete_items(&pool, user.id, &payload.ids).await?;
     Ok(())
 }
 
@@ -51,12 +52,12 @@ pub async fn perma_delete_handler(
     Ok(())
 }
 
-#[instrument(skip(context, user), err(Debug))]
+#[instrument(skip(pool, user), err(Debug))]
 pub async fn restore_handler(
-    State(context): State<ApiContext>,
+    State(pool): State<PgPool>,
     Extension(user): Extension<ApiUser>,
     Json(payload): Json<TrashBatchRequest>,
 ) -> Result<(), AppError> {
-    restore_items(&context.pool, user.id, &payload.ids).await?;
+    restore_items(&pool, user.id, &payload.ids).await?;
     Ok(())
 }

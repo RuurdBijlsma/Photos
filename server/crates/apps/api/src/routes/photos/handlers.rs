@@ -14,8 +14,9 @@ use crate::api_state::ApiContext;
 use crate::auth::middlewares::user::ApiUser;
 use axum::http::header;
 use axum::response::IntoResponse;
-use axum_extra::headers::Range;
 use axum_extra::TypedHeader;
+use axum_extra::headers::Range;
+use sqlx::PgPool;
 use common_services::api::app_error::AppError;
 use common_services::api::photos::interfaces::PhotoThumbnailParams;
 use common_services::database::cached_store::cached_store;
@@ -23,33 +24,33 @@ use common_services::database::media_item_store::MediaItemStore;
 use common_types::pb::api::MapPhotosResponse;
 use tracing::instrument;
 
-#[instrument(skip(context, user), err(Debug))]
+#[instrument(skip(pool, user), err(Debug))]
 pub async fn get_full_item_handler(
-    State(context): State<ApiContext>,
+    State(pool): State<PgPool>,
     Extension(user): Extension<ApiUser>,
     Path(media_item_id): Path<String>,
 ) -> Result<Json<MediaItemWithAlbums>, AppError> {
-    let item = MediaItemStore::find_by_id(&context.pool, &media_item_id).await?;
+    let item = MediaItemStore::find_by_id(&pool, &media_item_id).await?;
     if let Some(item) = item
         && item.user_id == user.id
     {
         Ok(Json(MediaItemWithAlbums {
             media_item: item,
-            albums: AlbumStore::list_for_media_item(&context.pool, user.id, &media_item_id).await?,
+            albums: AlbumStore::list_for_media_item(&pool, user.id, &media_item_id).await?,
         }))
     } else {
         Err(AppError::NotFound(media_item_id))
     }
 }
 
-#[instrument(skip(context, user), err(Debug))]
+#[instrument(skip(pool, user), err(Debug))]
 pub async fn update_media_item_handler(
-    State(context): State<ApiContext>,
+    State(pool): State<PgPool>,
     Extension(user): Extension<ApiUser>,
     Path(media_item_id): Path<String>,
     Json(payload): Json<UpdateMediaItemRequest>,
 ) -> Result<(), AppError> {
-    update_media_item(&context.pool, &media_item_id, user.id, &payload).await?;
+    update_media_item(&pool, &media_item_id, user.id, &payload).await?;
 
     Ok(())
 }
@@ -140,18 +141,33 @@ pub async fn stream_video_handler(
     .await
 }
 
-#[instrument(skip(context, user), err(Debug))]
+#[instrument(skip(pool, user), err(Debug))]
 pub async fn get_geo_photos_handler(
-    State(context): State<ApiContext>,
+    State(pool): State<PgPool>,
     Extension(user): Extension<ApiUser>,
     Query(params): Query<GeoPhotosParams>,
 ) -> Result<Protobuf<MapPhotosResponse>, AppError> {
     let items = MediaItemStore::find_all_geo_by_user_id(
-        &context.pool,
+        &pool,
         user.id,
         params.start_date,
         params.end_date,
     )
     .await?;
     Ok(Protobuf(MapPhotosResponse { items }))
+}
+
+#[instrument(skip(pool), err(Debug))]
+pub async fn get_pano_config(
+    State(pool): State<PgPool>,
+    Path(media_item_id): Path<String>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    let Some(full_media_item) = MediaItemStore::find_by_id(&pool, &media_item_id).await?
+    else {
+        return Err(AppError::NotFound("Media Item not found".to_owned()));
+    };
+    let Some(pano_config) = full_media_item.panorama_config else {
+        return Err(AppError::NotFound("Media Item not a pano".to_owned()));
+    };
+    Ok(Json(pano_config))
 }

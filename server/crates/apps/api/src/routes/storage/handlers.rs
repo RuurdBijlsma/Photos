@@ -3,6 +3,7 @@ use crate::auth::middlewares::user::ApiUser;
 use axum::extract::State;
 use axum::Extension;
 use axum_extra::protobuf::Protobuf;
+use sqlx::PgPool;
 use common_services::api::app_error::AppError;
 use common_services::api::system::storage::{
     get_blurry_storage_items, get_large_storage_items, get_storage_summary,
@@ -20,22 +21,22 @@ pub async fn storage_summary_handler(
     ))
 }
 
-#[instrument(skip(context, user), err(Debug))]
+#[instrument(skip(pool, user), err(Debug))]
 pub async fn storage_review_handler(
-    State(context): State<ApiContext>,
+    State(pool): State<PgPool>,
     Extension(user): Extension<ApiUser>,
 ) -> Result<Protobuf<StorageReviewResponse>, AppError> {
     Ok(Protobuf(
-        get_large_storage_items(&context.pool, user.id).await?,
+        get_large_storage_items(&pool, user.id).await?,
     ))
 }
 
-#[instrument(skip(context, user), err(Debug))]
+#[instrument(skip(pool, user), err(Debug))]
 pub async fn storage_blurry_handler(
-    State(context): State<ApiContext>,
+    State(pool): State<PgPool>,
     Extension(user): Extension<ApiUser>,
 ) -> Result<Protobuf<StorageReviewResponse>, AppError> {
     Ok(Protobuf(
-        get_blurry_storage_items(&context.pool, user.id).await?,
+        get_blurry_storage_items(&pool, user.id).await?,
     ))
 }

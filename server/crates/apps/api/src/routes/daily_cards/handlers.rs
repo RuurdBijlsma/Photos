@@ -3,6 +3,7 @@ use crate::auth::middlewares::user::ApiUser;
 use axum::extract::{Query, State};
 use axum::{Extension, Json};
 use chrono::NaiveDate;
+use sqlx::PgPool;
 use common_services::api::app_error::AppError;
 use common_services::api::daily_cards::interfaces::{
     DailyCardResponse, DailyCardsQueryParams, ValidateMediaRequest,
@@ -27,12 +28,12 @@ pub async fn get_daily_cards_handler(
     Ok(Json(result))
 }
 
-#[instrument(skip(context, user), err(Debug))]
+#[instrument(skip(pool, user), err(Debug))]
 pub async fn validate_media_handler(
-    State(context): State<ApiContext>,
+    State(pool): State<PgPool>,
     Extension(user): Extension<ApiUser>,
     Json(payload): Json<ValidateMediaRequest>,
 ) -> Result<Json<Vec<String>>, AppError> {
-    let result = validate_media_items(&context.pool, user.id, &payload.media_item_ids).await?;
+    let result = validate_media_items(&pool, user.id, &payload.media_item_ids).await?;
     Ok(Json(result))
 }

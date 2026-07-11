@@ -232,6 +232,7 @@ pub struct SharedMediaItem {
     pub media_features: SharedMediaFeatures,
     pub camera_settings: CameraSettings,
     pub user_caption: Option<String>,
+    pub panorama_config: Option<serde_json::Value>
 }
 
 impl From<FullMediaItem> for SharedMediaItem {
@@ -254,6 +255,7 @@ impl From<FullMediaItem> for SharedMediaItem {
             weather: item.weather,
             camera_settings: item.camera_settings,
             user_caption: item.user_caption,
+            panorama_config: item.panorama_config,
             media_features: SharedMediaFeatures {
                 mime_type: item.media_features.mime_type,
                 size_bytes: item.media_features.size_bytes,

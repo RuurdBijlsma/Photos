@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { defineAsyncComponent } from 'vue'
+import type { PannellumConfig } from '@/scripts/types/api/pannellumConfig.ts'
 
 const PhotoViewer = defineAsyncComponent(
   () => import('@/vues/components/viewer/viewers/PhotoViewer.vue'),
@@ -16,6 +17,7 @@ defineProps<{
   showUi?: boolean
   autoplay?: boolean
   elementalFullscreen: boolean
+  forcePano?: PannellumConfig | undefined
 }>()
 
 const emit = defineEmits<{
@@ -33,6 +35,7 @@ const emit = defineEmits<{
       :show-ui="showUi"
       @zoom-change="emit('zoom-change', $event)"
       @pano-active="emit('pano-active', $event)"
+      :force-pano="forcePano"
     />
     <video-viewer
       :media-item-id="mediaItemId"

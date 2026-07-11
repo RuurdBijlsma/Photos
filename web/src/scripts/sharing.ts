@@ -1,11 +1,12 @@
-import { onMounted, onUnmounted, watch } from 'vue'
 import apiClient from '@/scripts/services/api.ts'
 import { copyToClipboard, getThumbnailHeight, getVideoHeight } from '@/scripts/utils.ts'
 
-export async function navigatorShare(id: string, isVideo: boolean, hasThumbnails?: boolean, filename?: string) {
+export async function navigatorShare(id: string, isVideo: boolean, hasThumbnails?: boolean, filename?: string, usePanoViewer?: boolean) {
   if (!id) return
 
-  const shareUrl = `${window.location.origin}/share/${isVideo ? 'v' : 'p'}/${id}`
+  const isPano = usePanoViewer ?? false
+  const shareLetter = isVideo ? 'v' : isPano ? 'pano' : 'p'
+  const shareUrl = `${window.location.origin}/share/${shareLetter}/${id}`
 
   try {
     if (!navigator.share) {

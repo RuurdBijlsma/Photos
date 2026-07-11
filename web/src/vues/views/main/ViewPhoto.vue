@@ -253,9 +253,12 @@ function shareMedia() {
       isVideo.value,
       fullImage.value?.has_thumbnails,
       fullImage.value?.filename,
+      fullImage.value?.use_panorama_viewer,
     )
   else {
-    const shareUrl = `${window.location.origin}/share/${isVideo.value ? 'v' : 'p'}/${id.value}`
+    const isPano = fullImage.value?.use_panorama_viewer ?? false
+    const shareLetter = isVideo.value ? 'v' : isPano ? 'pano' : 'p'
+    const shareUrl = `${window.location.origin}/share/${shareLetter}/${id.value}`
     copyToClipboard(shareUrl)
   }
 }

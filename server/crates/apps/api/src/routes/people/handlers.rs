@@ -1,4 +1,3 @@
-use crate::api_state::ApiContext;
 use crate::auth::middlewares::user::ApiUser;
 use app_state::constants::FACE_CLUSTERS_FOLDER;
 use axum::extract::{Path, State};
@@ -12,66 +11,67 @@ use common_services::api::people::service::{
 };
 use common_types::pb::api::{FullPersonMediaResponse, ListPeopleResponse};
 use http::header::CACHE_CONTROL;
+use sqlx::PgPool;
 use tracing::instrument;
 
-#[instrument(skip(context, user), err(Debug))]
+#[instrument(skip(pool, user), err(Debug))]
 pub async fn list_people_handler(
-    State(context): State<ApiContext>,
+    State(pool): State<PgPool>,
     Extension(user): Extension<ApiUser>,
 ) -> Result<Protobuf<ListPeopleResponse>, AppError> {
-    let result = get_all_people(&context.pool, user.id).await?;
+    let result = get_all_people(&pool, user.id).await?;
     Ok(Protobuf(result))
 }
 
-#[instrument(skip(context, user), err(Debug))]
+#[instrument(skip(pool, user), err(Debug))]
 pub async fn update_person_handler(
-    State(context): State<ApiContext>,
+    State(pool): State<PgPool>,
     Extension(user): Extension<ApiUser>,
     Path(person_id): Path<String>,
     Json(payload): Json<UpdatePersonRequest>,
 ) -> Result<(), AppError> {
-    update_person(&context.pool, &person_id, user.id, &payload).await?;
+    update_person(&pool, &person_id, user.id, &payload).await?;
     Ok(())
 }
 
-#[instrument(skip(context, user), err(Debug))]
+#[instrument(skip(pool, user), err(Debug))]
 pub async fn merge_person_handler(
-    State(context): State<ApiContext>,
+    State(pool): State<PgPool>,
     Extension(user): Extension<ApiUser>,
     Path(person_id): Path<String>,
     Json(payload): Json<MergePersonRequest>,
 ) -> Result<(), AppError> {
-    merge_person(&context.pool, &person_id, user.id, &payload).await?;
+    merge_person(&pool, &person_id, user.id, &payload).await?;
     Ok(())
 }
 
-#[instrument(skip(context, user), err(Debug))]
+#[instrument(skip(pool, user), err(Debug))]
 pub async fn unmerge_person_handler(
-    State(context): State<ApiContext>,
+    State(pool): State<PgPool>,
     Extension(user): Extension<ApiUser>,
     Path(person_id): Path<String>,
 ) -> Result<(), AppError> {
-    unmerge_person(&context.pool, &person_id, user.id).await?;
+    unmerge_person(&pool, &person_id, user.id).await?;
     Ok(())
 }
 
-#[instrument(skip(context, user), err(Debug))]
+#[instrument(skip(pool, user), err(Debug))]
 pub async fn get_person_photos_handler(
-    State(context): State<ApiContext>,
+    State(pool): State<PgPool>,
     Extension(user): Extension<ApiUser>,
     Path(person_id): Path<String>,
 ) -> Result<Protobuf<FullPersonMediaResponse>, AppError> {
-    let result = get_person_photos(&context.pool, &person_id, user.id).await?;
+    let result = get_person_photos(&pool, &person_id, user.id).await?;
     Ok(Protobuf(result))
 }
 
 pub async fn get_person_thumbnail_redirect_handler(
-    State(context): State<ApiContext>,
+    State(pool): State<PgPool>,
     Path(person_id): Path<String>,
 ) -> Result<impl IntoResponse, AppError> {
     let cluster_id = if let Some(db_face) =
         sqlx::query_scalar!("SELECT face_thumb_id FROM person WHERE id = $1", person_id)
-            .fetch_one(&context.pool)
+            .fetch_one(&pool)
             .await?
     {
         db_face
@@ -80,7 +80,7 @@ pub async fn get_person_thumbnail_redirect_handler(
             "SELECT id FROM face_cluster WHERE person_id = $1",
             person_id
         )
-        .fetch_one(&context.pool)
+        .fetch_one(&pool)
         .await?
     };
     let target_url = format!("/{FACE_CLUSTERS_FOLDER}/{cluster_id}.webp");
@@ -88,9 +88,9 @@ pub async fn get_person_thumbnail_redirect_handler(
     Ok((headers, Redirect::temporary(&target_url)))
 }
 
-#[instrument(skip(context, user), err(Debug))]
+#[instrument(skip(pool, user), err(Debug))]
 pub async fn get_person_media_item_id(
-    State(context): State<ApiContext>,
+    State(pool): State<PgPool>,
     Extension(user): Extension<ApiUser>,
     Path(person_id): Path<String>,
 ) -> Result<Json<String>, AppError> {
@@ -98,7 +98,7 @@ pub async fn get_person_media_item_id(
         "SELECT thumb_media_item_id FROM face_cluster WHERE person_id = $1 AND user_id = $2 AND thumb_media_item_id IS NOT NULL",
         person_id, user.id
     )
-        .fetch_one(&context.pool)
+        .fetch_one(&pool)
         .await? else {
         return Err(AppError::NotFound(person_id));
     };

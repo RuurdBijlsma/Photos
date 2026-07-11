@@ -15,6 +15,7 @@ use common_services::api::search::service::{
 use common_types::pb::api::{SearchResponse, SearchSuggestionsResponse};
 use image::ImageReader;
 use std::io::Cursor;
+use sqlx::PgPool;
 use tracing::instrument;
 use uuid::Uuid;
 use crate::auth::middlewares::user::ApiUser;
@@ -44,31 +45,31 @@ pub async fn get_search_results(
     }))
 }
 
-#[instrument(skip(context, user), err(Debug))]
+#[instrument(skip(pool, user), err(Debug))]
 pub async fn get_search_suggestions_handler(
-    State(context): State<ApiContext>,
+    State(pool): State<PgPool>,
     Extension(user): Extension<ApiUser>,
     Query(params): Query<SearchSuggestionsParams>,
 ) -> Result<Protobuf<SearchSuggestionsResponse>, AppError> {
-    let result = get_search_suggestions(user.id, &context.pool, &params.query, params.limit).await?;
+    let result = get_search_suggestions(user.id, &pool, &params.query, params.limit).await?;
     Ok(Protobuf(result))
 }
 
-#[instrument(skip(context, user), err(Debug))]
+#[instrument(skip(pool, user), err(Debug))]
 pub async fn get_random_search_suggestion_handler(
-    State(context): State<ApiContext>,
+    State(pool): State<PgPool>,
     Extension(user): Extension<ApiUser>,
 ) -> Result<String, AppError> {
-    let result = get_random_search_suggestion(user.id, &context.pool).await?;
+    let result = get_random_search_suggestion(user.id, &pool).await?;
     Ok(result.unwrap_or_default())
 }
 
-#[instrument(skip(context, user), err(Debug))]
+#[instrument(skip(pool, user), err(Debug))]
 pub async fn get_search_filter_ranges(
-    State(context): State<ApiContext>,
+    State(pool): State<PgPool>,
     Extension(user): Extension<ApiUser>,
 ) -> Result<Json<SearchFilterRanges>, AppError> {
-    let result = search_filter_ranges(user.id, &context.pool).await?;
+    let result = search_filter_ranges(user.id, &pool).await?;
     Ok(Json(result))
 }
 
