@@ -6,8 +6,11 @@ import { useMediaItemStore } from '@/scripts/stores/timeline/mediaItemStore.ts'
 import { useSelectionStore } from '@/scripts/stores/timeline/selectionStore.ts'
 import { useViewPhotoStore } from '@/scripts/stores/timeline/viewPhotoStore.ts'
 import MediaViewer from '@/vues/components/viewer/MediaViewer.vue'
-import { TimelineItem } from '@/scripts/types/generated/timeline.ts'
-import { useTimelineStore } from '@/scripts/stores/timeline/timelineStore.ts'
+import {
+  type SimpleTimelineItem,
+  type StorageReviewItem,
+  TimelineItem,
+} from '@/scripts/types/generated/timeline.ts'
 import MediaInfoPanel from '@/vues/components/viewer/components/MediaInfoPanel.vue'
 import {
   copyToClipboard,
@@ -45,7 +48,6 @@ const router = useRouter()
 const theme = useTheme()
 const mediaItemStore = useMediaItemStore()
 const downloadStore = useDownloadStore()
-const timelineStore = useTimelineStore()
 const settings = useSettingStore()
 const selectionStore = useSelectionStore()
 const viewPhotoStore = useViewPhotoStore()
@@ -168,10 +170,12 @@ const albumsForCurrentItem = computed(() => {
   return mediaItemStore.getAlbumsForMediaItem(id.value)
 })
 
-const timelineItem = computed<TimelineItem | undefined>(() => {
-  if (!id.value) return undefined
-  return timelineStore.mediaItemsMap.get(id.value)
-})
+const timelineItem = computed<TimelineItem | SimpleTimelineItem | StorageReviewItem | undefined>(
+  () => {
+    if (!id.value) return undefined
+    return viewPhotoStore.idsMetadata.get(id.value)
+  },
+)
 
 const isVideo = computed<boolean>(
   () => fullImage.value?.is_video ?? timelineItem.value?.isVideo ?? false,

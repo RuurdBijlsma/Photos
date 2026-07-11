@@ -542,6 +542,14 @@ onBeforeUnmount(() => {
 })
 
 watch(
+  () => timelineStore.mediaItemsMap,
+  () => {
+    viewPhotoStore.idsMetadata = timelineStore.mediaItemsMap
+  },
+  { immediate: true },
+)
+
+watch(
   () => route.query.onboarding,
   (onboarding) => {
     if (onboarding === 'true') {

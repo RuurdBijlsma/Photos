@@ -2,7 +2,7 @@
 import type { SimpleTimelineItem } from '@/scripts/types/generated/timeline.ts'
 import { computed, nextTick, ref, shallowRef, useTemplateRef, watch } from 'vue'
 import type { SimpleLayoutRow, TimelineContext } from '@/scripts/types/timeline/layout.ts'
-import { getThumbnailHeight } from '@/scripts/utils.ts'
+import { arrayToMap, getThumbnailHeight } from '@/scripts/utils.ts'
 import { useDebounceFn, useEventListener, useResizeObserver, useThrottleFn } from '@vueuse/core'
 import { useVirtualizer } from '@tanstack/vue-virtual'
 import VirtualSimpleRow from '@/vues/components/timeline/simple-timeline/VirtualSimpleRow.vue'
@@ -346,6 +346,9 @@ watch(
   () => {
     const ids = props.timelineItems.map((item) => item.id)
     viewPhotoStore.ids = ids
+    requestIdleCallback(() => {
+      viewPhotoStore.idsMetadata = arrayToMap(props.timelineItems)
+    })
     viewPhotoStore.viewLink = props.viewLink
     selectionStore.allIds = ids
   },

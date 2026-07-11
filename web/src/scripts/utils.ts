@@ -209,3 +209,14 @@ export function caps(str: string) {
   if (str.length === 0) return str
   return str[0].toUpperCase() + str.slice(1)
 }
+
+export function arrayToMap<T extends { id: string }>(items: readonly T[]): Map<string, T> {
+  const map = new Map<string, T>();
+
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
+    map.set(item.id, item);
+  }
+
+  return map;
+}

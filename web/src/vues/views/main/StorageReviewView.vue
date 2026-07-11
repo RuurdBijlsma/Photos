@@ -5,7 +5,7 @@ import { useResizeObserver } from '@vueuse/core'
 import { useVirtualizer } from '@tanstack/vue-virtual'
 import MainLayoutContainer from '@/vues/components/MainLayoutContainer.vue'
 import storageService from '@/scripts/services/storageService.ts'
-import { prettyBytes } from '@/scripts/utils.ts'
+import { arrayToMap, prettyBytes } from '@/scripts/utils.ts'
 import { useDialogStore } from '@/scripts/stores/dialogStore.ts'
 import { useSnackbarsStore } from '@/scripts/stores/snackbarStore.ts'
 import type { StorageReviewItem } from '@/scripts/types/generated/timeline.ts'
@@ -138,6 +138,9 @@ watch(
   [items, () => mode.value],
   () => {
     viewPhotoStore.ids = items.value.map((i) => i.id)
+    requestIdleCallback(() => {
+      viewPhotoStore.idsMetadata = arrayToMap(items.value)
+    })
     viewPhotoStore.viewLink =
       mode.value === 'blurry' ? '/storage/blurry/view/' : '/storage/review/view/'
   },
