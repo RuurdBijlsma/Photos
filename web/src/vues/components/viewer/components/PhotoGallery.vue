@@ -12,8 +12,9 @@ const props = defineProps<{
 
 const scrollContainerEl = useTemplateRef<HTMLDivElement>('scrollContainer')
 const NON_FOCUS_RATIO = 0.5
-const PADDING = 4
+const PADDING = 2
 const GAP = 2
+const FOCUS_MARGIN = 10
 
 const virtualizerOptions = computed(() => ({
   count: props.queue.length,
@@ -51,7 +52,6 @@ watch(
   { immediate: true },
 )
 
-// Watch for queue updates to ensure layout remeasures correctly
 watch(
   () => props.queue,
   () => {
@@ -69,24 +69,21 @@ watch(
         width: `${virtualizer.getTotalSize()}px`,
       }"
     >
-      <div
+      <thumbnail-img
         v-for="virtualItem in virtualizer.getVirtualItems()"
         :key="virtualItem.key"
-        class="gallery-img"
+        :media-item-id="queue[virtualItem.index]!"
+        :height="144"
+        cover
+        loading="lazy"
+        decoding="async"
+        class="gallery-thumb"
         :style="{
           width: `${virtualItem.size - GAP}px`,
           height: `${height - PADDING * 2}px`,
           transform: `translateX(${virtualItem.start}px)`,
         }"
-      >
-        <thumbnail-img
-          :media-item-id="queue[virtualItem.index]!"
-          :height="144"
-          cover
-          loading="lazy"
-          decoding="async"
-        />
-      </div>
+      />
     </div>
   </div>
 </template>
@@ -101,6 +98,7 @@ watch(
   scrollbar-width: none;
   background-color: red;
   padding: calc(v-bind(PADDING) * 1px);
+  box-sizing: border-box;
 }
 
 .gallery-container::-webkit-scrollbar {
@@ -110,10 +108,15 @@ watch(
 .gallery-inner {
   height: 100%;
   position: relative;
+  box-sizing: border-box;
 }
 
-.gallery-img {
+.gallery-thumb {
   position: absolute;
+  top: 0;
   left: 0;
+  overflow: hidden;
+  box-sizing: border-box;
+  border-radius: 4px;
 }
 </style>
