@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useRoute, useRouter } from 'vue-router'
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useSettingStore } from '@/scripts/stores/settingsStore.ts'
 import { useMediaItemStore } from '@/scripts/stores/timeline/mediaItemStore.ts'
 import { useSelectionStore } from '@/scripts/stores/timeline/selectionStore.ts'
@@ -25,7 +25,7 @@ import AddToAlbumCard from '@/vues/components/timeline/timeline-components/AddTo
 import { useUiHider } from '@/scripts/composables/useUiHider.ts'
 import { navigatorShare } from '@/scripts/sharing.ts'
 import PhotoGallery from '@/vues/components/viewer/components/PhotoGallery.vue'
-import { useStorage } from '@vueuse/core'
+import { useStorage, useEventListener } from '@vueuse/core'
 
 const props = withDefaults(
   defineProps<{
@@ -67,7 +67,6 @@ const isSharing = ref(false)
 const photoGalleryHeight = useStorage('view-photo-gallery-height', 100)
 const showGallery = useStorage('show-view-photo-gallery', false)
 
-// todo: vueuse event listeners
 const isResizing = ref(false)
 let startY = 0
 let startHeight = 0
@@ -77,16 +76,13 @@ function startResize(e: PointerEvent) {
   isResizing.value = true
   startY = e.clientY
   startHeight = photoGalleryHeight.value
-
-  window.addEventListener('pointermove', handleResize)
-  window.addEventListener('pointerup', stopResize)
 }
 
 function handleResize(e: PointerEvent) {
   if (!isResizing.value) return
   const deltaY = startY - e.clientY
   let newHeight = startHeight + deltaY
-  if (newHeight < 40) {
+  if (newHeight < 5) {
     showGallery.value = false
     stopResize()
     return
@@ -98,10 +94,12 @@ function handleResize(e: PointerEvent) {
 function stopResize() {
   if (isResizing.value) {
     isResizing.value = false
-    window.removeEventListener('pointermove', handleResize)
-    window.removeEventListener('pointerup', stopResize)
   }
 }
+
+useEventListener(window, 'pointermove', handleResize)
+useEventListener(window, 'pointerup', stopResize)
+useEventListener(document, 'keydown', handleKeyDown)
 
 const { showUI } = useUiHider(10, () => {
   return infoMenuOpen.value || optionsOpen.value
@@ -265,12 +263,6 @@ function goNext() {
 function goPrev() {
   changeMediaItem(prevId.value)
 }
-onMounted(() => document.addEventListener('keydown', handleKeyDown))
-onUnmounted(() => {
-  document.removeEventListener('keydown', handleKeyDown)
-  window.removeEventListener('pointermove', handleResize)
-  window.removeEventListener('pointerup', stopResize)
-})
 
 // Pre-fetch
 watch(prevId, () => {
