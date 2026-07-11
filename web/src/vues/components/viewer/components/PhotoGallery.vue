@@ -9,6 +9,7 @@ const props = defineProps<{
   focusId: string
   queue: string[]
   height: number
+  resizing?: boolean
 }>()
 const emit = defineEmits(['change-focus'])
 
@@ -85,20 +86,19 @@ watch(
   { immediate: true },
 )
 
-// 2. Watch the decoupled active ID and ratio updates to trigger scroll centering and remeasuring
+// 2. Watch active ID, ratio, and height updates to trigger scroll centering and remeasuring
 watch(
-  [activeFocusId, () => props.ratio],
+  [activeFocusId, () => props.ratio, () => props.height],
   ([newId]) => {
     if (!newId) return
-
     virtualizer.value.measure()
     const index = props.queue.indexOf(newId)
     if (index === -1) return
-
+    const useInstant = isRapid || props.resizing
     nextTick(() => {
       virtualizer.value.scrollToIndex(index, {
         align: 'center',
-        behavior: isRapid ? 'auto' : 'smooth',
+        behavior: useInstant ? 'auto' : 'smooth',
       })
     })
   },
@@ -116,7 +116,7 @@ watch(
 </script>
 
 <template>
-  <div ref="scrollContainer" class="gallery-container">
+  <div ref="scrollContainer" class="gallery-container" :class="{ resizing: props.resizing }">
     <div
       class="gallery-inner"
       :style="{
@@ -175,5 +175,10 @@ watch(
     width 0.5s cubic-bezier(0.25, 0.8, 0.25, 1),
     transform 0.5s cubic-bezier(0.25, 0.8, 0.25, 1);
   will-change: transform;
+}
+
+/* Disable transitions entirely on the thumbnails while resizing is in progress */
+.gallery-container.resizing .gallery-thumb {
+  transition: none !important;
 }
 </style>

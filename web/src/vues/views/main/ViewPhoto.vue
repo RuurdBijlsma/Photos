@@ -63,8 +63,45 @@ const isZoomed = ref(false)
 const isPanoActive = ref(false)
 const showAddToAlbum = ref(false)
 const isSharing = ref(false)
-const photoGalleryHeight = ref(500)
+
+const photoGalleryHeight = useStorage('view-photo-gallery-height', 100)
 const showGallery = useStorage('show-view-photo-gallery', false)
+
+// todo: vueuse event listeners
+const isResizing = ref(false)
+let startY = 0
+let startHeight = 0
+
+function startResize(e: PointerEvent) {
+  e.preventDefault()
+  isResizing.value = true
+  startY = e.clientY
+  startHeight = photoGalleryHeight.value
+
+  window.addEventListener('pointermove', handleResize)
+  window.addEventListener('pointerup', stopResize)
+}
+
+function handleResize(e: PointerEvent) {
+  if (!isResizing.value) return
+  const deltaY = startY - e.clientY
+  let newHeight = startHeight + deltaY
+  if (newHeight < 40) {
+    showGallery.value = false
+    stopResize()
+    return
+  }
+  newHeight = Math.max(50, Math.min(300, newHeight))
+  photoGalleryHeight.value = newHeight
+}
+
+function stopResize() {
+  if (isResizing.value) {
+    isResizing.value = false
+    window.removeEventListener('pointermove', handleResize)
+    window.removeEventListener('pointerup', stopResize)
+  }
+}
 
 const { showUI } = useUiHider(10, () => {
   return infoMenuOpen.value || optionsOpen.value
@@ -229,7 +266,11 @@ function goPrev() {
   changeMediaItem(prevId.value)
 }
 onMounted(() => document.addEventListener('keydown', handleKeyDown))
-onUnmounted(() => document.removeEventListener('keydown', handleKeyDown))
+onUnmounted(() => {
+  document.removeEventListener('keydown', handleKeyDown)
+  window.removeEventListener('pointermove', handleResize)
+  window.removeEventListener('pointerup', stopResize)
+})
 
 // Pre-fetch
 watch(prevId, () => {
@@ -291,8 +332,10 @@ watch(isVideo, () => {
       :focus-id="id"
       :queue="orderedIds"
       :ratio="currentItemRatio"
+      :resizing="isResizing"
       @change-focus="(id) => changeMediaItem(id)"
     />
+    <div v-if="showGallery && id" class="gallery-resize-handle" @pointerdown="startResize" />
     <div class="top-bar">
       <div class="left-buttons">
         <v-btn
@@ -533,6 +576,16 @@ watch(isVideo, () => {
   left: 0;
   z-index: 1500;
   position: absolute;
+}
+
+.gallery-resize-handle {
+  position: absolute;
+  bottom: calc(v-bind(photoGalleryHeight) * 1px - 8px);
+  left: 0;
+  width: 100%;
+  height: 12px;
+  cursor: ns-resize;
+  z-index: 1510;
 }
 
 .top-bar {

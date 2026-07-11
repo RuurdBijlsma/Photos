@@ -19,7 +19,7 @@ export function useUiHider(maxHideSeconds: number, preventUiHide: () => boolean 
   })
   useEventListener(document, 'mouseleave', () => {
     if (!preventUiHide()) {
-      hideSeconds.value = 0
+      hideSeconds.value = 1
     }
   })
 
