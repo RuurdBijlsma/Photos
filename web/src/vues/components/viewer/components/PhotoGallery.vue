@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, useTemplateRef, watch } from 'vue'
+import { computed, nextTick, useTemplateRef, watch, ref, onBeforeUnmount } from 'vue'
 import { useVirtualizer, type VirtualItem } from '@tanstack/vue-virtual'
 import ThumbnailImg from '@/vues/components/ui/ThumbnailImg.vue'
 
@@ -17,12 +17,14 @@ const PADDING = 5
 const GAP = 4
 const FOCUS_MARGIN = 10
 
+const activeFocusId = ref(props.focusId)
+
 const virtualizerOptions = computed(() => ({
   count: props.queue.length,
   getScrollElement: () => scrollContainerEl.value,
   estimateSize: (index: number) => {
     const id = props.queue[index]
-    const isFocused = id === props.focusId
+    const isFocused = id === activeFocusId.value
     const baseSize = isFocused
       ? (props.height - PADDING * 2) * props.ratio + FOCUS_MARGIN * 2
       : props.height * NON_FOCUS_RATIO
@@ -36,7 +38,7 @@ const virtualizer = useVirtualizer(virtualizerOptions)
 
 // Dynamically calculate individual dimensions and absolute positioning shifts
 function getThumbStyle(virtualItem: VirtualItem) {
-  const isFocused = props.queue[virtualItem.index] === props.focusId
+  const isFocused = props.queue[virtualItem.index] === activeFocusId.value
   const width = isFocused ? virtualItem.size - FOCUS_MARGIN * 2 - GAP : virtualItem.size - GAP
   const translateX = isFocused ? virtualItem.start + FOCUS_MARGIN : virtualItem.start
 
@@ -47,13 +49,43 @@ function getThumbStyle(virtualItem: VirtualItem) {
   }
 }
 
-let lastFocusId = ''
 let lastFocusIdChangeTime = 0
 let isRapid = false
 const RAPID_NAVIGATION_THRESHOLD = 180 // ms
+let deferTimeout: number | null = null
 
+// 1. Listen for raw prop focus changes to gauge transition speeds and queue delays
 watch(
-  [() => props.focusId, () => props.ratio],
+  () => props.focusId,
+  (newId) => {
+    if (!newId) return
+
+    if (deferTimeout) {
+      clearTimeout(deferTimeout)
+    }
+
+    const now = performance.now()
+    const isInitial = lastFocusIdChangeTime === 0
+    isRapid = isInitial || now - lastFocusIdChangeTime < RAPID_NAVIGATION_THRESHOLD
+    lastFocusIdChangeTime = now
+
+    if (isRapid) {
+      // Rapid skipping / loop: don't delay layout updates so it snaps instantly
+      activeFocusId.value = newId
+    } else {
+      // Single slow navigation: defer layout changes by 140ms
+      // to yield the main thread to MediaViewer's high-res loading scripting
+      deferTimeout = window.setTimeout(() => {
+        activeFocusId.value = newId
+      }, 100)
+    }
+  },
+  { immediate: true },
+)
+
+// 2. Watch the decoupled active ID and ratio updates to trigger scroll centering and remeasuring
+watch(
+  [activeFocusId, () => props.ratio],
   ([newId]) => {
     if (!newId) return
 
@@ -61,18 +93,7 @@ watch(
     const index = props.queue.indexOf(newId)
     if (index === -1) return
 
-    // Only update navigation timestamps and recalculate rapid skipping
-    // when the active media item actually changes, ignoring ratio-only updates.
-    if (newId !== lastFocusId) {
-      const now = performance.now()
-      const isInitial = lastFocusIdChangeTime === 0
-      isRapid = isInitial || now - lastFocusIdChangeTime < RAPID_NAVIGATION_THRESHOLD
-      lastFocusIdChangeTime = now
-      lastFocusId = newId
-    }
-
     nextTick(() => {
-      console.log(isRapid ? 'auto' : 'smooth')
       virtualizer.value.scrollToIndex(index, {
         align: 'center',
         behavior: isRapid ? 'auto' : 'smooth',
@@ -82,6 +103,7 @@ watch(
   { immediate: true },
 )
 
+// Watch for queue updates to ensure layout remeasures
 watch(
   () => props.queue,
   () => {
@@ -89,6 +111,12 @@ watch(
   },
   { deep: true },
 )
+
+onBeforeUnmount(() => {
+  if (deferTimeout) {
+    clearTimeout(deferTimeout)
+  }
+})
 </script>
 
 <template>
@@ -150,6 +178,9 @@ watch(
   transition:
     width 0.5s cubic-bezier(0.25, 0.8, 0.25, 1),
     transform 0.5s cubic-bezier(0.25, 0.8, 0.25, 1);
-  will-change: width, transform;
+
+  /* FIXED: Remove "width" from layout-engine preparing optimizes.
+     Only transition transform on the compositor thread. */
+  will-change: transform;
 }
 </style>
