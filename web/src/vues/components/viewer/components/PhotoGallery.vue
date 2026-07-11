@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, useTemplateRef, watch } from 'vue'
-import { useVirtualizer } from '@tanstack/vue-virtual'
+import { useVirtualizer, type VirtualItem } from '@tanstack/vue-virtual'
 import ThumbnailImg from '@/vues/components/ui/ThumbnailImg.vue'
 
 const props = defineProps<{
@@ -22,16 +22,29 @@ const virtualizerOptions = computed(() => ({
   estimateSize: (index: number) => {
     const id = props.queue[index]
     const isFocused = id === props.focusId
-    return (
-      (isFocused ? (props.height - PADDING * 2) * props.ratio : props.height * NON_FOCUS_RATIO) +
-      GAP
-    )
+    const baseSize = isFocused
+      ? (props.height - PADDING * 2) * props.ratio + FOCUS_MARGIN * 2
+      : props.height * NON_FOCUS_RATIO
+    return baseSize + GAP
   },
   horizontal: true,
   overscan: 10,
 }))
 
 const virtualizer = useVirtualizer(virtualizerOptions)
+
+// Dynamically calculate individual dimensions and absolute positioning shifts
+function getThumbStyle(virtualItem: VirtualItem) {
+  const isFocused = props.queue[virtualItem.index] === props.focusId
+  const width = isFocused ? virtualItem.size - FOCUS_MARGIN * 2 - GAP : virtualItem.size - GAP
+  const translateX = isFocused ? virtualItem.start + FOCUS_MARGIN : virtualItem.start
+
+  return {
+    width: `${width}px`,
+    height: `${props.height - PADDING * 2}px`,
+    transform: `translateX(${translateX}px)`,
+  }
+}
 
 // Force virtualizer remeasurement and auto-center the current active item
 watch(
@@ -78,11 +91,7 @@ watch(
         loading="lazy"
         decoding="async"
         class="gallery-thumb"
-        :style="{
-          width: `${virtualItem.size - GAP}px`,
-          height: `${height - PADDING * 2}px`,
-          transform: `translateX(${virtualItem.start}px)`,
-        }"
+        :style="getThumbStyle(virtualItem)"
       />
     </div>
   </div>
