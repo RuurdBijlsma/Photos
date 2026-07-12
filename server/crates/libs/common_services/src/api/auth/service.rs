@@ -164,11 +164,11 @@ pub async fn refresh_tokens(
          WHERE selector = $1 AND expires_at > NOW()",
         selector
     )
-        .fetch_optional(pool)
-        .await?
-        .ok_or(AppError::Unauthorized(
-            "Refresh token expired or not found".to_owned(),
-        ))?;
+    .fetch_optional(pool)
+    .await?
+    .ok_or(AppError::Unauthorized(
+        "Refresh token expired or not found".to_owned(),
+    ))?;
 
     if !verify_token(&verifier_bytes, &record.verifier_hash)? {
         // If the verifier is wrong, assume token theft and delete all refresh tokens for that user.
@@ -176,9 +176,9 @@ pub async fn refresh_tokens(
             "DELETE FROM refresh_token WHERE user_id = $1",
             record.user_id
         )
-            .execute(pool)
-            .await
-            .ok();
+        .execute(pool)
+        .await
+        .ok();
         return Err(AppError::Unauthorized("Invalid token".to_owned()));
     }
 

@@ -93,8 +93,7 @@ impl CachedStore {
         let key = user_id;
 
         cache_lookup!(self.user_folders, key, async {
-            let user = UserStore::get_user_media_folder(executor, user_id)
-                .await?;
+            let user = UserStore::get_user_media_folder(executor, user_id).await?;
             Ok::<Option<String>, DbError>(user)
         })
     }

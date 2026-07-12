@@ -46,8 +46,7 @@ async function logout() {
         </template>
         <ingest-overlay-menu @close-menu="ingestMenuOpen = false" />
       </v-menu>
-
-      <v-btn variant="plain" rounded prepend-icon="mdi-upload"> Upload </v-btn>
+      <v-btn variant="plain" rounded prepend-icon="mdi-upload" to="/upload"> Upload </v-btn>
       <v-menu v-model="menuOpen" :close-on-content-click="false">
         <template v-slot:activator="{ props }">
           <v-btn icon v-bind="props">

@@ -16,12 +16,12 @@ use axum::http::header;
 use axum::response::IntoResponse;
 use axum_extra::TypedHeader;
 use axum_extra::headers::Range;
-use sqlx::PgPool;
 use common_services::api::app_error::AppError;
 use common_services::api::photos::interfaces::PhotoThumbnailParams;
 use common_services::database::cached_store::cached_store;
 use common_services::database::media_item_store::MediaItemStore;
 use common_types::pb::api::MapPhotosResponse;
+use sqlx::PgPool;
 use tracing::instrument;
 
 #[instrument(skip(pool, user), err(Debug))]
@@ -147,13 +147,9 @@ pub async fn get_geo_photos_handler(
     Extension(user): Extension<ApiUser>,
     Query(params): Query<GeoPhotosParams>,
 ) -> Result<Protobuf<MapPhotosResponse>, AppError> {
-    let items = MediaItemStore::find_all_geo_by_user_id(
-        &pool,
-        user.id,
-        params.start_date,
-        params.end_date,
-    )
-    .await?;
+    let items =
+        MediaItemStore::find_all_geo_by_user_id(&pool, user.id, params.start_date, params.end_date)
+            .await?;
     Ok(Protobuf(MapPhotosResponse { items }))
 }
 
@@ -162,8 +158,7 @@ pub async fn get_pano_config(
     State(pool): State<PgPool>,
     Path(media_item_id): Path<String>,
 ) -> Result<Json<serde_json::Value>, AppError> {
-    let Some(full_media_item) = MediaItemStore::find_by_id(&pool, &media_item_id).await?
-    else {
+    let Some(full_media_item) = MediaItemStore::find_by_id(&pool, &media_item_id).await? else {
         return Err(AppError::NotFound("Media Item not found".to_owned()));
     };
     let Some(pano_config) = full_media_item.panorama_config else {

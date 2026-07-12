@@ -1,4 +1,5 @@
 use crate::api_state::ApiContext;
+use crate::auth::middlewares::user::ApiUser;
 use axum::Extension;
 use axum::body::Bytes;
 use axum::extract::{Query, State};
@@ -11,7 +12,6 @@ use std::io::{Error as IoError, ErrorKind, Read, Result as IoResult, Write};
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 use tracing::instrument;
-use crate::auth::middlewares::user::ApiUser;
 
 struct ChannelWriter {
     tx: mpsc::Sender<Result<Bytes, IoError>>,
@@ -51,7 +51,11 @@ pub async fn download_zip_stream_handler(
     Extension(user): Extension<ApiUser>,
     Query(params): Query<ZipDownloadParams>,
 ) -> Result<impl IntoResponse, AppError> {
-    let ids: Vec<String> = params.ids.split(',').map(std::string::ToString::to_string).collect();
+    let ids: Vec<String> = params
+        .ids
+        .split(',')
+        .map(std::string::ToString::to_string)
+        .collect();
     if ids.is_empty() {
         return Err(AppError::BadRequest("No media IDs provided".to_string()));
     }
@@ -60,10 +64,11 @@ pub async fn download_zip_stream_handler(
     let mut files_to_zip = Vec::new();
     for id in &ids {
         if let Some(item) = MediaItemStore::find_by_id(&context.pool, id).await?
-            && item.user_id == user.id {
-                let full_path = context.settings.ingest.media_root.join(&item.relative_path);
-                files_to_zip.push((item.filename, full_path));
-            }
+            && item.user_id == user.id
+        {
+            let full_path = context.settings.ingest.media_root.join(&item.relative_path);
+            files_to_zip.push((item.filename, full_path));
+        }
     }
 
     if files_to_zip.is_empty() {

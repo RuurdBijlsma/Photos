@@ -6,7 +6,6 @@ use app_state::IngestSettings;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::{Extension, Json};
-use sqlx::PgPool;
 use common_services::api::admin::interfaces::{
     AdminUserInfo, DiskResponse, FolderParams, MakeFolderBody, MediaSampleResponse,
     UnsupportedFilesResponse, UpdateUserMediaFolderBody,
@@ -17,6 +16,7 @@ use common_services::api::admin::service::{
     list_admin_users,
 };
 use common_services::api::app_error::AppError;
+use sqlx::PgPool;
 
 /// Retrieves information about the configured media and thumbnail disks.
 pub async fn get_disk_response(

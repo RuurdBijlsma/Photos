@@ -1,6 +1,6 @@
-use crate::auth::middlewares::user::{ApiUser};
-use axum::extract::{Path, State};
+use crate::auth::middlewares::user::ApiUser;
 use axum::Extension;
+use axum::extract::{Path, State};
 use axum_extra::protobuf::Protobuf;
 use common_services::api::app_error::AppError;
 use common_services::api::camera::service::{get_all_cameras, get_camera_photos};

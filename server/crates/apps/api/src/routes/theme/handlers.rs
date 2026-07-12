@@ -11,7 +11,7 @@ use common_services::api::theme::interfaces::{
 use common_services::api::theme::service::random_photo_theme;
 use material_color_utils::dynamic::variant::Variant;
 use material_color_utils::utils::color_utils::Argb;
-use material_color_utils::{theme_from_color, MaterializedTheme};
+use material_color_utils::{MaterializedTheme, theme_from_color};
 
 pub async fn get_random_photo_theme(
     State(context): State<ApiContext>,

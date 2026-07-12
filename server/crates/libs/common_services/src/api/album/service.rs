@@ -1,5 +1,6 @@
 use super::interfaces::{AcceptInviteRequest, AlbumShareClaims, AlbumSort, SharedMediaItem};
 use crate::api::app_error::AppError;
+use crate::api::user::service::find_required_by_id;
 use crate::database::album::album::{Album, AlbumRole, AlbumSummary};
 use crate::database::album::album_collaborator::AlbumCollaborator;
 use crate::database::album_store::AlbumStore;
@@ -19,7 +20,6 @@ use common_types::pb::api::{AlbumInfo, FullAlbumMediaResponse, SimpleTimelineIte
 use jsonwebtoken::{EncodingKey, Header, encode};
 use sqlx::{Executor, PgPool, PgTransaction, Postgres};
 use tracing::instrument;
-use crate::api::user::service::find_required_by_id;
 
 const DEFAULT_ALBUM_SORT: AlbumSort = AlbumSort::DateAsc;
 

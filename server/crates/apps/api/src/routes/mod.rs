@@ -14,6 +14,7 @@ pub mod system;
 pub mod theme;
 pub mod timeline;
 pub mod trash;
+pub mod upload;
 pub mod user;
 
 use crate::album::router::{album_auth_optional_router, album_protected_router};
@@ -36,8 +37,9 @@ use crate::search::router::search_protected_router;
 use crate::storage::router::storage_protected_router;
 use crate::system::router::system_protected_router;
 use crate::theme::router::theme_protected_router;
-use crate::timeline::router::{timeline_protected_router};
+use crate::timeline::router::timeline_protected_router;
 use crate::trash::router::trash_protected_router;
+use crate::upload::router::upload_protected_router;
 use app_state::RateLimitingSettings;
 use axum::Router;
 use axum::middleware::{from_extractor_with_state, from_fn_with_state};
@@ -86,6 +88,7 @@ fn protected_routes(api_state: ApiContext) -> Router<ApiContext> {
         .merge(daily_cards_protected_router())
         .merge(trash_protected_router())
         .merge(jobs_protected_router())
+        .merge(upload_protected_router(&api_state))
         .route_layer(from_extractor_with_state::<ApiUser, ApiContext>(api_state))
 }
 

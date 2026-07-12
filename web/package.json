@@ -20,6 +20,7 @@
     "proto:gen": "protoc --plugin=protoc-gen-ts_proto=.\\node_modules\\.bin\\protoc-gen-ts_proto.cmd --ts_proto_out=./src/scripts/types/generated --ts_proto_opt=esModuleInterop=true --proto_path=./src/proto src/proto/timeline.proto"
   },
   "dependencies": {
+    "tus-js-client": "^4.3.1",
     "@mdi/font": "^7.4.47",
     "@tanstack/vue-virtual": "^3.13.23",
     "@vueuse/core": "^14.2.1",

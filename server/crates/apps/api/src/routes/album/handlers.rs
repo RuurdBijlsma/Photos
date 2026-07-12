@@ -6,6 +6,7 @@ use axum::{Extension, Json};
 use axum_extra::protobuf::Protobuf;
 use common_services::api::album::backup_restore::{list_backups, restore_albums};
 
+use crate::auth::middlewares::user::ApiUser;
 use app_state::IngestSettings;
 use common_services::api::album::interfaces::{
     AcceptInviteRequest, AddCollaboratorRequest, AddMediaToAlbumRequest, BackupInfo,
@@ -23,7 +24,6 @@ use common_services::database::album::album_collaborator::AlbumCollaborator;
 use common_services::database::album_store::AlbumStore;
 use common_types::pb::api::{FullAlbumMediaResponse, OrderedMediaResponse};
 use tracing::instrument;
-use crate::auth::middlewares::user::ApiUser;
 
 /// Create a new album.
 ///

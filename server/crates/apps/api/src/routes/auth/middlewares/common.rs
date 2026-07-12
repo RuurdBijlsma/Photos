@@ -22,7 +22,8 @@ where
 
 /// Parses a specific cookie's value from the HTTP request headers.
 pub fn extract_cookie_value(parts: &Parts, cookie_name: &str) -> Option<String> {
-    parts.headers
+    parts
+        .headers
         .get(header::COOKIE)?
         .to_str()
         .ok()?
@@ -55,6 +56,6 @@ pub fn decode_token(token: &str, jwt_secret: &str) -> Result<AuthClaims, AuthErr
         &DecodingKey::from_secret(jwt_secret.as_ref()),
         &Validation::default(),
     )
-        .map(|data| data.claims)
-        .map_err(|_| AuthError::InvalidToken)
+    .map(|data| data.claims)
+    .map_err(|_| AuthError::InvalidToken)
 }

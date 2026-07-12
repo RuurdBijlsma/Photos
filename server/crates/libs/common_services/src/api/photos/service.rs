@@ -1,6 +1,6 @@
 use crate::api::app_error::AppError;
 use crate::api::photos::interfaces::UpdateMediaItemRequest;
-use crate::database::app_user::{UserRole};
+use crate::database::app_user::UserRole;
 use crate::database::cached_store::cached_store;
 use crate::database::media_item_store::MediaItemStore;
 use crate::database::{UpdateField, UpdateMediaItemPayload, with_fallback_timezone};

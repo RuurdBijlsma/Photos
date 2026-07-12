@@ -5,7 +5,7 @@ use axum::{
     http::request::Parts,
 };
 use common_services::api::auth::error::AuthError;
-use common_services::database::app_user::{UserRole};
+use common_services::database::app_user::UserRole;
 
 #[derive(Clone, Debug)]
 pub struct ApiUser {

@@ -3,13 +3,13 @@ use crate::auth::middlewares::user::ApiUser;
 use axum::extract::State;
 use axum::{Extension, Json};
 use axum_extra::protobuf::Protobuf;
-use sqlx::PgPool;
 use common_services::api::app_error::AppError;
 use common_services::api::trash::interfaces::TrashBatchRequest;
 use common_services::api::trash::service::{
     get_trash_items, perma_delete_items, restore_items, soft_delete_items,
 };
 use common_types::pb::api::OrderedMediaResponse;
+use sqlx::PgPool;
 use tracing::instrument;
 
 #[instrument(skip(pool, user), err(Debug))]

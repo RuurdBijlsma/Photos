@@ -32,6 +32,9 @@ image = "0.25.10"
 uuid = { version = "1.23.2", features = ["v4", "serde"] }
 zip = { version = "9.0.0-pre2", default-features = false, features = ["deflate"] }
 tokio-stream = { version = "0.1.18", features = ["sync"] }
+fileloft-core = "0.3.0"
+fileloft-store-fs = "0.3.0"
+fileloft-axum = "0.3.0"
 
 
 [features]

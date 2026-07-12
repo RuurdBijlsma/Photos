@@ -1,4 +1,5 @@
 use crate::api_state::ApiContext;
+use crate::auth::middlewares::user::ApiUser;
 use axum::extract::{Multipart, Path, Query, State};
 use axum::{Extension, Json};
 use axum_extra::protobuf::Protobuf;
@@ -14,11 +15,10 @@ use common_services::api::search::service::{
 };
 use common_types::pb::api::{SearchResponse, SearchSuggestionsResponse};
 use image::ImageReader;
-use std::io::Cursor;
 use sqlx::PgPool;
+use std::io::Cursor;
 use tracing::instrument;
 use uuid::Uuid;
-use crate::auth::middlewares::user::ApiUser;
 
 /// Get a timeline of all media ratios, grouped by month.
 ///

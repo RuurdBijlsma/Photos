@@ -585,7 +585,7 @@ pub async fn get_search_suggestions(
 }
 
 pub async fn get_random_search_suggestion(
-    user_id:i32,
+    user_id: i32,
     pool: &PgPool,
 ) -> Result<Option<String>, AppError> {
     let rows = sqlx::query!(

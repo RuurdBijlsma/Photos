@@ -1,11 +1,11 @@
 use crate::api_state::ApiContext;
-use crate::auth::middlewares::common::{decode_token, extract_context, extract_access_token};
+use crate::auth::middlewares::common::{decode_token, extract_access_token, extract_context};
+use crate::auth::middlewares::user::ApiUser;
 use axum::{
     extract::{FromRequestParts, State},
     http::request::Parts,
 };
 use common_services::api::auth::error::AuthError;
-use crate::auth::middlewares::user::ApiUser;
 
 #[derive(Clone, Debug)]
 pub struct OptionalUser(pub Option<ApiUser>);

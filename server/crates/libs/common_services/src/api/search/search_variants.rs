@@ -8,7 +8,7 @@ use sqlx::PgPool;
 use std::sync::Arc;
 
 pub async fn basic_search_media(
-    user_id:i32,
+    user_id: i32,
     pool: &PgPool,
     embedder: Arc<TextEmbedder>,
     query: &str,
@@ -116,7 +116,7 @@ pub async fn basic_search_media(
 
 #[allow(clippy::too_many_lines)]
 pub async fn advanced_search_media(
-    user_id:i32,
+    user_id: i32,
     pool: &PgPool,
     embedder: Arc<TextEmbedder>,
     query: &str,
@@ -302,7 +302,7 @@ pub async fn advanced_search_media(
 }
 
 pub async fn filter_only_search_media(
-    user_id:i32,
+    user_id: i32,
     pool: &PgPool,
     config: SearchMediaConfig,
 ) -> Result<Vec<SimpleTimelineItem>, AppError> {

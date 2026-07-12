@@ -232,7 +232,7 @@ pub struct SharedMediaItem {
     pub media_features: SharedMediaFeatures,
     pub camera_settings: CameraSettings,
     pub user_caption: Option<String>,
-    pub panorama_config: Option<serde_json::Value>
+    pub panorama_config: Option<serde_json::Value>,
 }
 
 impl From<FullMediaItem> for SharedMediaItem {
