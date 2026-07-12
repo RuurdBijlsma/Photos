@@ -88,7 +88,7 @@ fn protected_routes(api_state: ApiContext) -> Router<ApiContext> {
         .merge(daily_cards_protected_router())
         .merge(trash_protected_router())
         .merge(jobs_protected_router())
-        .merge(upload_protected_router())
+        .merge(upload_protected_router(&api_state))
         .route_layer(from_extractor_with_state::<ApiUser, ApiContext>(api_state))
 }
 

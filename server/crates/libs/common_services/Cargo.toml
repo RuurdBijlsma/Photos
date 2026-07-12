@@ -13,7 +13,7 @@ axum = { version = "0.8.8", features = ["macros", "ws", "http2"] }
 serde = { version = "1.0.228", features = ["derive"] }
 tokio = { version = "1.47.1", features = ["full"] }
 jsonwebtoken = { version = "10.0.0", features = ["rust_crypto"] }
-argon2 = { version = "0.6.0-rc.1" }
+argon2 = { version = "0.6.0-rc.8" }
 chrono = { version = "0.4.42", features = ["serde"] }
 sqlx = { version = "0.8.6", features = ["runtime-tokio-native-tls", "postgres", "chrono", "macros", "json", "uuid"] }
 rand = "0.10.0-rc.9"
