@@ -9732,6 +9732,7 @@ dependencies = [
  "common_services",
  "common_types",
  "face_id",
+ "fileloft-core",
  "generate_thumbnails",
  "hdbscan",
  "image 0.25.10",

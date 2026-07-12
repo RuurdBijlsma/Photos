@@ -14,7 +14,7 @@ use app_state::constants::HOSTED_FOLDER;
 use axum::routing::get_service;
 use color_eyre::Result;
 use common_services::s2s_client::S2SClient;
-use http::{HeaderValue, Method, header, HeaderName};
+use http::{HeaderName, HeaderValue, Method, header};
 use open_clip_inference::{TextEmbedder, VisionEmbedder};
 use reqwest::Client;
 use sqlx::PgPool;

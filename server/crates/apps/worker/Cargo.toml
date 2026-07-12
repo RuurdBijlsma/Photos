@@ -33,6 +33,7 @@ tempfile = "3.23.0"
 itertools = "0.14.0"
 open_clip_inference = { version = "0.4.0" }
 async-trait = "0.1.89"
+fileloft-core = "0.3.0"
 
 [features]
 load-dynamic = ["common_services/load-dynamic", "ml_analysis/load-dynamic", "common_types/load-dynamic", "open_clip_inference/load-dynamic"] # -> Load ONNXRuntime dynamically instead of statically

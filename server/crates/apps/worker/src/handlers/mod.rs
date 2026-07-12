@@ -13,6 +13,7 @@ pub mod cluster_faces;
 pub mod cluster_photos;
 pub mod delayed_scan;
 pub mod generate_daily_cards;
+pub mod handle_web_upload;
 pub mod import_album_item;
 pub mod ingest_analysis;
 pub mod ingest_llm;
@@ -22,7 +23,6 @@ pub mod remove;
 pub mod scan;
 pub mod sync_thumbnails;
 pub mod update_global_centroid;
-pub mod handle_web_upload;
 
 /// The outcome of a job handler's execution.
 #[derive(Debug, PartialEq, Eq)]
