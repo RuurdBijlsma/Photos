@@ -24,8 +24,8 @@ pub enum AuthError {
     UserAlreadyExists,
     #[error("user not found")]
     UserNotFound,
-    #[error("permission denied for {user_email} on {path}")]
-    PermissionDenied { user_email: String, path: String },
+    #[error("permission denied for {user_id} on {path}")]
+    PermissionDenied { user_id: i32, path: String },
     #[error("invalid or expired invite token")]
     InvalidInvite,
     #[error(transparent)]
@@ -44,10 +44,10 @@ fn log_auth_failure(error: &AuthError) {
         AuthError::RefreshTokenExpiredOrNotFound => info!("Refresh token not found or expired."),
         AuthError::UserAlreadyExists => info!("Registration failed: User already exists."),
         AuthError::UserNotFound => warn!("Authentication failed: User from token not found."),
-        AuthError::PermissionDenied { user_email, path } => {
+        AuthError::PermissionDenied { user_id, path } => {
             warn!(
                 "Authorization failed: User {} tried to access admin endpoint: {}",
-                user_email, path
+                user_id, path
             );
         }
         AuthError::InvalidInvite => info!("Registration failed: Invalid or expired invite token."),
