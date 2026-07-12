@@ -367,7 +367,7 @@ useEventListener(window, 'mouseup', () => {
 
 <template>
   <div class="simple-timeline">
-    <main-layout-container :hide-drop-shadow="hideDropShadow" :ignore-scroll-bar="hideScrollBar" hide-scrollbar>
+    <main-layout-container :hide-drop-shadow="hideDropShadow" :ignore-scroll-bar="hideScrollBar">
       <selection-overlay v-if="context" :context="context" />
       <teleport to="body">
         <router-view />

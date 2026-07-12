@@ -58,6 +58,10 @@ const backgroundStore = useBackgroundStore()
 </template>
 
 <style scoped>
+.settings {
+  overflow-y: auto;
+}
+
 .settings-content {
   max-width: 1400px;
   margin: 0 auto;
