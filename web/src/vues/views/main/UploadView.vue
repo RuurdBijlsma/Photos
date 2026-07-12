@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import MainLayoutContainer from '@/vues/components/MainLayoutContainer.vue'
-import { useUploadStore } from '@/scripts/stores/uploadStore.ts'
+import { useUploadStore, type UploadItem } from '@/scripts/stores/uploadStore.ts'
 import { ref } from 'vue'
 import { prettyBytes } from '@/scripts/utils.ts'
 
@@ -38,6 +38,13 @@ function onDrop(event: DragEvent) {
   }
 }
 
+// Safe check that never throws if item.file is undefined on reload
+function isVideo(item: UploadItem): boolean {
+  if (item.file?.type) return item.file.type.startsWith('video/')
+  if (item.filetype) return item.filetype.startsWith('video/')
+  return /\.(mp4|webm|mov|mkv|avi|m4v|3gp|flv)$/i.test(item.filename)
+}
+
 function getStatusColor(status: string) {
   switch (status) {
     case 'uploading':
@@ -46,6 +53,8 @@ function getStatusColor(status: string) {
       return 'success'
     case 'failed':
       return 'error'
+    case 'paused':
+      return 'warning'
     default:
       return 'grey'
   }
@@ -59,6 +68,8 @@ function getStatusIcon(status: string) {
       return 'mdi-check-circle'
     case 'failed':
       return 'mdi-alert-circle'
+    case 'paused':
+      return 'mdi-pause-circle-outline'
     default:
       return 'mdi-clock-outline'
   }
@@ -133,25 +144,19 @@ function getStatusIcon(status: string) {
             >
               <template v-slot:prepend>
                 <div class="file-icon-wrapper mr-4">
-                  <v-icon
-                    size="36"
-                    :color="item.file.type.startsWith('video/') ? 'secondary' : 'primary'"
-                  >
-                    {{
-                      item.file.type.startsWith('video/')
-                        ? 'mdi-video-outline'
-                        : 'mdi-image-outline'
-                    }}
+                  <v-icon size="36" :color="isVideo(item) ? 'secondary' : 'primary'">
+                    {{ isVideo(item) ? 'mdi-video-outline' : 'mdi-image-outline' }}
                   </v-icon>
                 </div>
               </template>
 
+              <!-- Safe access to persisted filename and size -->
               <v-list-item-title class="file-name font-weight-medium">
-                {{ item.file.name }}
+                {{ item.filename }}
               </v-list-item-title>
 
               <v-list-item-subtitle class="file-meta mt-1 d-flex align-center gap-3">
-                <span>{{ prettyBytes(item.file.size) }}</span>
+                <span>{{ prettyBytes(item.size) }}</span>
                 <v-chip
                   size="x-small"
                   :color="getStatusColor(item.status)"
@@ -201,7 +206,7 @@ function getStatusIcon(status: string) {
                     @click="uploadStore.pauseUpload(item)"
                   />
                   <v-btn
-                    v-if="item.status === 'idle' && item.progress > 0"
+                    v-if="(item.status === 'idle' || item.status === 'paused') && item.progress > 0"
                     icon="mdi-play"
                     variant="tonal"
                     color="primary"

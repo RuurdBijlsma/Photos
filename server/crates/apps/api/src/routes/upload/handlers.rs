@@ -7,12 +7,6 @@ use common_services::api::app_error::AppError;
 use common_services::api::upload::interfaces::UploadCompletePayload;
 use common_services::api::upload::service::handle_upload_complete;
 
-pub async fn upload_poc_handler(
-    State(_context): State<ApiContext>,
-    Extension(_user): Extension<ApiUser>,
-) -> Result<Json<String>, AppError> {
-    Ok(Json("TUS Resumable Upload POC active.".to_owned()))
-}
 
 pub async fn upload_complete_handler(
     State(context): State<ApiContext>,
