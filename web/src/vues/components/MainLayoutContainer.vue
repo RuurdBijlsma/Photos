@@ -4,11 +4,13 @@ withDefaults(
     fitToContent?: boolean
     hideDropShadow?: boolean
     ignoreScrollBar?: boolean
+    hideScrollbar?: boolean
   }>(),
   {
     fitToContent: false,
     hideDropShadow: false,
     ignoreScrollBar: false,
+    hideScrollbar: false,
   },
 )
 </script>
@@ -22,7 +24,7 @@ withDefaults(
       'ignore-scrollbar': ignoreScrollBar,
     }"
   >
-    <div class="inner-container">
+    <div class="inner-container" :class="{ 'hide-scrollbar': hideScrollbar }">
       <slot></slot>
     </div>
   </div>
@@ -82,9 +84,15 @@ withDefaults(
   border-radius: 50px 50px 0 0;
   overflow: hidden;
   overflow-y: auto;
+}
 
+.inner-container.hide-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+.inner-container.hide-scrollbar::-webkit-scrollbar {
+  display: none;
 }
 
 .fit-content .inner-container {
@@ -93,9 +101,5 @@ withDefaults(
   border-radius: 50px;
   overflow-y: visible;
   margin-bottom: 10px;
-}
-
-.inner-container::-webkit-scrollbar {
-  display: none;
 }
 </style>

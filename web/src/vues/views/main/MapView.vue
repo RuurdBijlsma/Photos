@@ -190,7 +190,7 @@ useRefreshFunction(() => loadMediaItems(), { immediate: true })
     }"
     :style="layoutStyle"
   >
-    <main-layout-container class="map-layout">
+    <main-layout-container class="map-layout" hide-scrollbar>
       <map-container
         ref="mapContainerRef"
         :map-photos="mapPhotos"
