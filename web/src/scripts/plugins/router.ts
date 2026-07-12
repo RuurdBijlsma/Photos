@@ -35,6 +35,11 @@ const router = createRouter({
           component: () => import('@/vues/views/main/ShareView.vue'),
         },
         {
+          path: 'upload',
+          name: 'upload',
+          component: () => import('@/vues/views/main/UploadView.vue'),
+        },
+        {
           path: 'daily/:cardId',
           name: 'daily-card-viewer',
           component: () => import('@/vues/components/timeline/daily-cards/DailyViewer.vue'),

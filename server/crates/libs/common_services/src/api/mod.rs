@@ -14,3 +14,4 @@ pub mod theme;
 pub mod timeline;
 pub mod trash;
 pub mod user;
+pub mod upload;
