@@ -14,7 +14,7 @@ use app_state::constants::HOSTED_FOLDER;
 use axum::routing::get_service;
 use color_eyre::Result;
 use common_services::s2s_client::S2SClient;
-use http::{HeaderValue, Method, header};
+use http::{HeaderValue, Method, header, HeaderName};
 use open_clip_inference::{TextEmbedder, VisionEmbedder};
 use reqwest::Client;
 use sqlx::PgPool;
@@ -68,7 +68,17 @@ pub async fn serve(pool: PgPool, settings: AppSettings, run_task_scheduler: bool
         .collect();
 
     let cors = CorsLayer::new()
-        .expose_headers([header::CONTENT_DISPOSITION])
+        .expose_headers([
+            header::CONTENT_DISPOSITION,
+            HeaderName::from_static("location"),
+            HeaderName::from_static("tus-resumable"),
+            HeaderName::from_static("tus-version"),
+            HeaderName::from_static("tus-max-size"),
+            HeaderName::from_static("tus-extension"),
+            HeaderName::from_static("upload-offset"),
+            HeaderName::from_static("upload-length"),
+            HeaderName::from_static("upload-metadata"),
+        ])
         .allow_methods([
             Method::GET,
             Method::POST,
@@ -87,6 +97,14 @@ pub async fn serve(pool: PgPool, settings: AppSettings, run_task_scheduler: bool
             header::USER_AGENT,
             header::CACHE_CONTROL,
             header::PRAGMA,
+            HeaderName::from_static("upload-length"),
+            HeaderName::from_static("upload-offset"),
+            HeaderName::from_static("tus-resumable"),
+            HeaderName::from_static("upload-metadata"),
+            HeaderName::from_static("upload-defer-length"),
+            HeaderName::from_static("upload-checksum"),
+            HeaderName::from_static("x-requested-with"),
+            HeaderName::from_static("x-http-method-override"),
         ]);
 
     // Static file serving
