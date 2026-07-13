@@ -29,7 +29,7 @@ fn get_tus_handler(context: &ApiContext) -> TusHandler<FileStore, FileLocker> {
     let config = Config {
         extensions,
         hooks: HookConfig {
-            channel_capacity: 100,
+            channel_capacity: 2048,
             pre_create: Some(Arc::new(move |info| {
                 let cloned_state = create_context.clone();
                 Box::pin(pre_create_handler(cloned_state, info))
@@ -44,9 +44,21 @@ fn get_tus_handler(context: &ApiContext) -> TusHandler<FileStore, FileLocker> {
     if let Some(mut rx) = handler.hook_receiver() {
         let api_state_clone = context.clone();
         tokio::spawn(async move {
-            while let Ok(event) = rx.recv().await {
-                if let HookEvent::UploadFinished { info } = event {
-                    handle_upload_finished(&api_state_clone, &info).await;
+            loop {
+                match rx.recv().await {
+                    Ok(HookEvent::UploadFinished { info }) => {
+                        handle_upload_finished(&api_state_clone, &info).await;
+                    }
+                    Ok(_) => {} // Ignore other hook events if they occur
+                    Err(tokio::sync::broadcast::error::RecvError::Lagged(skipped)) => {
+                        tracing::warn!(
+                        "Upload event loop lagged. Skipped {skipped} events."
+                    );
+                    }
+                    Err(tokio::sync::broadcast::error::RecvError::Closed) => {
+                        tracing::info!("Upload hook channel closed. Exiting event loop task.");
+                        break;
+                    }
                 }
             }
         });
@@ -56,6 +68,7 @@ fn get_tus_handler(context: &ApiContext) -> TusHandler<FileStore, FileLocker> {
 }
 
 pub fn upload_protected_router() -> Router<ApiContext> {
+    // todo, can i do multi file upload or something? So i can batch enqueue the jobs for it as well?
     Router::new().route("/upload/jwt", get(get_upload_jwt))
 }
 

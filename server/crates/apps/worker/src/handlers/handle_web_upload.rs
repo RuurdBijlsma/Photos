@@ -62,7 +62,6 @@ pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
         .ok_or_else(|| eyre!("HandleWebUpload payload metadata is missing filename"))?;
     let sanitized_filename = sanitize(user_provided_filename);
 
-    dbg!(&payload);
     let tus_dir = context
         .settings
         .ingest
@@ -80,21 +79,37 @@ pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
         &user_upload_folder,
         &user_upload_folder.join(&sanitized_filename),
     )
-    .await;
+        .await;
 
     tokio::fs::create_dir_all(&user_upload_folder).await?;
-    let temp_destination_path = get_unique_filename(
-        &user_upload_folder,
-        &user_upload_folder.join(format!("{sanitized_filename}.uploading")),
-    )
-    .await;
 
-    if fs::rename(&uploaded_file, &destination_path).await.is_err() {
-        fs::copy(&uploaded_file, &temp_destination_path).await?;
-        fs::rename(&temp_destination_path, &destination_path).await?;
-        fs::remove_file(&uploaded_file).await?;
+    let file_exists_at_destination = tokio::fs::try_exists(&destination_path).await.unwrap_or(false);
+    let file_exists_at_source = tokio::fs::try_exists(&uploaded_file).await.unwrap_or(false);
+
+    if !file_exists_at_source && file_exists_at_destination {
+        tracing::info!(
+            "Source upload file is gone but destination file already exists at {:?}. Assuming already moved.",
+            destination_path
+        );
+    } else {
+        let temp_destination_path = get_unique_filename(
+            &user_upload_folder,
+            &user_upload_folder.join(format!("{sanitized_filename}.uploading")),
+        )
+            .await;
+
+        if fs::rename(&uploaded_file, &destination_path).await.is_err() {
+            fs::copy(&uploaded_file, &temp_destination_path).await?;
+            fs::rename(&temp_destination_path, &destination_path).await?;
+            fs::remove_file(&uploaded_file).await?;
+        }
     }
-    fs::remove_file(&uploaded_metadata_file).await?;
+
+    // Attempt to clean up the metadata file, but ignore failures if it was already deleted
+    if let Err(e) = fs::remove_file(&uploaded_metadata_file).await
+        && e.kind() != std::io::ErrorKind::NotFound {
+            tracing::warn!("Failed to clean up metadata file {:?}: {}", uploaded_metadata_file, e);
+        }
 
     enqueue_full_ingest(
         &context.pool,
