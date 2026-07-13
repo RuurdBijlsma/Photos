@@ -5,9 +5,10 @@ use axum::Router;
 use axum::routing::get;
 use fileloft_axum::tus_router;
 use fileloft_core::hooks::HookConfig;
-use fileloft_core::{Config, HookEvent, TusHandler};
+use fileloft_core::{Config, Extensions, HookEvent, TusHandler};
 use fileloft_store_fs::{FileLocker, FileStore};
 use std::sync::Arc;
+use std::time::Duration;
 
 fn get_tus_handler(context: &ApiContext) -> TusHandler<FileStore, FileLocker> {
     let app_data_root = &context.settings.ingest.app_data_root;
@@ -16,11 +17,17 @@ fn get_tus_handler(context: &ApiContext) -> TusHandler<FileStore, FileLocker> {
 
     let store = FileStore::new(&tus_dir);
     let locker = FileLocker::new(&locks_dir);
-    // todo: if uploads fail or are abandoned, files will pile up in the /tus/uploads folder
+
+    let extensions = Extensions {
+        expiration: true,
+        expiration_ttl: Some(Duration::from_hours(72)),
+        ..Default::default()
+    };
 
     // Subscribe to pre_create hook to handle auth
     let create_context = context.clone();
     let config = Config {
+        extensions,
         hooks: HookConfig {
             channel_capacity: 100,
             pre_create: Some(Arc::new(move |info| {

@@ -51,5 +51,9 @@ pub async fn handle(context: &WorkerContext, _job: &Job) -> Result<JobResult> {
     .execute(&context.pool)
     .await?;
 
+    // todo: clean up _old_ .uploading files in the user upload folders
+    // todo: clean up old files in tus/upload folder and tus/locks folder
+    // old is defined at 72 hours and older
+
     Ok(JobResult::Done)
 }
