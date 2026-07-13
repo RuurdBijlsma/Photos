@@ -19,7 +19,6 @@ async function upload(e: Event) {
   }
 
   const endpoint = `${apiClient.defaults.baseURL}/files`
-  // todo: if auth expires during upload, it fails
 
   const uploadInstance = new tus.Upload(file, {
     endpoint,
@@ -29,12 +28,6 @@ async function upload(e: Event) {
       filename: file.name,
       filetype: file.type,
       jwt: jwtToken,
-    },
-    onBeforeRequest: function (req) {
-      const xhr = req.getUnderlyingObject()
-      if (xhr) {
-        xhr.withCredentials = true
-      }
     },
     onError: function (error) {
       console.error('Upload failed:', error)

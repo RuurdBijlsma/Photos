@@ -1,4 +1,5 @@
 pub const ALBUM_IMPORT_FOLDER: &str = "import";
+pub const USER_UPLOAD_FOLDER: &str = "uploads";
 
 // app_data folders
 pub const CACHE_FOLDER: &str = "cache";

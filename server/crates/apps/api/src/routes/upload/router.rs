@@ -48,10 +48,12 @@ fn get_tus_handler(context: &ApiContext) -> TusHandler<FileStore, FileLocker> {
     handler
 }
 
-pub fn upload_protected_router(api_state: &ApiContext) -> Router<ApiContext> {
-    let tus = Arc::new(get_tus_handler(api_state));
+pub fn upload_protected_router() -> Router<ApiContext> {
+    Router::new().route("/upload/jwt", get(get_upload_jwt))
+}
 
-    Router::new()
-        .route("/upload/jwt", get(get_upload_jwt))
-        .nest("/files", tus_router(tus).with_state(()))
+// Public because the auth is in the jwt token which is validated in `pre_create_handler`
+pub fn upload_public_router(api_state: &ApiContext) -> Router<ApiContext> {
+    let tus = Arc::new(get_tus_handler(api_state));
+    Router::new().nest("/files", tus_router(tus).with_state(()))
 }

@@ -1,36 +1,74 @@
 use crate::context::WorkerContext;
 use crate::handlers::JobResult;
+use app_state::constants::{TUS_UPLOADS_FOLDER, USER_UPLOAD_FOLDER};
+use app_state::MakeRelativePath;
 use color_eyre::eyre::eyre;
 use color_eyre::Result;
 use common_services::database::jobs::Job;
+use common_services::database::user_store::UserStore;
+use common_services::job_queue::enqueue_full_ingest;
 use fileloft_core::UploadInfo;
 use serde_json::from_value;
 use tokio::fs;
-use app_state::constants::TUS_UPLOADS_FOLDER;
+use tokio::fs::canonicalize;
 
 pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
+    let user_id = job
+        .user_id
+        .ok_or_else(|| eyre!("HandleWebUpload job is missing a user_id"))?;
+    let user_media_folder = UserStore::get_user_media_folder(&context.pool, user_id)
+        .await?
+        .ok_or_else(|| eyre!("HandleWebUpload: User has media folder set"))?;
     let payload_value = job
         .payload
         .as_ref()
         .ok_or_else(|| eyre!("HandleWebUpload job is missing a payload"))?;
     let payload: UploadInfo = from_value(payload_value.clone())?;
-    let tus_dir = context.settings.ingest.app_data_root.join(TUS_UPLOADS_FOLDER);
-    let mut entries = fs::read_dir(&tus_dir).await?;
-
-    println!("Contents of {}:", tus_dir.display());
-
-    while let Some(entry) = entries.next_entry().await? {
-        let path = entry.path();
-        let metadata = entry.metadata().await?;
-
-        if metadata.is_file() {
-            println!("{} ({} bytes)", path.display(), metadata.len());
-        } else {
-            println!("{}/", path.display());
-        }
-    }
-    // todo: also other stuff like use rename to get it in the media folder, first move to file.mp4.tmp or something
+    let user_provided_filename = payload
+        .metadata
+        .get("filename")
+        .and_then(|opt| opt.as_ref())
+        .ok_or_else(|| eyre!("HandleWebUpload payload metadata is missing filename"))?;
 
     dbg!(&payload);
+    let tus_dir = context
+        .settings
+        .ingest
+        .app_data_root
+        .join(TUS_UPLOADS_FOLDER);
+    let uploaded_file = tus_dir.join(payload.id.as_str());
+    let user_upload_folder = context
+        .settings
+        .ingest
+        .media_root
+        .join(user_media_folder)
+        .join(USER_UPLOAD_FOLDER);
+    let destination_path = user_upload_folder.join(user_provided_filename);
+
+    // Verify user provided file doesnt escape upload folder
+    let canon_user_upload_folder = canonicalize(&user_upload_folder).await?;
+    let canon_dest_path = canonicalize(&destination_path).await?;
+    if !canon_dest_path.starts_with(canon_user_upload_folder) {
+        return Err(eyre!("User provided file escapes from user upload folder"));
+    }
+
+    let temp_destination_path =
+        user_upload_folder.join(format!("{user_provided_filename}.uploading"));
+
+    if fs::rename(&uploaded_file, &destination_path).await.is_err() {
+        fs::copy(&uploaded_file, &temp_destination_path).await?;
+        fs::remove_file(&uploaded_file).await?;
+        fs::rename(&temp_destination_path, &destination_path).await?;
+    }
+
+    enqueue_full_ingest(
+        &context.pool,
+        &context.settings.ingest,
+        &destination_path.make_relative(&context.settings.ingest.media_root)?,
+        user_id,
+        None,
+    )
+    .await?;
+
     Ok(JobResult::Done)
 }

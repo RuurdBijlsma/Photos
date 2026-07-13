@@ -39,7 +39,7 @@ use crate::system::router::system_protected_router;
 use crate::theme::router::theme_protected_router;
 use crate::timeline::router::timeline_protected_router;
 use crate::trash::router::trash_protected_router;
-use crate::upload::router::upload_protected_router;
+use crate::upload::router::{upload_protected_router, upload_public_router};
 use app_state::RateLimitingSettings;
 use axum::Router;
 use axum::middleware::{from_extractor_with_state, from_fn_with_state};
@@ -48,20 +48,27 @@ use common_services::database::app_user::UserRole;
 // --- Router Construction ---
 pub fn create_router(api_state: ApiContext) -> Router {
     Router::new()
-        .merge(public_routes(&api_state.settings.api.rate_limiting))
+        .merge(public_routes(
+            &api_state,
+            &api_state.settings.api.rate_limiting,
+        ))
         .merge(protected_routes(api_state.clone()))
         .merge(auth_optional_routes(api_state.clone()))
         .merge(admin_routes(api_state.clone()))
         .with_state(api_state)
 }
 
-fn public_routes(rate_limiting: &RateLimitingSettings) -> Router<ApiContext> {
+fn public_routes(
+    api_state: &ApiContext,
+    rate_limiting: &RateLimitingSettings,
+) -> Router<ApiContext> {
     Router::new()
         .merge(auth_public_router(rate_limiting))
         .merge(root_public_router())
         .merge(s2s_public_router())
         .merge(people_public_router())
         .merge(photos_public_router())
+        .merge(upload_public_router(api_state))
 }
 
 fn auth_optional_routes(api_state: ApiContext) -> Router<ApiContext> {
@@ -88,7 +95,7 @@ fn protected_routes(api_state: ApiContext) -> Router<ApiContext> {
         .merge(daily_cards_protected_router())
         .merge(trash_protected_router())
         .merge(jobs_protected_router())
-        .merge(upload_protected_router(&api_state))
+        .merge(upload_protected_router())
         .route_layer(from_extractor_with_state::<ApiUser, ApiContext>(api_state))
 }
 
