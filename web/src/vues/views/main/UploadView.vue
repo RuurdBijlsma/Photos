@@ -19,6 +19,7 @@ async function upload(e: Event) {
   }
 
   const endpoint = `${apiClient.defaults.baseURL}/files`
+  // todo: if auth expires during upload, it fails
 
   const uploadInstance = new tus.Upload(file, {
     endpoint,
