@@ -7,8 +7,6 @@ async function upload(e: Event) {
   const target = e.target as HTMLInputElement
   if (!target.files || target.files.length === 0) return
 
-  const file = target.files[0]
-
   let jwtToken = ''
   try {
     const { data } = await uploadService.getUploadJwt()
@@ -20,37 +18,42 @@ async function upload(e: Event) {
 
   const endpoint = `${apiClient.defaults.baseURL}/files`
 
-  const uploadInstance = new tus.Upload(file, {
-    endpoint,
-    retryDelays: [0, 3000, 5000, 10000, 20000],
-    chunkSize: 50 * 1024 * 1024,
-    metadata: {
-      filename: file.name,
-      filetype: file.type,
-      jwt: jwtToken,
-    },
-    onError: function (error) {
-      console.error('Upload failed:', error)
-    },
-    onProgress: function (bytesUploaded, bytesTotal) {
-      console.log({
-        bytesUploaded,
-        bytesTotal,
-        percentage: `${(bytesUploaded / bytesTotal) * 100}%`,
-      })
-    },
-    onSuccess: function () {
-      console.log('Upload finished for: %s. URL: %s', uploadInstance.file.name, uploadInstance.url)
-    },
-  })
+  // Loop through all selected files
+  // todo: limit to N uploads concurrently
+  for (const file of Array.from(target.files)) {
+    const uploadInstance = new tus.Upload(file, {
+      endpoint,
+      retryDelays: [0, 3000, 5000, 10000, 20000],
+      chunkSize: 50 * 1024 * 1024,
+      metadata: {
+        filename: file.name,
+        filetype: file.type,
+        jwt: jwtToken,
+      },
+      onError: function (error) {
+        console.error(`Upload failed for ${file.name}:`, error)
+      },
+      onProgress: function (bytesUploaded, bytesTotal) {
+        console.log({
+          file: file.name,
+          bytesUploaded,
+          bytesTotal,
+          percentage: `${((bytesUploaded / bytesTotal) * 100).toFixed(2)}%`,
+        })
+      },
+      onSuccess: function () {
+        console.log('Upload finished for: %s. URL: %s', uploadInstance.file.name, uploadInstance.url)
+      },
+    })
 
-  // Check if there are any previous uploads to resume
-  uploadInstance.findPreviousUploads().then(function (previousUploads) {
-    if (previousUploads.length) {
-      uploadInstance.resumeFromPreviousUpload(previousUploads[0])
-    }
-    uploadInstance.start()
-  })
+    // Check if there are any previous uploads to resume
+    uploadInstance.findPreviousUploads().then(function (previousUploads) {
+      if (previousUploads.length) {
+        uploadInstance.resumeFromPreviousUpload(previousUploads[0])
+      }
+      uploadInstance.start()
+    })
+  }
 }
 </script>
 
@@ -59,7 +62,7 @@ async function upload(e: Event) {
     <h1>Upload</h1>
 
     <div>
-      <input type="file" @change="upload" />
+      <input multiple type="file" @change="upload" />
     </div>
   </div>
 </template>
