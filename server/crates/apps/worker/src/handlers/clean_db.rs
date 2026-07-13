@@ -1,9 +1,13 @@
 use crate::context::WorkerContext;
 use crate::handlers::JobResult;
+use app_state::constants::USER_UPLOAD_FOLDER;
 use chrono::Utc;
 use color_eyre::Result;
 use common_services::database::jobs::Job;
-use std::time::Duration;
+use common_services::database::user_store::UserStore;
+use std::fs;
+use std::time::{Duration, SystemTime};
+use walkdir::WalkDir;
 
 /// Deletes expired refresh tokens from the database.
 pub async fn handle(context: &WorkerContext, _job: &Job) -> Result<JobResult> {
@@ -51,9 +55,77 @@ pub async fn handle(context: &WorkerContext, _job: &Job) -> Result<JobResult> {
     .execute(&context.pool)
     .await?;
 
-    // todo: clean up _old_ .uploading files in the user upload folders
-    // todo: clean up old files in tus/upload folder and tus/locks folder
-    // old is defined at 72 hours and older
+    // Clean up old .uploading files in user upload folders and old files in TUS folders
+    clean_old_upload_files(context).await?;
 
     Ok(JobResult::Done)
+}
+
+/// Cleans up expired `.uploading` files from user upload folders,
+/// as well as expired files in `tus/uploads` and `tus/locks`.
+async fn clean_old_upload_files(context: &WorkerContext) -> Result<()> {
+    let cutoff = SystemTime::now() - Duration::from_hours(72);
+    // todo fix ridiculous nesting and not using the result ?
+
+    // Clean up old .uploading files in the user upload folder
+    for user in UserStore::list_users(&context.pool).await? {
+        let Some(user_media_folder) = &user.media_folder else {
+            continue;
+        };
+        let user_upload_folder = context
+            .settings
+            .ingest
+            .media_root
+            .join(user_media_folder)
+            .join(USER_UPLOAD_FOLDER);
+        if !user_upload_folder.exists() {
+            continue;
+        }
+        dbg!(&user_upload_folder);
+        for entry in WalkDir::new(&user_upload_folder)
+            .contents_first(true)
+            .into_iter()
+            .filter_map(Result::ok)
+        {
+            let path = entry.path();
+            if entry.file_type().is_file()
+                && path.extension().and_then(|ext| ext.to_str()) == Some("uploading")
+                && let Ok(metadata) = fs::metadata(path)
+                && let Ok(modified) = metadata.modified()
+                && modified <= cutoff
+            {
+                tracing::info!("Removing expired uploading file: {:?}", path);
+                fs::remove_file(path)?;
+            }
+        }
+    }
+
+    // Clean up old files in TUS folders (uploads & locks)
+    let app_data_root = &context.settings.ingest.app_data_root;
+    let tus_uploads = app_data_root.join(app_state::constants::TUS_UPLOADS_FOLDER);
+    let tus_locks = app_data_root.join(app_state::constants::TUS_LOCKS_FOLDER);
+
+    for dir in &[tus_uploads, tus_locks] {
+        if !dir.exists() {
+            continue;
+        }
+
+        for entry in WalkDir::new(dir)
+            .contents_first(true)
+            .into_iter()
+            .filter_map(Result::ok)
+        {
+            let path = entry.path();
+            if entry.file_type().is_file()
+                && let Ok(metadata) = fs::metadata(path)
+                && let Ok(modified) = metadata.modified()
+                && modified <= cutoff
+            {
+                tracing::info!("Removing expired TUS file: {:?}", path);
+                fs::remove_file(path)?;
+            }
+        }
+    }
+
+    Ok(())
 }

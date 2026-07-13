@@ -58,6 +58,6 @@ pub fn decode_token(token: &str, jwt_secret: &str) -> Result<AuthClaims, AuthErr
         &DecodingKey::from_secret(jwt_secret.as_ref()),
         &validation,
     )
-        .map(|data| data.claims)
-        .map_err(|_| AuthError::InvalidToken)
+    .map(|data| data.claims)
+    .map_err(|_| AuthError::InvalidToken)
 }

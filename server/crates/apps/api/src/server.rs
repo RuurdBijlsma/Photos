@@ -1,20 +1,12 @@
-#![allow(
-    clippy::needless_for_each,
-    clippy::cognitive_complexity,
-    clippy::cast_sign_loss,
-    clippy::struct_excessive_bools,
-    clippy::missing_errors_doc,
-    clippy::missing_panics_doc,
-    clippy::cast_possible_truncation
-)]
 use crate::api_state::ApiContext;
+use crate::cors::get_cors;
 use crate::create_router;
 use app_state::AppSettings;
 use app_state::constants::HOSTED_FOLDER;
 use axum::routing::get_service;
 use color_eyre::Result;
 use common_services::s2s_client::S2SClient;
-use http::{HeaderName, HeaderValue, Method, header};
+use http::{HeaderValue, header};
 use open_clip_inference::{TextEmbedder, VisionEmbedder};
 use reqwest::Client;
 use sqlx::PgPool;
@@ -23,12 +15,11 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use tasks::task_runner::init_task_scheduler;
 use tower_http::compression::CompressionLayer;
-use tower_http::cors::CorsLayer;
 use tower_http::sensitive_headers::SetSensitiveRequestHeadersLayer;
 use tower_http::services::ServeDir;
 use tower_http::set_header::SetResponseHeaderLayer;
 use tower_http::trace::TraceLayer;
-use tracing::{error, info};
+use tracing::info;
 
 pub async fn serve(pool: PgPool, settings: AppSettings, run_task_scheduler: bool) -> Result<()> {
     if run_task_scheduler {
@@ -53,60 +44,6 @@ pub async fn serve(pool: PgPool, settings: AppSettings, run_task_scheduler: bool
         vision_embedder: Arc::new(vision_embedder),
     };
 
-    // --- CORS Configuration ---
-    let allowed_origins: Vec<HeaderValue> = settings
-        .api
-        .allowed_origins
-        .iter()
-        .filter_map(|s| match s.parse() {
-            Ok(hv) => Some(hv),
-            Err(e) => {
-                error!("Invalid CORS origin configured: {} - Error: {}", s, e);
-                None
-            }
-        })
-        .collect();
-
-    let cors = CorsLayer::new()
-        .expose_headers([
-            header::CONTENT_DISPOSITION,
-            HeaderName::from_static("location"),
-            HeaderName::from_static("tus-resumable"),
-            HeaderName::from_static("tus-version"),
-            HeaderName::from_static("tus-max-size"),
-            HeaderName::from_static("tus-extension"),
-            HeaderName::from_static("upload-offset"),
-            HeaderName::from_static("upload-length"),
-            HeaderName::from_static("upload-metadata"),
-        ])
-        .allow_methods([
-            Method::GET,
-            Method::POST,
-            Method::PUT,
-            Method::DELETE,
-            Method::PATCH,
-            Method::OPTIONS,
-        ])
-        .allow_origin(allowed_origins)
-        .allow_credentials(true)
-        .allow_headers([
-            header::AUTHORIZATION,
-            header::CONTENT_TYPE,
-            header::ACCEPT,
-            header::ORIGIN,
-            header::USER_AGENT,
-            header::CACHE_CONTROL,
-            header::PRAGMA,
-            HeaderName::from_static("upload-length"),
-            HeaderName::from_static("upload-offset"),
-            HeaderName::from_static("tus-resumable"),
-            HeaderName::from_static("upload-metadata"),
-            HeaderName::from_static("upload-defer-length"),
-            HeaderName::from_static("upload-checksum"),
-            HeaderName::from_static("x-requested-with"),
-            HeaderName::from_static("x-http-method-override"),
-        ]);
-
     // Static file serving
     let serve_thumbnails = ServeDir::new(&settings.ingest.thumbnails_root);
     let thumbnail_cache_layer = SetResponseHeaderLayer::if_not_present(
@@ -119,6 +56,7 @@ pub async fn serve(pool: PgPool, settings: AppSettings, run_task_scheduler: bool
         header::CACHE_CONTROL,
         HeaderValue::from_static("public, max-age=86400"),
     );
+    let cors = get_cors(&settings.api.allowed_origins);
     let serve_hosted = get_service(serve_hosted)
         .layer::<_, std::convert::Infallible>(hosted_cache_layer)
         .layer::<_, std::convert::Infallible>(cors.clone());

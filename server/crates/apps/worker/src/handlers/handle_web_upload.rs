@@ -1,9 +1,9 @@
 use crate::context::WorkerContext;
 use crate::handlers::JobResult;
-use app_state::constants::{TUS_UPLOADS_FOLDER, USER_UPLOAD_FOLDER};
 use app_state::MakeRelativePath;
-use color_eyre::eyre::eyre;
+use app_state::constants::{TUS_UPLOADS_FOLDER, USER_UPLOAD_FOLDER};
 use color_eyre::Result;
+use color_eyre::eyre::eyre;
 use common_services::database::jobs::Job;
 use common_services::database::user_store::UserStore;
 use common_services::job_queue::enqueue_full_ingest;
@@ -31,9 +31,9 @@ async fn get_unique_filename(dest_folder: &Path, destination_path: &Path) -> Pat
             .to_string_lossy();
 
         let new_filename = if extension.is_empty() {
-            format!("{}_{}", stem, counter)
+            format!("{stem}_{counter}")
         } else {
-            format!("{}_{}.{}", stem, counter, extension)
+            format!("{stem}_{counter}.{extension}")
         };
 
         unique_destination_path = dest_folder.join(new_filename);
@@ -69,6 +69,7 @@ pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
         .app_data_root
         .join(TUS_UPLOADS_FOLDER);
     let uploaded_file = tus_dir.join(payload.id.as_str());
+    let uploaded_metadata_file = tus_dir.join(format!("{}.info", payload.id.as_str()));
     let user_upload_folder = context
         .settings
         .ingest
@@ -93,6 +94,7 @@ pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
         fs::rename(&temp_destination_path, &destination_path).await?;
         fs::remove_file(&uploaded_file).await?;
     }
+    fs::remove_file(&uploaded_metadata_file).await?;
 
     enqueue_full_ingest(
         &context.pool,
