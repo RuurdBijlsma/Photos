@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import * as tus from 'tus-js-client'
+import uploadService from '@/scripts/services/uploadService.ts'
+import apiClient from '@/scripts/services/api.ts'
 
 async function upload(e: Event) {
   const target = e.target as HTMLInputElement
@@ -7,13 +9,25 @@ async function upload(e: Event) {
 
   const file = target.files[0]
 
-  const upload = new tus.Upload(file, {
-    endpoint: 'http://localhost:9475/files',
+  let jwtToken = ''
+  try {
+    const { data } = await uploadService.getUploadJwt()
+    jwtToken = data
+  } catch (error) {
+    console.error('Failed to retrieve upload JWT token:', error)
+    return
+  }
+
+  const endpoint = `${apiClient.defaults.baseURL}/files`
+
+  const uploadInstance = new tus.Upload(file, {
+    endpoint,
     retryDelays: [0, 3000, 5000, 10000, 20000],
     chunkSize: 50 * 1024 * 1024,
     metadata: {
       filename: file.name,
       filetype: file.type,
+      jwt: jwtToken,
     },
     onBeforeRequest: function (req) {
       const xhr = req.getUnderlyingObject()
@@ -21,25 +35,27 @@ async function upload(e: Event) {
         xhr.withCredentials = true
       }
     },
-    // ... rest of your hooks
     onError: function (error) {
-      console.log('Failed because: ' + error)
+      console.error('Upload failed:', error)
     },
     onProgress: function (bytesUploaded, bytesTotal) {
-      const percentage = ((bytesUploaded / bytesTotal) * 100).toFixed(2)
-      console.log(bytesUploaded, bytesTotal, percentage + '%')
+      console.log({
+        bytesUploaded,
+        bytesTotal,
+        percentage: `${(bytesUploaded / bytesTotal) * 100}%`,
+      })
     },
     onSuccess: function () {
-      console.log('Upload finished for: %s. URL: %s', upload.file.name, upload.url)
+      console.log('Upload finished for: %s. URL: %s', uploadInstance.file.name, uploadInstance.url)
     },
   })
 
   // Check if there are any previous uploads to resume
-  upload.findPreviousUploads().then(function (previousUploads) {
+  uploadInstance.findPreviousUploads().then(function (previousUploads) {
     if (previousUploads.length) {
-      upload.resumeFromPreviousUpload(previousUploads[0])
+      uploadInstance.resumeFromPreviousUpload(previousUploads[0])
     }
-    upload.start()
+    uploadInstance.start()
   })
 }
 </script>
@@ -47,6 +63,11 @@ async function upload(e: Event) {
 <template>
   <div>
     <h1>Upload</h1>
-    <input type="file" @change="upload" />
+
+    <div>
+      <input type="file" @change="upload" />
+    </div>
   </div>
 </template>
+
+<style scoped></style>

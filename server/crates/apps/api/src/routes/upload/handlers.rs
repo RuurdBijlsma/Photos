@@ -1,67 +1,31 @@
 use crate::auth::middlewares::user::ApiUser;
-use axum::extract::{Query, State};
+use app_state::{AppSettings, constants};
+use axum::extract::State;
 use axum::{Extension, Json};
-use axum_extra::protobuf::Protobuf;
-use chrono::NaiveDate;
+use chrono::{Duration, Utc};
 use common_services::api::app_error::AppError;
-use common_services::api::timeline::interfaces::{GetMediaByMonthParams, TimelineParams};
-use common_services::api::timeline::service::{
-    get_photos_by_month, get_timeline_ids, get_timeline_ratios,
-};
-use common_types::pb::api::{TimelineItemsResponse, TimelineRatiosResponse};
-use sqlx::PgPool;
+use common_services::api::auth::interfaces::AuthClaims;
+use jsonwebtoken::{EncodingKey, Header, encode};
 
-/// Get a timeline of all media ratios, grouped by month.
-///
-/// # Errors
-///
-/// Returns a `AppError` if the database query fails.
-pub async fn get_timeline_ratios_handler(
-    State(pool): State<PgPool>,
+pub async fn get_upload_jwt(
+    State(settings): State<AppSettings>,
     Extension(user): Extension<ApiUser>,
-    Query(params): Query<TimelineParams>,
-) -> Result<Protobuf<TimelineRatiosResponse>, AppError> {
-    let timeline = get_timeline_ratios(user.id, &pool, params.sort).await?;
-    Ok(Protobuf(timeline))
-}
+) -> Result<Json<String>, AppError> {
+    let exp =
+        (Utc::now() + Duration::minutes(constants().auth.access_token_expiry_minutes)).timestamp();
+    let claims = AuthClaims {
+        sub: user.id,
+        role: user.role,
+        exp,
+        aud: "upload".to_string(),
+    };
+    // todo: its probably not safe to store the jwt secret in the config YAML
+    let access_token = encode(
+        &Header::default(),
+        &claims,
+        &EncodingKey::from_secret(settings.secrets.jwt.as_ref()),
+    )
+    .map_err(Into::<AppError>::into)?;
 
-/// Get a timeline of all media ids
-///
-/// # Errors
-///
-/// Returns a `AppError` if the database query fails.
-pub async fn get_timeline_ids_handler(
-    State(pool): State<PgPool>,
-    Extension(user): Extension<ApiUser>,
-    Query(params): Query<TimelineParams>,
-) -> Result<Json<Vec<String>>, AppError> {
-    let timeline = get_timeline_ids(user.id, &pool, params.sort).await?;
-    Ok(Json(timeline))
-}
-
-/// Get all media items for a given set of months.
-///
-/// # Errors
-///
-/// Returns a `AppError` if the database query fails.
-pub async fn get_photos_by_month_handler(
-    State(pool): State<PgPool>,
-    Extension(user): Extension<ApiUser>,
-    Query(params): Query<GetMediaByMonthParams>,
-) -> Result<Protobuf<TimelineItemsResponse>, AppError> {
-    let month_ids = params
-        .months
-        .split(',')
-        .map(str::trim)
-        .filter(|s| !s.is_empty())
-        .map(|date_str| NaiveDate::parse_from_str(date_str, "%Y-%m-%d"))
-        .collect::<Result<Vec<NaiveDate>, _>>()
-        .map_err(|_| {
-            AppError::BadRequest(
-                "Invalid date format in 'months' parameter. Please use 'YYYY-MM-DD'.".to_string(),
-            )
-        })?;
-
-    let photos = get_photos_by_month(user.id, &pool, &month_ids, params.sort).await?;
-    Ok(Protobuf(photos))
+    Ok(Json(access_token))
 }

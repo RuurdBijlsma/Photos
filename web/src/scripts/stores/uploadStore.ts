@@ -1,6 +1,5 @@
 import { defineStore } from 'pinia'
-import * as tus from 'tus-js-client'
-
+import uploadService from '@/scripts/services/uploadService.ts'
 
 export const useUploadStore = defineStore('upload', () => {
 

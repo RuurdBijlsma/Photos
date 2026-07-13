@@ -104,6 +104,7 @@ constants:
   auth:
     access_token_expiry_minutes: 30
     refresh_token_expiry_days: 7
+    upload_token_expiry_minutes: 5
     album_invitation_expiry_minutes: 1440 # 24 hours
 
 daily_cards:

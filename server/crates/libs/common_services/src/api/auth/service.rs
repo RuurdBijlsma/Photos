@@ -141,6 +141,7 @@ pub fn create_access_token(
         sub: user_id,
         role,
         exp,
+        aud: "api".to_owned(),
     };
     let access_token = encode(
         &Header::default(),

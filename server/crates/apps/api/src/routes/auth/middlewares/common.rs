@@ -45,17 +45,19 @@ pub fn extract_refresh_token(parts: &Parts) -> Result<String, AuthError> {
     extract_cookie_value(parts, "refresh_token").ok_or(AuthError::MissingToken)
 }
 
-/// Helper to maintain backward compatibility with other endpoints (e.g. temporary WS setups)
 pub fn extract_token(parts: &Parts) -> Result<String, AuthError> {
     extract_access_token(parts)
 }
 
 pub fn decode_token(token: &str, jwt_secret: &str) -> Result<AuthClaims, AuthError> {
+    let mut validation = Validation::default();
+    validation.set_audience(&["api"]);
+
     decode::<AuthClaims>(
         token,
         &DecodingKey::from_secret(jwt_secret.as_ref()),
-        &Validation::default(),
+        &validation,
     )
-    .map(|data| data.claims)
-    .map_err(|_| AuthError::InvalidToken)
+        .map(|data| data.claims)
+        .map_err(|_| AuthError::InvalidToken)
 }

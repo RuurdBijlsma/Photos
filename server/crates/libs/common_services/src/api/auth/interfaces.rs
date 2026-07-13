@@ -45,7 +45,8 @@ pub struct Tokens {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct AuthClaims {
-    pub sub: i32, // Subject (user ID)
-    pub exp: i64, // Expiration time
+    pub sub: i32,
+    pub exp: i64,
     pub role: UserRole,
+    pub aud: String, // "api" or "upload"
 }
