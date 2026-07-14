@@ -4,6 +4,7 @@ import type { ThemeType, ThemeVariant } from '@/scripts/constants.ts'
 
 export const TIMELINE_ROW_HEIGHT = 320
 export const CUSTOM_THEME_CONTRAST = 0.2
+export const UPLOAD_CONCURRENCY_LIMIT = 3
 
 export const useSettingStore = defineStore('settings', () => {
   // Theme -> Mode
@@ -28,6 +29,8 @@ export const useSettingStore = defineStore('settings', () => {
   const timelineRowHeight = useStorage('timelineRowHeight', TIMELINE_ROW_HEIGHT)
   const timelineUseDayLabels = useStorage('timelineUseDayLabels', false)
   const asyncImageDecoding = useStorage('timelineAsyncImageDecoding', false)
+  // Uploads
+  const uploadConcurrencyLimit = useStorage('uploadConcurrencyLimit', UPLOAD_CONCURRENCY_LIMIT)
 
   return {
     useImageGlow,
@@ -47,5 +50,6 @@ export const useSettingStore = defineStore('settings', () => {
     useSunSchedule,
     enableLightThemeTime,
     enableDarkThemeTime,
+    uploadConcurrencyLimit,
   }
 })
