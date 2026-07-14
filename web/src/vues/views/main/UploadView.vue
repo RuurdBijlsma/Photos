@@ -2,24 +2,20 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
 import MainLayoutContainer from '@/vues/components/MainLayoutContainer.vue'
-import SettingsSlider from '@/vues/components/settings/components/SettingsSlider.vue'
 import { useUploadStore } from '@/scripts/stores/uploadStore.ts'
 import { prettyBytes } from '@/scripts/utils.ts'
 
 const uploadStore = useUploadStore()
 
-// File picker input element bindings
 const fileInput = ref<HTMLInputElement | null>(null)
 const folderInput = ref<HTMLInputElement | null>(null)
 const dragover = ref(false)
 
-// Computed stats
 const successCount = computed(
   () => uploadStore.uploads.filter((u) => u.status === 'success').length,
 )
 const failedCount = computed(() => uploadStore.uploads.filter((u) => u.status === 'failed').length)
 
-// Element triggers
 function triggerFileSelect() {
   fileInput.value?.click()
 }
@@ -28,7 +24,6 @@ function triggerFolderSelect() {
   folderInput.value?.click()
 }
 
-// Drag & Drop handlers
 function onDragOver() {
   dragover.value = true
 }
@@ -39,12 +34,41 @@ function onDragLeave() {
 
 function onDrop(e: DragEvent) {
   dragover.value = false
-  if (e.dataTransfer?.files && e.dataTransfer.files.length > 0) {
-    uploadStore.addFiles(e.dataTransfer.files)
+  if (!e.dataTransfer) return
+
+  const filesToUpload: File[] = []
+
+  if (e.dataTransfer.items && e.dataTransfer.items.length > 0) {
+    for (const item of Array.from(e.dataTransfer.items)) {
+      if (item.kind !== 'file') continue
+
+      const entry = typeof item.webkitGetAsEntry === 'function' ? item.webkitGetAsEntry() : null
+
+      if (entry) {
+        if (entry.isFile) {
+          const file = item.getAsFile()
+          if (file) filesToUpload.push(file)
+        } else if (entry.isDirectory) {
+          console.warn(
+            `Dropped directory "${entry.name}" was ignored. Please use the "Upload Folder" button.`,
+          )
+        }
+      } else {
+        const file = item.getAsFile()
+        if (file) filesToUpload.push(file)
+      }
+    }
+  } else if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+    for (const file of Array.from(e.dataTransfer.files)) {
+      filesToUpload.push(file)
+    }
+  }
+
+  if (filesToUpload.length > 0) {
+    uploadStore.addFiles(filesToUpload)
   }
 }
 
-// Input change listeners
 function onFileChanged(e: Event) {
   const target = e.target as HTMLInputElement
   if (target.files && target.files.length > 0) {
@@ -59,7 +83,6 @@ function onFolderChanged(e: Event) {
   }
 }
 
-// Status style adapters
 function getStatusColor(status: string) {
   switch (status) {
     case 'uploading':
@@ -90,7 +113,6 @@ function getStatusIcon(status: string) {
   }
 }
 
-// Navigation & Tab Closing Guards
 onBeforeRouteLeave((to, from, next) => {
   if (uploadStore.isUploading) {
     const confirmation = window.confirm(
@@ -125,14 +147,12 @@ onUnmounted(() => {
 <template>
   <main-layout-container class="upload-scroll-view">
     <div class="upload-content">
-      <!-- Title & Header -->
       <header class="upload-header mb-6">
         <h1 class="upload-title">Upload Media</h1>
         <p class="upload-subtitle">Import local photos and videos into your library dashboard.</p>
       </header>
 
       <div class="upload-grid">
-        <!-- Panel: Control and Dropzone Area -->
         <section class="picker-panel">
           <v-card class="settings-card" flat border>
             <div class="card-header">
@@ -141,7 +161,6 @@ onUnmounted(() => {
             </div>
 
             <div class="card-body">
-              <!-- Dropzone Container -->
               <div
                 class="dropzone"
                 :class="{ dragover: dragover }"
@@ -157,7 +176,6 @@ onUnmounted(() => {
                 <div class="dropzone-subtext mt-1">Supports common image and video formats</div>
               </div>
 
-              <!-- Invisible Elements for Directory Selection and Multi-File Selection -->
               <input ref="fileInput" type="file" multiple class="d-none" @change="onFileChanged" />
 
               <input
@@ -170,7 +188,6 @@ onUnmounted(() => {
                 @change="onFolderChanged"
               />
 
-              <!-- Extra Directory Buttons -->
               <div class="d-flex align-center gap-4 mt-4 justify-center flex-wrap">
                 <v-btn
                   variant="tonal"
@@ -193,7 +210,6 @@ onUnmounted(() => {
                 </v-btn>
               </div>
 
-              <!-- Active Stats Panel -->
               <v-expand-transition>
                 <div v-if="uploadStore.uploads.length > 0" class="stats-overview mt-6">
                   <div class="section-divider">
@@ -220,11 +236,6 @@ onUnmounted(() => {
                     </div>
                   </div>
 
-                  <!-- Integrated Reusable Settings Slider for queue size controls -->
-                  <div class="concurrency-settings mt-4">
-
-                  </div>
-
                   <v-btn
                     block
                     variant="tonal"
@@ -242,7 +253,6 @@ onUnmounted(() => {
           </v-card>
         </section>
 
-        <!-- Panel: Upload Queue Progress Tracker -->
         <section class="queue-panel">
           <v-card class="settings-card height-100" flat border>
             <div class="card-header">
@@ -259,10 +269,21 @@ onUnmounted(() => {
               >
                 <template v-slot:default="{ item }">
                   <v-list-item class="queue-item" border>
+                    <!-- Prepend slot: Dynamically renders either active circular progress or status icon -->
                     <template v-slot:prepend>
-                      <v-icon :color="getStatusColor(item.status)" class="mr-2">
-                        {{ getStatusIcon(item.status) }}
-                      </v-icon>
+                      <div class="status-icon-container">
+                        <v-progress-circular
+                          v-if="item.status === 'uploading'"
+                          :model-value="(item.bytesUploaded / item.size) * 100"
+                          :indeterminate="item.bytesUploaded / item.size === 1"
+                          color="primary"
+                          size="24"
+                          width="3"
+                        />
+                        <v-icon v-else :color="getStatusColor(item.status)">
+                          {{ getStatusIcon(item.status) }}
+                        </v-icon>
+                      </div>
                     </template>
 
                     <v-list-item-title class="queue-filename">
@@ -279,7 +300,6 @@ onUnmounted(() => {
                           {{ ((item.bytesUploaded / item.size) * 100).toFixed(0) }}%
                         </span>
 
-                        <!-- Cancel context button depending on processing state -->
                         <v-btn
                           v-if="item.status === 'uploading' || item.status === 'pending'"
                           color="error"
@@ -299,21 +319,10 @@ onUnmounted(() => {
                         />
                       </div>
                     </template>
-
-                    <!-- Absolute background progress bar for active uploads -->
-                    <v-progress-linear
-                      v-if="item.status === 'uploading'"
-                      :model-value="(item.bytesUploaded / item.size) * 100"
-                      color="primary"
-                      height="3"
-                      absolute
-                      bottom
-                    />
                   </v-list-item>
                 </template>
               </v-virtual-scroll>
 
-              <!-- Queue Placeholder Fallback -->
               <div
                 v-else
                 class="empty-queue-placeholder d-flex flex-column align-center justify-center py-12"
@@ -478,6 +487,15 @@ onUnmounted(() => {
 
 .queue-virtual-scroll {
   background: transparent;
+}
+
+.status-icon-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  margin-right: 16px;
 }
 
 .queue-item {

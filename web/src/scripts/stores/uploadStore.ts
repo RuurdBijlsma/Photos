@@ -17,30 +17,20 @@ export interface UploadItem {
 
 export const useUploadStore = defineStore('upload', () => {
   const uploads = ref<UploadItem[]>([])
-
   const settings = useSettingStore()
 
-  // Local, non-reactive mapping to store original File instances
-  // keeping the reactive store lightweight and performant
   const fileMap = new Map<string, File>()
 
-  // JWT cache properties
   let cachedJwt = ''
   let jwtFetchedAt = 0
 
-  // Computed state getters
   const activeCount = computed(() => uploads.value.filter((u) => u.status === 'uploading').length)
   const isUploading = computed(() =>
     uploads.value.some((u) => u.status === 'uploading' || u.status === 'pending'),
   )
 
-  /**
-   * Retrieves a cached JWT token if valid (under 2.5 minutes old),
-   * otherwise requests a fresh token from the auth system.
-   */
   async function getValidJwt(): Promise<string> {
     const now = Date.now()
-    // JWT expires in 3 minutes. Request a new one if older than 150 seconds.
     if (cachedJwt && now - jwtFetchedAt < 150000) {
       return cachedJwt
     }
@@ -50,32 +40,49 @@ export const useUploadStore = defineStore('upload', () => {
     return cachedJwt
   }
 
-  /**
-   * Appends files to the upload queue and begins processing
-   */
   function addFiles(files: FileList | File[]) {
     const itemsToAdd: UploadItem[] = []
 
     for (const file of Array.from(files)) {
-      const id = `${file.name}-${file.size}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`
-      itemsToAdd.push({
-        id,
-        name: file.name,
-        size: file.size,
-        bytesUploaded: 0,
-        status: 'pending',
-        tusUpload: null,
-      })
-      fileMap.set(id, file)
+      // Filter out 0-byte entries, which are highly likely to be directories or invalid uploads
+      if (file.size === 0) {
+        console.warn(`File "${file.name}" was skipped because it is empty (0 bytes).`)
+        continue
+      }
+
+      // Check if a stopped or failed entry for this exact file is already present
+      const existingItem = uploads.value.find(
+        (u) =>
+          u.name === file.name &&
+          u.size === file.size &&
+          (u.status === 'stopped' || u.status === 'failed'),
+      )
+
+      if (existingItem) {
+        // Reuse and reset the entry instead of creating a duplicate
+        existingItem.status = 'pending'
+        existingItem.error = undefined
+        fileMap.set(existingItem.id, file)
+      } else {
+        const id = `${file.name}-${file.size}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`
+        itemsToAdd.push({
+          id,
+          name: file.name,
+          size: file.size,
+          bytesUploaded: 0,
+          status: 'pending',
+          tusUpload: null,
+        })
+        fileMap.set(id, file)
+      }
     }
 
-    uploads.value.push(...itemsToAdd)
+    if (itemsToAdd.length > 0) {
+      uploads.value.push(...itemsToAdd)
+    }
     processQueue()
   }
 
-  /**
-   * Monitors active limits and kicks off pending uploads
-   */
   function processQueue() {
     if (activeCount.value >= settings.uploadConcurrencyLimit) return
 
@@ -83,13 +90,9 @@ export const useUploadStore = defineStore('upload', () => {
     if (!nextPending) return
 
     startUpload(nextPending)
-    // Recurse to fill the remaining slots up to the concurrency limit
     processQueue()
   }
 
-  /**
-   * Initiates the Tus upload protocol for a specific item
-   */
   async function startUpload(item: UploadItem) {
     const file = fileMap.get(item.id)
     if (!file) {
@@ -124,7 +127,6 @@ export const useUploadStore = defineStore('upload', () => {
         jwt: jwtToken,
       },
       onError: (error) => {
-        // Prevent updates if the operation was manually canceled
         if (item.status === 'stopped') return
 
         console.error(`Upload failed for ${file.name}:`, error)
@@ -146,11 +148,10 @@ export const useUploadStore = defineStore('upload', () => {
 
     item.tusUpload = uploadInstance
 
-    // Query server for resume targets, then initiate
     uploadInstance
       .findPreviousUploads()
       .then((previousUploads) => {
-        if (item.status !== 'uploading') return // Ensure user hasn't canceled during query
+        if (item.status !== 'uploading') return
 
         if (previousUploads.length) {
           uploadInstance.resumeFromPreviousUpload(previousUploads[0])
@@ -165,9 +166,6 @@ export const useUploadStore = defineStore('upload', () => {
       })
   }
 
-  /**
-   * Stops an active upload, freeing up a worker spot in the queue
-   */
   function stopUpload(id: string) {
     const item = uploads.value.find((u) => u.id === id)
     if (!item) return
@@ -184,9 +182,6 @@ export const useUploadStore = defineStore('upload', () => {
     processQueue()
   }
 
-  /**
-   * Removes an item from the queue entirely
-   */
   function removeUpload(id: string) {
     stopUpload(id)
     const idx = uploads.value.findIndex((u) => u.id === id)
@@ -195,9 +190,6 @@ export const useUploadStore = defineStore('upload', () => {
     }
   }
 
-  /**
-   * Clears out completed, canceled, and failed items
-   */
   function clearCompleted() {
     uploads.value = uploads.value.filter((u) => {
       if (u.status === 'success' || u.status === 'failed' || u.status === 'stopped') {
@@ -208,9 +200,6 @@ export const useUploadStore = defineStore('upload', () => {
     })
   }
 
-  /**
-   * Cancels all remaining queued or active operations
-   */
   function abortAll() {
     uploads.value.forEach((u) => {
       if (u.status === 'uploading' || u.status === 'pending') {
