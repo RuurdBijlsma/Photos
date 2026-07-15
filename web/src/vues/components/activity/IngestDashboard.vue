@@ -592,11 +592,17 @@ onUnmounted(() => {
               <div v-if="ingestStore.runningJobs.length > 0" class="running-jobs-wrap">
                 <RunningJobPill
                   bg-color="surface-container-high"
-                  v-for="job in ingestStore.runningJobs"
+                  v-for="job in ingestStore.runningJobs.slice(0, 15)"
                   :key="job.id"
                   :job-type="job.jobType"
                   :relative-path="job.relativePath"
                 />
+                <div
+                  v-if="ingestStore.runningJobs.length > 15"
+                  class="text-center text-caption text-medium-emphasis py-2"
+                >
+                  + {{ ingestStore.runningJobs.length - 15 }} more active tasks in background
+                </div>
               </div>
               <div v-else class="running-empty-state text-center py-8 text-medium-emphasis">
                 <v-icon size="large" class="opacity-40 mb-2">mdi-check-circle-outline</v-icon>

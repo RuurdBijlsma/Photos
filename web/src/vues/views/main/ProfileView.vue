@@ -140,171 +140,178 @@ useRefreshFunction(() => loadProfile())
 </script>
 
 <template>
-  <main-layout-container class="profile-view" fit-to-content>
-    <div v-if="loading" class="loading-state">
-      <v-progress-circular indeterminate color="primary" size="64" />
-    </div>
+  <main-layout-container fit-to-content>
+    <div class="profile-view">
+      <div v-if="loading" class="loading-state">
+        <v-progress-circular indeterminate color="primary" size="64" />
+      </div>
 
-    <div v-else-if="profile" class="profile-content">
-      <!-- Header Section -->
-      <section class="profile-header">
-        <user-avatar :name="profile.name" :avatar-id="profile.avatarId" :size="150" elevation="4" />
-        <div class="user-info">
-          <div class="user-title-row">
-            <h1 class="user-name">{{ profile.name }}</h1>
-            <v-btn
-              v-if="isCurrentUser"
-              prepend-icon="mdi-pencil"
-              variant="tonal"
-              rounded="xl"
-              class="edit-btn"
-              color="primary"
-              @click="openEditDialog"
-            >
-              Edit Profile
-            </v-btn>
+      <div v-else-if="profile" class="profile-content">
+        <!-- Header Section -->
+        <section class="profile-header">
+          <user-avatar
+            :name="profile.name"
+            :avatar-id="profile.avatarId"
+            :size="150"
+            elevation="4"
+          />
+          <div class="user-info">
+            <div class="user-title-row">
+              <h1 class="user-name">{{ profile.name }}</h1>
+              <v-btn
+                v-if="isCurrentUser"
+                prepend-icon="mdi-pencil"
+                variant="tonal"
+                rounded="xl"
+                class="edit-btn"
+                color="primary"
+                @click="openEditDialog"
+              >
+                Edit Profile
+              </v-btn>
+            </div>
+            <p v-if="profile.email" class="user-email">{{ profile.email }}</p>
+            <div class="user-joined">
+              <v-icon icon="mdi-calendar-range" size="small" class="joined-icon" />
+              <span>Joined {{ formatDate(profile.createdAt) }}</span>
+            </div>
           </div>
-          <p v-if="profile.email" class="user-email">{{ profile.email }}</p>
-          <div class="user-joined">
-            <v-icon icon="mdi-calendar-range" size="small" class="joined-icon" />
-            <span>Joined {{ formatDate(profile.createdAt) }}</span>
-          </div>
-        </div>
-      </section>
+        </section>
 
-      <!-- Stats Section -->
-      <section class="profile-stats">
-        <v-row>
-          <v-col v-for="stat in statCards" :key="stat.title" cols="12" sm="6" md="3">
-            <v-card class="stat-card" variant="flat">
-              <div class="stat-card-content">
-                <v-avatar :color="stat.color" variant="tonal" class="stat-icon" rounded="lg">
-                  <v-icon :icon="stat.icon" />
-                </v-avatar>
-                <div>
-                  <div class="stat-value">{{ stat.value.toLocaleString() }}</div>
-                  <div class="stat-label">
-                    {{ stat.title }}
+        <!-- Stats Section -->
+        <section class="profile-stats">
+          <v-row>
+            <v-col v-for="stat in statCards" :key="stat.title" cols="12" sm="6" md="3">
+              <v-card class="stat-card" variant="flat">
+                <div class="stat-card-content">
+                  <v-avatar :color="stat.color" variant="tonal" class="stat-icon" rounded="lg">
+                    <v-icon :icon="stat.icon" />
+                  </v-avatar>
+                  <div>
+                    <div class="stat-value">{{ stat.value.toLocaleString() }}</div>
+                    <div class="stat-label">
+                      {{ stat.title }}
+                    </div>
                   </div>
                 </div>
-              </div>
-            </v-card>
-          </v-col>
-        </v-row>
-      </section>
-    </div>
+              </v-card>
+            </v-col>
+          </v-row>
+        </section>
+      </div>
 
-    <div v-else class="not-found-state">
-      <v-icon icon="mdi-account-off" size="100" class="not-found-icon" />
-      <h2 class="not-found-title">User not found</h2>
-      <v-btn color="primary" variant="tonal" rounded class="home-btn" @click="router.push('/')">
-        Go Home
-      </v-btn>
-    </div>
+      <div v-else class="not-found-state">
+        <v-icon icon="mdi-account-off" size="100" class="not-found-icon" />
+        <h2 class="not-found-title">User not found</h2>
+        <v-btn color="primary" variant="tonal" rounded class="home-btn" @click="router.push('/')">
+          Go Home
+        </v-btn>
+      </div>
 
-    <!-- Edit Profile Dialog -->
-    <v-dialog v-model="editDialog" max-width="500px">
-      <v-card color="surface-container-high" rounded="xl">
-        <v-card-title class="dialog-header">
-          <span>Edit Profile</span>
-          <v-btn
-            icon="mdi-close"
-            variant="text"
-            @click="editDialog = false"
-            :disabled="saving"
-          ></v-btn>
-        </v-card-title>
-
-        <v-divider></v-divider>
-
-        <v-card-text class="dialog-body">
-          <div class="avatar-preview-wrapper">
-            <user-avatar
-              :name="editName || (profile ? profile.name : '')"
-              :avatar-id="editAvatar || (profile ? profile.avatarId : null)"
-              :size="180"
-              elevation="2"
-            />
+      <!-- Edit Profile Dialog -->
+      <v-dialog v-model="editDialog" max-width="500px">
+        <v-card color="surface-container-high" rounded="xl">
+          <v-card-title class="dialog-header">
+            <span>Edit Profile</span>
             <v-btn
-              v-if="!showExplanation"
-              class="avatar-edit-overlay"
-              color="transparent"
-              @click="showExplanation = true"
-            >
-              <v-icon class="avatar-edit-icon" size="40" color="white">mdi-pencil</v-icon>
+              icon="mdi-close"
+              variant="text"
+              @click="editDialog = false"
+              :disabled="saving"
+            ></v-btn>
+          </v-card-title>
+
+          <v-divider></v-divider>
+
+          <v-card-text class="dialog-body">
+            <div class="avatar-preview-wrapper">
+              <user-avatar
+                :name="editName || (profile ? profile.name : '')"
+                :avatar-id="editAvatar || (profile ? profile.avatarId : null)"
+                :size="180"
+                elevation="2"
+              />
+              <v-btn
+                v-if="!showExplanation"
+                class="avatar-edit-overlay"
+                color="transparent"
+                @click="showExplanation = true"
+              >
+                <v-icon class="avatar-edit-icon" size="40" color="white">mdi-pencil</v-icon>
+              </v-btn>
+            </div>
+
+            <v-expand-transition mode="out-in">
+              <v-card
+                rounded="xl"
+                variant="tonal"
+                color="primary"
+                v-if="showExplanation"
+                class="pa-4 mt-5"
+              >
+                <v-card-title>Edit picture</v-card-title>
+                <v-divider />
+                <v-card-text>
+                  To edit your profile picture, select one image, and click 'Set as profile picture'
+                  in the selection overlay. Or you can have the server automatically find a profile
+                  picture.
+                </v-card-text>
+                <v-card-actions>
+                  <v-spacer />
+                  <v-btn
+                    class="px-5"
+                    rounded
+                    variant="tonal"
+                    prepend-icon="mdi-auto-fix"
+                    @click="autoSetProfilePic"
+                    >Auto-set</v-btn
+                  >
+                  <v-btn
+                    class="px-5"
+                    exact
+                    rounded
+                    variant="tonal"
+                    prepend-icon="mdi-chevron-right"
+                    to="/"
+                    >Photos</v-btn
+                  >
+                </v-card-actions>
+              </v-card>
+            </v-expand-transition>
+
+            <v-text-field
+              v-model="editName"
+              label="Name"
+              variant="outlined"
+              base-color="outline"
+              autofocus
+              class="mt-5"
+              rounded
+              prepend-inner-icon="mdi-account"
+              :disabled="saving"
+              hide-details
+              @keyup.enter="saveProfile"
+            ></v-text-field>
+          </v-card-text>
+
+          <v-card-actions class="pa-4">
+            <v-spacer></v-spacer>
+            <v-btn variant="text" rounded @click="editDialog = false" :disabled="saving">
+              Cancel
             </v-btn>
-          </div>
-
-          <v-expand-transition mode="out-in">
-            <v-card
-              rounded="xl"
-              variant="tonal"
-              color="primary"
-              v-if="showExplanation"
-              class="pa-4 mt-5"
-            >
-              <v-card-title>Edit picture</v-card-title>
-              <v-divider />
-              <v-card-text>
-                To edit your profile picture, select one image, and click 'Set as profile picture'
-                in the selection overlay. Or you can have the server automatically find a profile
-                picture.
-              </v-card-text>
-              <v-card-actions>
-                <v-spacer />
-                <v-btn
-                  class="px-5"
-                  rounded
-                  variant="tonal"
-                  prepend-icon="mdi-auto-fix"
-                  @click="autoSetProfilePic"
-                  >Auto-set</v-btn
-                >
-                <v-btn
-                  class="px-5"
-                  exact
-                  rounded
-                  variant="tonal"
-                  prepend-icon="mdi-chevron-right"
-                  to="/"
-                  >Photos</v-btn
-                >
-              </v-card-actions>
-            </v-card>
-          </v-expand-transition>
-
-          <v-text-field
-            v-model="editName"
-            label="Name"
-            variant="outlined"
-            base-color="outline"
-            autofocus
-            class="mt-5"
-            rounded
-            prepend-inner-icon="mdi-account"
-            :disabled="saving"
-            hide-details
-            @keyup.enter="saveProfile"
-          ></v-text-field>
-        </v-card-text>
-
-        <v-card-actions class="pa-4">
-          <v-spacer></v-spacer>
-          <v-btn variant="text" rounded @click="editDialog = false" :disabled="saving">
-            Cancel
-          </v-btn>
-          <v-btn color="primary" variant="tonal" rounded :loading="saving" @click="saveProfile">
-            Save Changes
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+            <v-btn color="primary" variant="tonal" rounded :loading="saving" @click="saveProfile">
+              Save Changes
+            </v-btn>
+          </v-card-actions>
+        </v-card>
+      </v-dialog>
+    </div>
   </main-layout-container>
 </template>
 
 <style scoped>
 .profile-view {
-  padding: 40px;
+  padding:40px;
 }
 
 .profile-content {
