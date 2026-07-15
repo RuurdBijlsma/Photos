@@ -287,7 +287,7 @@ onUnmounted(() => {
 <template>
   <div class="dashboard-root">
     <!-- Top Pipeline Section -->
-    <section class="pipeline-section mb-8">
+    <section class="pipeline-section">
       <div class="pipeline-row">
         <!-- Upload circle -->
         <div
@@ -311,11 +311,9 @@ onUnmounted(() => {
                 <span class="circle-pct">{{ uploadProgress }}%</span>
               </div>
             </v-progress-circular>
-            <div class="step-details mt-2">
-              <span class="step-label font-weight-bold">Upload</span>
-              <span class="step-status text-caption text-medium-emphasis">{{
-                uploadToGoText
-              }}</span>
+            <div class="step-details">
+              <span class="step-label">Upload</span>
+              <span class="step-status">{{ uploadToGoText }}</span>
             </div>
           </div>
         </div>
@@ -339,11 +337,9 @@ onUnmounted(() => {
                 <span class="circle-pct">{{ metadataProgress }}%</span>
               </div>
             </v-progress-circular>
-            <div class="step-details mt-2">
-              <span class="step-label font-weight-bold">Metadata</span>
-              <span class="step-status text-caption text-medium-emphasis">{{
-                metadataToGoText
-              }}</span>
+            <div class="step-details">
+              <span class="step-label">Metadata</span>
+              <span class="step-status">{{ metadataToGoText }}</span>
             </div>
           </div>
         </div>
@@ -367,11 +363,9 @@ onUnmounted(() => {
                 <span class="circle-pct">{{ thumbnailsProgress }}%</span>
               </div>
             </v-progress-circular>
-            <div class="step-details mt-2">
-              <span class="step-label font-weight-bold">Thumbnails</span>
-              <span class="step-status text-caption text-medium-emphasis">{{
-                thumbnailsToGoText
-              }}</span>
+            <div class="step-details">
+              <span class="step-label">Thumbnails</span>
+              <span class="step-status">{{ thumbnailsToGoText }}</span>
             </div>
           </div>
         </div>
@@ -395,11 +389,9 @@ onUnmounted(() => {
                 <span class="circle-pct">{{ analysisProgress }}%</span>
               </div>
             </v-progress-circular>
-            <div class="step-details mt-2">
-              <span class="step-label font-weight-bold">Analysis</span>
-              <span class="step-status text-caption text-medium-emphasis">{{
-                analysisToGoText
-              }}</span>
+            <div class="step-details">
+              <span class="step-label">Analysis</span>
+              <span class="step-status">{{ analysisToGoText }}</span>
             </div>
           </div>
         </div>
@@ -411,17 +403,17 @@ onUnmounted(() => {
       <!-- Left Column: Scan, Dropzone, Upload Progress -->
       <div class="grid-column">
         <!-- Scan Card -->
-        <v-card class="action-card mb-6" flat>
-          <div class="action-content pa-5">
+        <v-card class="action-card" flat>
+          <div class="action-content">
             <div class="action-text">
               <div>
-                <h2 class="fix-margin text-h6 font-weight-bold">Index Library Folder</h2>
-                <p class="text-subtitle-2 text-medium-emphasis mb-0 mt-1">
+                <h2 class="section-title">Index Library Folder</h2>
+                <p class="section-subtitle">
                   Folder: Start a search of your media folder to discover new photos and videos.
                 </p>
               </div>
               <show-selected-folder
-                class="mt-3 mr-1"
+                class="selected-folder-display"
                 bg-color="surface-variant"
                 text-color="on-surface-variant"
                 exclude-check-icon
@@ -437,7 +429,7 @@ onUnmounted(() => {
               prepend-icon="mdi-folder-search-outline"
               :loading="isScanning"
               @click="handleScan"
-              class="mt-4"
+              class="scan-button"
             >
               Scan Folder
             </v-btn>
@@ -445,9 +437,9 @@ onUnmounted(() => {
         </v-card>
 
         <!-- Simplified File Dropzone -->
-        <v-card class="action-card mb-6" flat>
-          <div class="pa-5">
-            <h2 class="text-h6 font-weight-bold mb-3">Upload Media</h2>
+        <v-card class="action-card" flat>
+          <div class="card-body">
+            <h2 class="card-title">Upload Media</h2>
             <div
               class="custom-dropzone"
               :class="{ dragover: dragover }"
@@ -456,27 +448,33 @@ onUnmounted(() => {
               @drop.prevent="onDrop"
               @click="triggerFileSelect"
             >
-              <v-icon size="x-large" color="primary" class="mb-2">mdi-tray-arrow-up</v-icon>
+              <v-icon size="x-large" color="primary" class="dropzone-icon"
+                >mdi-tray-arrow-up</v-icon
+              >
               <div class="dropzone-label">
                 Drag & Drop files here or <span class="browse-link">Browse</span>
               </div>
-              <div class="dropzone-hint text-caption text-medium-emphasis mt-1">
-                Supports image and video file formats
-              </div>
+              <div class="dropzone-hint">Supports image and video file formats</div>
             </div>
 
-            <input ref="fileInput" type="file" multiple class="d-none" @change="onFileChanged" />
+            <input
+              ref="fileInput"
+              type="file"
+              multiple
+              class="hidden-input"
+              @change="onFileChanged"
+            />
             <input
               ref="folderInput"
               type="file"
               multiple
               webkitdirectory
               directory
-              class="d-none"
+              class="hidden-input"
               @change="onFolderChanged"
             />
 
-            <div class="dropzone-buttons mt-4">
+            <div class="dropzone-buttons">
               <v-btn
                 variant="tonal"
                 color="secondary"
@@ -493,7 +491,7 @@ onUnmounted(() => {
                 rounded
                 prepend-icon="mdi-trash-can-outline"
                 @click="uploadStore.clearCompleted"
-                class="ml-2"
+                class="clear-button"
               >
                 Clear Completed
               </v-btn>
@@ -503,9 +501,9 @@ onUnmounted(() => {
 
         <!-- Active Uploads List -->
         <v-card v-if="uploadStore.uploads.length > 0" class="action-card" flat>
-          <div class="pa-5">
-            <div class="d-flex align-center justify-space-between mb-4">
-              <h2 class="text-h6 font-weight-bold">Active Uploads</h2>
+          <div class="card-body">
+            <div class="active-uploads-header">
+              <h2 class="card-title">Active Uploads</h2>
               <v-btn
                 variant="tonal"
                 color="error"
@@ -534,23 +532,18 @@ onUnmounted(() => {
                   </v-icon>
                 </div>
 
-                <div class="upload-item-details ml-3">
+                <div class="upload-item-details">
                   <div class="upload-item-name">{{ item.name }}</div>
-                  <div class="upload-item-meta text-caption text-medium-emphasis">
+                  <div class="upload-item-meta">
                     {{ prettyBytes(item.bytesUploaded) }} / {{ prettyBytes(item.size) }}
-                    <span v-if="item.error" class="text-error font-weight-medium"
-                      >&bull; {{ item.error }}</span
-                    >
+                    <span v-if="item.error" class="error-text">&bull; {{ item.error }}</span>
                   </div>
                 </div>
 
                 <v-spacer />
 
-                <div class="upload-item-actions ml-2">
-                  <span
-                    class="progress-percent mr-2 text-caption font-weight-bold"
-                    v-if="item.status === 'uploading'"
-                  >
+                <div class="upload-item-actions">
+                  <span class="progress-percent" v-if="item.status === 'uploading'">
                     {{ ((item.bytesUploaded / item.size) * 100).toFixed(0) }}%
                   </span>
                   <v-btn
@@ -579,9 +572,9 @@ onUnmounted(() => {
       <!-- Right Column: Currently Ingesting Feed & Ingest Jobs Table -->
       <div class="grid-column">
         <!-- Currently Ingesting Jobs Feed -->
-        <v-card class="action-card mb-6" flat>
-          <div class="pa-5">
-            <h2 class="text-h6 font-weight-bold mb-3 d-flex align-center gap-2">
+        <v-card class="action-card" flat>
+          <div class="card-body">
+            <h2 class="feed-title">
               <span
                 >Currently importing ({{ ingestStore.runningJobs.length
                 }}{{ ingestStore.runningJobs.length >= 100 ? '+' : '' }})</span
@@ -597,16 +590,13 @@ onUnmounted(() => {
                   :job-type="job.jobType"
                   :relative-path="job.relativePath"
                 />
-                <div
-                  v-if="ingestStore.runningJobs.length > 15"
-                  class="text-center text-caption text-medium-emphasis py-2"
-                >
+                <div v-if="ingestStore.runningJobs.length > 15" class="background-tasks-indicator">
                   + {{ ingestStore.runningJobs.length - 15 }} more active tasks in background
                 </div>
               </div>
-              <div v-else class="running-empty-state text-center py-8 text-medium-emphasis">
-                <v-icon size="large" class="opacity-40 mb-2">mdi-check-circle-outline</v-icon>
-                <div class="text-subtitle-2">No active background ingestion tasks running.</div>
+              <div v-else class="running-empty-state">
+                <v-icon size="large" class="empty-state-icon">mdi-check-circle-outline</v-icon>
+                <div class="empty-state-text">No active background ingestion tasks running.</div>
               </div>
             </div>
           </div>
@@ -614,11 +604,11 @@ onUnmounted(() => {
 
         <!-- Ingest Jobs Table with Tabs -->
         <v-card class="action-card" flat>
-          <div class="pa-5">
-            <h2 class="text-h6 font-weight-bold mb-4">Ingestion Queue Details</h2>
+          <div class="card-body">
+            <h2 class="card-title">Ingestion Queue Details</h2>
 
             <!-- Search row -->
-            <div class="table-filters mb-4 mt-4">
+            <div class="table-filters">
               <v-text-field
                 v-model="ingestStore.searchQuery"
                 label="Search filenames"
@@ -638,7 +628,7 @@ onUnmounted(() => {
             <v-tabs
               v-model="ingestStore.selectedTab"
               color="primary"
-              class="tabs-control mb-3"
+              class="tabs-control"
               density="comfortable"
             >
               <v-tab value="queued">Queued</v-tab>
@@ -657,40 +647,34 @@ onUnmounted(() => {
             >
               <!-- Empty state -->
               <template #no-data>
-                <div class="py-6 text-center text-medium-emphasis text-body-2">
-                  No ingest jobs match this filter.
-                </div>
+                <div class="table-empty-state">No ingest jobs match this filter.</div>
               </template>
 
-              <!-- Job Type Slot -->
+              <!-- Job Status Slot -->
               <template #[`item.status`]="{ item }">
-                <v-chip class="font-weight-medium text-caption">{{ item.status }}</v-chip>
+                <v-chip class="table-chip">{{ item.status }}</v-chip>
               </template>
 
               <!-- Job Type Slot -->
               <template #[`item.jobType`]="{ item }">
-                <v-chip class="font-weight-medium text-caption">{{
-                  formatJobType(item.jobType)
-                }}</v-chip>
+                <v-chip class="table-chip">{{ formatJobType(item.jobType) }}</v-chip>
               </template>
 
               <!-- Relative Path Slot -->
               <template #[`item.relativePath`]="{ item }">
-                <span class="path-text text-truncate d-inline-block" style="max-width: 200px">
+                <span class="path-text">
                   {{ item.relativePath || '-' }}
                 </span>
               </template>
 
               <!-- Attempts Slot -->
               <template #[`item.attempts`]="{ item }">
-                <span class="text-caption text-medium-emphasis"
-                  >{{ item.attempts }} / {{ item.maxAttempts }}</span
-                >
+                <span class="attempts-display"> {{ item.attempts }} / {{ item.maxAttempts }} </span>
               </template>
 
               <!-- Actions Slot -->
               <template #[`item.actions`]="{ item }">
-                <div class="d-flex align-center justify-end gap-1">
+                <div class="row-actions">
                   <!-- Retry button for failed -->
                   <v-btn
                     v-if="item.status === 'failed'"
@@ -720,9 +704,9 @@ onUnmounted(() => {
             <!-- Pagination -->
             <div
               v-if="ingestStore.totalJobsCount > ingestStore.itemsPerPage"
-              class="d-flex align-center justify-space-between mt-4"
+              class="table-pagination-row"
             >
-              <span class="text-caption text-medium-emphasis">
+              <span class="pagination-info">
                 Showing {{ (ingestStore.page - 1) * ingestStore.itemsPerPage + 1 }} -
                 {{
                   Math.min(ingestStore.page * ingestStore.itemsPerPage, ingestStore.totalJobsCount)
@@ -744,14 +728,12 @@ onUnmounted(() => {
     <!-- Modal Dialog for Job Details -->
     <v-dialog v-model="detailsDialog" max-width="700px">
       <v-card rounded="xl" color="surface-container-highest" class="dialog-card">
-        <v-card-title
-          class="dialog-header d-flex align-center justify-space-between py-4 px-6 border-bottom"
-        >
-          <div class="d-flex align-center font-weight-bold text-h6">
+        <v-card-title class="dialog-header">
+          <div class="dialog-title">
             <v-icon
               :icon="detailedJob?.lastError ? 'mdi-alert-circle' : 'mdi-information'"
               :color="detailedJob?.lastError ? 'error' : 'primary'"
-              class="mr-2"
+              class="dialog-title-icon"
             />
             Job #{{ detailedJob?.id }} ({{
               detailedJob?.jobType ? formatJobType(detailedJob.jobType) : ''
@@ -760,31 +742,27 @@ onUnmounted(() => {
           <v-btn icon="mdi-close" variant="text" density="comfortable" @click="closeDetails" />
         </v-card-title>
 
-        <v-card-text class="py-4 px-6 dialog-body">
+        <v-card-text class="dialog-body">
           <!-- Relative Path Info -->
-          <div class="mb-4">
-            <div class="text-subtitle-2 font-weight-bold text-medium-emphasis mb-1">File Path</div>
-            <code class="path-display px-2 py-1 rounded">{{
-              detailedJob?.relativePath || '-'
-            }}</code>
+          <div class="dialog-error-section">
+            <div class="dialog-section-label">File Path</div>
+            <code class="path-display">{{ detailedJob?.relativePath || '-' }}</code>
           </div>
 
           <!-- Error Stack Trace -->
-          <div v-if="detailedJob?.lastError" class="mb-4">
-            <div class="text-subtitle-2 font-weight-bold error-label mb-1">Error Log</div>
-            <pre class="console-box error-box pa-3">{{ detailedJob.lastError }}</pre>
+          <div v-if="detailedJob?.lastError" class="dialog-error-section">
+            <div class="error-label">Error Log</div>
+            <pre class="console-box error-box">{{ detailedJob.lastError }}</pre>
           </div>
 
           <!-- Payload parameters -->
           <div>
-            <div class="text-subtitle-2 font-weight-bold text-medium-emphasis mb-1">
-              Parameters (Payload)
-            </div>
-            <pre class="console-box pa-3">{{ JSON.stringify(detailedJob?.payload, null, 2) }}</pre>
+            <div class="dialog-section-label">Parameters (Payload)</div>
+            <pre class="console-box">{{ JSON.stringify(detailedJob?.payload, null, 2) }}</pre>
           </div>
 
           <!-- Extra Meta Info -->
-          <v-row class="mt-4 text-caption text-medium-emphasis" density="comfortable">
+          <v-row class="dialog-metadata" density="comfortable">
             <v-col cols="6" sm="4">
               <strong>Created:</strong><br />
               {{ formatDate(detailedJob?.createdAt || '') }}
@@ -800,7 +778,7 @@ onUnmounted(() => {
           </v-row>
         </v-card-text>
 
-        <v-card-actions class="px-6 pb-6 d-flex align-center border-top pt-4">
+        <v-card-actions class="dialog-actions">
           <!-- Retry Button for Failed, Done, Cancelled -->
           <v-btn
             v-if="
@@ -815,7 +793,7 @@ onUnmounted(() => {
             rounded="xl"
             :loading="isActionLoading"
             @click="handleDialogRetry(detailedJob.id)"
-            class="mr-2"
+            class="dialog-action-btn"
           >
             Retry Job
           </v-btn>
@@ -836,6 +814,7 @@ onUnmounted(() => {
 .pipeline-section {
   border-radius: 28px;
   padding: 24px;
+  margin-bottom: 32px;
 }
 
 .pipeline-row {
@@ -903,15 +882,19 @@ onUnmounted(() => {
   flex-direction: column;
   align-items: center;
   text-align: center;
+  margin-top: 8px;
 }
 
 .step-label {
   font-size: 0.9rem;
+  font-weight: 700;
   color: rgb(var(--v-theme-on-surface));
 }
 
 .step-status {
+  font-size: 0.75rem;
   font-weight: 500;
+  color: rgba(var(--v-theme-on-surface), 0.6);
 }
 
 .pipeline-arrow {
@@ -943,12 +926,14 @@ onUnmounted(() => {
 .action-card {
   background-color: rgb(var(--v-theme-surface-container-low)) !important;
   border-radius: 28px !important;
+  margin-bottom: 24px;
 }
 
 .action-content {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
+  padding: 20px;
 }
 
 .action-text {
@@ -956,8 +941,38 @@ onUnmounted(() => {
   align-items: flex-start;
 }
 
-.fix-margin {
+.section-title {
   margin: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.section-subtitle {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: rgba(var(--v-theme-on-surface), 0.6);
+  margin-top: 4px;
+  margin-bottom: 0;
+}
+
+.selected-folder-display {
+  margin-top: 12px;
+  margin-right: 4px;
+}
+
+.scan-button {
+  margin-top: 16px;
+}
+
+/* Card Body spacing */
+.card-body {
+  padding: 20px;
+}
+
+.card-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin-bottom: 12px;
 }
 
 /* Custom Dropzone */
@@ -977,6 +992,10 @@ onUnmounted(() => {
   background-color: rgba(var(--v-theme-primary), 0.06);
 }
 
+.dropzone-icon {
+  margin-bottom: 8px;
+}
+
 .dropzone-label {
   font-size: 0.95rem;
   font-weight: 600;
@@ -990,7 +1009,14 @@ onUnmounted(() => {
 }
 
 .dropzone-hint {
+  font-size: 0.75rem;
   font-weight: 500;
+  color: rgba(var(--v-theme-on-surface), 0.6);
+  margin-top: 4px;
+}
+
+.hidden-input {
+  display: none;
 }
 
 .dropzone-buttons {
@@ -998,9 +1024,21 @@ onUnmounted(() => {
   align-items: center;
   flex-wrap: wrap;
   gap: 8px;
+  margin-top: 16px;
+}
+
+.clear-button {
+  margin-left: 8px;
 }
 
 /* Active Uploads */
+.active-uploads-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
 .active-uploads-list {
   max-height: 350px;
   overflow-y: auto;
@@ -1021,6 +1059,17 @@ onUnmounted(() => {
   background-color: rgb(var(--v-theme-surface-container-highest));
 }
 
+.upload-item-prefix {
+  display: flex;
+  align-items: center;
+}
+
+.upload-item-details {
+  margin-left: 12px;
+  flex-grow: 1;
+  min-width: 0;
+}
+
 .upload-item-name {
   font-weight: 600;
   font-size: 0.85rem;
@@ -1031,13 +1080,40 @@ onUnmounted(() => {
 }
 
 .upload-item-meta {
+  font-size: 0.75rem;
   font-weight: 500;
-  opacity: 0.8;
+  color: rgba(var(--v-theme-on-surface), 0.6);
+}
+
+.error-text {
+  color: rgb(var(--v-theme-error));
+  font-weight: 500;
+}
+
+.upload-item-actions {
+  margin-left: 8px;
+  display: flex;
+  align-items: center;
+}
+
+.progress-percent {
+  margin-right: 8px;
+  font-size: 0.75rem;
+  font-weight: 700;
 }
 
 /* Running Jobs Feed */
 .running-list-container {
   min-height: 140px;
+}
+
+.feed-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .running-jobs-wrap {
@@ -1049,11 +1125,36 @@ onUnmounted(() => {
   padding-right: 4px;
 }
 
+.background-tasks-indicator {
+  text-align: center;
+  font-size: 0.75rem;
+  color: rgba(var(--v-theme-on-surface), 0.6);
+  padding: 8px 0;
+}
+
+.running-empty-state {
+  text-align: center;
+  padding: 32px 0;
+  color: rgba(var(--v-theme-on-surface), 0.6);
+}
+
+.empty-state-icon {
+  opacity: 0.4;
+  margin-bottom: 8px;
+}
+
+.empty-state-text {
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
 /* Ingest Queue Table */
 .table-filters {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  margin-top: 16px;
+  margin-bottom: 16px;
 }
 
 .search-bar {
@@ -1063,24 +1164,58 @@ onUnmounted(() => {
 .tabs-control {
   border-bottom: 1px solid rgba(var(--v-border-color), 0.1);
   font-weight: 500;
+  margin-bottom: 12px;
 }
 
 .user-jobs-table {
   background: transparent !important;
 }
 
+.table-empty-state {
+  padding: 24px 0;
+  text-align: center;
+  color: rgba(var(--v-theme-on-surface), 0.6);
+  font-size: 0.875rem;
+}
+
+.table-chip {
+  font-weight: 500;
+  font-size: 0.75rem;
+}
+
 .path-text {
   font-family: monospace;
   font-size: 0.8rem;
   color: rgb(var(--v-theme-on-surface));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: inline-block;
+  max-width: 200px;
 }
 
-.gap-1 {
+.attempts-display {
+  font-size: 0.75rem;
+  color: rgba(var(--v-theme-on-surface), 0.6);
+}
+
+.row-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
   gap: 4px;
 }
 
-.gap-2 {
-  gap: 8px;
+.table-pagination-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 16px;
+}
+
+.pagination-info {
+  font-size: 0.75rem;
+  color: rgba(var(--v-theme-on-surface), 0.6);
 }
 
 /* Details Dialog */
@@ -1089,7 +1224,33 @@ onUnmounted(() => {
 }
 
 .dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 24px;
   border-bottom: 1px solid rgba(var(--v-border-color), 0.12);
+}
+
+.dialog-title {
+  display: flex;
+  align-items: center;
+  font-weight: 700;
+  font-size: 1.25rem;
+}
+
+.dialog-title-icon {
+  margin-right: 8px;
+}
+
+.dialog-body {
+  padding: 16px 24px;
+}
+
+.dialog-section-label {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: rgba(var(--v-theme-on-surface), 0.6);
+  margin-bottom: 4px;
 }
 
 .path-display {
@@ -1098,10 +1259,19 @@ onUnmounted(() => {
   font-size: 0.85rem;
   display: inline-block;
   word-break: break-all;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.dialog-error-section {
+  margin-bottom: 16px;
 }
 
 .error-label {
   color: rgb(var(--v-theme-error));
+  font-size: 0.875rem;
+  font-weight: 700;
+  margin-bottom: 4px;
 }
 
 .console-box {
@@ -1115,6 +1285,7 @@ onUnmounted(() => {
   word-break: break-all;
   max-height: 220px;
   overflow-y: auto;
+  padding: 12px;
 }
 
 .error-box {
@@ -1123,7 +1294,20 @@ onUnmounted(() => {
   background-color: rgba(var(--v-theme-error), 0.02);
 }
 
-.border-top {
+.dialog-metadata {
+  margin-top: 16px;
+  font-size: 0.75rem;
+  color: rgba(var(--v-theme-on-surface), 0.6);
+}
+
+.dialog-actions {
+  padding: 16px 24px 24px 24px;
+  display: flex;
+  align-items: center;
   border-top: 1px solid rgba(var(--v-border-color), 0.12);
+}
+
+.dialog-action-btn {
+  margin-right: 8px;
 }
 </style>
