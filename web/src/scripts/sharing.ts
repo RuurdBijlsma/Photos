@@ -1,7 +1,13 @@
 import apiClient from '@/scripts/services/api.ts'
 import { copyToClipboard, getThumbnailHeight, getVideoHeight } from '@/scripts/utils.ts'
 
-export async function navigatorShare(id: string, isVideo: boolean, hasThumbnails?: boolean, filename?: string, usePanoViewer?: boolean) {
+export async function navigatorShare(
+  id: string,
+  isVideo: boolean,
+  hasThumbnails?: boolean,
+  filename?: string,
+  usePanoViewer?: boolean,
+) {
   if (!id) return
 
   const isPano = usePanoViewer ?? false
@@ -14,16 +20,14 @@ export async function navigatorShare(id: string, isVideo: boolean, hasThumbnails
     }
 
     filename = filename || (isVideo ? 'video.mp4' : 'photo.jpg')
-     hasThumbnails = hasThumbnails ?? true
+    hasThumbnails = hasThumbnails ?? true
     const onDemand = !hasThumbnails
 
     let url = ''
     if (isVideo) {
       const baseUrl = apiClient.defaults.baseURL
       const vidHeight = getVideoHeight(1440)
-      const path = onDemand
-        ? `/photos/${id}/video`
-        : `/hosted/thumbnails/${id}/${vidHeight}p.webm`
+      const path = onDemand ? `/photos/${id}/video` : `/hosted/thumbnails/${id}/${vidHeight}p.webm`
       url = new URL(path, baseUrl).href
     } else {
       const baseUrl = apiClient.defaults.baseURL
@@ -64,7 +68,7 @@ export async function navigatorShare(id: string, isVideo: boolean, hasThumbnails
     if (navigator.canShare && navigator.canShare({ files: [file] })) {
       await navigator.share({
         files: [file],
-        title:filename,
+        title: filename,
       })
     } else {
       // Fallback 1: Share standard Web Share parameters
@@ -73,9 +77,9 @@ export async function navigatorShare(id: string, isVideo: boolean, hasThumbnails
         url: shareUrl,
       })
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     // Graceful cancellation: Do not copy to clipboard if the user manually exited the share dialog
-    if (error?.name === 'AbortError') {
+    if (error instanceof Error && error.name === 'AbortError') {
       console.log('Sharing operation dismissed by the user.')
       return
     }
@@ -93,8 +97,8 @@ export async function navigatorShare(id: string, isVideo: boolean, hasThumbnails
           url: shareUrl,
         })
         return
-      } catch (innerError: any) {
-        if (innerError?.name === 'AbortError') {
+      } catch (innerError: unknown) {
+        if (innerError instanceof Error && innerError.name === 'AbortError') {
           return
         }
       }

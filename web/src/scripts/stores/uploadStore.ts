@@ -107,7 +107,7 @@ export const useUploadStore = defineStore('upload', () => {
     let jwtToken = ''
     try {
       jwtToken = await getValidJwt()
-    } catch (err: any) {
+    } catch (err: unknown) {
       item.status = 'failed'
       item.error = 'Unable to fetch upload token'
       console.error('[UploadStore] Error retrieving JWT:', err)

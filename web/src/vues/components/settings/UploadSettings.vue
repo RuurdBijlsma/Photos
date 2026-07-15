@@ -1,9 +1,5 @@
 <script setup lang="ts">
-import {
-  CUSTOM_THEME_CONTRAST,
-  UPLOAD_CONCURRENCY_LIMIT,
-  useSettingStore,
-} from '@/scripts/stores/settingsStore.ts'
+import { UPLOAD_CONCURRENCY_LIMIT, useSettingStore } from '@/scripts/stores/settingsStore.ts'
 import SettingsSlider from '@/vues/components/settings/components/SettingsSlider.vue'
 
 const settings = useSettingStore()

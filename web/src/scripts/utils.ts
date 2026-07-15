@@ -211,12 +211,12 @@ export function caps(str: string) {
 }
 
 export function arrayToMap<T extends { id: string }>(items: readonly T[]): Map<string, T> {
-  const map = new Map<string, T>();
+  const map = new Map<string, T>()
 
   for (let i = 0; i < items.length; i++) {
-    const item = items[i];
-    map.set(item.id, item);
+    const item = items[i]
+    map.set(item.id, item)
   }
 
-  return map;
+  return map
 }

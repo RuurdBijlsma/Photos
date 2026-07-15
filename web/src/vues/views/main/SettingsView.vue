@@ -46,7 +46,7 @@ const backgroundStore = useBackgroundStore()
         <v-divider />
       </div>
 
-      <upload-settings class="mb-6"/>
+      <upload-settings class="mb-6" />
 
       <backup-settings />
     </div>

@@ -11,7 +11,7 @@ const apiClient = axios.create({
 
 // --- Response Interceptor ---
 let isRefreshing = false
-let failedQueue: { resolve: (value: unknown) => void; reject: (reason?: any) => void }[] = []
+let failedQueue: { resolve: (value: unknown) => void; reject: (reason?: unknown) => void }[] = []
 
 const processQueue = (error: Error | null) => {
   failedQueue.forEach((prom) => {

@@ -311,7 +311,7 @@ useRefreshFunction(() => loadProfile())
 
 <style scoped>
 .profile-view {
-  padding:40px;
+  padding: 40px;
 }
 
 .profile-content {
