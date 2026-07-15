@@ -1,7 +1,7 @@
 import type { AxiosResponse } from 'axios'
 import apiClient from './api.ts'
 import type { IngestOverviewResponse } from '@/scripts/types/api/ingestJobs.ts'
-import type { JobInfo } from '@/scripts/types/api/admin.ts'
+import type { JobInfo, PaginatedJobsResponse } from '@/scripts/types/api/admin.ts'
 
 const ingestJobsService = {
   /**
@@ -19,10 +19,15 @@ const ingestJobsService = {
   },
 
   /**
-   * Get failed ingest jobs for the current user.
+   * Get paginated ingest jobs for the current user.
    */
-  getFailed(): Promise<AxiosResponse<JobInfo[]>> {
-    return apiClient.get<JobInfo[]>('/jobs/ingest/failed')
+  getUserJobs(params: {
+    page?: number
+    limit?: number
+    status?: string
+    search?: string
+  }): Promise<AxiosResponse<PaginatedJobsResponse>> {
+    return apiClient.get<PaginatedJobsResponse>('/jobs/ingest', { params })
   },
 
   /**

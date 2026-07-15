@@ -4,12 +4,12 @@ use axum::{Extension, Json};
 use axum_extra::extract::Query;
 use common_services::api::app_error::AppError;
 use common_services::api::jobs::interfaces::{
-    IngestOverviewResponse, JobInfo, JobsQuery, PaginatedJobsResponse, RetryJobPayload,
+    IngestOverviewResponse, JobInfo, JobsQuery, PaginatedJobsResponse, RetryJobPayload, UserJobsQuery,
 };
 use common_services::api::jobs::service::{cancel_job, get_job_overview, retry_job};
 use common_services::api::jobs::user_level::{
     enqueue_scan_job, get_failed_ingest_jobs, get_running_ingest_jobs, get_user_ingest_overview,
-    retry_user_job,
+    retry_user_job, get_user_ingest_jobs,
 };
 use sqlx::PgPool;
 use tracing::instrument;
@@ -87,4 +87,14 @@ pub async fn retry_ingest_job_handler(
 ) -> Result<Json<()>, AppError> {
     retry_user_job(&pool, payload.id, user.id).await?;
     Ok(Json(()))
+}
+
+#[instrument(skip(pool, user), err(Debug))]
+pub async fn get_user_ingest_jobs_handler(
+    State(pool): State<PgPool>,
+    Extension(user): Extension<ApiUser>,
+    Query(query): Query<UserJobsQuery>,
+) -> Result<Json<PaginatedJobsResponse>, AppError> {
+    let jobs = get_user_ingest_jobs(&pool, user.id, query).await?;
+    Ok(Json(jobs))
 }

@@ -1,6 +1,19 @@
 <script setup lang="ts">
 import MainLayoutContainer from '@/vues/components/MainLayoutContainer.vue'
 import IngestDashboard from '@/vues/components/activity/IngestDashboard.vue'
+import { useUploadStore } from '@/scripts/stores/uploadStore.ts'
+import { useEventListener } from '@vueuse/core'
+
+const uploadStore = useUploadStore()
+
+function handleBeforeUnload(e: BeforeUnloadEvent) {
+  if (uploadStore.isUploading) {
+    e.preventDefault()
+    e.returnValue = ''
+  }
+}
+
+useEventListener('beforeunload', handleBeforeUnload)
 </script>
 
 <template>

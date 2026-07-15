@@ -1,7 +1,7 @@
 use crate::api::app_error::AppError;
-use crate::api::jobs::interfaces::{IngestOverviewResponse, JobInfo};
+use crate::api::jobs::interfaces::{IngestOverviewResponse, JobInfo, UserJobsQuery, PaginatedJobsResponse};
 use crate::database::jobs::{JobStatus, JobType};
-use sqlx::PgPool;
+use sqlx::{PgPool, Postgres, QueryBuilder};
 
 /// Retrieves the counts of queued, running, failed, completed, and cancelled ingest jobs.
 /// Leverages the cleanDB job routine to only count recently relevant records.
@@ -183,3 +183,101 @@ pub async fn retry_user_job(pool: &PgPool, job_id: i64, user_id: i32) -> Result<
 
     Ok(())
 }
+
+/// Retrieves a paginated list of user ingest jobs matching filter/search parameters.
+pub async fn get_user_ingest_jobs(
+    pool: &PgPool,
+    user_id: i32,
+    query: UserJobsQuery,
+) -> Result<PaginatedJobsResponse, AppError> {
+    let limit = query.limit.unwrap_or(10).clamp(1, 100);
+    let page = query.page.unwrap_or(1).max(1);
+    let offset = (page - 1) * limit;
+
+    // 1. Build and execute total count query
+    let mut count_builder = QueryBuilder::<Postgres>::new("SELECT COUNT(*) FROM jobs WHERE user_id = ");
+    count_builder.push_bind(user_id);
+    count_builder.push(" AND job_type IN ('ingest_metadata'::job_type, 'ingest_thumbnails'::job_type, 'ingest_analysis'::job_type)");
+
+    // Add status filter
+    if let Some(status) = &query.status {
+        match status.as_str() {
+            "queued" => {
+                count_builder.push(" AND status = 'queued'::job_status");
+            }
+            "running" | "processing" | "in_progress" => {
+                count_builder.push(" AND status = 'running'::job_status");
+            }
+            "failed" => {
+                count_builder.push(" AND status = 'failed'::job_status");
+            }
+            _ => {
+                count_builder.push(" AND status IN ('queued'::job_status, 'running'::job_status, 'failed'::job_status)");
+            }
+        }
+    } else {
+        count_builder.push(" AND status IN ('queued'::job_status, 'running'::job_status, 'failed'::job_status)");
+    }
+
+    if let Some(search) = &query.search {
+        if !search.trim().is_empty() {
+            count_builder.push(" AND relative_path ILIKE ");
+            count_builder.push_bind(format!("%{}%", search.trim()));
+        }
+    }
+
+    let count_query = count_builder.build_query_scalar::<i64>();
+    let total = count_query.fetch_one(pool).await?;
+
+    // 2. Build select query
+    let mut select_builder = QueryBuilder::<Postgres>::new(
+        "SELECT id, relative_path, user_id, job_type, payload, priority, status, attempts, \
+         dependency_attempts, max_attempts, owner, started_at, finished_at, created_at, \
+         scheduled_at, last_heartbeat, last_error FROM jobs WHERE user_id = "
+    );
+    select_builder.push_bind(user_id);
+    select_builder.push(" AND job_type IN ('ingest_metadata'::job_type, 'ingest_thumbnails'::job_type, 'ingest_analysis'::job_type)");
+
+    // Add status filter
+    if let Some(status) = &query.status {
+        match status.as_str() {
+            "queued" => {
+                select_builder.push(" AND status = 'queued'::job_status");
+            }
+            "running" | "processing" | "in_progress" => {
+                select_builder.push(" AND status = 'running'::job_status");
+            }
+            "failed" => {
+                select_builder.push(" AND status = 'failed'::job_status");
+            }
+            _ => {
+                select_builder.push(" AND status IN ('queued'::job_status, 'running'::job_status, 'failed'::job_status)");
+            }
+        }
+    } else {
+        select_builder.push(" AND status IN ('queued'::job_status, 'running'::job_status, 'failed'::job_status)");
+    }
+
+    if let Some(search) = &query.search {
+        if !search.trim().is_empty() {
+            select_builder.push(" AND relative_path ILIKE ");
+            select_builder.push_bind(format!("%{}%", search.trim()));
+        }
+    }
+
+    select_builder.push(" ORDER BY id DESC LIMIT ");
+    select_builder.push_bind(limit);
+    select_builder.push(" OFFSET ");
+    select_builder.push_bind(offset);
+
+    let select_query = select_builder.build_query_as::<JobInfo>();
+    let data = select_query.fetch_all(pool).await?;
+
+    Ok(PaginatedJobsResponse {
+        data,
+        total,
+        limit,
+        offset,
+    })
+}
+

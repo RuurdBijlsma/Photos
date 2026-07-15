@@ -126,7 +126,7 @@ watch(
       <thumbnail-img
         @click="emit('change-focus', queue[virtualItem.index]!)"
         v-for="virtualItem in virtualizer.getVirtualItems()"
-        :key="virtualItem.key"
+        :key="virtualItem.key.toString()"
         :media-item-id="queue[virtualItem.index]!"
         :height="144"
         cover

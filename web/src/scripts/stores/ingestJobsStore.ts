@@ -18,16 +18,16 @@ export const useIngestJobsStore = defineStore('ingestJobs', () => {
   // --- STATE ---
   const overview: Ref<IngestOverviewResponse | null> = ref(null)
   const runningJobs: Ref<DisplayJob[]> = ref([])
-  const failedJobs: Ref<JobInfo[]> = ref([])
+  // const detailsQueueTableInfo = ...
 
   const isOverviewLoading: Ref<boolean> = ref(false)
   const isRunningLoading: Ref<boolean> = ref(false)
-  const isFailedLoading: Ref<boolean> = ref(false)
+  const isDetailsLoading: Ref<boolean> = ref(false)
 
   // Polling State & Connection Counters
   let pollingIntervalId: ReturnType<typeof setInterval> | null = null
   const activeSubscribers = ref(0)
-  const needsFailedScope = ref(0)
+  const needsDetailsScope = ref(0)
 
   // Dynamic Flow Accumulator State [1]
   const trickleQueue: Ref<DisplayJob[]> = ref([])
@@ -164,15 +164,15 @@ export const useIngestJobsStore = defineStore('ingestJobs', () => {
     }
   }
 
-  async function fetchFailed() {
-    isFailedLoading.value = true
+  async function fetchIngestDetails() {
+    isDetailsLoading.value = true
     try {
-      const response = await ingestJobsService.getFailed()
-      failedJobs.value = response.data
+      // const response =...
+      // jobDetails.value = response.data
     } catch (error) {
       snackbarStore.error('Failed to load failed ingest processes', error)
     } finally {
-      isFailedLoading.value = false
+      isDetailsLoading.value = false
     }
   }
 
@@ -190,7 +190,7 @@ export const useIngestJobsStore = defineStore('ingestJobs', () => {
     try {
       await ingestJobsService.retry(jobId)
       snackbarStore.success(`Ingest Job #${jobId} scheduled for retry`)
-      await Promise.all([fetchOverview(), fetchFailed()])
+      await Promise.all([fetchOverview(), fetchIngestDetails()])
     } catch (error) {
       snackbarStore.error(`Failed to retry Ingest Job #${jobId}`, error)
       throw error
@@ -199,16 +199,16 @@ export const useIngestJobsStore = defineStore('ingestJobs', () => {
 
   async function pollTick() {
     const promises: Promise<void>[] = [fetchOverview(), fetchRunning()]
-    if (needsFailedScope.value > 0) {
-      promises.push(fetchFailed())
+    if (needsDetailsScope.value > 0) {
+      promises.push(fetchIngestDetails())
     }
     await Promise.all(promises)
   }
 
-  function startPolling(includeFailed = false) {
+  function startPolling(includeDetails = false) {
     activeSubscribers.value++
-    if (includeFailed) {
-      needsFailedScope.value++
+    if (includeDetails) {
+      needsDetailsScope.value++
     }
 
     if (activeSubscribers.value === 1) {
@@ -224,15 +224,15 @@ export const useIngestJobsStore = defineStore('ingestJobs', () => {
           tickTrickleAndCleanup()
         }, 50)
       }
-    } else if (includeFailed && needsFailedScope.value === 1) {
-      fetchFailed()
+    } else if (includeDetails && needsDetailsScope.value === 1) {
+      fetchIngestDetails()
     }
   }
 
-  function stopPolling(includeFailed = false) {
+  function stopPolling(includeDetails = false) {
     activeSubscribers.value = Math.max(0, activeSubscribers.value - 1)
-    if (includeFailed) {
-      needsFailedScope.value = Math.max(0, needsFailedScope.value - 1)
+    if (includeDetails) {
+      needsDetailsScope.value = Math.max(0, needsDetailsScope.value - 1)
     }
 
     if (activeSubscribers.value === 0) {
@@ -250,10 +250,9 @@ export const useIngestJobsStore = defineStore('ingestJobs', () => {
   return {
     overview,
     runningJobs,
-    failedJobs,
     isOverviewLoading,
     isRunningLoading,
-    isFailedLoading,
+    isDetailsLoading,
     triggerScan,
     retryJob,
     pollTick,

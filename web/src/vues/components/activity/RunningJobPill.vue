@@ -5,11 +5,17 @@ defineProps<{
   jobType: string
   relativePath?: string | null
   compact?: boolean
+  bgColor?: string
 }>()
 </script>
 
 <template>
-  <div :class="['job-pill', compact ? 'pa-3' : 'pa-4']">
+  <div
+    :class="['job-pill', compact ? 'pa-3' : 'pa-4']"
+    :style="{
+      'background-color': `rgb(var(--v-theme-${bgColor ?? 'surface-container-low'}))`,
+    }"
+  >
     <div class="job-info-left">
       <span class="job-type-badge" :class="{ 'text-caption mb-1': !compact }">
         {{ caps(jobType.replace('ingest_', '')) }}
@@ -29,7 +35,6 @@ defineProps<{
 
 <style scoped>
 .job-pill {
-  background-color: rgb(var(--v-theme-surface-container-low));
   border-radius: 18px;
   margin-bottom: 8px;
   display: flex;
