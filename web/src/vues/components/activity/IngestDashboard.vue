@@ -5,7 +5,6 @@ import { useUploadStore } from '@/scripts/stores/uploadStore.ts'
 import { useAuthStore } from '@/scripts/stores/authStore.ts'
 import RunningJobPill from '@/vues/components/activity/RunningJobPill.vue'
 import ShowSelectedFolder from '@/vues/components/onboarding/ShowSelectedFolder.vue'
-import ingestJobsService from '@/scripts/services/ingestJobsService.ts'
 import type { JobInfo } from '@/scripts/types/api/admin.ts'
 import { prettyBytes } from '@/scripts/utils.ts'
 
@@ -20,15 +19,6 @@ const isScanning = ref(false)
 const fileInput = ref<HTMLInputElement | null>(null)
 const folderInput = ref<HTMLInputElement | null>(null)
 const dragover = ref(false)
-
-// Ingest jobs table pagination/filtering state
-const page = ref(1)
-const itemsPerPage = ref(10)
-const searchQuery = ref('')
-const selectedTab = ref('queued') // queued, processing, failed
-const userJobs = ref<JobInfo[]>([])
-const totalJobsCount = ref(0)
-const isJobsLoading = ref(false)
 
 // Retrying tracking
 const retryingJobIds = ref<Set<number>>(new Set())
@@ -48,40 +38,20 @@ const headers = computed(() => {
   ]
 })
 
-// Fetch jobs paginated
-async function fetchUserJobs() {
-  isJobsLoading.value = true
-  try {
-    const statusParam = selectedTab.value === 'processing' ? 'running' : selectedTab.value
-    const response = await ingestJobsService.getUserJobs({
-      page: page.value,
-      limit: itemsPerPage.value,
-      status: statusParam,
-      search: searchQuery.value,
-    })
-    userJobs.value = response.data.data
-    totalJobsCount.value = response.data.total
-  } catch {
-    // SnackBar handles errors
-  } finally {
-    isJobsLoading.value = false
-  }
-}
-
 // Search debounce
 let searchDebounce: ReturnType<typeof setTimeout> | null = null
 function handleSearchInput() {
   if (searchDebounce) clearTimeout(searchDebounce)
   searchDebounce = setTimeout(() => {
-    page.value = 1
-    fetchUserJobs()
+    ingestStore.page = 1
+    ingestStore.fetchUserJobs(true)
   }, 400)
 }
 
 function handleSearchClear() {
-  searchQuery.value = ''
-  page.value = 1
-  fetchUserJobs()
+  ingestStore.searchQuery = ''
+  ingestStore.page = 1
+  ingestStore.fetchUserJobs(true)
 }
 
 // Upload actions
@@ -202,7 +172,6 @@ async function handleRetry(jobId: number) {
   retryingJobIds.value.add(jobId)
   try {
     await ingestStore.retryJob(jobId)
-    await fetchUserJobs()
   } catch {
     // Managed in store
   } finally {
@@ -218,7 +187,6 @@ async function handleDialogRetry(jobId: number) {
       detailedJob.value.status = 'queued'
     }
     detailsDialog.value = false
-    await fetchUserJobs()
   } catch {
     // Managed in store
   } finally {
@@ -290,35 +258,30 @@ function formatDate(dateStr: string | null) {
 }
 
 // Watch table configurations & tabs
-watch(page, () => {
-  fetchUserJobs()
-})
+watch(
+  () => ingestStore.page,
+  () => {
+    ingestStore.fetchUserJobs(true)
+  },
+)
 
-watch(selectedTab, () => {
-  page.value = 1
-  fetchUserJobs()
-})
+watch(
+  () => ingestStore.selectedTab,
+  () => {
+    ingestStore.page = 1
+    ingestStore.fetchUserJobs(true)
+  },
+)
 
 // Polling setup
 onMounted(() => {
   ingestStore.startPolling(true)
-  fetchUserJobs()
+  ingestStore.fetchUserJobs(true)
 })
 
 onUnmounted(() => {
   ingestStore.stopPolling(true)
 })
-
-// Auto refresh the table when overview ticks in store
-watch(
-  () => ingestStore.overview,
-  () => {
-    if (!isJobsLoading.value) {
-      fetchUserJobs()
-    }
-  },
-  { deep: true },
-)
 </script>
 
 <template>
@@ -648,10 +611,10 @@ watch(
           <div class="pa-5">
             <h2 class="text-h6 font-weight-bold mb-4">Ingestion Queue Details</h2>
 
-            <!-- Search and Tabs row -->
+            <!-- Search row -->
             <div class="table-filters mb-4 mt-4">
               <v-text-field
-                v-model="searchQuery"
+                v-model="ingestStore.searchQuery"
                 label="Search filenames"
                 placeholder="Search..."
                 density="compact"
@@ -662,21 +625,12 @@ watch(
                 prepend-inner-icon="mdi-magnify"
                 @input="handleSearchInput"
                 @click:clear="handleSearchClear"
-                class="search-bar mr-4"
-              />
-
-              <v-btn
-                icon="mdi-refresh"
-                variant="tonal"
-                color="secondary"
-                size="small"
-                :loading="isJobsLoading"
-                @click="fetchUserJobs"
+                class="search-bar"
               />
             </div>
 
             <v-tabs
-              v-model="selectedTab"
+              v-model="ingestStore.selectedTab"
               color="primary"
               class="tabs-control mb-3"
               density="comfortable"
@@ -689,8 +643,8 @@ watch(
             <!-- Table -->
             <v-data-table
               :headers="headers"
-              :items="userJobs"
-              :loading="isJobsLoading"
+              :items="ingestStore.userJobs"
+              :loading="ingestStore.isJobsLoading"
               hide-default-footer
               hover
               class="user-jobs-table"
@@ -759,16 +713,19 @@ watch(
 
             <!-- Pagination -->
             <div
-              v-if="totalJobsCount > itemsPerPage"
+              v-if="ingestStore.totalJobsCount > ingestStore.itemsPerPage"
               class="d-flex align-center justify-space-between mt-4"
             >
               <span class="text-caption text-medium-emphasis">
-                Showing {{ (page - 1) * itemsPerPage + 1 }} -
-                {{ Math.min(page * itemsPerPage, totalJobsCount) }} of {{ totalJobsCount }}
+                Showing {{ (ingestStore.page - 1) * ingestStore.itemsPerPage + 1 }} -
+                {{
+                  Math.min(ingestStore.page * ingestStore.itemsPerPage, ingestStore.totalJobsCount)
+                }}
+                of {{ ingestStore.totalJobsCount }}
               </span>
               <v-pagination
-                v-model="page"
-                :length="Math.ceil(totalJobsCount / itemsPerPage)"
+                v-model="ingestStore.page"
+                :length="Math.ceil(ingestStore.totalJobsCount / ingestStore.itemsPerPage)"
                 :total-visible="4"
                 density="compact"
               />

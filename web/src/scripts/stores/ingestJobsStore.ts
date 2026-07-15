@@ -18,11 +18,18 @@ export const useIngestJobsStore = defineStore('ingestJobs', () => {
   // --- STATE ---
   const overview: Ref<IngestOverviewResponse | null> = ref(null)
   const runningJobs: Ref<DisplayJob[]> = ref([])
-  // const detailsQueueTableInfo = ...
+  const userJobs: Ref<JobInfo[]> = ref([])
 
   const isOverviewLoading: Ref<boolean> = ref(false)
   const isRunningLoading: Ref<boolean> = ref(false)
-  const isDetailsLoading: Ref<boolean> = ref(false)
+  const isJobsLoading = ref(false)
+
+  // Paginated Jobs Table State
+  const totalJobsCount = ref(0)
+  const page = ref(1)
+  const itemsPerPage = ref(10)
+  const searchQuery = ref('')
+  const selectedTab = ref('queued') // queued, processing, failed
 
   // Polling State & Connection Counters
   let pollingIntervalId: ReturnType<typeof setInterval> | null = null
@@ -164,15 +171,24 @@ export const useIngestJobsStore = defineStore('ingestJobs', () => {
     }
   }
 
-  async function fetchIngestDetails() {
-    isDetailsLoading.value = true
+  async function fetchUserJobs(showLoading = true) {
+    if (showLoading) {
+      isJobsLoading.value = true
+    }
     try {
-      // const response =...
-      // jobDetails.value = response.data
+      const statusParam = selectedTab.value === 'processing' ? 'running' : selectedTab.value
+      const response = await ingestJobsService.getUserJobs({
+        page: page.value,
+        limit: itemsPerPage.value,
+        status: statusParam,
+        search: searchQuery.value,
+      })
+      userJobs.value = response.data.data
+      totalJobsCount.value = response.data.total
     } catch (error) {
-      snackbarStore.error('Failed to load failed ingest processes', error)
+      snackbarStore.error('Failed to load ingest queue details', error)
     } finally {
-      isDetailsLoading.value = false
+      isJobsLoading.value = false
     }
   }
 
@@ -190,7 +206,7 @@ export const useIngestJobsStore = defineStore('ingestJobs', () => {
     try {
       await ingestJobsService.retry(jobId)
       snackbarStore.success(`Ingest Job #${jobId} scheduled for retry`)
-      await Promise.all([fetchOverview(), fetchIngestDetails()])
+      await Promise.all([fetchOverview(), fetchUserJobs(true)])
     } catch (error) {
       snackbarStore.error(`Failed to retry Ingest Job #${jobId}`, error)
       throw error
@@ -200,7 +216,7 @@ export const useIngestJobsStore = defineStore('ingestJobs', () => {
   async function pollTick() {
     const promises: Promise<void>[] = [fetchOverview(), fetchRunning()]
     if (needsDetailsScope.value > 0) {
-      promises.push(fetchIngestDetails())
+      promises.push(fetchUserJobs(false))
     }
     await Promise.all(promises)
   }
@@ -225,7 +241,7 @@ export const useIngestJobsStore = defineStore('ingestJobs', () => {
         }, 50)
       }
     } else if (includeDetails && needsDetailsScope.value === 1) {
-      fetchIngestDetails()
+      fetchUserJobs(true)
     }
   }
 
@@ -252,7 +268,14 @@ export const useIngestJobsStore = defineStore('ingestJobs', () => {
     runningJobs,
     isOverviewLoading,
     isRunningLoading,
-    isDetailsLoading,
+    userJobs,
+    totalJobsCount,
+    isJobsLoading,
+    page,
+    itemsPerPage,
+    searchQuery,
+    selectedTab,
+    fetchUserJobs,
     triggerScan,
     retryJob,
     pollTick,
