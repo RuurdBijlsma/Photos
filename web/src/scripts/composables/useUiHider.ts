@@ -1,10 +1,11 @@
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { useEventListener } from '@vueuse/core'
+import { computed, ref } from 'vue'
+import { useEventListener, useIntervalFn } from '@vueuse/core'
 
 export function useUiHider(maxHideSeconds: number, preventUiHide: () => boolean = () => false) {
   const hideSeconds = ref(maxHideSeconds)
   const showUI = computed(() => hideSeconds.value > 0)
-  const hideTimer = setInterval(() => {
+
+  const { pause, resume, isActive } = useIntervalFn(() => {
     hideSeconds.value--
     if (preventUiHide()) {
       hideSeconds.value = maxHideSeconds
@@ -23,6 +24,5 @@ export function useUiHider(maxHideSeconds: number, preventUiHide: () => boolean 
     }
   })
 
-  onBeforeUnmount(() => clearInterval(hideTimer))
-  return { showUI, hideTimer }
+  return { showUI, pause, resume, isActive }
 }
