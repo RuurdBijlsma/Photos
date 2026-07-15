@@ -236,14 +236,11 @@
 * check of readme uitleg klopt met verse windows installatie & linux
 * better error if exiftool isnt there (worker wont work then)
 * improve speed of album/{id} endpoint
-* rotate image by changing thumbnail orientation?
+* make single executable kind of that runs api, watcher, and worker, but have it sort of auto-scale based off number of jobs. So api, watcher, autoscaler, and if theres jobs, then N amount of workers.
 
 # High level TODO:
 
-* admin page
-  * restart server? [for later]
-  * backup (met export jsons / import?)
-* import albums from google photos
+* ✅ admin page
 * explore page
   * stats over je fotos?
   * most visited places
@@ -252,6 +249,14 @@
   * zelfde voor time of day?
 * ✅ photo viewer page
   * ✅ implement different viewers
-  * find similar fotos view, misschien  een expandable ding in de info panel?
-* photo upload feature
+  * ✅ find similar fotos view, misschien  een expandable ding in de info panel?
+* ✅ photo upload feature
+
+# post mvp TODO:
+
 * email password reset?
+* restart server? [for later]
+* backup (met export jsons / import?)
+* import albums from google photos
+* duplicate photo remover tool
+* rotate image by changing thumbnail orientation?
