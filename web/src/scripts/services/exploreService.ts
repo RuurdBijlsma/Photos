@@ -12,16 +12,12 @@ const exploreService = {
   getExploreTable(
     params?: ExploreTableParams,
   ): Promise<AxiosResponse<PaginatedExploreTableResponse>> {
-    const searchParams = new URLSearchParams()
-    if (params) {
-      if (params.page !== undefined) searchParams.append('page', params.page.toString())
-      if (params.limit !== undefined) searchParams.append('limit', params.limit.toString())
-      if (params.offset !== undefined) searchParams.append('offset', params.offset.toString())
-      if (params.sort) {
-        params.sort.forEach((s) => searchParams.append('sort', s))
-      }
-    }
-    return apiClient.get<PaginatedExploreTableResponse>('/explore/table', { params: searchParams })
+    return apiClient.get<PaginatedExploreTableResponse>('/explore/table', {
+      params,
+      paramsSerializer: {
+        indexes: null, // Forces Axios to repeat array params directly (e.g., sort=a&sort=b)
+      },
+    })
   },
 }
 

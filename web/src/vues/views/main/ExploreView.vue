@@ -5,6 +5,10 @@ import ExploreTable from '@/vues/components/explore/ExploreTable.vue'
 
 <template>
   <main-layout-container class="explore-scroll-view">
+    <teleport to="body">
+      <router-view />
+    </teleport>
+
     <div class="explore-content">
       <header class="explore-header mb-6">
         <h1 class="explore-title">Explore Stats</h1>

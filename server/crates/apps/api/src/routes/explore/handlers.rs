@@ -1,6 +1,8 @@
 use crate::api_state::ApiContext;
 use crate::auth::middlewares::user::ApiUser;
-use axum::extract::{Query, State};
+// Change: Remove Query from axum::extract, and import Query from axum_extra::extract
+use axum::extract::State;
+use axum_extra::extract::Query;
 use axum::{Extension, Json};
 use common_services::api::app_error::AppError;
 use common_services::api::explore::interfaces::{ExploreTableQuery, PaginatedExploreTableResponse};

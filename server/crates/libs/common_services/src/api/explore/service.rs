@@ -143,9 +143,9 @@ pub async fn get_explore_table(
         }
         select_builder.push(sort.column);
         if sort.direction == "DESC" {
-            select_builder.push(" DESC");
+            select_builder.push(" DESC NULLS LAST");
         } else {
-            select_builder.push(" ASC");
+            select_builder.push(" ASC NULLS LAST");
         }
     }
 
