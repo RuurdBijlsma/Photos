@@ -1,5 +1,7 @@
 use crate::api::app_error::AppError;
-use crate::api::explore::interfaces::{ExploreTableQuery, PaginatedExploreTableResponse, ExploreMediaItem};
+use crate::api::explore::interfaces::{
+    ExploreMediaItem, ExploreTableQuery, PaginatedExploreTableResponse,
+};
 use sqlx::{PgPool, Postgres, QueryBuilder};
 
 pub struct ExploreSort {
@@ -23,10 +25,15 @@ pub fn map_explore_field_to_column(field: &str) -> Option<&'static str> {
         "temp" | "temperature" => Some("w.temperature"),
         "wind_speed" | "windSpeed" => Some("w.wind_speed"),
         "iso" => Some("c.iso"),
-        "exposure_time" | "exposureTime" | "shutter_speed" | "shutterSpeed" => Some("c.exposure_time"),
+        "exposure_time" | "exposureTime" | "shutter_speed" | "shutterSpeed" => {
+            Some("c.exposure_time")
+        }
         "aperture" => Some("c.aperture"),
         "focal_length" | "focalLength" => Some("c.focal_length"),
         "size_bytes" | "sizeBytes" => Some("f.size_bytes"),
+        "relative_humidity" | "relativeHumidity" => Some("w.relative_humidity"),
+        "precipitation" => Some("w.precipitation"),
+        "snow" => Some("w.snow"),
         _ => None,
     }
 }
@@ -34,7 +41,9 @@ pub fn map_explore_field_to_column(field: &str) -> Option<&'static str> {
 pub fn parse_explore_sort(sort_str: &str) -> Result<ExploreSort, AppError> {
     let parts: Vec<&str> = sort_str.splitn(2, ':').collect();
     if parts.is_empty() {
-        return Err(AppError::BadRequest("Sort parameter cannot be empty".to_owned()));
+        return Err(AppError::BadRequest(
+            "Sort parameter cannot be empty".to_owned(),
+        ));
     }
 
     let raw_field = parts[0];
@@ -120,6 +129,9 @@ pub async fn get_explore_table(
             g.altitude, \
             w.temperature, \
             w.wind_speed, \
+            w.relative_humidity, \
+            w.precipitation, \
+            w.snow, \
             c.iso, \
             c.exposure_time, \
             c.aperture, \
@@ -130,7 +142,7 @@ pub async fn get_explore_table(
          LEFT JOIN weather w ON m.id = w.media_item_id \
          LEFT JOIN camera_settings c ON m.id = c.media_item_id \
          LEFT JOIN media_features f ON m.id = f.media_item_id \
-         WHERE m.user_id = "
+         WHERE m.user_id = ",
     );
     select_builder.push_bind(user_id);
     select_builder.push(" AND m.deleted = false");

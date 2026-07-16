@@ -31,6 +31,9 @@ pub struct ExploreMediaItem {
     // Weather fields
     pub temperature: Option<f32>,
     pub wind_speed: Option<f32>,
+    pub relative_humidity: Option<i32>,
+    pub precipitation: Option<f32>,
+    pub snow: Option<i32>,
 
     // Camera settings
     pub iso: Option<i32>,

@@ -14,6 +14,9 @@ export interface ExploreMediaItem {
   // Weather fields
   temperature: number | null
   windSpeed: number | null
+  relativeHumidity: number | null
+  precipitation: number | null
+  snow: number | null
 
   // Camera settings
   iso: number | null

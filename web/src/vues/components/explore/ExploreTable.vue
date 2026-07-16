@@ -16,6 +16,9 @@ const headers = [
   { title: 'Size', key: 'sizeBytes', sortable: true },
   { title: 'Temp', key: 'temperature', sortable: true },
   { title: 'Wind', key: 'windSpeed', sortable: true },
+  { title: 'Humidity', key: 'relative_humidity', sortable: true },
+  { title: 'Downfall', key: 'precipitation', sortable: true },
+  { title: 'Snow', key: 'snow', sortable: true },
   { title: 'ISO', key: 'iso', sortable: true },
   { title: 'Shutter', key: 'exposureTime', sortable: true },
   { title: 'Focal', key: 'focalLength', sortable: true },
@@ -93,19 +96,7 @@ function formatCoords(lat: number | null, lon: number | null): string {
     <div class="table-header-row">
       <div class="header-title-group">
         <span class="header-title">Media Stats Explorer</span>
-        <v-icon color="primary" class="ml-2">mdi-chart-scatter-plot</v-icon>
       </div>
-      <v-spacer />
-      <v-btn
-        prepend-icon="mdi-refresh"
-        variant="tonal"
-        color="primary"
-        rounded
-        :loading="exploreStore.isTableLoading"
-        @click="exploreStore.fetchExploreTable"
-      >
-        Refresh
-      </v-btn>
     </div>
 
     <div class="table-body">
@@ -117,7 +108,6 @@ function formatCoords(lat: number | null, lon: number | null): string {
         :items-length="exploreStore.totalCount"
         :loading="exploreStore.isTableLoading"
         item-value="id"
-        multi-sort
         hover
         class="explore-server-table"
         @update:options="loadTableData"
@@ -152,6 +142,33 @@ function formatCoords(lat: number | null, lon: number | null): string {
           <div v-if="item.windSpeed !== null" class="d-flex align-center">
             <v-icon icon="mdi-weather-windy" size="small" color="blue-lighten-2" class="mr-1" />
             <span>{{ item.windSpeed.toFixed(1) }} km/h</span>
+          </div>
+          <span v-else class="text-disabled">-</span>
+        </template>
+
+        <!-- Weather: Wind Speed Column -->
+        <template #[`item.relative_humidity`]="{ item }">
+          <div v-if="item.relativeHumidity !== null" class="d-flex align-center">
+            <v-icon icon="mdi-water-percent" size="small" color="blue-lighten-2" class="mr-1" />
+            <span>{{ item.relativeHumidity.toFixed(1) }}%</span>
+          </div>
+          <span v-else class="text-disabled">-</span>
+        </template>
+
+        <!-- Weather: Wind Speed Column -->
+        <template #[`item.precipitation`]="{ item }">
+          <div v-if="item.precipitation !== null" class="d-flex align-center">
+            <v-icon icon="mdi-weather-pouring" size="small" color="blue-lighten-2" class="mr-1" />
+            <span>{{ item.precipitation.toFixed(1) }} mm</span>
+          </div>
+          <span v-else class="text-disabled">-</span>
+        </template>
+
+        <!-- Weather: Wind Speed Column -->
+        <template #[`item.snow`]="{ item }">
+          <div v-if="item.snow !== null" class="d-flex align-center">
+            <v-icon icon="mdi-snowflake" size="small" color="blue-lighten-2" class="mr-1" />
+            <span>{{ item.snow.toFixed(1) }} mm</span>
           </div>
           <span v-else class="text-disabled">-</span>
         </template>
