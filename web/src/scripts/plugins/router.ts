@@ -84,6 +84,13 @@ const router = createRouter({
           path: 'explore',
           name: 'explore',
           component: () => import('@/vues/views/main/ExploreView.vue'),
+          children: [
+            {
+              path: 'view/:mediaId',
+              name: 'view-photo-explore',
+              component: ViewPhoto,
+            },
+          ],
         },
         {
           path: 'bin',

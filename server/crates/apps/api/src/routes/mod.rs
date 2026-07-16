@@ -15,6 +15,7 @@ pub mod theme;
 pub mod timeline;
 pub mod trash;
 pub mod upload;
+pub mod explore;
 pub mod user;
 
 use crate::album::router::{album_auth_optional_router, album_protected_router};
@@ -44,6 +45,7 @@ use app_state::RateLimitingSettings;
 use axum::Router;
 use axum::middleware::{from_extractor_with_state, from_fn_with_state};
 use common_services::database::app_user::UserRole;
+use crate::explore::router::explore_protected_router;
 
 // --- Router Construction ---
 pub fn create_router(api_state: ApiContext) -> Router {
@@ -96,6 +98,7 @@ fn protected_routes(api_state: ApiContext) -> Router<ApiContext> {
         .merge(trash_protected_router())
         .merge(jobs_protected_router())
         .merge(upload_protected_router())
+        .merge(explore_protected_router())
         .route_layer(from_extractor_with_state::<ApiUser, ApiContext>(api_state))
 }
 

@@ -1,11 +1,45 @@
 <script setup lang="ts">
 import MainLayoutContainer from '@/vues/components/MainLayoutContainer.vue'
+import ExploreTable from '@/vues/components/explore/ExploreTable.vue'
 </script>
 
 <template>
-  <main-layout-container class="explore">
-    <h1>Explore!</h1>
+  <main-layout-container class="explore-scroll-view">
+    <div class="explore-content">
+      <header class="explore-header mb-6">
+        <h1 class="explore-title">Explore Stats</h1>
+        <p class="explore-subtitle">
+          Query, sort, and analyze media metadata, weather profiles, GPS locations, and camera
+          hardware settings.
+        </p>
+      </header>
+
+      <explore-table />
+    </div>
   </main-layout-container>
 </template>
 
-<style scoped></style>
+<style scoped>
+.explore-scroll-view {
+  overflow-y: auto;
+}
+
+.explore-content {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 32px 24px;
+}
+
+.explore-title {
+  font-size: 2.125rem;
+  font-weight: 700;
+  margin-bottom: 6px;
+  color: rgb(var(--v-theme-on-surface));
+}
+
+.explore-subtitle {
+  font-size: 0.95rem;
+  color: rgb(var(--v-theme-on-surface-variant));
+  margin-bottom: 0;
+}
+</style>

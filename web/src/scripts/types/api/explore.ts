@@ -1,0 +1,40 @@
+export interface ExploreMediaItem {
+  id: string
+  filename: string
+  isVideo: boolean
+  hasThumbnails: boolean
+  durationMs: number | null
+  takenAtLocal: string
+
+  // GPS fields
+  latitude: number | null
+  longitude: number | null
+  altitude: number | null
+
+  // Weather fields
+  temperature: number | null
+  windSpeed: number | null
+
+  // Camera settings
+  iso: number | null
+  exposureTime: number | null
+  aperture: number | null
+  focalLength: number | null
+
+  // Media features
+  sizeBytes: number | null
+}
+
+export interface PaginatedExploreTableResponse {
+  data: ExploreMediaItem[]
+  total: number
+  limit: number
+  offset: number
+}
+
+export interface ExploreTableParams {
+  page?: number
+  limit?: number
+  offset?: number
+  sort?: string[]
+}
