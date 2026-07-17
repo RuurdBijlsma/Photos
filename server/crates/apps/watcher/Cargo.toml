@@ -6,7 +6,7 @@ edition = "2024"
 [dependencies]
 app_state = { path = "../../libs/app_state" }
 common_services = { path = "../../libs/common_services" }
-sqlx = { version = "0.8.6", features = ["runtime-tokio-native-tls", "postgres", "chrono", "macros", "json", "uuid"] }
+sqlx = { version = "0.9.0", features = ["runtime-tokio", "tls-native-tls", "postgres", "chrono", "macros", "json", "uuid"] }
 tokio = { version = "1.47.1", features = ["full"] }
 color-eyre = "0.6.5"
 notify = "8.2.0"

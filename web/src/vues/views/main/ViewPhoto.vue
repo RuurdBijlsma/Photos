@@ -28,7 +28,7 @@ import AddToAlbumCard from '@/vues/components/timeline/timeline-components/AddTo
 import { useUiHider } from '@/scripts/composables/useUiHider.ts'
 import { navigatorShare } from '@/scripts/sharing.ts'
 import PhotoGallery from '@/vues/components/viewer/components/PhotoGallery.vue'
-import { useStorage, useEventListener } from '@vueuse/core'
+import { useStorage, useEventListener, useDebounceFn } from '@vueuse/core'
 
 const props = withDefaults(
   defineProps<{
@@ -186,6 +186,32 @@ const currentItemRatio = computed(() => {
   return 1
 })
 
+function forwardWheel(e: WheelEvent) {
+  // Find the interactive pan container inside the photo viewer
+  const zoomPanContainer = document.querySelector('.zoom-pan-container')
+  if (!zoomPanContainer) return
+
+  // Prevent default page scroll actions
+  e.preventDefault()
+
+  // Replicate and dispatch the wheel event downward with matching coordinate context
+  const forwardedEvent = new WheelEvent('wheel', {
+    clientX: e.clientX,
+    clientY: e.clientY,
+    deltaX: e.deltaX,
+    deltaY: e.deltaY,
+    deltaMode: e.deltaMode,
+    ctrlKey: e.ctrlKey,
+    metaKey: e.metaKey,
+    shiftKey: e.shiftKey,
+    altKey: e.altKey,
+    bubbles: true,
+    cancelable: true,
+  })
+
+  zoomPanContainer.dispatchEvent(forwardedEvent)
+}
+
 async function initialize() {
   const loadingId = id.value
   if (loadingId === null) return router.push(parentLocation.value)
@@ -335,7 +361,7 @@ watch(isVideo, () => {
       @change-focus="(id) => changeMediaItem(id)"
     />
     <div v-if="showGallery && id" class="gallery-resize-handle" @pointerdown="startResize" />
-    <div class="top-bar">
+    <div class="top-bar" @wheel="forwardWheel">
       <div class="left-buttons">
         <v-btn
           :to="parentLocation"
@@ -509,6 +535,7 @@ watch(isVideo, () => {
       @click="goPrev()"
       @mouseenter="showLeftButton = true"
       @mouseleave="showLeftButton = false"
+      @wheel="forwardWheel"
     >
       <v-btn
         class="nav-btn"
@@ -526,6 +553,7 @@ watch(isVideo, () => {
       @click="goNext()"
       @mouseenter="showRightButton = true"
       @mouseleave="showRightButton = false"
+      @wheel="forwardWheel"
     >
       <v-btn
         class="nav-btn"
@@ -700,9 +728,8 @@ watch(isVideo, () => {
   right: 0;
   top: 70px;
   height: calc(100% - 190px);
-  width: 20%;
+  width: 33%;
   min-width: 92px;
-  max-width: 150px;
   cursor: pointer;
   display: flex;
   justify-content: flex-end;
@@ -716,9 +743,8 @@ watch(isVideo, () => {
   left: 0;
   top: 70px;
   height: calc(100% - 190px);
-  width: 20%;
+  width: 33%;
   min-width: 92px;
-  max-width: 150px;
   cursor: pointer;
   display: flex;
   justify-content: flex-start;
