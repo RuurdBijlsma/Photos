@@ -93,6 +93,18 @@ const router = createRouter({
           ],
         },
         {
+          path: 'explore/location/:locationId',
+          name: 'explore-location-view',
+          component: () => import('@/vues/views/main/LocationView.vue'),
+          children: [
+            {
+              path: 'view/:mediaId',
+              name: 'view-photo-explore-location',
+              component: ViewPhoto,
+            },
+          ],
+        },
+        {
           path: 'bin',
           name: 'bin',
           component: () => import('@/vues/views/main/BinView.vue'),

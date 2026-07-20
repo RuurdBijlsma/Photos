@@ -2,6 +2,7 @@
 import MainLayoutContainer from '@/vues/components/MainLayoutContainer.vue'
 import ExploreTable from '@/vues/components/explore/ExploreTable.vue'
 import ExploreHistograms from '@/vues/components/explore/ExploreHistograms.vue'
+import ExploreLocations from '@/vues/components/explore/ExploreLocations.vue'
 </script>
 
 <template>
@@ -18,6 +19,8 @@ import ExploreHistograms from '@/vues/components/explore/ExploreHistograms.vue'
           to activity patterns over time.
         </p>
       </header>
+
+      <explore-locations class="mb-7" />
 
       <explore-histograms />
 

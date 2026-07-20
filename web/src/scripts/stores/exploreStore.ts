@@ -1,6 +1,12 @@
 import { ref, type Ref } from 'vue'
 import { defineStore } from 'pinia'
-import type { ExploreMediaItem, HistogramResponse } from '@/scripts/types/api/explore.ts'
+import type {
+  ExploreMediaItem,
+  HistogramResponse,
+  VisitedPlacesResponse,
+  VisitedLocation,
+} from '@/scripts/types/api/explore.ts'
+import type { SimpleTimelineItem } from '@/scripts/types/generated/timeline.ts'
 import exploreService from '@/scripts/services/exploreService.ts'
 import { useSnackbarsStore } from '@/scripts/stores/snackbarStore.ts'
 
@@ -16,6 +22,13 @@ export const useExploreStore = defineStore('explore', () => {
   const histograms: Ref<HistogramResponse | null> = ref(null)
   const isHistogramsLoading = ref(false)
 
+  // Visited Places & Details STATE
+  const visitedPlaces: Ref<VisitedPlacesResponse | null> = ref(null)
+  const isVisitedPlacesLoading = ref(false)
+  const locationMedia = ref(new Map<number, SimpleTimelineItem[]>())
+  const locationDetails = ref(new Map<number, VisitedLocation>())
+  const isLocationLoading = ref(false)
+
   // Pagination & Datatable Parameters
   const page = ref(1)
   const itemsPerPage = ref(15)
@@ -25,7 +38,6 @@ export const useExploreStore = defineStore('explore', () => {
   async function fetchExploreTable() {
     isTableLoading.value = true
     try {
-      // Map Pinia sortBy states into the "key:order" syntax expected by the backend
       const sortParams: string[] = []
       if (sortBy.value && sortBy.value.length > 0) {
         sortBy.value.forEach((s) => {
@@ -60,6 +72,34 @@ export const useExploreStore = defineStore('explore', () => {
     }
   }
 
+  async function fetchVisitedPlaces() {
+    isVisitedPlacesLoading.value = true
+    try {
+      const response = await exploreService.getVisitedPlaces()
+      visitedPlaces.value = response.data
+    } catch (error) {
+      snackbarStore.error('Failed to load visited places', error)
+    } finally {
+      isVisitedPlacesLoading.value = false
+    }
+  }
+
+  async function fetchLocationData(locationId: number) {
+    isLocationLoading.value = true
+    try {
+      const [media, details] = await Promise.all([
+        exploreService.getLocationMedia(locationId),
+        exploreService.getLocationDetails(locationId),
+      ])
+      locationMedia.value.set(locationId, media.items)
+      locationDetails.value.set(locationId, details.data)
+    } catch (error) {
+      snackbarStore.error('Failed to load location data', error)
+    } finally {
+      isLocationLoading.value = false
+    }
+  }
+
   function resetPagination() {
     page.value = 1
     items.value = []
@@ -72,11 +112,18 @@ export const useExploreStore = defineStore('explore', () => {
     isTableLoading,
     histograms,
     isHistogramsLoading,
+    visitedPlaces,
+    isVisitedPlacesLoading,
+    locationMedia,
+    locationDetails,
+    isLocationLoading,
     page,
     itemsPerPage,
     sortBy,
     fetchExploreTable,
     fetchHistograms,
+    fetchVisitedPlaces,
+    fetchLocationData,
     resetPagination,
   }
 })

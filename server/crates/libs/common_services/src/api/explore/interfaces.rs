@@ -83,3 +83,33 @@ pub struct HourOfDayBucket {
     pub hour: i32,
     pub count: i64,
 }
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct VisitedLocation {
+    pub id: i32,
+    pub name: String,
+    pub admin1: String,
+    pub admin2: String,
+    pub country_code: String,
+    pub country_name: String,
+    pub photo_count: i64,
+    pub thumbnail_id: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct VisitedPlacesCategory {
+    pub key: String,
+    pub label: String,
+    pub locations: Vec<VisitedLocation>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct VisitedPlacesResponse {
+    pub categories: Vec<VisitedPlacesCategory>,
+}
+
+
+

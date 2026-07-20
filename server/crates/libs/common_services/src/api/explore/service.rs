@@ -1,8 +1,5 @@
 use crate::api::app_error::AppError;
-use crate::api::explore::interfaces::{
-    DayOfWeekBucket, ExploreMediaItem, ExploreTableQuery, HistogramResponse, HourOfDayBucket,
-    PaginatedExploreTableResponse, WeekOfYearBucket,
-};
+use crate::api::explore::interfaces::{DayOfWeekBucket, ExploreMediaItem, ExploreTableQuery, HistogramResponse, HourOfDayBucket, PaginatedExploreTableResponse, WeekOfYearBucket};
 use sqlx::{PgPool, Postgres, QueryBuilder};
 
 pub struct ExploreSort {
