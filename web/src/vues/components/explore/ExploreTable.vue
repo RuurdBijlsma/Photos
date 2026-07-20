@@ -10,7 +10,7 @@ const exploreStore = useExploreStore()
 const viewPhotoStore = useViewPhotoStore()
 const router = useRouter()
 
-// Simplified column layout (removed Date Taken, Filename, and Aperture)
+// Simplified column layout
 const headers = [
   { title: 'Preview', key: 'thumbnail', sortable: false, width: '80px' },
   { title: 'Size', key: 'sizeBytes', sortable: true },
@@ -92,14 +92,16 @@ function formatCoords(lat: number | null, lon: number | null): string {
 </script>
 
 <template>
-  <v-card class="explore-table-card" flat border>
-    <div class="table-header-row">
-      <div class="header-title-group">
-        <span class="header-title">Media Stats Explorer</span>
+  <v-card class="explore-table-card" flat>
+    <!-- Styled Header to match ExploreHistograms cards -->
+    <div class="card-header">
+      <div class="header-texts">
+        <h3 class="card-title">Media Catalog</h3>
+        <p class="card-subtitle">Browse through metadata parameters and local weather attributes</p>
       </div>
     </div>
 
-    <div class="table-body">
+    <div class="table-container">
       <v-data-table-server
         v-model:items-per-page="exploreStore.itemsPerPage"
         v-model:page="exploreStore.page"
@@ -123,7 +125,7 @@ function formatCoords(lat: number | null, lon: number | null): string {
 
         <!-- Size Column -->
         <template #[`item.sizeBytes`]="{ item }">
-          <span class="monospace-text">
+          <span class="monospace-text text-on-surface">
             {{ item.sizeBytes !== null ? prettyBytes(item.sizeBytes) : '-' }}
           </span>
         </template>
@@ -132,7 +134,7 @@ function formatCoords(lat: number | null, lon: number | null): string {
         <template #[`item.temperature`]="{ item }">
           <div v-if="item.temperature !== null" class="d-flex align-center">
             <v-icon icon="mdi-thermometer" size="small" color="orange" class="mr-1" />
-            <span>{{ item.temperature.toFixed(1) }}°C</span>
+            <span class="val-text">{{ item.temperature.toFixed(1) }}°C</span>
           </div>
           <span v-else class="text-disabled">-</span>
         </template>
@@ -141,41 +143,41 @@ function formatCoords(lat: number | null, lon: number | null): string {
         <template #[`item.windSpeed`]="{ item }">
           <div v-if="item.windSpeed !== null" class="d-flex align-center">
             <v-icon icon="mdi-weather-windy" size="small" color="blue-lighten-2" class="mr-1" />
-            <span>{{ item.windSpeed.toFixed(1) }} km/h</span>
+            <span class="val-text">{{ item.windSpeed.toFixed(1) }} km/h</span>
           </div>
           <span v-else class="text-disabled">-</span>
         </template>
 
-        <!-- Weather: Wind Speed Column -->
+        <!-- Weather: Relative Humidity Column -->
         <template #[`item.relative_humidity`]="{ item }">
           <div v-if="item.relativeHumidity !== null" class="d-flex align-center">
             <v-icon icon="mdi-water-percent" size="small" color="blue-lighten-2" class="mr-1" />
-            <span>{{ item.relativeHumidity.toFixed(1) }}%</span>
+            <span class="val-text">{{ item.relativeHumidity.toFixed(1) }}%</span>
           </div>
           <span v-else class="text-disabled">-</span>
         </template>
 
-        <!-- Weather: Wind Speed Column -->
+        <!-- Weather: Precipitation Column -->
         <template #[`item.precipitation`]="{ item }">
           <div v-if="item.precipitation !== null" class="d-flex align-center">
             <v-icon icon="mdi-weather-pouring" size="small" color="blue-lighten-2" class="mr-1" />
-            <span>{{ item.precipitation.toFixed(1) }} mm</span>
+            <span class="val-text">{{ item.precipitation.toFixed(1) }} mm</span>
           </div>
           <span v-else class="text-disabled">-</span>
         </template>
 
-        <!-- Weather: Wind Speed Column -->
+        <!-- Weather: Snow Column -->
         <template #[`item.snow`]="{ item }">
           <div v-if="item.snow !== null" class="d-flex align-center">
             <v-icon icon="mdi-snowflake" size="small" color="blue-lighten-2" class="mr-1" />
-            <span>{{ item.snow.toFixed(1) }} mm</span>
+            <span class="val-text">{{ item.snow.toFixed(1) }} mm</span>
           </div>
           <span v-else class="text-disabled">-</span>
         </template>
 
         <!-- Camera Settings: ISO Column -->
         <template #[`item.iso`]="{ item }">
-          <span v-if="item.iso !== null" class="monospace-text font-weight-medium">{{
+          <span v-if="item.iso !== null" class="monospace-text font-weight-medium val-text">{{
             item.iso
           }}</span>
           <span v-else class="text-disabled">-</span>
@@ -183,12 +185,12 @@ function formatCoords(lat: number | null, lon: number | null): string {
 
         <!-- Camera Settings: Shutter Speed Column -->
         <template #[`item.exposureTime`]="{ item }">
-          <span class="monospace-text">{{ formatShutterSpeed(item.exposureTime) }}</span>
+          <span class="monospace-text val-text">{{ formatShutterSpeed(item.exposureTime) }}</span>
         </template>
 
         <!-- Camera Settings: Focal Length Column -->
         <template #[`item.focalLength`]="{ item }">
-          <span class="monospace-text">{{ formatFocalLength(item.focalLength) }}</span>
+          <span class="monospace-text val-text">{{ formatFocalLength(item.focalLength) }}</span>
         </template>
 
         <!-- GPS: Altitude Column -->
@@ -199,7 +201,7 @@ function formatCoords(lat: number | null, lon: number | null): string {
             :title="formatCoords(item.latitude, item.longitude)"
           >
             <v-icon icon="mdi-image-filter-hdr" size="small" color="teal" class="mr-1" />
-            <span>{{ Math.round(item.altitude) }}m</span>
+            <span class="val-text">{{ Math.round(item.altitude) }}m</span>
           </div>
           <span v-else class="text-disabled">-</span>
         </template>
@@ -211,40 +213,59 @@ function formatCoords(lat: number | null, lon: number | null): string {
 <style scoped>
 .explore-table-card {
   background-color: rgb(var(--v-theme-surface-container-low)) !important;
-  border-radius: 24px !important;
-  border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity)) !important;
+  border-radius: 28px !important;
+  padding: 24px;
+  border: none !important;
   overflow: hidden;
 }
 
-.table-header-row {
-  background-color: rgb(var(--v-theme-surface-container-high));
-  padding: 16px 24px;
+/* Card Header styles mimicking ExploreHistograms.vue */
+.card-header {
   display: flex;
-  align-items: center;
-  border-bottom: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 24px;
 }
 
-.header-title-group {
-  display: flex;
-  align-items: center;
+.card-icon {
+  color: rgb(var(--v-theme-primary));
+  font-size: 28px;
 }
 
-.header-title {
+.header-texts {
+  display: flex;
+  flex-direction: column;
+}
+
+.card-title {
+  margin: 0;
   font-size: 1.25rem;
   font-weight: 600;
   color: rgb(var(--v-theme-on-surface));
 }
 
-.table-body {
-  padding: 24px;
+.card-subtitle {
+  margin: 4px 0 0;
+  font-size: 0.85rem;
+  color: rgb(var(--v-theme-on-surface-variant));
+}
+
+.table-container {
+  margin-top: 8px;
 }
 
 .explore-server-table {
   background: transparent !important;
 }
 
+/* Add custom transition and hover matching other views */
 .explore-server-table :deep(tbody tr) {
   cursor: pointer;
+  transition: background-color 0.18s ease;
+}
+
+.explore-server-table :deep(tbody tr:hover) {
+  background-color: rgb(var(--v-theme-surface-container-high)) !important;
 }
 
 .thumbnail-wrapper {
@@ -255,7 +276,8 @@ function formatCoords(lat: number | null, lon: number | null): string {
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1.5px solid rgba(var(--v-border-color), var(--v-border-opacity));
+  border: 1px solid rgba(var(--v-border-color), 0.1);
+  background-color: rgba(var(--v-theme-on-surface), 0.03);
 }
 
 .table-thumbnail {
@@ -267,5 +289,14 @@ function formatCoords(lat: number | null, lon: number | null): string {
 .monospace-text {
   font-family: monospace;
   font-size: 0.85rem;
+}
+
+.val-text {
+  color: rgb(var(--v-theme-on-surface));
+}
+
+.text-disabled {
+  color: rgb(var(--v-theme-on-surface-variant));
+  opacity: 0.5;
 }
 </style>

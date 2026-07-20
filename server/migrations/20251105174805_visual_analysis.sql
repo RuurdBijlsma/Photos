@@ -64,6 +64,7 @@ CREATE TABLE measured_quality
     weighted_score     DOUBLE PRECISION NOT NULL
 );
 
+-- Only available when LLM is on, currently always off
 CREATE TABLE quality_judge
 (
     visual_analysis_id BIGINT PRIMARY KEY REFERENCES visual_analysis (id) ON DELETE CASCADE,
@@ -82,7 +83,6 @@ CREATE TABLE quality_judge
 );
 
 
--- CHANGE: themes is now an array of JSONB (JSONB[]).
 CREATE TABLE color
 (
     visual_analysis_id BIGINT PRIMARY KEY REFERENCES visual_analysis (id) ON DELETE CASCADE,
@@ -94,7 +94,7 @@ CREATE TABLE color
 );
 
 
--- CHANGE: All boolean flags are now explicitly marked as NOT NULL.
+-- Only available when LLM is on, currently always off
 CREATE TABLE classification
 (
     visual_analysis_id   BIGINT PRIMARY KEY REFERENCES visual_analysis (id) ON DELETE CASCADE,

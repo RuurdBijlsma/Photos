@@ -110,7 +110,6 @@ function getMonthLabelForWeek(weekNum: number): string | null {
         <!-- Day of Week Card -->
         <v-card class="histogram-card" flat>
           <div class="card-header">
-            <v-icon icon="mdi-calendar-week" class="card-icon" />
             <div class="header-texts">
               <h3 class="card-title">Weekly Habits</h3>
               <p class="card-subtitle">Media volume captured across days of the week</p>
@@ -143,7 +142,6 @@ function getMonthLabelForWeek(weekNum: number): string | null {
         <!-- Hour of Day Card -->
         <v-card class="histogram-card" flat>
           <div class="card-header">
-            <v-icon icon="mdi-clock-outline" class="card-icon" />
             <div class="header-texts">
               <h3 class="card-title">Daily Rhythm</h3>
               <p class="card-subtitle">Activity trends mapped by hour of the day</p>
@@ -180,7 +178,6 @@ function getMonthLabelForWeek(weekNum: number): string | null {
       <!-- Bottom Row: Seasonal / Week of Year -->
       <v-card class="histogram-card full-width-card" flat>
         <div class="card-header">
-          <v-icon icon="mdi-weather-partly-cloudy" class="card-icon" />
           <div class="header-texts">
             <h3 class="card-title">Seasonal Trends</h3>
             <p class="card-subtitle">Distribution of photos and videos over 53 weeks of the year</p>
@@ -310,7 +307,6 @@ function getMonthLabelForWeek(weekNum: number): string | null {
   align-items: center;
   flex: 1;
   height: 100%;
-  cursor: pointer;
   transition: opacity 0.15s ease;
 }
 

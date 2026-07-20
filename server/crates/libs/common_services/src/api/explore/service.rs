@@ -190,92 +190,62 @@ const PG_DAY_LABELS: [&str; 7] = [
 ];
 
 pub async fn get_histograms(pool: &PgPool, user_id: i32) -> Result<HistogramResponse, AppError> {
-    // 1. Media count per day of week (EXTRACT(DOW ...) returns 0=Sunday..6=Saturday)
-    let dow_rows = sqlx::query_as!(
-        RawBucket,
+    let rows = sqlx::query!(
         r#"
-        SELECT EXTRACT(DOW FROM taken_at_local)::int AS "key!",
-               COUNT(*)::bigint                      AS "count!"
+        SELECT
+            EXTRACT(DOW FROM taken_at_local)::int AS "dow?",
+            EXTRACT(WEEK FROM taken_at_local)::int AS "week?",
+            EXTRACT(HOUR FROM taken_at_local)::int AS "hour?",
+            COUNT(*)::bigint AS "count!"
         FROM media_item
         WHERE user_id = $1 AND deleted = false
-        GROUP BY "key!"
-        ORDER BY "key!"
+        GROUP BY GROUPING SETS (
+            (EXTRACT(DOW FROM taken_at_local)::int),
+            (EXTRACT(WEEK FROM taken_at_local)::int),
+            (EXTRACT(HOUR FROM taken_at_local)::int)
+        )
         "#,
         user_id
     )
-    .fetch_all(pool)
-    .await?;
+        .fetch_all(pool)
+        .await?;
 
-    let day_of_week: Vec<DayOfWeekBucket> = dow_rows
-        .into_iter()
-        .map(|r| DayOfWeekBucket {
-            day: r.key,
-            label: PG_DAY_LABELS
-                .get(r.key as usize)
-                .unwrap_or(&"Unknown")
-                .to_string(),
-            count: r.count,
-        })
-        .collect();
+    let mut day_of_week = Vec::new();
+    let mut week_of_year = Vec::new();
+    let mut hour_of_day = Vec::new();
 
-    // 2. Media count per ISO week of year (1–53)
-    let week_rows = sqlx::query_as!(
-        RawBucket,
-        r#"
-        SELECT EXTRACT(WEEK FROM taken_at_local)::int AS "key!",
-               COUNT(*)::bigint                       AS "count!"
-        FROM media_item
-        WHERE user_id = $1 AND deleted = false
-        GROUP BY "key!"
-        ORDER BY "key!"
-        "#,
-        user_id
-    )
-    .fetch_all(pool)
-    .await?;
+    for row in rows {
+        if let Some(dow) = row.dow {
+            day_of_week.push(DayOfWeekBucket {
+                day: dow,
+                label: PG_DAY_LABELS
+                    .get(dow as usize)
+                    .unwrap_or(&"Unknown")
+                    .to_string(),
+                count: row.count,
+            });
+        } else if let Some(week) = row.week {
+            week_of_year.push(WeekOfYearBucket {
+                week,
+                count: row.count,
+            });
+        } else if let Some(hour) = row.hour {
+            hour_of_day.push(HourOfDayBucket {
+                hour,
+                count: row.count,
+            });
+        }
+    }
 
-    let week_of_year: Vec<WeekOfYearBucket> = week_rows
-        .into_iter()
-        .map(|r| WeekOfYearBucket {
-            week: r.key,
-            count: r.count,
-        })
-        .collect();
-
-    // 3. Media count per hour of day (0–23)
-    let hour_rows = sqlx::query_as!(
-        RawBucket,
-        r#"
-        SELECT EXTRACT(HOUR FROM taken_at_local)::int AS "key!",
-               COUNT(*)::bigint                       AS "count!"
-        FROM media_item
-        WHERE user_id = $1 AND deleted = false
-        GROUP BY "key!"
-        ORDER BY "key!"
-        "#,
-        user_id
-    )
-    .fetch_all(pool)
-    .await?;
-
-    let hour_of_day: Vec<HourOfDayBucket> = hour_rows
-        .into_iter()
-        .map(|r| HourOfDayBucket {
-            hour: r.key,
-            count: r.count,
-        })
-        .collect();
+    // Since grouping sets do not guarantee output ordering across sets,
+    // we perform a quick sort on each bucket category here in Rust.
+    day_of_week.sort_by_key(|b| b.day);
+    week_of_year.sort_by_key(|b| b.week);
+    hour_of_day.sort_by_key(|b| b.hour);
 
     Ok(HistogramResponse {
         day_of_week,
         week_of_year,
         hour_of_day,
     })
-}
-
-/// Internal helper struct for the raw (key, count) rows returned by the histogram queries.
-#[derive(sqlx::FromRow)]
-struct RawBucket {
-    key: i32,
-    count: i64,
 }

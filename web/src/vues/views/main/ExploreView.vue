@@ -12,10 +12,10 @@ import ExploreHistograms from '@/vues/components/explore/ExploreHistograms.vue'
 
     <div class="explore-content">
       <header class="explore-header mb-6">
-        <h1 class="explore-title">Explore Stats</h1>
+        <h1 class="explore-title">Explore Insights</h1>
         <p class="explore-subtitle">
-          Query, sort, and analyze media metadata, weather profiles, GPS locations, and camera
-          hardware settings.
+          Explore stats from your library, from seasonal weather conditions and geographic metadata
+          to activity patterns over time.
         </p>
       </header>
 
