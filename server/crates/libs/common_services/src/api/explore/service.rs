@@ -1,6 +1,7 @@
 use crate::api::app_error::AppError;
 use crate::api::explore::interfaces::{
-    ExploreMediaItem, ExploreTableQuery, PaginatedExploreTableResponse,
+    DayOfWeekBucket, ExploreMediaItem, ExploreTableQuery, HistogramResponse, HourOfDayBucket,
+    PaginatedExploreTableResponse, WeekOfYearBucket,
 };
 use sqlx::{PgPool, Postgres, QueryBuilder};
 
@@ -176,4 +177,105 @@ pub async fn get_explore_table(
         limit,
         offset,
     })
+}
+
+const PG_DAY_LABELS: [&str; 7] = [
+    "Sunday",
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+];
+
+pub async fn get_histograms(pool: &PgPool, user_id: i32) -> Result<HistogramResponse, AppError> {
+    // 1. Media count per day of week (EXTRACT(DOW ...) returns 0=Sunday..6=Saturday)
+    let dow_rows = sqlx::query_as!(
+        RawBucket,
+        r#"
+        SELECT EXTRACT(DOW FROM taken_at_local)::int AS "key!",
+               COUNT(*)::bigint                      AS "count!"
+        FROM media_item
+        WHERE user_id = $1 AND deleted = false
+        GROUP BY "key!"
+        ORDER BY "key!"
+        "#,
+        user_id
+    )
+    .fetch_all(pool)
+    .await?;
+
+    let day_of_week: Vec<DayOfWeekBucket> = dow_rows
+        .into_iter()
+        .map(|r| DayOfWeekBucket {
+            day: r.key,
+            label: PG_DAY_LABELS
+                .get(r.key as usize)
+                .unwrap_or(&"Unknown")
+                .to_string(),
+            count: r.count,
+        })
+        .collect();
+
+    // 2. Media count per ISO week of year (1–53)
+    let week_rows = sqlx::query_as!(
+        RawBucket,
+        r#"
+        SELECT EXTRACT(WEEK FROM taken_at_local)::int AS "key!",
+               COUNT(*)::bigint                       AS "count!"
+        FROM media_item
+        WHERE user_id = $1 AND deleted = false
+        GROUP BY "key!"
+        ORDER BY "key!"
+        "#,
+        user_id
+    )
+    .fetch_all(pool)
+    .await?;
+
+    let week_of_year: Vec<WeekOfYearBucket> = week_rows
+        .into_iter()
+        .map(|r| WeekOfYearBucket {
+            week: r.key,
+            count: r.count,
+        })
+        .collect();
+
+    // 3. Media count per hour of day (0–23)
+    let hour_rows = sqlx::query_as!(
+        RawBucket,
+        r#"
+        SELECT EXTRACT(HOUR FROM taken_at_local)::int AS "key!",
+               COUNT(*)::bigint                       AS "count!"
+        FROM media_item
+        WHERE user_id = $1 AND deleted = false
+        GROUP BY "key!"
+        ORDER BY "key!"
+        "#,
+        user_id
+    )
+    .fetch_all(pool)
+    .await?;
+
+    let hour_of_day: Vec<HourOfDayBucket> = hour_rows
+        .into_iter()
+        .map(|r| HourOfDayBucket {
+            hour: r.key,
+            count: r.count,
+        })
+        .collect();
+
+    Ok(HistogramResponse {
+        day_of_week,
+        week_of_year,
+        hour_of_day,
+    })
+}
+
+/// Internal helper struct for the raw (key, count) rows returned by the histogram queries.
+#[derive(sqlx::FromRow)]
+struct RawBucket {
+    key: i32,
+    count: i64,
 }

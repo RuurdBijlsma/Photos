@@ -41,3 +41,25 @@ export interface ExploreTableParams {
   offset?: number
   sort?: string[]
 }
+
+export interface DayOfWeekBucket {
+  day: number
+  label: string
+  count: number
+}
+
+export interface WeekOfYearBucket {
+  week: number
+  count: number
+}
+
+export interface HourOfDayBucket {
+  hour: number
+  count: number
+}
+
+export interface HistogramResponse {
+  dayOfWeek: DayOfWeekBucket[]
+  weekOfYear: WeekOfYearBucket[]
+  hourOfDay: HourOfDayBucket[]
+}

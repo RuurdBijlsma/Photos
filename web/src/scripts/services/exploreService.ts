@@ -3,6 +3,7 @@ import apiClient from '@/scripts/services/api.ts'
 import type {
   PaginatedExploreTableResponse,
   ExploreTableParams,
+  HistogramResponse,
 } from '@/scripts/types/api/explore.ts'
 
 const exploreService = {
@@ -18,6 +19,13 @@ const exploreService = {
         indexes: null, // Forces Axios to repeat array params directly (e.g., sort=a&sort=b)
       },
     })
+  },
+
+  /**
+   * Get media item histogram insights.
+   */
+  getHistograms(): Promise<AxiosResponse<HistogramResponse>> {
+    return apiClient.get<HistogramResponse>('/explore/histograms')
   },
 }
 

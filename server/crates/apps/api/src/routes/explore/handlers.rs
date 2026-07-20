@@ -5,8 +5,8 @@ use axum::extract::State;
 use axum_extra::extract::Query;
 use axum::{Extension, Json};
 use common_services::api::app_error::AppError;
-use common_services::api::explore::interfaces::{ExploreTableQuery, PaginatedExploreTableResponse};
-use common_services::api::explore::service::get_explore_table;
+use common_services::api::explore::interfaces::{ExploreTableQuery, HistogramResponse, PaginatedExploreTableResponse};
+use common_services::api::explore::service::{get_explore_table, get_histograms};
 use tracing::instrument;
 
 #[instrument(skip(context, user), err(Debug))]
@@ -16,5 +16,14 @@ pub async fn get_explore_table_handler(
     Query(query): Query<ExploreTableQuery>,
 ) -> Result<Json<PaginatedExploreTableResponse>, AppError> {
     let result = get_explore_table(&context.pool, user.id, query).await?;
+    Ok(Json(result))
+}
+
+#[instrument(skip(context, user), err(Debug))]
+pub async fn get_histograms_handler(
+    State(context): State<ApiContext>,
+    Extension(user): Extension<ApiUser>,
+) -> Result<Json<HistogramResponse>, AppError> {
+    let result = get_histograms(&context.pool, user.id).await?;
     Ok(Json(result))
 }

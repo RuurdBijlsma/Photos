@@ -53,3 +53,33 @@ pub struct PaginatedExploreTableResponse {
     pub limit: i64,
     pub offset: i64,
 }
+
+#[derive(Serialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct HistogramResponse {
+    pub day_of_week: Vec<DayOfWeekBucket>,
+    pub week_of_year: Vec<WeekOfYearBucket>,
+    pub hour_of_day: Vec<HourOfDayBucket>,
+}
+
+#[derive(Serialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct DayOfWeekBucket {
+    pub day: i32,
+    pub label: String,
+    pub count: i64,
+}
+
+#[derive(Serialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct WeekOfYearBucket {
+    pub week: i32,
+    pub count: i64,
+}
+
+#[derive(Serialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct HourOfDayBucket {
+    pub hour: i32,
+    pub count: i64,
+}

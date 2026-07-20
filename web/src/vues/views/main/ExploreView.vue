@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import MainLayoutContainer from '@/vues/components/MainLayoutContainer.vue'
 import ExploreTable from '@/vues/components/explore/ExploreTable.vue'
+import ExploreHistograms from '@/vues/components/explore/ExploreHistograms.vue'
 </script>
 
 <template>
@@ -17,6 +18,8 @@ import ExploreTable from '@/vues/components/explore/ExploreTable.vue'
           hardware settings.
         </p>
       </header>
+
+      <explore-histograms />
 
       <explore-table />
     </div>

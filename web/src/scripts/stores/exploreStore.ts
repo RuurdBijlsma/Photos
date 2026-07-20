@@ -1,6 +1,6 @@
 import { ref, type Ref } from 'vue'
 import { defineStore } from 'pinia'
-import type { ExploreMediaItem } from '@/scripts/types/api/explore.ts'
+import type { ExploreMediaItem, HistogramResponse } from '@/scripts/types/api/explore.ts'
 import exploreService from '@/scripts/services/exploreService.ts'
 import { useSnackbarsStore } from '@/scripts/stores/snackbarStore.ts'
 
@@ -11,6 +11,10 @@ export const useExploreStore = defineStore('explore', () => {
   const items: Ref<ExploreMediaItem[]> = ref([])
   const totalCount = ref(0)
   const isTableLoading = ref(false)
+
+  // Histograms STATE
+  const histograms: Ref<HistogramResponse | null> = ref(null)
+  const isHistogramsLoading = ref(false)
 
   // Pagination & Datatable Parameters
   const page = ref(1)
@@ -44,6 +48,18 @@ export const useExploreStore = defineStore('explore', () => {
     }
   }
 
+  async function fetchHistograms() {
+    isHistogramsLoading.value = true
+    try {
+      const response = await exploreService.getHistograms()
+      histograms.value = response.data
+    } catch (error) {
+      snackbarStore.error('Failed to load explore histograms', error)
+    } finally {
+      isHistogramsLoading.value = false
+    }
+  }
+
   function resetPagination() {
     page.value = 1
     items.value = []
@@ -54,10 +70,13 @@ export const useExploreStore = defineStore('explore', () => {
     items,
     totalCount,
     isTableLoading,
+    histograms,
+    isHistogramsLoading,
     page,
     itemsPerPage,
     sortBy,
     fetchExploreTable,
+    fetchHistograms,
     resetPagination,
   }
 })
