@@ -1,8 +1,8 @@
-use sqlx::PgPool;
-use common_types::pb::api::SimpleTimelineItem;
 use crate::api::album::service::get_representative_thumbnail;
 use crate::api::app_error::AppError;
 use crate::api::explore::interfaces::VisitedLocation;
+use common_types::pb::api::SimpleTimelineItem;
+use sqlx::PgPool;
 
 #[derive(Clone)]
 struct RawLocation {
@@ -34,8 +34,8 @@ async fn resolve_locations(
             user_id,
             loc.id
         )
-            .fetch_all(&mut **tx)
-            .await?;
+        .fetch_all(&mut **tx)
+        .await?;
         let thumbnail_id = get_representative_thumbnail(tx, &media_item_ids).await?;
 
         resolved.push(VisitedLocation {
@@ -177,13 +177,14 @@ pub async fn get_visited_places(
         JOIN location l ON g.location_id = l.id
         WHERE m.user_id = $1 AND m.deleted = false
         GROUP BY l.id, l.name, l.admin1, l.admin2, l.country_code, l.country_name
+        HAVING COUNT(*) >= 3
         ORDER BY MIN(m.sort_timestamp) DESC, l.id DESC
         LIMIT 3
         "#,
         user_id
     )
-        .fetch_all(&mut *tx)
-        .await?;
+    .fetch_all(&mut *tx)
+    .await?;
 
     let recent_destinations_raw: Vec<RawLocation> = recent_destinations_rows
         .into_iter()
@@ -205,8 +206,6 @@ pub async fn get_visited_places(
     let recent_destinations = resolve_locations(&mut tx, user_id, recent_destinations_raw).await?;
 
     tx.commit().await?;
-
-    dbg!(&recent_destinations);
 
     // Combine and deduplicate
     let mut all_locations = Vec::new();
@@ -252,8 +251,8 @@ pub async fn get_location_media(
         user_id,
         location_id
     )
-        .fetch_all(pool)
-        .await?;
+    .fetch_all(pool)
+    .await?;
 
     let items = rows
         .into_iter()
@@ -310,8 +309,8 @@ pub async fn get_location_details(
         user_id,
         location_id
     )
-        .fetch_all(&mut *tx)
-        .await?;
+    .fetch_all(&mut *tx)
+    .await?;
 
     let thumbnail_id = get_representative_thumbnail(&mut tx, &media_item_ids).await?;
 
