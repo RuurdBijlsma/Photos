@@ -13,7 +13,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <v-card class="explore-locations-card" flat>
+  <v-card class="explore-locations-card" flat :loading="exploreStore.isVisitedPlacesLoading">
     <div class="card-header">
       <div class="header-texts">
         <h3 class="card-title">Frequently visited places</h3>
@@ -23,15 +23,9 @@ onMounted(async () => {
       </div>
     </div>
 
-    <!-- Loading State -->
-    <div v-if="exploreStore.isVisitedPlacesLoading" class="loading-state">
-      <v-progress-circular indeterminate color="primary" size="48" />
-      <p class="loading-text">Analyzing travels...</p>
-    </div>
-
     <!-- Places Row -->
     <div
-      v-else-if="exploreStore.visitedPlaces && exploreStore.visitedPlaces.length > 0"
+      v-if="exploreStore.visitedPlaces && exploreStore.visitedPlaces.length > 0"
       class="locations-list"
     >
       <explore-location-row :locations="exploreStore.visitedPlaces" />
@@ -46,6 +40,7 @@ onMounted(async () => {
   padding: 24px;
   border: none !important;
   overflow: hidden;
+  min-height:288px;
 }
 
 .card-header {

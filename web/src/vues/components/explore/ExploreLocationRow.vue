@@ -45,10 +45,6 @@ function getSecondaryLabel(loc: VisitedLocation): string {
   return loc.countryName || loc.admin1 || ''
 }
 
-function navigateToLocation(locationId: number) {
-  router.push(`/explore/location/${locationId}`)
-}
-
 useResizeObserver(containerRef, () => {
   updateScrollButtons()
 })
@@ -83,12 +79,11 @@ watch(
 
       <!-- Scrollable Container -->
       <div class="scroll-container" ref="containerRef" @scroll="updateScrollButtons">
-        <div
+        <router-link
+          :to="`/explore/location/${loc.id}`"
           v-for="loc in locations"
           :key="loc.id"
           class="location-item"
-          @click="navigateToLocation(loc.id)"
-          v-ripple
         >
           <div class="avatar-wrapper">
             <thumbnail-img
@@ -106,7 +101,7 @@ watch(
           <span class="location-secondary" :title="getSecondaryLabel(loc)">{{
             getSecondaryLabel(loc)
           }}</span>
-        </div>
+        </router-link>
       </div>
 
       <!-- Scroll Right Button -->
@@ -163,6 +158,11 @@ watch(
     transform 0.2s cubic-bezier(0.16, 1, 0.3, 1),
     background-color 0.2s ease;
   user-select: none;
+  text-decoration: none;
+}
+
+.location-item:active {
+  background-color: rgba(var(--v-theme-on-surface), 0.1);
 }
 
 .location-item:hover {

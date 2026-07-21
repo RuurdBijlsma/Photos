@@ -109,16 +109,11 @@ function getMonthLabelForWeek(weekNum: number): string | null {
 
 <template>
   <div class="histograms-container">
-    <div v-if="exploreStore.isHistogramsLoading" class="loading-state">
-      <v-progress-circular indeterminate color="primary" size="64" />
-      <p class="loading-text">Loading insights...</p>
-    </div>
-
-    <div v-else-if="exploreStore.histograms" class="histograms-grid">
+    <div class="histograms-grid">
       <!-- Top Row: Day of Week & Hour of Day -->
       <div class="top-row">
         <!-- Day of Week Card -->
-        <v-card class="histogram-card" flat>
+        <v-card class="histogram-card" flat :loading="exploreStore.isHistogramsLoading">
           <div class="card-header">
             <div class="header-texts">
               <h3 class="card-title">Weekly Habits</h3>
@@ -150,7 +145,7 @@ function getMonthLabelForWeek(weekNum: number): string | null {
         </v-card>
 
         <!-- Hour of Day Card -->
-        <v-card class="histogram-card" flat>
+        <v-card class="histogram-card" flat :loading="exploreStore.isHistogramsLoading">
           <div class="card-header">
             <div class="header-texts">
               <h3 class="card-title">Daily Rhythm</h3>
@@ -186,7 +181,11 @@ function getMonthLabelForWeek(weekNum: number): string | null {
       </div>
 
       <!-- Bottom Row: Seasonal / Week of Year -->
-      <v-card class="histogram-card full-width-card" flat>
+      <v-card
+        class="histogram-card full-width-card"
+        flat
+        :loading="exploreStore.isHistogramsLoading"
+      >
         <div class="card-header">
           <div class="header-texts">
             <h3 class="card-title">Seasonal Trends</h3>

@@ -31,7 +31,7 @@ const items = computed(() => {
 })
 
 function photoCountText(count: number) {
-  return `${count.toLocaleString()} memory${count === 1 ? '' : 'ies'}`
+  return `${count.toLocaleString()} item${count === 1 ? '' : 's'}`
 }
 
 const primaryName = computed(() => details.value?.name || '')
@@ -78,7 +78,7 @@ useRefreshFunction(() => {
       :view-link="`/explore/location/${locationId}/view/`"
     >
       <!-- Location Header Info -->
-      <div class="location-header" v-if="fetched && details">
+      <div class="location-header" v-if="details">
         <div class="location-header-left">
           <v-avatar class="location-avatar" size="176">
             <thumbnail-img
@@ -202,10 +202,12 @@ useRefreshFunction(() => {
   margin: 0;
   overflow-wrap: anywhere;
   color: rgb(var(--v-theme-on-surface));
+  margin-left: -2px;
 }
 
 .location-subtitle-context {
   margin: 4px 0 0;
+  margin-top: 0;
   font-size: 1.15rem;
   font-weight: 500;
   color: rgb(var(--v-theme-primary));
@@ -217,6 +219,8 @@ useRefreshFunction(() => {
   gap: 8px;
   margin: 8px 0 0;
   color: rgb(var(--v-theme-on-surface-variant));
+  font-size: 13px;
+  font-weight: 500;
 }
 
 .empty-location {
