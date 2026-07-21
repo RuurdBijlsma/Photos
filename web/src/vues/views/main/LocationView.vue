@@ -44,22 +44,32 @@ const secondaryContextLinks = computed(() => {
 
   // 1. Generate Link for Admin1
   if (details.value.admin1 && details.value.admin1 !== details.value.name) {
+    const id = `admin1:${countryCode}:${details.value.admin1}`
     links.push({
       text: details.value.admin1,
-      to: `/explore/location/admin1:${countryCode}:${details.value.admin1}`,
+      to: `/explore/location/${id}`,
+      id,
     })
   }
 
   // 2. Generate Link for Country
   if (details.value.countryName && details.value.countryName !== details.value.name) {
+    const id = `country:${countryCode}`
     links.push({
       text: details.value.countryName,
-      to: `/explore/location/country:${countryCode}`,
+      to: `/explore/location/${id}`,
+      id,
     })
   }
 
   return links
 })
+
+function prefetchLocation(id: string) {
+  if (id && !exploreStore.locations.has(id)) {
+    exploreStore.fetchLocationData(id)
+  }
+}
 
 watch(
   locationId,
@@ -111,7 +121,13 @@ useRefreshFunction(() => {
                 <h1 class="location-title">{{ primaryName }}</h1>
                 <p class="location-subtitle" v-if="secondaryContextLinks.length > 0">
                   <template v-for="(link, index) in secondaryContextLinks" :key="link.to">
-                    <router-link :to="link.to" class="context-link">{{ link.text }}</router-link>
+                    <router-link
+                      :to="link.to"
+                      class="context-link"
+                      @mouseenter="prefetchLocation(link.id)"
+                    >
+                      {{ link.text }}
+                    </router-link>
                     <span v-if="index < secondaryContextLinks.length - 1">, </span>
                   </template>
                 </p>

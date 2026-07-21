@@ -29,6 +29,7 @@ export const useExploreStore = defineStore('explore', () => {
   const isVisitedPlacesLoading = ref(false)
   const locations = shallowRef(new Map<string, LocationDetailsResponse>())
   const isLocationLoading = ref(false)
+  const activeLocationFetches = new Set<string>()
 
   // Pagination & Datatable Parameters
   const page = ref(1)
@@ -86,6 +87,11 @@ export const useExploreStore = defineStore('explore', () => {
   }
 
   async function fetchLocationData(locationKey: string) {
+    if (locations.value.has(locationKey) || activeLocationFetches.has(locationKey)) {
+      return
+    }
+
+    activeLocationFetches.add(locationKey)
     isLocationLoading.value = true
     try {
       const response = await exploreService.getLocation(locationKey)
@@ -94,6 +100,7 @@ export const useExploreStore = defineStore('explore', () => {
     } catch (error) {
       snackbarStore.error('Failed to load location data', error)
     } finally {
+      activeLocationFetches.delete(locationKey)
       isLocationLoading.value = false
     }
   }

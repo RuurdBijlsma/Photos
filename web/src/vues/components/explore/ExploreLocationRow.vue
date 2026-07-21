@@ -1,15 +1,15 @@
 <script setup lang="ts">
 import { ref, watch, nextTick, shallowRef } from 'vue'
-import { useRouter } from 'vue-router'
 import { useResizeObserver } from '@vueuse/core'
 import type { VisitedLocation } from '@/scripts/types/api/explore.ts'
+import { useExploreStore } from '@/scripts/stores/exploreStore.ts'
 import ThumbnailImg from '@/vues/components/ui/ThumbnailImg.vue'
 
 const props = defineProps<{
   locations: VisitedLocation[]
 }>()
 
-const router = useRouter()
+const exploreStore = useExploreStore()
 const containerRef = shallowRef<HTMLElement | null>(null)
 const canScrollLeft = ref(false)
 const canScrollRight = ref(false)
@@ -31,6 +31,12 @@ function scroll(direction: 'left' | 'right') {
     left: target,
     behavior: 'smooth',
   })
+}
+
+function prefetchLocation(id: string) {
+  if (id && !exploreStore.locations.has(id)) {
+    exploreStore.fetchLocationData(id)
+  }
 }
 
 // Smart context label generator
@@ -84,6 +90,7 @@ watch(
           v-for="loc in locations"
           :key="loc.id"
           class="location-item"
+          @mouseenter="prefetchLocation(loc.id)"
         >
           <div class="avatar-wrapper">
             <thumbnail-img
