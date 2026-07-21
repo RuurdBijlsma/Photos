@@ -24,8 +24,8 @@ export const useExploreStore = defineStore('explore', () => {
   // Visited Places & Details STATE
   const visitedPlaces: Ref<VisitedLocation[] | null> = shallowRef(null)
   const isVisitedPlacesLoading = ref(false)
-  const locationMedia = shallowRef(new Map<number, SimpleTimelineItem[]>())
-  const locationDetails = shallowRef(new Map<number, VisitedLocation>())
+  const locationMedia = shallowRef(new Map<string, SimpleTimelineItem[]>())
+  const locationDetails = shallowRef(new Map<string, VisitedLocation>())
   const isLocationLoading = ref(false)
 
   // Pagination & Datatable Parameters
@@ -83,15 +83,15 @@ export const useExploreStore = defineStore('explore', () => {
     }
   }
 
-  async function fetchLocationData(locationId: number) {
+  async function fetchLocationData(locationKey: string) {
     isLocationLoading.value = true
     try {
       const [media, details] = await Promise.all([
-        exploreService.getLocationMedia(locationId),
-        exploreService.getLocationDetails(locationId),
+        exploreService.getLocationMedia(locationKey),
+        exploreService.getLocationDetails(locationKey),
       ])
-      locationMedia.value.set(locationId, media.items)
-      locationDetails.value.set(locationId, details.data)
+      locationMedia.value.set(locationKey, media.items)
+      locationDetails.value.set(locationKey, details.data)
       triggerRef(locationMedia)
       triggerRef(locationDetails)
     } catch (error) {

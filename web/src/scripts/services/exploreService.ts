@@ -18,7 +18,7 @@ const exploreService = {
     return apiClient.get<PaginatedExploreTableResponse>('/explore/table', {
       params,
       paramsSerializer: {
-        indexes: null, // Forces Axios to repeat array params directly (e.g., sort=a&sort=b)
+        indexes: null,
       },
     })
   },
@@ -40,14 +40,14 @@ const exploreService = {
   /**
    * Fetch location metadata details
    */
-  getLocationDetails(locationId: number): Promise<AxiosResponse<VisitedLocation>> {
+  getLocationDetails(locationId: string): Promise<AxiosResponse<VisitedLocation>> {
     return apiClient.get<VisitedLocation>(`/explore/locations/${locationId}/details`)
   },
 
   /**
    * Fetch chronological simple timeline items encoded as protobuf
    */
-  async getLocationMedia(locationId: number): Promise<OrderedMediaResponse> {
+  async getLocationMedia(locationId: string): Promise<OrderedMediaResponse> {
     const response = await apiClient.get(`/explore/locations/${locationId}/media`, {
       responseType: 'arraybuffer',
     })

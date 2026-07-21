@@ -87,7 +87,7 @@ pub struct HourOfDayBucket {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct VisitedLocation {
-    pub id: i32,
+    pub id: String,
     pub name: String,
     pub admin1: String,
     pub admin2: String,

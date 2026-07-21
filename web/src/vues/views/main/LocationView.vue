@@ -17,7 +17,7 @@ const fetched = ref(false)
 const locationId = computed(() => {
   const rawId = route.params.locationId
   const idStr = Array.isArray(rawId) ? rawId[0] : rawId
-  return idStr ? Number(idStr) : null
+  return idStr || null
 })
 
 const details = computed(() => {
@@ -41,7 +41,8 @@ const secondaryContext = computed(() => {
   if (details.value.admin1 && details.value.admin1 !== details.value.name) {
     parts.push(details.value.admin1)
   }
-  if (details.value.countryName) {
+  // Deduplicate secondary rendering when primary details already represent the country itself
+  if (details.value.countryName && details.value.countryName !== details.value.name) {
     parts.push(details.value.countryName)
   }
   return parts.join(', ')

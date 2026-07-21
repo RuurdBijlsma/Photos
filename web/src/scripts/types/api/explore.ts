@@ -65,7 +65,7 @@ export interface HistogramResponse {
 }
 
 export interface VisitedLocation {
-  id: number
+  id: string
   name: string
   admin1: string
   admin2: string

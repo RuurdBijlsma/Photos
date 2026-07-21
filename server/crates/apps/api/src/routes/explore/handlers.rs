@@ -47,9 +47,9 @@ pub async fn get_visited_places_handler(
 pub async fn get_location_media_handler(
     State(context): State<ApiContext>,
     Extension(user): Extension<ApiUser>,
-    Path(location_id): Path<i32>,
+    Path(location_key): Path<String>, // Parsed dynamic polymorphic location key
 ) -> Result<Protobuf<OrderedMediaResponse>, AppError> {
-    let items = get_location_media(&context.pool, user.id, location_id).await?;
+    let items = get_location_media(&context.pool, user.id, &location_key).await?;
     Ok(Protobuf(OrderedMediaResponse { items }))
 }
 
@@ -57,8 +57,8 @@ pub async fn get_location_media_handler(
 pub async fn get_location_details_handler(
     State(context): State<ApiContext>,
     Extension(user): Extension<ApiUser>,
-    Path(location_id): Path<i32>,
+    Path(location_key): Path<String>, // Parsed dynamic polymorphic location key
 ) -> Result<Json<VisitedLocation>, AppError> {
-    let result = get_location_details(&context.pool, user.id, location_id).await?;
+    let result = get_location_details(&context.pool, user.id, &location_key).await?;
     Ok(Json(result))
 }

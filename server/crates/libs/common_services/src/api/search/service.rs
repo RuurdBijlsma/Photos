@@ -518,18 +518,35 @@ pub async fn get_search_suggestions(
 
             UNION ALL
 
-            (SELECT loc.val as suggestion, COUNT(DISTINCT g.media_item_id) as photo_count, 'LOCATION' as "type!", MIN(loc.id)::text as "id"
-            FROM (
-                SELECT id, name as val FROM location WHERE name ILIKE $2
-                UNION
-                SELECT id, admin1 as val FROM location WHERE admin1 ILIKE $2
-                UNION
-                SELECT id, country_name as val FROM location WHERE country_name ILIKE $2
-            ) loc
-            JOIN gps g ON g.location_id = loc.id
+            -- Country Suggestions
+            (SELECT l.country_name as suggestion, COUNT(DISTINCT g.media_item_id) as photo_count, 'LOCATION' as "type!", ('country:' || l.country_code) as "id"
+            FROM location l
+            JOIN gps g ON g.location_id = l.id
             JOIN media_item mi ON g.media_item_id = mi.id
-            WHERE mi.user_id = $1 AND mi.deleted = false
-            GROUP BY loc.val
+            WHERE mi.user_id = $1 AND mi.deleted = false AND l.country_name ILIKE $2 AND l.country_name != ''
+            GROUP BY l.country_name, l.country_code
+            LIMIT $3 * 2)
+
+            UNION ALL
+
+            -- Admin1 Region Suggestions
+            (SELECT l.admin1 as suggestion, COUNT(DISTINCT g.media_item_id) as photo_count, 'LOCATION' as "type!", ('admin1:' || l.country_code || ':' || l.admin1) as "id"
+            FROM location l
+            JOIN gps g ON g.location_id = l.id
+            JOIN media_item mi ON g.media_item_id = mi.id
+            WHERE mi.user_id = $1 AND mi.deleted = false AND l.admin1 ILIKE $2 AND l.admin1 != ''
+            GROUP BY l.admin1, l.country_code
+            LIMIT $3 * 2)
+
+            UNION ALL
+
+            -- Place/Town Suggestions
+            (SELECT l.name as suggestion, COUNT(DISTINCT g.media_item_id) as photo_count, 'LOCATION' as "type!", ('place:' || MIN(l.id)) as "id"
+            FROM location l
+            JOIN gps g ON g.location_id = l.id
+            JOIN media_item mi ON g.media_item_id = mi.id
+            WHERE mi.user_id = $1 AND mi.deleted = false AND l.name ILIKE $2 AND l.name != ''
+            GROUP BY l.name
             LIMIT $3 * 2)
 
             UNION ALL
