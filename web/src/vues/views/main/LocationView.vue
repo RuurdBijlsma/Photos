@@ -9,7 +9,7 @@ import { getThumbnailHeight } from '@/scripts/utils.ts'
 
 const route = useRoute()
 const exploreStore = useExploreStore()
-const simpleTimeline = useTemplateRef('simpleTimeline')
+const simpleTimelineRef = useTemplateRef('simpleTimeline')
 
 const isInitialLoad = ref(true)
 const fetched = ref(false)
@@ -52,7 +52,7 @@ watch(
   () => {
     isInitialLoad.value = true
     fetched.value = false
-    simpleTimeline.value?.scrollToTop()
+    simpleTimelineRef.value?.scrollToTop()
     if (locationId.value === null) return
     exploreStore.fetchLocationData(locationId.value).then(() => {
       fetched.value = true

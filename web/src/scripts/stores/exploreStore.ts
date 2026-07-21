@@ -1,4 +1,4 @@
-import { ref, type Ref } from 'vue'
+import { ref, type Ref, shallowRef, triggerRef } from 'vue'
 import { defineStore } from 'pinia'
 import type {
   ExploreMediaItem,
@@ -24,8 +24,8 @@ export const useExploreStore = defineStore('explore', () => {
   // Visited Places & Details STATE
   const visitedPlaces: Ref<VisitedLocation[] | null> = ref(null)
   const isVisitedPlacesLoading = ref(false)
-  const locationMedia = ref(new Map<number, SimpleTimelineItem[]>())
-  const locationDetails = ref(new Map<number, VisitedLocation>())
+  const locationMedia = shallowRef(new Map<number, SimpleTimelineItem[]>())
+  const locationDetails = shallowRef(new Map<number, VisitedLocation>())
   const isLocationLoading = ref(false)
 
   // Pagination & Datatable Parameters
@@ -92,6 +92,8 @@ export const useExploreStore = defineStore('explore', () => {
       ])
       locationMedia.value.set(locationId, media.items)
       locationDetails.value.set(locationId, details.data)
+      triggerRef(locationMedia)
+      triggerRef(locationDetails)
     } catch (error) {
       snackbarStore.error('Failed to load location data', error)
     } finally {

@@ -71,7 +71,7 @@ watch(
           class="scroll-btn scroll-btn-left"
           variant="elevated"
           color="surface"
-          elevation="4"
+          elevation="6"
           size="small"
           @click="scroll('left')"
         />
@@ -112,7 +112,7 @@ watch(
           class="scroll-btn scroll-btn-right"
           variant="elevated"
           color="surface"
-          elevation="4"
+          elevation="6"
           size="small"
           @click="scroll('right')"
         />
@@ -150,7 +150,7 @@ watch(
   align-items: center;
   text-align: center;
   cursor: pointer;
-  width: 110px;
+  width: 130px;
   flex-shrink: 0;
   border-radius: 16px;
   padding: 8px;
@@ -171,8 +171,8 @@ watch(
 }
 
 .avatar-wrapper {
-  width: 80px;
-  height: 80px;
+  width: 110px;
+  height: 110px;
   border-radius: 50%;
   overflow: hidden;
   border: 3px solid rgba(var(--v-theme-primary), 0.2);
