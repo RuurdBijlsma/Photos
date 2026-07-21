@@ -6,7 +6,7 @@ import type {
   HistogramResponse,
   VisitedLocation,
 } from '@/scripts/types/api/explore.ts'
-import { OrderedMediaResponse } from '@/scripts/types/generated/timeline.ts'
+import { LocationDetailsResponse } from '@/scripts/types/generated/timeline.ts'
 
 const exploreService = {
   /**
@@ -38,21 +38,14 @@ const exploreService = {
   },
 
   /**
-   * Fetch location metadata details
+   * Fetch unified location metadata and media items encoded as protobuf
    */
-  getLocationDetails(locationId: string): Promise<AxiosResponse<VisitedLocation>> {
-    return apiClient.get<VisitedLocation>(`/explore/locations/${locationId}/details`)
-  },
-
-  /**
-   * Fetch chronological simple timeline items encoded as protobuf
-   */
-  async getLocationMedia(locationId: string): Promise<OrderedMediaResponse> {
-    const response = await apiClient.get(`/explore/locations/${locationId}/media`, {
+  async getLocation(locationId: string): Promise<LocationDetailsResponse> {
+    const response = await apiClient.get(`/explore/locations/${locationId}`, {
       responseType: 'arraybuffer',
     })
     const buffer = new Uint8Array(response.data)
-    return OrderedMediaResponse.decode(buffer)
+    return LocationDetailsResponse.decode(buffer)
   },
 }
 

@@ -212,6 +212,33 @@ export interface StorageSummaryResponse {
   appDataFolderSizeBytes: number
 }
 
+/** --- Explore & Location Specific --- */
+export interface VisitedLocation {
+  id: string
+  name: string
+  admin1: string
+  admin2: string
+  countryCode: string
+  countryName: string
+  photoCount: number
+  thumbnailId?: string | undefined
+}
+
+export interface LocationMediaItem {
+  id: string
+  isVideo: boolean
+  hasThumbnails: boolean
+  durationMs?: number | undefined
+  ratio: number
+  latitude?: number | undefined
+  longitude?: number | undefined
+}
+
+export interface LocationDetailsResponse {
+  location: VisitedLocation | undefined
+  items: LocationMediaItem[]
+}
+
 function createBaseTimelineRatiosResponse(): TimelineRatiosResponse {
   return { months: [] }
 }
@@ -2787,6 +2814,467 @@ export const StorageSummaryResponse: MessageFns<StorageSummaryResponse> = {
     message.blurryItemCount = object.blurryItemCount ?? 0
     message.mediaFolderSizeBytes = object.mediaFolderSizeBytes ?? 0
     message.appDataFolderSizeBytes = object.appDataFolderSizeBytes ?? 0
+    return message
+  },
+}
+
+function createBaseVisitedLocation(): VisitedLocation {
+  return {
+    id: '',
+    name: '',
+    admin1: '',
+    admin2: '',
+    countryCode: '',
+    countryName: '',
+    photoCount: 0,
+    thumbnailId: undefined,
+  }
+}
+
+export const VisitedLocation: MessageFns<VisitedLocation> = {
+  encode(message: VisitedLocation, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.id !== '') {
+      writer.uint32(10).string(message.id)
+    }
+    if (message.name !== '') {
+      writer.uint32(18).string(message.name)
+    }
+    if (message.admin1 !== '') {
+      writer.uint32(26).string(message.admin1)
+    }
+    if (message.admin2 !== '') {
+      writer.uint32(34).string(message.admin2)
+    }
+    if (message.countryCode !== '') {
+      writer.uint32(42).string(message.countryCode)
+    }
+    if (message.countryName !== '') {
+      writer.uint32(50).string(message.countryName)
+    }
+    if (message.photoCount !== 0) {
+      writer.uint32(56).int64(message.photoCount)
+    }
+    if (message.thumbnailId !== undefined) {
+      writer.uint32(66).string(message.thumbnailId)
+    }
+    return writer
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): VisitedLocation {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input)
+    const end = length === undefined ? reader.len : reader.pos + length
+    const message = createBaseVisitedLocation()
+    while (reader.pos < end) {
+      const tag = reader.uint32()
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break
+          }
+
+          message.id = reader.string()
+          continue
+        }
+        case 2: {
+          if (tag !== 18) {
+            break
+          }
+
+          message.name = reader.string()
+          continue
+        }
+        case 3: {
+          if (tag !== 26) {
+            break
+          }
+
+          message.admin1 = reader.string()
+          continue
+        }
+        case 4: {
+          if (tag !== 34) {
+            break
+          }
+
+          message.admin2 = reader.string()
+          continue
+        }
+        case 5: {
+          if (tag !== 42) {
+            break
+          }
+
+          message.countryCode = reader.string()
+          continue
+        }
+        case 6: {
+          if (tag !== 50) {
+            break
+          }
+
+          message.countryName = reader.string()
+          continue
+        }
+        case 7: {
+          if (tag !== 56) {
+            break
+          }
+
+          message.photoCount = longToNumber(reader.int64())
+          continue
+        }
+        case 8: {
+          if (tag !== 66) {
+            break
+          }
+
+          message.thumbnailId = reader.string()
+          continue
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break
+      }
+      reader.skip(tag & 7)
+    }
+    return message
+  },
+
+  fromJSON(object: any): VisitedLocation {
+    return {
+      id: isSet(object.id) ? globalThis.String(object.id) : '',
+      name: isSet(object.name) ? globalThis.String(object.name) : '',
+      admin1: isSet(object.admin1) ? globalThis.String(object.admin1) : '',
+      admin2: isSet(object.admin2) ? globalThis.String(object.admin2) : '',
+      countryCode: isSet(object.countryCode)
+        ? globalThis.String(object.countryCode)
+        : isSet(object.country_code)
+          ? globalThis.String(object.country_code)
+          : '',
+      countryName: isSet(object.countryName)
+        ? globalThis.String(object.countryName)
+        : isSet(object.country_name)
+          ? globalThis.String(object.country_name)
+          : '',
+      photoCount: isSet(object.photoCount)
+        ? globalThis.Number(object.photoCount)
+        : isSet(object.photo_count)
+          ? globalThis.Number(object.photo_count)
+          : 0,
+      thumbnailId: isSet(object.thumbnailId)
+        ? globalThis.String(object.thumbnailId)
+        : isSet(object.thumbnail_id)
+          ? globalThis.String(object.thumbnail_id)
+          : undefined,
+    }
+  },
+
+  toJSON(message: VisitedLocation): unknown {
+    const obj: any = {}
+    if (message.id !== '') {
+      obj.id = message.id
+    }
+    if (message.name !== '') {
+      obj.name = message.name
+    }
+    if (message.admin1 !== '') {
+      obj.admin1 = message.admin1
+    }
+    if (message.admin2 !== '') {
+      obj.admin2 = message.admin2
+    }
+    if (message.countryCode !== '') {
+      obj.countryCode = message.countryCode
+    }
+    if (message.countryName !== '') {
+      obj.countryName = message.countryName
+    }
+    if (message.photoCount !== 0) {
+      obj.photoCount = Math.round(message.photoCount)
+    }
+    if (message.thumbnailId !== undefined) {
+      obj.thumbnailId = message.thumbnailId
+    }
+    return obj
+  },
+
+  create<I extends Exact<DeepPartial<VisitedLocation>, I>>(base?: I): VisitedLocation {
+    return VisitedLocation.fromPartial(base ?? ({} as any))
+  },
+  fromPartial<I extends Exact<DeepPartial<VisitedLocation>, I>>(object: I): VisitedLocation {
+    const message = createBaseVisitedLocation()
+    message.id = object.id ?? ''
+    message.name = object.name ?? ''
+    message.admin1 = object.admin1 ?? ''
+    message.admin2 = object.admin2 ?? ''
+    message.countryCode = object.countryCode ?? ''
+    message.countryName = object.countryName ?? ''
+    message.photoCount = object.photoCount ?? 0
+    message.thumbnailId = object.thumbnailId ?? undefined
+    return message
+  },
+}
+
+function createBaseLocationMediaItem(): LocationMediaItem {
+  return {
+    id: '',
+    isVideo: false,
+    hasThumbnails: false,
+    durationMs: undefined,
+    ratio: 0,
+    latitude: undefined,
+    longitude: undefined,
+  }
+}
+
+export const LocationMediaItem: MessageFns<LocationMediaItem> = {
+  encode(message: LocationMediaItem, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.id !== '') {
+      writer.uint32(10).string(message.id)
+    }
+    if (message.isVideo !== false) {
+      writer.uint32(16).bool(message.isVideo)
+    }
+    if (message.hasThumbnails !== false) {
+      writer.uint32(24).bool(message.hasThumbnails)
+    }
+    if (message.durationMs !== undefined) {
+      writer.uint32(32).int32(message.durationMs)
+    }
+    if (message.ratio !== 0) {
+      writer.uint32(45).float(message.ratio)
+    }
+    if (message.latitude !== undefined) {
+      writer.uint32(49).double(message.latitude)
+    }
+    if (message.longitude !== undefined) {
+      writer.uint32(57).double(message.longitude)
+    }
+    return writer
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): LocationMediaItem {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input)
+    const end = length === undefined ? reader.len : reader.pos + length
+    const message = createBaseLocationMediaItem()
+    while (reader.pos < end) {
+      const tag = reader.uint32()
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break
+          }
+
+          message.id = reader.string()
+          continue
+        }
+        case 2: {
+          if (tag !== 16) {
+            break
+          }
+
+          message.isVideo = reader.bool()
+          continue
+        }
+        case 3: {
+          if (tag !== 24) {
+            break
+          }
+
+          message.hasThumbnails = reader.bool()
+          continue
+        }
+        case 4: {
+          if (tag !== 32) {
+            break
+          }
+
+          message.durationMs = reader.int32()
+          continue
+        }
+        case 5: {
+          if (tag !== 45) {
+            break
+          }
+
+          message.ratio = reader.float()
+          continue
+        }
+        case 6: {
+          if (tag !== 49) {
+            break
+          }
+
+          message.latitude = reader.double()
+          continue
+        }
+        case 7: {
+          if (tag !== 57) {
+            break
+          }
+
+          message.longitude = reader.double()
+          continue
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break
+      }
+      reader.skip(tag & 7)
+    }
+    return message
+  },
+
+  fromJSON(object: any): LocationMediaItem {
+    return {
+      id: isSet(object.id) ? globalThis.String(object.id) : '',
+      isVideo: isSet(object.isVideo)
+        ? globalThis.Boolean(object.isVideo)
+        : isSet(object.is_video)
+          ? globalThis.Boolean(object.is_video)
+          : false,
+      hasThumbnails: isSet(object.hasThumbnails)
+        ? globalThis.Boolean(object.hasThumbnails)
+        : isSet(object.has_thumbnails)
+          ? globalThis.Boolean(object.has_thumbnails)
+          : false,
+      durationMs: isSet(object.durationMs)
+        ? globalThis.Number(object.durationMs)
+        : isSet(object.duration_ms)
+          ? globalThis.Number(object.duration_ms)
+          : undefined,
+      ratio: isSet(object.ratio) ? globalThis.Number(object.ratio) : 0,
+      latitude: isSet(object.latitude) ? globalThis.Number(object.latitude) : undefined,
+      longitude: isSet(object.longitude) ? globalThis.Number(object.longitude) : undefined,
+    }
+  },
+
+  toJSON(message: LocationMediaItem): unknown {
+    const obj: any = {}
+    if (message.id !== '') {
+      obj.id = message.id
+    }
+    if (message.isVideo !== false) {
+      obj.isVideo = message.isVideo
+    }
+    if (message.hasThumbnails !== false) {
+      obj.hasThumbnails = message.hasThumbnails
+    }
+    if (message.durationMs !== undefined) {
+      obj.durationMs = Math.round(message.durationMs)
+    }
+    if (message.ratio !== 0) {
+      obj.ratio = message.ratio
+    }
+    if (message.latitude !== undefined) {
+      obj.latitude = message.latitude
+    }
+    if (message.longitude !== undefined) {
+      obj.longitude = message.longitude
+    }
+    return obj
+  },
+
+  create<I extends Exact<DeepPartial<LocationMediaItem>, I>>(base?: I): LocationMediaItem {
+    return LocationMediaItem.fromPartial(base ?? ({} as any))
+  },
+  fromPartial<I extends Exact<DeepPartial<LocationMediaItem>, I>>(object: I): LocationMediaItem {
+    const message = createBaseLocationMediaItem()
+    message.id = object.id ?? ''
+    message.isVideo = object.isVideo ?? false
+    message.hasThumbnails = object.hasThumbnails ?? false
+    message.durationMs = object.durationMs ?? undefined
+    message.ratio = object.ratio ?? 0
+    message.latitude = object.latitude ?? undefined
+    message.longitude = object.longitude ?? undefined
+    return message
+  },
+}
+
+function createBaseLocationDetailsResponse(): LocationDetailsResponse {
+  return { location: undefined, items: [] }
+}
+
+export const LocationDetailsResponse: MessageFns<LocationDetailsResponse> = {
+  encode(
+    message: LocationDetailsResponse,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
+    if (message.location !== undefined) {
+      VisitedLocation.encode(message.location, writer.uint32(10).fork()).join()
+    }
+    for (const v of message.items) {
+      LocationMediaItem.encode(v!, writer.uint32(18).fork()).join()
+    }
+    return writer
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): LocationDetailsResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input)
+    const end = length === undefined ? reader.len : reader.pos + length
+    const message = createBaseLocationDetailsResponse()
+    while (reader.pos < end) {
+      const tag = reader.uint32()
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break
+          }
+
+          message.location = VisitedLocation.decode(reader, reader.uint32())
+          continue
+        }
+        case 2: {
+          if (tag !== 18) {
+            break
+          }
+
+          message.items.push(LocationMediaItem.decode(reader, reader.uint32()))
+          continue
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break
+      }
+      reader.skip(tag & 7)
+    }
+    return message
+  },
+
+  fromJSON(object: any): LocationDetailsResponse {
+    return {
+      location: isSet(object.location) ? VisitedLocation.fromJSON(object.location) : undefined,
+      items: globalThis.Array.isArray(object?.items)
+        ? object.items.map((e: any) => LocationMediaItem.fromJSON(e))
+        : [],
+    }
+  },
+
+  toJSON(message: LocationDetailsResponse): unknown {
+    const obj: any = {}
+    if (message.location !== undefined) {
+      obj.location = VisitedLocation.toJSON(message.location)
+    }
+    if (message.items?.length) {
+      obj.items = message.items.map((e) => LocationMediaItem.toJSON(e))
+    }
+    return obj
+  },
+
+  create<I extends Exact<DeepPartial<LocationDetailsResponse>, I>>(
+    base?: I,
+  ): LocationDetailsResponse {
+    return LocationDetailsResponse.fromPartial(base ?? ({} as any))
+  },
+  fromPartial<I extends Exact<DeepPartial<LocationDetailsResponse>, I>>(
+    object: I,
+  ): LocationDetailsResponse {
+    const message = createBaseLocationDetailsResponse()
+    message.location =
+      object.location !== undefined && object.location !== null
+        ? VisitedLocation.fromPartial(object.location)
+        : undefined
+    message.items = object.items?.map((e) => LocationMediaItem.fromPartial(e)) || []
     return message
   },
 }

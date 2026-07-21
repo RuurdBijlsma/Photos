@@ -137,6 +137,20 @@ fn main() -> std::io::Result<()> {
         "#[derive(serde::Serialize, serde::Deserialize)]",
     );
 
+    // --- EXPLORE STRUCTS ---
+    config.type_attribute(
+        ".api.VisitedLocation",
+        "#[derive(serde::Serialize, serde::Deserialize)]",
+    );
+    config.type_attribute(
+        ".api.LocationMediaItem",
+        "#[derive(serde::Serialize, serde::Deserialize)]",
+    );
+    config.type_attribute(
+        ".api.LocationDetailsResponse",
+        "#[derive(serde::Serialize, serde::Deserialize)]",
+    );
+
     config.type_attribute(".api", "#[serde(rename_all = \"camelCase\")]");
     config.compile_fds(file_descriptors)?;
 

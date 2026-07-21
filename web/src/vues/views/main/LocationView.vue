@@ -22,12 +22,12 @@ const locationId = computed(() => {
 
 const details = computed(() => {
   if (locationId.value === null) return null
-  return exploreStore.locationDetails.get(locationId.value) ?? null
+  return exploreStore.locations.get(locationId.value)?.location ?? null
 })
 
 const items = computed(() => {
   if (locationId.value === null) return []
-  return exploreStore.locationMedia.get(locationId.value) ?? []
+  return exploreStore.locations.get(locationId.value)?.items ?? []
 })
 
 function photoCountText(count: number) {

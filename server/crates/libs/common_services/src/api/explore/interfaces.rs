@@ -74,25 +74,12 @@ pub struct DayOfWeekBucket {
 #[serde(rename_all = "camelCase")]
 pub struct WeekOfYearBucket {
     pub week: i32,
-    pub count: i64,
+    pub count: i64
 }
 
 #[derive(Serialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct HourOfDayBucket {
     pub hour: i32,
-    pub count: i64,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct VisitedLocation {
-    pub id: String,
-    pub name: String,
-    pub admin1: String,
-    pub admin2: String,
-    pub country_code: String,
-    pub country_name: String,
-    pub photo_count: i64,
-    pub thumbnail_id: Option<String>,
+    pub count: i64
 }

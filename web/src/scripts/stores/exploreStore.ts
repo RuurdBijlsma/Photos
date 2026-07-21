@@ -5,7 +5,10 @@ import type {
   HistogramResponse,
   VisitedLocation,
 } from '@/scripts/types/api/explore.ts'
-import type { SimpleTimelineItem } from '@/scripts/types/generated/timeline.ts'
+import type {
+  LocationDetailsResponse,
+  LocationMediaItem,
+} from '@/scripts/types/generated/timeline.ts'
 import exploreService from '@/scripts/services/exploreService.ts'
 import { useSnackbarsStore } from '@/scripts/stores/snackbarStore.ts'
 
@@ -24,8 +27,7 @@ export const useExploreStore = defineStore('explore', () => {
   // Visited Places & Details STATE
   const visitedPlaces: Ref<VisitedLocation[] | null> = shallowRef(null)
   const isVisitedPlacesLoading = ref(false)
-  const locationMedia = shallowRef(new Map<string, SimpleTimelineItem[]>())
-  const locationDetails = shallowRef(new Map<string, VisitedLocation>())
+  const locations = shallowRef(new Map<string, LocationDetailsResponse>())
   const isLocationLoading = ref(false)
 
   // Pagination & Datatable Parameters
@@ -86,14 +88,9 @@ export const useExploreStore = defineStore('explore', () => {
   async function fetchLocationData(locationKey: string) {
     isLocationLoading.value = true
     try {
-      const [media, details] = await Promise.all([
-        exploreService.getLocationMedia(locationKey),
-        exploreService.getLocationDetails(locationKey),
-      ])
-      locationMedia.value.set(locationKey, media.items)
-      locationDetails.value.set(locationKey, details.data)
-      triggerRef(locationMedia)
-      triggerRef(locationDetails)
+      const response = await exploreService.getLocation(locationKey)
+      locations.value.set(locationKey, response)
+      triggerRef(locations)
     } catch (error) {
       snackbarStore.error('Failed to load location data', error)
     } finally {
@@ -115,8 +112,7 @@ export const useExploreStore = defineStore('explore', () => {
     isHistogramsLoading,
     visitedPlaces,
     isVisitedPlacesLoading,
-    locationMedia,
-    locationDetails,
+    locations,
     isLocationLoading,
     page,
     itemsPerPage,

@@ -1,7 +1,6 @@
 use crate::api::album::service::get_representative_thumbnail;
 use crate::api::app_error::AppError;
-use crate::api::explore::interfaces::VisitedLocation;
-use common_types::pb::api::SimpleTimelineItem;
+use common_types::pb::api::{VisitedLocation, LocationMediaItem, LocationDetailsResponse};
 use sqlx::PgPool;
 use std::collections::HashMap;
 
@@ -241,95 +240,15 @@ pub async fn get_visited_places(
     Ok(all_locations)
 }
 
-/// Retrieve chronological `SimpleTimelineItem` protobuf records matching a selected location
-pub async fn get_location_media(
+pub async fn get_location(
     pool: &PgPool,
     user_id: i32,
     location_key: &str,
-) -> Result<Vec<SimpleTimelineItem>, AppError> {
-    let scope = LocationScope::parse(location_key)?;
-
-    let rows = match scope {
-        LocationScope::Place(id) => {
-            sqlx::query_as!(
-                SimpleTimelineItem,
-                r#"
-                SELECT
-                    m.id,
-                    m.is_video as "is_video!",
-                    m.has_thumbnails as "has_thumbnails!",
-                    m.duration_ms::INT,
-                    (m.width::real / m.height::real) AS "ratio!"
-                FROM media_item m
-                JOIN gps g ON m.id = g.media_item_id
-                WHERE m.user_id = $1 AND g.location_id = $2 AND m.deleted = false
-                ORDER BY m.sort_timestamp, id
-                "#,
-                user_id,
-                id
-            )
-                .fetch_all(pool)
-                .await?
-        }
-        LocationScope::Country(code) => {
-            sqlx::query_as!(
-                SimpleTimelineItem,
-                r#"
-                SELECT
-                    m.id,
-                    m.is_video as "is_video!",
-                    m.has_thumbnails as "has_thumbnails!",
-                    m.duration_ms::INT,
-                    (m.width::real / m.height::real) AS "ratio!"
-                FROM media_item m
-                JOIN gps g ON m.id = g.media_item_id
-                JOIN location l ON g.location_id = l.id
-                WHERE m.user_id = $1 AND l.country_code = $2 AND m.deleted = false
-                ORDER BY m.sort_timestamp, id
-                "#,
-                user_id,
-                code
-            )
-                .fetch_all(pool)
-                .await?
-        }
-        LocationScope::Admin1 { country_code, admin1 } => {
-            sqlx::query_as!(
-                SimpleTimelineItem,
-                r#"
-                SELECT
-                    m.id,
-                    m.is_video as "is_video!",
-                    m.has_thumbnails as "has_thumbnails!",
-                    m.duration_ms::INT,
-                    (m.width::real / m.height::real) AS "ratio!"
-                FROM media_item m
-                JOIN gps g ON m.id = g.media_item_id
-                JOIN location l ON g.location_id = l.id
-                WHERE m.user_id = $1 AND l.country_code = $2 AND l.admin1 = $3 AND m.deleted = false
-                ORDER BY m.sort_timestamp, id
-                "#,
-                user_id,
-                country_code,
-                admin1
-            )
-                .fetch_all(pool)
-                .await?
-        }
-    };
-
-    Ok(rows)
-}
-
-pub async fn get_location_details(
-    pool: &PgPool,
-    user_id: i32,
-    location_key: &str,
-) -> Result<VisitedLocation, AppError> {
+) -> Result<LocationDetailsResponse, AppError> {
     let scope = LocationScope::parse(location_key)?;
     let mut tx = pool.begin().await?;
 
-    let (loc_name, loc_admin1, loc_admin2, loc_country_code, loc_country_name, photo_count, media_item_ids) = match scope {
+    let (loc_name, loc_admin1, loc_admin2, loc_country_code, loc_country_name, photo_count, media_item_ids) = match &scope {
         LocationScope::Place(id) => {
             let rows = sqlx::query!(
                 r#"
@@ -340,7 +259,7 @@ pub async fn get_location_details(
                 WHERE m.user_id = $1 AND l.id = $2 AND m.deleted = false
                 "#,
                 user_id,
-                id
+                *id
             )
                 .fetch_all(&mut *tx)
                 .await?;
@@ -370,7 +289,7 @@ pub async fn get_location_details(
                 WHERE m.user_id = $1 AND l.country_code = $2 AND m.deleted = false
                 "#,
                 user_id,
-                &code
+                code
             )
                 .fetch_all(&mut *tx)
                 .await?;
@@ -383,7 +302,7 @@ pub async fn get_location_details(
             let photo_count = rows.len() as i64;
             let media_item_ids: Vec<String> = rows.into_iter().map(|r| r.media_item_id).collect();
 
-            (country_name.clone(), String::new(), String::new(), code, country_name, photo_count, media_item_ids)
+            (country_name.clone(), String::new(), String::new(), code.clone(), country_name, photo_count, media_item_ids)
         }
         LocationScope::Admin1 { country_code, admin1 } => {
             let rows = sqlx::query!(
@@ -395,8 +314,8 @@ pub async fn get_location_details(
                 WHERE m.user_id = $1 AND l.country_code = $2 AND l.admin1 = $3 AND m.deleted = false
                 "#,
                 user_id,
-                &country_code,
-                &admin1
+                country_code,
+                admin1
             )
                 .fetch_all(&mut *tx)
                 .await?;
@@ -409,21 +328,100 @@ pub async fn get_location_details(
             let photo_count = rows.len() as i64;
             let media_item_ids: Vec<String> = rows.into_iter().map(|r| r.media_item_id).collect();
 
-            (admin1.clone(), admin1, String::new(), country_code, country_name, photo_count, media_item_ids)
+            (admin1.clone(), admin1.clone(), String::new(), country_code.clone(), country_name, photo_count, media_item_ids)
         }
     };
 
     let thumbnail_id = get_representative_thumbnail(&mut tx, &media_item_ids).await?;
+
+    let items = match &scope {
+        LocationScope::Place(id) => {
+            sqlx::query_as!(
+                LocationMediaItem,
+                r#"
+                SELECT
+                    m.id,
+                    m.is_video as "is_video!",
+                    m.has_thumbnails as "has_thumbnails!",
+                    m.duration_ms::INT,
+                    (m.width::real / m.height::real) AS "ratio!",
+                    g.latitude AS "latitude?",
+                    g.longitude AS "longitude?"
+                FROM media_item m
+                JOIN gps g ON m.id = g.media_item_id
+                WHERE m.user_id = $1 AND g.location_id = $2 AND m.deleted = false
+                ORDER BY m.sort_timestamp, id
+                "#,
+                user_id,
+                *id
+            )
+                .fetch_all(&mut *tx)
+                .await?
+        }
+        LocationScope::Country(code) => {
+            sqlx::query_as!(
+                LocationMediaItem,
+                r#"
+                SELECT
+                    m.id,
+                    m.is_video as "is_video!",
+                    m.has_thumbnails as "has_thumbnails!",
+                    m.duration_ms::INT,
+                    (m.width::real / m.height::real) AS "ratio!",
+                    g.latitude AS "latitude?",
+                    g.longitude AS "longitude?"
+                FROM media_item m
+                JOIN gps g ON m.id = g.media_item_id
+                JOIN location l ON g.location_id = l.id
+                WHERE m.user_id = $1 AND l.country_code = $2 AND m.deleted = false
+                ORDER BY m.sort_timestamp, id
+                "#,
+                user_id,
+                code
+            )
+                .fetch_all(&mut *tx)
+                .await?
+        }
+        LocationScope::Admin1 { country_code, admin1 } => {
+            sqlx::query_as!(
+                LocationMediaItem,
+                r#"
+                SELECT
+                    m.id,
+                    m.is_video as "is_video!",
+                    m.has_thumbnails as "has_thumbnails!",
+                    m.duration_ms::INT,
+                    (m.width::real / m.height::real) AS "ratio!",
+                    g.latitude AS "latitude?",
+                    g.longitude AS "longitude?"
+                FROM media_item m
+                JOIN gps g ON m.id = g.media_item_id
+                JOIN location l ON g.location_id = l.id
+                WHERE m.user_id = $1 AND l.country_code = $2 AND l.admin1 = $3 AND m.deleted = false
+                ORDER BY m.sort_timestamp, id
+                "#,
+                user_id,
+                country_code,
+                admin1
+            )
+                .fetch_all(&mut *tx)
+                .await?
+        }
+    };
+
     tx.commit().await?;
 
-    Ok(VisitedLocation {
-        id: location_key.to_string(),
-        name: loc_name,
-        admin1: loc_admin1,
-        admin2: loc_admin2,
-        country_code: loc_country_code,
-        country_name: loc_country_name,
-        photo_count,
-        thumbnail_id,
+    Ok(LocationDetailsResponse {
+        location: Some(VisitedLocation {
+            id: location_key.to_string(),
+            name: loc_name,
+            admin1: loc_admin1,
+            admin2: loc_admin2,
+            country_code: loc_country_code,
+            country_name: loc_country_name,
+            photo_count,
+            thumbnail_id,
+        }),
+        items,
     })
 }

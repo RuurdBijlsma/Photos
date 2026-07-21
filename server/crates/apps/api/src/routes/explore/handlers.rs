@@ -6,14 +6,14 @@ use axum_extra::protobuf::Protobuf;
 use axum::{Extension, Json};
 use common_services::api::app_error::AppError;
 use common_services::api::explore::interfaces::{
-    ExploreTableQuery, HistogramResponse, PaginatedExploreTableResponse, VisitedLocation,
+    ExploreTableQuery, HistogramResponse, PaginatedExploreTableResponse,
 };
 use common_services::api::explore::service::{
     get_explore_table, get_histograms,
 };
-use common_types::pb::api::OrderedMediaResponse;
+use common_types::pb::api::{VisitedLocation, LocationDetailsResponse};
 use tracing::instrument;
-use common_services::api::explore::locations::{get_location_details, get_location_media, get_visited_places};
+use common_services::api::explore::locations::{get_location, get_visited_places};
 
 #[instrument(skip(context, user), err(Debug))]
 pub async fn get_explore_table_handler(
@@ -44,21 +44,11 @@ pub async fn get_visited_places_handler(
 }
 
 #[instrument(skip(context, user), err(Debug))]
-pub async fn get_location_media_handler(
+pub async fn get_location_handler(
     State(context): State<ApiContext>,
     Extension(user): Extension<ApiUser>,
-    Path(location_key): Path<String>, // Parsed dynamic polymorphic location key
-) -> Result<Protobuf<OrderedMediaResponse>, AppError> {
-    let items = get_location_media(&context.pool, user.id, &location_key).await?;
-    Ok(Protobuf(OrderedMediaResponse { items }))
-}
-
-#[instrument(skip(context, user), err(Debug))]
-pub async fn get_location_details_handler(
-    State(context): State<ApiContext>,
-    Extension(user): Extension<ApiUser>,
-    Path(location_key): Path<String>, // Parsed dynamic polymorphic location key
-) -> Result<Json<VisitedLocation>, AppError> {
-    let result = get_location_details(&context.pool, user.id, &location_key).await?;
-    Ok(Json(result))
+    Path(location_key): Path<String>,
+) -> Result<Protobuf<LocationDetailsResponse>, AppError> {
+    let result = get_location(&context.pool, user.id, &location_key).await?;
+    Ok(Protobuf(result))
 }
