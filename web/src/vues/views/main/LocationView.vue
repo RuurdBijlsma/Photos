@@ -36,17 +36,29 @@ function photoCountText(count: number) {
 }
 
 const primaryName = computed(() => details.value?.name || '')
-const secondaryContext = computed(() => {
-  if (!details.value) return ''
-  const parts = []
+
+const secondaryContextLinks = computed(() => {
+  if (!details.value) return []
+  const links = []
+  const countryCode = (details.value.countryCode || '').toUpperCase()
+
+  // 1. Generate Link for Admin1
   if (details.value.admin1 && details.value.admin1 !== details.value.name) {
-    parts.push(details.value.admin1)
+    links.push({
+      text: details.value.admin1,
+      to: `/explore/location/admin1:${countryCode}:${details.value.admin1}`,
+    })
   }
-  // Deduplicate secondary rendering when primary details already represent the country itself
+
+  // 2. Generate Link for Country
   if (details.value.countryName && details.value.countryName !== details.value.name) {
-    parts.push(details.value.countryName)
+    links.push({
+      text: details.value.countryName,
+      to: `/explore/location/country:${countryCode}`,
+    })
   }
-  return parts.join(', ')
+
+  return links
 })
 
 watch(
@@ -97,8 +109,11 @@ useRefreshFunction(() => {
             <div class="header-overlay">
               <div class="overlay-content">
                 <h1 class="location-title">{{ primaryName }}</h1>
-                <p class="location-subtitle" v-if="secondaryContext">
-                  {{ secondaryContext }}
+                <p class="location-subtitle" v-if="secondaryContextLinks.length > 0">
+                  <template v-for="(link, index) in secondaryContextLinks" :key="link.to">
+                    <router-link :to="link.to" class="context-link">{{ link.text }}</router-link>
+                    <span v-if="index < secondaryContextLinks.length - 1">, </span>
+                  </template>
                 </p>
                 <p class="location-meta">
                   {{ photoCountText(details.photoCount) }}
@@ -226,6 +241,16 @@ useRefreshFunction(() => {
   font-size: 1.15rem;
   font-weight: 500;
   color: rgb(var(--v-theme-primary));
+}
+
+.context-link {
+  color: rgb(var(--v-theme-primary));
+  text-decoration: none;
+  pointer-events: auto; /* Enable clicks since .header-overlay has pointer-events: none */
+}
+
+.context-link:hover {
+  text-decoration: underline;
 }
 
 .location-meta {
