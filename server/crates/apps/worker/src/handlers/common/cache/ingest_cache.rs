@@ -7,7 +7,7 @@ use tokio::fs;
 use tracing::warn;
 
 const INGEST_DIR: &str = "ingest";
-const INGEST_CACHE_VERSION: u32 = 4;
+const INGEST_CACHE_VERSION: u32 = 5;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct CachedIngestResult {

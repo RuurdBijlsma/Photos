@@ -13,6 +13,7 @@ export enum SuggestionType {
   SEARCH = 0,
   ALBUM = 1,
   PERSON = 2,
+  LOCATION = 3,
   UNRECOGNIZED = -1,
 }
 
@@ -27,6 +28,9 @@ export function suggestionTypeFromJSON(object: any): SuggestionType {
     case 2:
     case 'PERSON':
       return SuggestionType.PERSON
+    case 3:
+    case 'LOCATION':
+      return SuggestionType.LOCATION
     case -1:
     case 'UNRECOGNIZED':
     default:
@@ -42,6 +46,8 @@ export function suggestionTypeToJSON(object: SuggestionType): string {
       return 'ALBUM'
     case SuggestionType.PERSON:
       return 'PERSON'
+    case SuggestionType.LOCATION:
+      return 'LOCATION'
     case SuggestionType.UNRECOGNIZED:
     default:
       return 'UNRECOGNIZED'
