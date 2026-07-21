@@ -4,6 +4,7 @@ import { useRoute } from 'vue-router'
 import { useExploreStore } from '@/scripts/stores/exploreStore.ts'
 import SimpleTimeline from '@/vues/components/timeline/simple-timeline/SimpleTimeline.vue'
 import ThumbnailImg from '@/vues/components/ui/ThumbnailImg.vue'
+import LocationMediaMap from '@/vues/components/map/LocationMediaMap.vue'
 import { useRefreshFunction } from '@/scripts/composables/useRefreshFunction.ts'
 import { getThumbnailHeight } from '@/scripts/utils.ts'
 
@@ -106,6 +107,9 @@ useRefreshFunction(() => {
           </p>
         </div>
       </div>
+
+      <!-- Map Preview View -->
+      <location-media-map v-if="details" :items="items" />
 
       <!-- Loading State -->
       <div v-else class="loading-header">

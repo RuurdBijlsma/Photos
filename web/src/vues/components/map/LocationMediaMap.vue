@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue'
 import maplibregl from 'maplibre-gl'
-import BaseMap from '@/vues/components/map/BaseMap.vue'
+import BaseMap, { type StyleName } from '@/vues/components/map/BaseMap.vue'
 import type { LocationMediaItem } from '@/scripts/types/generated/timeline.ts'
 import { useSettingStore } from '@/scripts/stores/settingsStore.ts'
 import { useTheme } from 'vuetify/framework'
+import { useStorage } from '@vueuse/core'
 
 const props = defineProps<{
   items: LocationMediaItem[]
@@ -39,10 +40,7 @@ const getBounds = () => {
   return bounds
 }
 
-const mapStyle = computed(() => {
-  const isLight = settings.lightPhotoViewerMap || !theme.current.value.dark
-  return isLight ? 'LIBERTY' : 'DARK'
-})
+const mapStyle = useStorage<StyleName>('mapCurrentStyle', 'LIBERTY')
 
 // Map initialization configuration
 const mapOptions = computed(() => {
@@ -153,7 +151,7 @@ watch(
 <style scoped>
 .location-media-map-container {
   width: 100%;
-  height: 220px;
+  height: 480px;
   border-radius: 28px;
   overflow: hidden;
   margin-bottom: 24px;
