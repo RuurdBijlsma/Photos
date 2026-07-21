@@ -50,6 +50,7 @@ const mapOptions = computed(() => {
       center: { lon: 0, lat: 0 },
       zoom: 2,
       attributionControl: { compact: true },
+      scrollZoom: false, // Disables scroll zoom upon map initialization
     }
   }
   return {
@@ -59,11 +60,22 @@ const mapOptions = computed(() => {
       maxZoom: 15,
     },
     attributionControl: { compact: true },
+    scrollZoom: false, // Disables scroll zoom upon map initialization
   }
 })
 
 function handleMapLoad(map: maplibregl.Map) {
   mapInstance.value = map
+
+  // Add standard built-in +/- zoom controls in the bottom right
+  map.addControl(
+    new maplibregl.NavigationControl({
+      showCompass: false,
+      showZoom: true,
+    }),
+    'bottom-right',
+  )
+
   setupMapResources()
 }
 
@@ -152,10 +164,10 @@ watch(
 .location-media-map-container {
   width: 100%;
   height: 480px;
-  border-radius: 28px;
+  border-radius: 50px;
   overflow: hidden;
   margin-bottom: 24px;
-  border: 1px solid rgba(var(--v-theme-on-surface), 0.1);
+  border: 15px solid rgba(var(--v-theme-on-surface), 0.1);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
 }
 
