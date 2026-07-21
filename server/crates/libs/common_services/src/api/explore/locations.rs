@@ -3,6 +3,7 @@ use crate::api::app_error::AppError;
 use crate::api::explore::interfaces::VisitedLocation;
 use common_types::pb::api::SimpleTimelineItem;
 use sqlx::PgPool;
+use std::collections::HashMap;
 
 pub enum LocationScope {
     Place(i32),
@@ -56,20 +57,35 @@ async fn resolve_locations(
     user_id: i32,
     raw_locs: Vec<RawLocation>,
 ) -> Result<Vec<VisitedLocation>, AppError> {
+    if raw_locs.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let loc_ids: Vec<i32> = raw_locs.iter().map(|l| l.id).collect();
+
+    // Batch fetch all media items for the locations
+    let mappings = sqlx::query!(
+        r#"
+        SELECT g.location_id as "location_id!", m.id as "media_id!"
+        FROM media_item m
+        JOIN gps g ON m.id = g.media_item_id
+        WHERE m.user_id = $1 AND g.location_id = ANY($2) AND m.deleted = false
+        "#,
+        user_id,
+        &loc_ids
+    )
+        .fetch_all(&mut **tx)
+        .await?;
+
+    // Group the media items by their location_id
+    let mut loc_to_media: HashMap<i32, Vec<String>> = HashMap::new();
+    for row in mappings {
+        loc_to_media.entry(row.location_id).or_default().push(row.media_id);
+    }
+
     let mut resolved = Vec::with_capacity(raw_locs.len());
     for loc in raw_locs {
-        let media_item_ids = sqlx::query_scalar!(
-            r#"
-            SELECT m.id
-            FROM media_item m
-            JOIN gps g ON m.id = g.media_item_id
-            WHERE m.user_id = $1 AND g.location_id = $2 AND m.deleted = false
-            "#,
-            user_id,
-            loc.id
-        )
-            .fetch_all(&mut **tx)
-            .await?;
+        let media_item_ids = loc_to_media.get(&loc.id).cloned().unwrap_or_default();
         let thumbnail_id = get_representative_thumbnail(tx, &media_item_ids).await?;
 
         resolved.push(VisitedLocation {
@@ -121,31 +137,15 @@ pub async fn get_visited_places(
         })
         .collect();
 
-    let top_10: Vec<RawLocation> = top_locations.iter().take(10).cloned().collect();
-    let mut top_landmarks_raw = Vec::new();
-    if !top_10.is_empty() {
-        let mut indices: Vec<usize> = (0..top_10.len()).collect();
-        fastrand::shuffle(&mut indices);
-        for &idx in indices.iter().take(3) {
-            if let Some(loc) = top_10.get(idx) {
-                top_landmarks_raw.push(loc.clone());
-            }
-        }
-    }
+    let mut top_10: Vec<RawLocation> = top_locations.iter().take(10).cloned().collect();
+    fastrand::shuffle(&mut top_10);
+    let common_locs_raw: Vec<RawLocation> = top_10.into_iter().take(3).collect();
 
-    let ranks_11_30: Vec<RawLocation> = top_locations.iter().skip(10).take(20).cloned().collect();
-    let mut past_adventures_raw = Vec::new();
-    if !ranks_11_30.is_empty() {
-        let mut indices: Vec<usize> = (0..ranks_11_30.len()).collect();
-        fastrand::shuffle(&mut indices);
-        for &idx in indices.iter().take(3) {
-            if let Some(loc) = ranks_11_30.get(idx) {
-                past_adventures_raw.push(loc.clone());
-            }
-        }
-    }
+    let mut ranks_11_30: Vec<RawLocation> = top_locations.iter().skip(10).take(20).cloned().collect();
+    fastrand::shuffle(&mut ranks_11_30);
+    let rare_locs_raw: Vec<RawLocation> = ranks_11_30.into_iter().take(3).collect();
 
-    let hidden_gems_rows = sqlx::query!(
+    let legendary_locs_rows = sqlx::query!(
         r#"
         SELECT l.id, l.name, l.admin1, l.admin2, l.country_code, l.country_name, COUNT(*)::bigint as "photo_count!"
         FROM media_item m
@@ -162,7 +162,7 @@ pub async fn get_visited_places(
         .fetch_all(&mut *tx)
         .await?;
 
-    let hidden_gems_all: Vec<RawLocation> = hidden_gems_rows
+    let mut legendary_locs_all: Vec<RawLocation> = legendary_locs_rows
         .into_iter()
         .map(|r| RawLocation {
             id: r.id,
@@ -175,17 +175,10 @@ pub async fn get_visited_places(
         })
         .collect();
 
-    let mut hidden_gems_raw = Vec::new();
-    if !hidden_gems_all.is_empty() {
-        let mut indices: Vec<usize> = (0..hidden_gems_all.len()).collect();
-        fastrand::shuffle(&mut indices);
-        for &idx in indices.iter().take(3) {
-            if let Some(loc) = hidden_gems_all.get(idx) {
-                hidden_gems_raw.push(loc.clone());
-            }
-        }
-    }
+    fastrand::shuffle(&mut legendary_locs_all);
+    let legendary_locs_raw: Vec<RawLocation> = legendary_locs_all.into_iter().take(3).collect();
 
+    // Retrieving Recent Destinations
     let recent_destinations_rows = sqlx::query!(
         r#"
         SELECT
@@ -223,9 +216,9 @@ pub async fn get_visited_places(
         })
         .collect();
 
-    let top_landmarks = resolve_locations(&mut tx, user_id, top_landmarks_raw).await?;
-    let past_adventures = resolve_locations(&mut tx, user_id, past_adventures_raw).await?;
-    let hidden_gems = resolve_locations(&mut tx, user_id, hidden_gems_raw).await?;
+    let common_locs = resolve_locations(&mut tx, user_id, common_locs_raw).await?;
+    let rare_locs = resolve_locations(&mut tx, user_id, rare_locs_raw).await?;
+    let legendary_locs = resolve_locations(&mut tx, user_id, legendary_locs_raw).await?;
     let recent_destinations = resolve_locations(&mut tx, user_id, recent_destinations_raw).await?;
 
     tx.commit().await?;
@@ -233,10 +226,10 @@ pub async fn get_visited_places(
     let mut all_locations = Vec::new();
     let mut seen_ids = std::collections::HashSet::new();
 
-    for loc in top_landmarks
+    for loc in common_locs
         .into_iter()
-        .chain(past_adventures.into_iter())
-        .chain(hidden_gems.into_iter())
+        .chain(rare_locs.into_iter())
+        .chain(legendary_locs.into_iter())
         .chain(recent_destinations.into_iter())
     {
         if seen_ids.insert(loc.id.clone()) {
@@ -338,28 +331,13 @@ pub async fn get_location_details(
 
     let (loc_name, loc_admin1, loc_admin2, loc_country_code, loc_country_name, photo_count, media_item_ids) = match scope {
         LocationScope::Place(id) => {
-            let loc = sqlx::query!(
+            let rows = sqlx::query!(
                 r#"
-                SELECT l.id, l.name, l.admin1, l.admin2, l.country_code, l.country_name, COUNT(*)::bigint as "photo_count!"
+                SELECT m.id as "media_item_id!", l.name, l.admin1, l.admin2, l.country_code, l.country_name
                 FROM media_item m
                 JOIN gps g ON m.id = g.media_item_id
                 JOIN location l ON g.location_id = l.id
                 WHERE m.user_id = $1 AND l.id = $2 AND m.deleted = false
-                GROUP BY l.id, l.name, l.admin1, l.admin2, l.country_code, l.country_name
-                "#,
-                user_id,
-                id
-            )
-                .fetch_optional(&mut *tx)
-                .await?
-                .ok_or_else(|| AppError::NotFound(format!("Location {id} not found")))?;
-
-            let media_item_ids = sqlx::query_scalar!(
-                r#"
-                SELECT m.id
-                FROM media_item m
-                JOIN gps g ON m.id = g.media_item_id
-                WHERE m.user_id = $1 AND g.location_id = $2 AND m.deleted = false
                 "#,
                 user_id,
                 id
@@ -367,75 +345,71 @@ pub async fn get_location_details(
                 .fetch_all(&mut *tx)
                 .await?;
 
-            (loc.name, loc.admin1, loc.admin2, loc.country_code, loc.country_name, loc.photo_count, media_item_ids)
+            if rows.is_empty() {
+                return Err(AppError::NotFound(format!("Location {id} not found")));
+            }
+
+            let first = &rows[0];
+            let name = first.name.clone();
+            let admin1 = first.admin1.clone();
+            let admin2 = first.admin2.clone();
+            let country_code = first.country_code.clone();
+            let country_name = first.country_name.clone();
+            let photo_count = rows.len() as i64;
+            let media_item_ids: Vec<String> = rows.into_iter().map(|r| r.media_item_id).collect();
+
+            (name, admin1, admin2, country_code, country_name, photo_count, media_item_ids)
         }
         LocationScope::Country(code) => {
-            let loc = sqlx::query!(
+            let rows = sqlx::query!(
                 r#"
-                SELECT l.country_name, COUNT(*)::bigint as "photo_count!"
-                FROM media_item m
-                JOIN gps g ON m.id = g.media_item_id
-                JOIN location l ON g.location_id = l.id
-                WHERE m.user_id = $1 AND l.country_code = $2 AND m.deleted = false
-                GROUP BY l.country_name
-                "#,
-                user_id,
-                code
-            )
-                .fetch_optional(&mut *tx)
-                .await?
-                .ok_or_else(|| AppError::NotFound(format!("Country {code} not found")))?;
-
-            let media_item_ids = sqlx::query_scalar!(
-                r#"
-                SELECT m.id
+                SELECT m.id as "media_item_id!", l.country_name
                 FROM media_item m
                 JOIN gps g ON m.id = g.media_item_id
                 JOIN location l ON g.location_id = l.id
                 WHERE m.user_id = $1 AND l.country_code = $2 AND m.deleted = false
                 "#,
                 user_id,
-                code
+                &code
             )
                 .fetch_all(&mut *tx)
                 .await?;
 
-            (loc.country_name.clone(), String::new(), String::new(), code, loc.country_name, loc.photo_count, media_item_ids)
+            if rows.is_empty() {
+                return Err(AppError::NotFound(format!("Country {code} not found")));
+            }
+
+            let country_name = rows[0].country_name.clone();
+            let photo_count = rows.len() as i64;
+            let media_item_ids: Vec<String> = rows.into_iter().map(|r| r.media_item_id).collect();
+
+            (country_name.clone(), String::new(), String::new(), code, country_name, photo_count, media_item_ids)
         }
         LocationScope::Admin1 { country_code, admin1 } => {
-            let loc = sqlx::query!(
+            let rows = sqlx::query!(
                 r#"
-                SELECT l.country_name, COUNT(*)::bigint as "photo_count!"
-                FROM media_item m
-                JOIN gps g ON m.id = g.media_item_id
-                JOIN location l ON g.location_id = l.id
-                WHERE m.user_id = $1 AND l.country_code = $2 AND l.admin1 = $3 AND m.deleted = false
-                GROUP BY l.country_name
-                "#,
-                user_id,
-                country_code,
-                admin1
-            )
-                .fetch_optional(&mut *tx)
-                .await?
-                .ok_or_else(|| AppError::NotFound(format!("Region {admin1} in {country_code} not found")))?;
-
-            let media_item_ids = sqlx::query_scalar!(
-                r#"
-                SELECT m.id
+                SELECT m.id as "media_item_id!", l.country_name
                 FROM media_item m
                 JOIN gps g ON m.id = g.media_item_id
                 JOIN location l ON g.location_id = l.id
                 WHERE m.user_id = $1 AND l.country_code = $2 AND l.admin1 = $3 AND m.deleted = false
                 "#,
                 user_id,
-                country_code,
-                admin1
+                &country_code,
+                &admin1
             )
                 .fetch_all(&mut *tx)
                 .await?;
 
-            (admin1.clone(), admin1, String::new(), country_code, loc.country_name, loc.photo_count, media_item_ids)
+            if rows.is_empty() {
+                return Err(AppError::NotFound(format!("Region {admin1} in {country_code} not found")));
+            }
+
+            let country_name = rows[0].country_name.clone();
+            let photo_count = rows.len() as i64;
+            let media_item_ids: Vec<String> = rows.into_iter().map(|r| r.media_item_id).collect();
+
+            (admin1.clone(), admin1, String::new(), country_code, country_name, photo_count, media_item_ids)
         }
     };
 
