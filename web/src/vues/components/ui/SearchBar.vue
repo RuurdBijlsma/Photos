@@ -136,6 +136,7 @@ async function fetchSuggestions(searchQuery: string | null) {
       .filter((s) => {
         if (s.suggestionType === SuggestionType.ALBUM) return true
         if (s.suggestionType === SuggestionType.PERSON) return true
+        if (s.suggestionType === SuggestionType.LOCATION) return true
         return !historicMatches.some((h) => h.text.toLowerCase() === s.text.toLowerCase())
       })
       .map((s) => ({
@@ -163,6 +164,8 @@ function selectSuggestion(suggestion: SearchBarSuggestion) {
       router.push(`/album/${suggestion.id}`)
     } else if (suggestion.suggestionType === SuggestionType.PERSON) {
       router.push(`/person/${suggestion.id}`)
+    } else if (suggestion.suggestionType === SuggestionType.LOCATION) {
+      router.push(`/explore/location/${suggestion.id}`)
     }
     isFocused.value = false
     if (searchInputEl.value) {
@@ -457,6 +460,12 @@ watch(
               <v-icon
                 v-else-if="suggestion.suggestionType === SuggestionType.ALBUM"
                 icon="mdi-image-album"
+                size="small"
+                class="suggestion-icon"
+              />
+              <v-icon
+                v-else-if="suggestion.suggestionType === SuggestionType.LOCATION"
+                icon="mdi-map-marker-outline"
                 size="small"
                 class="suggestion-icon"
               />
