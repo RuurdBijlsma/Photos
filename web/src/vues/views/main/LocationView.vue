@@ -79,29 +79,35 @@ useRefreshFunction(() => {
       :timeline-items="items"
       :view-link="`/explore/location/${locationId}/view/`"
     >
-      <!-- Location Header Info -->
-      <div class="location-header" v-if="details">
-        <div class="location-header-right">
-          <div class="location-title-row">
-            <h1>{{ primaryName }}</h1>
-          </div>
-          <p class="location-subtitle-context" v-if="secondaryContext">
-            <span>{{ secondaryContext }}</span>
-          </p>
-          <p class="location-meta">
-            <span>{{ photoCountText(details.photoCount) }}</span>
-          </p>
-        </div>
-      </div>
-
       <div class="loc-header" v-if="details">
-        <thumbnail-img
-          v-if="details.thumbnailId"
-          :media-item-id="details.thumbnailId"
-          :height="getThumbnailHeight(1080)"
-          cover
-          class="header-avatar-img"
-        />
+        <!-- Overlay Container for Thumbnail and Metadata -->
+        <div class="header-avatar-container">
+          <thumbnail-img
+            v-if="details.thumbnailId"
+            :media-item-id="details.thumbnailId"
+            :height="getThumbnailHeight(1080)"
+            cover
+            class="header-avatar-img"
+          />
+          <div v-else class="header-avatar-placeholder">
+            <v-icon size="64" color="on-surface-variant">mdi-image-outline</v-icon>
+          </div>
+
+          <v-theme-provider theme="dark" with-background>
+            <div class="header-overlay">
+              <div class="overlay-content">
+                <h1 class="location-title">{{ primaryName }}</h1>
+                <p class="location-subtitle" v-if="secondaryContext">
+                  {{ secondaryContext }}
+                </p>
+                <p class="location-meta">
+                  {{ photoCountText(details.photoCount) }}
+                </p>
+              </div>
+            </div>
+          </v-theme-provider>
+        </div>
+
         <location-media-map :items="items" />
       </div>
 
@@ -132,13 +138,6 @@ useRefreshFunction(() => {
   height: 100%;
 }
 
-.location-header {
-  display: flex;
-  width: 100%;
-  margin-bottom: 24px;
-  align-items: center;
-}
-
 .loading-header {
   height: 196px;
   width: 100%;
@@ -166,55 +165,74 @@ useRefreshFunction(() => {
   border-radius: 100px;
 }
 
-.header-avatar-img {
+/* Container hosting both the image and the text overlay */
+.header-avatar-container {
+  position: relative;
   width: 100%;
   height: 480px;
-  object-fit: cover;
+  overflow: hidden;
   border-radius: 50px;
   border: 15px solid rgb(var(--v-theme-surface-container));
-  border-right: 0px;
+  border-right: 0;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-  margin-bottom: 0;
+  background-color: rgb(var(--v-theme-surface-bright));
 }
 
-.location-header-right {
-  min-width: 0;
-  flex-grow: 1;
-  padding: 20px;
+.header-avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
-.location-title-row {
+.header-avatar-placeholder {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+}
+
+/* Subtle gradient to support white-text readability on arbitrary image content */
+.header-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to bottom,
+    rgba(var(--v-theme-background), 0) 35%,
+    rgba(var(--v-theme-background), 0.5) 60%,
+    rgba(var(--v-theme-background), 0.8) 100%
+  );
   display: flex;
-  align-items: flex-start;
+  align-items: flex-end;
+  padding: 25px;
+  pointer-events: none;
 }
 
-.location-title-row h1 {
-  min-width: 0;
-  font-size: 44px;
+.overlay-content {
+  color: #ffffff;
+  width: 100%;
+}
+
+.location-title {
+  font-size: 38px;
+  font-weight: 600;
   line-height: 1.2;
-  font-weight: 700;
   margin: 0;
   overflow-wrap: anywhere;
-  color: rgb(var(--v-theme-on-surface));
-  margin-left: -2px;
+  color: rgb(var(--v-theme-on-background));
 }
 
-.location-subtitle-context {
+.location-subtitle {
   margin: 4px 0 0;
-  margin-top: 0;
   font-size: 1.15rem;
   font-weight: 500;
   color: rgb(var(--v-theme-primary));
 }
 
 .location-meta {
-  display: flex;
-  align-items: center;
-  gap: 8px;
   margin: 8px 0 0;
-  color: rgb(var(--v-theme-on-surface-variant));
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 600;
+  color: rgb(var(--v-theme-on-surface-variant));
 }
 
 .empty-location {
@@ -233,30 +251,28 @@ useRefreshFunction(() => {
 }
 
 @media (max-width: 720px) {
-  .location-header {
+  .loc-header {
     flex-direction: column;
-    align-items: center;
-    text-align: center;
+    border-radius: 40px;
   }
 
-  .location-header-right {
-    padding: 10px;
-    width: 100%;
+  .header-avatar-container {
+    border-right: 15px solid rgb(var(--v-theme-surface-container));
+    border-bottom: 0;
+    border-radius: 40px 40px 0 0;
+    height: 360px;
   }
 
-  .location-title-row {
-    justify-content: center;
-    align-items: center;
-    flex-direction: column;
+  .header-overlay {
+    padding: 20px;
   }
 
-  .location-title-row h1 {
-    font-size: 34px;
+  .location-title {
+    font-size: 28px;
   }
 
-  .location-meta,
-  .location-subtitle-context {
-    justify-content: center;
+  .location-subtitle {
+    font-size: 1rem;
   }
 }
 </style>
