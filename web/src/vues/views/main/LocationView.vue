@@ -81,20 +81,6 @@ useRefreshFunction(() => {
     >
       <!-- Location Header Info -->
       <div class="location-header" v-if="details">
-        <div class="location-header-left">
-          <v-avatar class="location-avatar" size="176">
-            <thumbnail-img
-              v-if="details.thumbnailId"
-              :media-item-id="details.thumbnailId"
-              :height="getThumbnailHeight(300)"
-              cover
-              class="header-avatar-img"
-            />
-            <div v-else class="header-avatar-placeholder">
-              <v-icon size="64" color="primary">mdi-map-marker-outline</v-icon>
-            </div>
-          </v-avatar>
-        </div>
         <div class="location-header-right">
           <div class="location-title-row">
             <h1>{{ primaryName }}</h1>
@@ -108,8 +94,16 @@ useRefreshFunction(() => {
         </div>
       </div>
 
-      <!-- Map Preview View -->
-      <location-media-map v-if="details" :items="items" />
+      <div class="loc-header" v-if="details">
+        <thumbnail-img
+          v-if="details.thumbnailId"
+          :media-item-id="details.thumbnailId"
+          :height="getThumbnailHeight(1080)"
+          cover
+          class="header-avatar-img"
+        />
+        <location-media-map :items="items" />
+      </div>
 
       <!-- Loading State -->
       <div v-else class="loading-header">
@@ -165,27 +159,22 @@ useRefreshFunction(() => {
   margin-top: 10px;
 }
 
-.location-header-left {
-  padding: 10px;
-}
-
-.location-avatar {
-  background-color: rgba(var(--v-theme-on-background), 0.08);
-  border: 3px solid rgba(var(--v-theme-primary), 0.3);
+.loc-header {
+  display: flex;
+  background-color: rgb(var(--v-theme-surface-container));
+  margin-bottom: 25px;
+  border-radius: 100px;
 }
 
 .header-avatar-img {
   width: 100%;
-  height: 100%;
+  height: 480px;
   object-fit: cover;
-}
-
-.header-avatar-placeholder {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  height: 100%;
+  border-radius: 50px;
+  border: 15px solid rgb(var(--v-theme-surface-container));
+  border-right: 0px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  margin-bottom: 0;
 }
 
 .location-header-right {

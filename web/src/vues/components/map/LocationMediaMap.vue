@@ -164,11 +164,11 @@ watch(
 .location-media-map-container {
   width: 100%;
   height: 480px;
-  border-radius: 50px;
   overflow: hidden;
-  margin-bottom: 24px;
-  border: 15px solid rgba(var(--v-theme-on-surface), 0.1);
+  border-radius: 50px;
+  border: 15px solid rgb(var(--v-theme-surface-container));
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  margin-top: 0;
 }
 
 .location-media-map {
