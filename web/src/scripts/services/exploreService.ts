@@ -4,7 +4,6 @@ import type {
   PaginatedExploreTableResponse,
   ExploreTableParams,
   HistogramResponse,
-  VisitedPlacesResponse,
   VisitedLocation,
 } from '@/scripts/types/api/explore.ts'
 import { OrderedMediaResponse } from '@/scripts/types/generated/timeline.ts'
@@ -27,16 +26,15 @@ const exploreService = {
   /**
    * Get media item histogram insights.
    */
-
   getHistograms(): Promise<AxiosResponse<HistogramResponse>> {
     return apiClient.get<HistogramResponse>('/explore/histograms')
   },
 
   /**
-   * Get categorized visited places
+   * Get visited places
    */
-  getVisitedPlaces(): Promise<AxiosResponse<VisitedPlacesResponse>> {
-    return apiClient.get<VisitedPlacesResponse>('/explore/locations')
+  getVisitedPlaces(): Promise<AxiosResponse<VisitedLocation[]>> {
+    return apiClient.get<VisitedLocation[]>('/explore/locations')
   },
 
   /**

@@ -18,7 +18,7 @@ onMounted(async () => {
       <div class="header-texts">
         <h3 class="card-title">Frequently visited places</h3>
         <p class="card-subtitle">
-          Explore photos and videos categorized by your geographical journeys
+          Explore photos and videos from some of these highlighted locations.
         </p>
       </div>
     </div>
@@ -29,13 +29,12 @@ onMounted(async () => {
       <p class="loading-text">Analyzing travels...</p>
     </div>
 
-    <!-- Categories List -->
-    <div v-else-if="exploreStore.visitedPlaces" class="categories-list">
-      <explore-location-row
-        v-for="category in exploreStore.visitedPlaces.categories"
-        :key="category.key"
-        :category="category"
-      />
+    <!-- Places Row -->
+    <div
+      v-else-if="exploreStore.visitedPlaces && exploreStore.visitedPlaces.length > 0"
+      class="locations-list"
+    >
+      <explore-location-row :locations="exploreStore.visitedPlaces" />
     </div>
   </v-card>
 </template>
@@ -88,7 +87,7 @@ onMounted(async () => {
   font-size: 0.95rem;
 }
 
-.categories-list {
+.locations-list {
   display: flex;
   flex-direction: column;
 }

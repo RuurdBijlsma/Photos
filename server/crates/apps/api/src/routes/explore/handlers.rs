@@ -6,7 +6,7 @@ use axum_extra::protobuf::Protobuf;
 use axum::{Extension, Json};
 use common_services::api::app_error::AppError;
 use common_services::api::explore::interfaces::{
-    ExploreTableQuery, HistogramResponse, PaginatedExploreTableResponse, VisitedLocation, VisitedPlacesResponse,
+    ExploreTableQuery, HistogramResponse, PaginatedExploreTableResponse, VisitedLocation,
 };
 use common_services::api::explore::service::{
     get_explore_table, get_histograms,
@@ -38,7 +38,7 @@ pub async fn get_histograms_handler(
 pub async fn get_visited_places_handler(
     State(context): State<ApiContext>,
     Extension(user): Extension<ApiUser>,
-) -> Result<Json<VisitedPlacesResponse>, AppError> {
+) -> Result<Json<Vec<VisitedLocation>>, AppError> {
     let result = get_visited_places(&context.pool, user.id).await?;
     Ok(Json(result))
 }

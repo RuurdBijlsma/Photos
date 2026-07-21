@@ -55,16 +55,26 @@ const maxHourCount = computed(() => {
   return counts.length > 0 ? Math.max(...counts, 1) : 1
 })
 
-// Week mapping (1 to 53)
+// Week mapping (1 to 52)
 const weeksData = computed(() => {
   if (!exploreStore.histograms?.weekOfYear) return []
 
   const result = []
-  for (let w = 1; w <= 53; w++) {
+  for (let w = 1; w <= 52; w++) {
     const bucket = exploreStore.histograms?.weekOfYear.find((b) => b.week === w)
+    let count = bucket?.count || 0
+
+    // Merge week 53 into week 52 if it exists
+    if (w === 52) {
+      const week53Bucket = exploreStore.histograms?.weekOfYear.find((b) => b.week === 53)
+      if (week53Bucket) {
+        count += week53Bucket.count
+      }
+    }
+
     result.push({
       week: w,
-      count: bucket?.count || 0,
+      count,
     })
   }
   return result
@@ -75,7 +85,7 @@ const maxWeekCount = computed(() => {
   return counts.length > 0 ? Math.max(...counts, 1) : 1
 })
 
-// Helper to determine approximate month label positions for 53 weeks
+// Helper to determine approximate month label positions for 52 weeks
 const monthLabels = [
   { week: 1, label: 'Jan' },
   { week: 5, label: 'Feb' },
@@ -180,7 +190,7 @@ function getMonthLabelForWeek(weekNum: number): string | null {
         <div class="card-header">
           <div class="header-texts">
             <h3 class="card-title">Seasonal Trends</h3>
-            <p class="card-subtitle">Distribution of photos and videos over 53 weeks of the year</p>
+            <p class="card-subtitle">Distribution of photos and videos over 52 weeks of the year</p>
           </div>
         </div>
 

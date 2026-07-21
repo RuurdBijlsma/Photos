@@ -96,20 +96,3 @@ pub struct VisitedLocation {
     pub photo_count: i64,
     pub thumbnail_id: Option<String>,
 }
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct VisitedPlacesCategory {
-    pub key: String,
-    pub label: String,
-    pub locations: Vec<VisitedLocation>,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct VisitedPlacesResponse {
-    pub categories: Vec<VisitedPlacesCategory>,
-}
-
-
-

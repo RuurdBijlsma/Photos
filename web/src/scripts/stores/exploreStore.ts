@@ -3,7 +3,6 @@ import { defineStore } from 'pinia'
 import type {
   ExploreMediaItem,
   HistogramResponse,
-  VisitedPlacesResponse,
   VisitedLocation,
 } from '@/scripts/types/api/explore.ts'
 import type { SimpleTimelineItem } from '@/scripts/types/generated/timeline.ts'
@@ -23,7 +22,7 @@ export const useExploreStore = defineStore('explore', () => {
   const isHistogramsLoading = ref(false)
 
   // Visited Places & Details STATE
-  const visitedPlaces: Ref<VisitedPlacesResponse | null> = ref(null)
+  const visitedPlaces: Ref<VisitedLocation[] | null> = ref(null)
   const isVisitedPlacesLoading = ref(false)
   const locationMedia = ref(new Map<number, SimpleTimelineItem[]>())
   const locationDetails = ref(new Map<number, VisitedLocation>())

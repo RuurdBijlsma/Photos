@@ -2,7 +2,7 @@ use sqlx::PgPool;
 use common_types::pb::api::SimpleTimelineItem;
 use crate::api::album::service::get_representative_thumbnail;
 use crate::api::app_error::AppError;
-use crate::api::explore::interfaces::{VisitedLocation, VisitedPlacesCategory, VisitedPlacesResponse};
+use crate::api::explore::interfaces::VisitedLocation;
 
 #[derive(Clone)]
 struct RawLocation {
@@ -52,11 +52,10 @@ async fn resolve_locations(
     Ok(resolved)
 }
 
-/// Fetches visited places structured across 4 distinct visual categories
 pub async fn get_visited_places(
     pool: &PgPool,
     user_id: i32,
-) -> Result<VisitedPlacesResponse, AppError> {
+) -> Result<Vec<VisitedLocation>, AppError> {
     // todo: i'm sure this entire func can be made more performant
     let mut tx = pool.begin().await?;
 
@@ -162,31 +161,23 @@ pub async fn get_visited_places(
     }
 
     // 3. Query Recent Destinations
-    // todo: this one's broken. It should pick the 3 places whose oldest media item is most recent
+    // Sorts places, recent first, based on the oldest media item associated with each place.
     let recent_destinations_rows = sqlx::query!(
         r#"
-        WITH recent_locations AS (
-            SELECT
-                l.id,
-                l.name,
-                l.admin1,
-                l.admin2,
-                l.country_code,
-                l.country_name,
-                COUNT(*)::bigint as photo_count,
-                MAX(m.taken_at_local) as last_visit,
-                MIN(m.taken_at_local) as first_visit
-            FROM media_item m
-            JOIN gps g ON m.id = g.media_item_id
-            JOIN location l ON g.location_id = l.id
-            WHERE m.user_id = $1 AND m.deleted = false
-            GROUP BY l.id, l.name, l.admin1, l.admin2, l.country_code, l.country_name
-            ORDER BY last_visit DESC
-            LIMIT 15
-        )
-        SELECT id, name, admin1, admin2, country_code, country_name, photo_count as "photo_count!"
-        FROM recent_locations
-        ORDER BY first_visit ASC
+        SELECT
+            l.id,
+            l.name,
+            l.admin1,
+            l.admin2,
+            l.country_code,
+            l.country_name,
+            COUNT(*)::bigint as "photo_count!"
+        FROM media_item m
+        JOIN gps g ON m.id = g.media_item_id
+        JOIN location l ON g.location_id = l.id
+        WHERE m.user_id = $1 AND m.deleted = false
+        GROUP BY l.id, l.name, l.admin1, l.admin2, l.country_code, l.country_name
+        ORDER BY MIN(m.sort_timestamp) DESC, l.id DESC
         LIMIT 3
         "#,
         user_id
@@ -215,31 +206,27 @@ pub async fn get_visited_places(
 
     tx.commit().await?;
 
-    // todo: We can simplify this response type to just send an array of VisitedLocations, shuffled. Frontend won't need category names
-    Ok(VisitedPlacesResponse {
-        categories: vec![
-            VisitedPlacesCategory {
-                key: "top_landmarks".to_string(),
-                label: "Top Landmarks".to_string(),
-                locations: top_landmarks,
-            },
-            VisitedPlacesCategory {
-                key: "past_adventures".to_string(),
-                label: "Past Adventures".to_string(),
-                locations: past_adventures,
-            },
-            VisitedPlacesCategory {
-                key: "hidden_gems".to_string(),
-                label: "Hidden Gems".to_string(),
-                locations: hidden_gems,
-            },
-            VisitedPlacesCategory {
-                key: "recent_destinations".to_string(),
-                label: "Recent Destinations".to_string(),
-                locations: recent_destinations,
-            },
-        ],
-    })
+    dbg!(&recent_destinations);
+
+    // Combine and deduplicate
+    let mut all_locations = Vec::new();
+    let mut seen_ids = std::collections::HashSet::new();
+
+    for loc in top_landmarks
+        .into_iter()
+        .chain(past_adventures.into_iter())
+        .chain(hidden_gems.into_iter())
+        .chain(recent_destinations.into_iter())
+    {
+        if seen_ids.insert(loc.id) {
+            all_locations.push(loc);
+        }
+    }
+
+    // Shuffle the combined list to mix the categories
+    fastrand::shuffle(&mut all_locations);
+
+    Ok(all_locations)
 }
 
 /// Retrieve chronological `SimpleTimelineItem` protobuf records matching a selected location

@@ -74,13 +74,3 @@ export interface VisitedLocation {
   photoCount: number
   thumbnailId: string | null
 }
-
-export interface VisitedPlacesCategory {
-  key: string
-  label: string
-  locations: VisitedLocation[]
-}
-
-export interface VisitedPlacesResponse {
-  categories: VisitedPlacesCategory[]
-}

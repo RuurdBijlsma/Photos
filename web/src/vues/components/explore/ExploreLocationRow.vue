@@ -2,11 +2,11 @@
 import { ref, watch, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useResizeObserver } from '@vueuse/core'
-import type { VisitedPlacesCategory, VisitedLocation } from '@/scripts/types/api/explore.ts'
+import type { VisitedLocation } from '@/scripts/types/api/explore.ts'
 import ThumbnailImg from '@/vues/components/ui/ThumbnailImg.vue'
 
 const props = defineProps<{
-  category: VisitedPlacesCategory
+  locations: VisitedLocation[]
 }>()
 
 const router = useRouter()
@@ -54,7 +54,7 @@ useResizeObserver(containerRef, () => {
 })
 
 watch(
-  () => props.category.locations,
+  () => props.locations,
   () => {
     nextTick(() => {
       updateScrollButtons()
@@ -65,9 +65,7 @@ watch(
 </script>
 
 <template>
-  <div class="category-row-wrapper" v-if="category.locations && category.locations.length > 0">
-    <h4 class="category-title">{{ category.label }}</h4>
-
+  <div class="category-row-wrapper" v-if="locations && locations.length > 0">
     <div class="scroll-wrapper">
       <!-- Scroll Left Button -->
       <transition name="fade">
@@ -86,7 +84,7 @@ watch(
       <!-- Scrollable Container -->
       <div class="scroll-container" ref="containerRef" @scroll="updateScrollButtons">
         <div
-          v-for="loc in category.locations"
+          v-for="loc in locations"
           :key="loc.id"
           class="location-item"
           @click="navigateToLocation(loc.id)"
@@ -130,19 +128,7 @@ watch(
 
 <style scoped>
 .category-row-wrapper {
-  margin-bottom: 24px;
-}
-
-.category-row-wrapper:last-child {
   margin-bottom: 0;
-}
-
-.category-title {
-  font-size: 1rem;
-  font-weight: 600;
-  color: rgb(var(--v-theme-on-surface));
-  margin-bottom: 12px;
-  padding-left: 4px;
 }
 
 .scroll-wrapper {
