@@ -13,16 +13,16 @@ export const useExploreStore = defineStore('explore', () => {
   const snackbarStore = useSnackbarsStore()
 
   // --- STATE ---
-  const items: Ref<ExploreMediaItem[]> = ref([])
+  const items: Ref<ExploreMediaItem[]> = shallowRef([])
   const totalCount = ref(0)
   const isTableLoading = ref(false)
 
   // Histograms STATE
-  const histograms: Ref<HistogramResponse | null> = ref(null)
+  const histograms: Ref<HistogramResponse | null> = shallowRef(null)
   const isHistogramsLoading = ref(false)
 
   // Visited Places & Details STATE
-  const visitedPlaces: Ref<VisitedLocation[] | null> = ref(null)
+  const visitedPlaces: Ref<VisitedLocation[] | null> = shallowRef(null)
   const isVisitedPlacesLoading = ref(false)
   const locationMedia = shallowRef(new Map<number, SimpleTimelineItem[]>())
   const locationDetails = shallowRef(new Map<number, VisitedLocation>())
@@ -31,7 +31,7 @@ export const useExploreStore = defineStore('explore', () => {
   // Pagination & Datatable Parameters
   const page = ref(1)
   const itemsPerPage = ref(15)
-  const sortBy: Ref<{ key: string; order: 'asc' | 'desc' }[]> = ref([])
+  const sortBy: Ref<{ key: string; order: 'asc' | 'desc' }[]> = shallowRef([])
 
   // --- ACTIONS ---
   async function fetchExploreTable() {

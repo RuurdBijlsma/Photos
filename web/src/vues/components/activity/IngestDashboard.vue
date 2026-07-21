@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch, shallowRef } from 'vue'
 import { useIngestJobsStore } from '@/scripts/stores/ingestJobsStore.ts'
 import { useUploadStore } from '@/scripts/stores/uploadStore.ts'
 import { useAuthStore } from '@/scripts/stores/authStore.ts'
@@ -16,8 +16,8 @@ const authStore = useAuthStore()
 const isScanning = ref(false)
 
 // Dropzone state
-const fileInput = ref<HTMLInputElement | null>(null)
-const folderInput = ref<HTMLInputElement | null>(null)
+const fileInput = shallowRef<HTMLInputElement | null>(null)
+const folderInput = shallowRef<HTMLInputElement | null>(null)
 const dragover = ref(false)
 
 // Retrying tracking

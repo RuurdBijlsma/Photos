@@ -39,7 +39,7 @@ const viewPhotoStore = useViewPhotoStore()
 const selectionStore = useSelectionStore()
 const settings = useSettingStore()
 
-const localItemsOrder = ref<SimpleTimelineItem[]>([])
+const localItemsOrder = shallowRef<SimpleTimelineItem[]>([])
 let scrollInterval: number | null = null
 
 watch(
@@ -156,7 +156,7 @@ function calculateLayout(timelineItems: SimpleTimelineItem[], containerWidth: nu
 
   if (rowItems.length > 0) {
     let sizeMultiplier = Math.min(containerWidth / rowWidth, MAX_SIZE_MULTIPLIER)
-    // If full row width can be reached width size multiplier, then use it, otherwise dont increase size
+    // If full row width can be reached width size multiplier, then use it, otherwise don't increase size
     if (rowWidth * sizeMultiplier < containerWidth) {
       sizeMultiplier = 1
     }

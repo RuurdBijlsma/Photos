@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, nextTick } from 'vue'
+import { ref, watch, nextTick, shallowRef } from 'vue'
 import { useRouter } from 'vue-router'
 import { useResizeObserver } from '@vueuse/core'
 import type { VisitedLocation } from '@/scripts/types/api/explore.ts'
@@ -10,7 +10,7 @@ const props = defineProps<{
 }>()
 
 const router = useRouter()
-const containerRef = ref<HTMLElement | null>(null)
+const containerRef = shallowRef<HTMLElement | null>(null)
 const canScrollLeft = ref(false)
 const canScrollRight = ref(false)
 

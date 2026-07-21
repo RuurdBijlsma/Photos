@@ -6,7 +6,7 @@ edition = "2024"
 [dependencies]
 app_state = { path = "../../libs/app_state" }
 common_types = { path = "../../libs/common_types" }
-media_analyzer = "0.10.3"
+media_analyzer = "0.10.4"
 tracing = "0.1.41"
 color-eyre = "0.6.5"
 axum = { version = "0.8.8", features = ["macros", "ws", "http2"] }
