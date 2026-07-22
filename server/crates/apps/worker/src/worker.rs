@@ -73,7 +73,7 @@ pub async fn run_worker_loop(
 
             // Sleep for 3 seconds or wake up early if a shutdown signal is received
             tokio::select! {
-                _ = tokio::time::sleep(Duration::from_secs(3)) => {}
+                () = tokio::time::sleep(Duration::from_secs(3)) => {}
                 _ = shutdown_rx.changed() => {
                     info!("Shutdown signal received during sleep. Exiting worker loop.");
                     break;

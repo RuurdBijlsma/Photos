@@ -2,6 +2,7 @@ use crate::context::WorkerContext;
 use crate::handlers::JobResult;
 use crate::handlers::common::clustering::{self, ClusterEntity};
 use color_eyre::Result;
+use color_eyre::eyre::eyre;
 use common_services::api::album::service::get_representative_thumbnail;
 use common_services::database::jobs::Job;
 use common_services::database::photo_cluster::ExistingPhotoCluster;
@@ -113,9 +114,9 @@ async fn load_tag_embeddings(pool: &PgPool, text_embedder: &TextEmbedder) -> Res
         let batch_size = 64;
         for chunk in tags_to_process.chunks(batch_size) {
             let chunk_vec: Vec<String> = chunk.to_vec();
-            let embeddings_array = text_embedder.embed_texts(&chunk_vec).map_err(|e| {
-                color_eyre::eyre::eyre!("CLIP embedding generation failed: {:?}", e)
-            })?;
+            let embeddings_array = text_embedder
+                .embed_texts(&chunk_vec)
+                .map_err(|e| eyre!("CLIP embedding generation failed: {:?}", e))?;
 
             for (i, tag) in chunk.iter().enumerate() {
                 let row: Vec<f32> = embeddings_array.row(i).iter().copied().collect();
@@ -319,7 +320,11 @@ pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
 
     // Load, resolve, and generate embeddings for cluster labels
     let now = Instant::now();
-    load_tag_embeddings(&context.pool, &context.text_embedder).await?;
+    let text_embedder = context
+        .text_embedder
+        .clone()
+        .ok_or_else(|| eyre!("No visual_analyzer on worker that picked up ingest_llm job"))?;
+    load_tag_embeddings(&context.pool, &text_embedder).await?;
     info!("load_tag_embeddings took {:?}", now.elapsed());
 
     for user_id in user_ids {
