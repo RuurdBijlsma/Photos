@@ -214,7 +214,7 @@ struct IntermediateLocation {
     admin2: Option<String>,
     country_code: String,
     country_name: String,
-    media_item_ids: Vec<String>,
+    items: Vec<LocationMediaItem>,
 }
 
 async fn get_place_location(
@@ -223,18 +223,31 @@ async fn get_place_location(
     location_id: i32,
 ) -> Result<IntermediateLocation, AppError> {
     let rows = sqlx::query!(
-                r#"
-                SELECT m.id as "media_item_id!", l.name, l.admin1, l.admin2, l.country_code, l.country_name
-                FROM media_item m
-                JOIN gps g ON m.id = g.media_item_id
-                JOIN location l ON g.location_id = l.id
-                WHERE m.user_id = $1 AND l.id = $2 AND m.deleted = false
-                "#,
-                user_id,
-                location_id
-            )
-        .fetch_all(executor)
-        .await?;
+        r#"
+        SELECT
+            m.id as "media_item_id!",
+            m.is_video as "is_video!",
+            m.has_thumbnails as "has_thumbnails!",
+            m.duration_ms::INT as "duration_ms?",
+            (m.width::real / m.height::real) AS "ratio!",
+            g.latitude AS "latitude?",
+            g.longitude AS "longitude?",
+            l.name as "location_name!",
+            l.admin1 as "admin1!",
+            l.admin2 as "admin2!",
+            l.country_code as "country_code!",
+            l.country_name as "country_name!"
+        FROM media_item m
+        JOIN gps g ON m.id = g.media_item_id
+        JOIN location l ON g.location_id = l.id
+        WHERE m.user_id = $1 AND l.id = $2 AND m.deleted = false
+        ORDER BY m.sort_timestamp, m.id
+        "#,
+        user_id,
+        location_id
+    )
+    .fetch_all(executor)
+    .await?;
 
     if rows.is_empty() {
         return Err(AppError::NotFound(format!(
@@ -243,14 +256,24 @@ async fn get_place_location(
     }
 
     let first = &rows[0];
-
     Ok(IntermediateLocation {
-        name: first.name.clone(),
+        name: first.location_name.clone(),
         admin1: Some(first.admin1.clone()),
         admin2: Some(first.admin2.clone()),
         country_code: first.country_code.clone(),
         country_name: first.country_name.clone(),
-        media_item_ids: rows.into_iter().map(|r| r.media_item_id).collect(),
+        items: rows
+            .into_iter()
+            .map(|r| LocationMediaItem {
+                id: r.media_item_id,
+                is_video: r.is_video,
+                has_thumbnails: r.has_thumbnails,
+                duration_ms: r.duration_ms,
+                ratio: r.ratio,
+                latitude: r.latitude,
+                longitude: r.longitude,
+            })
+            .collect(),
     })
 }
 
@@ -261,12 +284,21 @@ async fn get_country_location(
 ) -> Result<IntermediateLocation, AppError> {
     let rows = sqlx::query!(
         r#"
-                SELECT m.id as "media_item_id!", l.country_name
-                FROM media_item m
-                JOIN gps g ON m.id = g.media_item_id
-                JOIN location l ON g.location_id = l.id
-                WHERE m.user_id = $1 AND l.country_code = $2 AND m.deleted = false
-                "#,
+        SELECT
+            m.id as "media_item_id!",
+            m.is_video as "is_video!",
+            m.has_thumbnails as "has_thumbnails!",
+            m.duration_ms::INT as "duration_ms?",
+            (m.width::real / m.height::real) AS "ratio!",
+            g.latitude AS "latitude?",
+            g.longitude AS "longitude?",
+            l.country_name as "country_name!"
+        FROM media_item m
+        JOIN gps g ON m.id = g.media_item_id
+        JOIN location l ON g.location_id = l.id
+        WHERE m.user_id = $1 AND l.country_code = $2 AND m.deleted = false
+        ORDER BY m.sort_timestamp, m.id
+        "#,
         user_id,
         country_code
     )
@@ -279,13 +311,25 @@ async fn get_country_location(
         )));
     }
 
+    let first = &rows[0];
     Ok(IntermediateLocation {
-        name: rows[0].country_name.clone(),
+        name: first.country_name.clone(),
         admin1: None,
         admin2: None,
         country_code: country_code.to_owned(),
-        country_name: rows[0].country_name.clone(),
-        media_item_ids: rows.into_iter().map(|r| r.media_item_id).collect(),
+        country_name: first.country_name.clone(),
+        items: rows
+            .into_iter()
+            .map(|r| LocationMediaItem {
+                id: r.media_item_id,
+                is_video: r.is_video,
+                has_thumbnails: r.has_thumbnails,
+                duration_ms: r.duration_ms,
+                ratio: r.ratio,
+                latitude: r.latitude,
+                longitude: r.longitude,
+            })
+            .collect(),
     })
 }
 
@@ -297,12 +341,21 @@ async fn get_admin1_location(
 ) -> Result<IntermediateLocation, AppError> {
     let rows = sqlx::query!(
         r#"
-                SELECT m.id as "media_item_id!", l.country_name
-                FROM media_item m
-                JOIN gps g ON m.id = g.media_item_id
-                JOIN location l ON g.location_id = l.id
-                WHERE m.user_id = $1 AND l.country_code = $2 AND l.admin1 = $3 AND m.deleted = false
-                "#,
+        SELECT
+            m.id as "media_item_id!",
+            m.is_video as "is_video!",
+            m.has_thumbnails as "has_thumbnails!",
+            m.duration_ms::INT as "duration_ms?",
+            (m.width::real / m.height::real) AS "ratio!",
+            g.latitude AS "latitude?",
+            g.longitude AS "longitude?",
+            l.country_name as "country_name!"
+        FROM media_item m
+        JOIN gps g ON m.id = g.media_item_id
+        JOIN location l ON g.location_id = l.id
+        WHERE m.user_id = $1 AND l.country_code = $2 AND l.admin1 = $3 AND m.deleted = false
+        ORDER BY m.sort_timestamp, m.id
+        "#,
         user_id,
         country_code,
         admin1
@@ -316,13 +369,25 @@ async fn get_admin1_location(
         )));
     }
 
+    let first = &rows[0];
     Ok(IntermediateLocation {
-        name: rows[0].country_name.clone(),
+        name: first.country_name.clone(),
         admin1: Some(admin1.to_owned()),
         admin2: None,
         country_code: country_code.to_owned(),
-        country_name: rows[0].country_name.clone(),
-        media_item_ids: rows.into_iter().map(|r| r.media_item_id).collect(),
+        country_name: first.country_name.clone(),
+        items: rows
+            .into_iter()
+            .map(|r| LocationMediaItem {
+                id: r.media_item_id,
+                is_video: r.is_video,
+                has_thumbnails: r.has_thumbnails,
+                duration_ms: r.duration_ms,
+                ratio: r.ratio,
+                latitude: r.latitude,
+                longitude: r.longitude,
+            })
+            .collect(),
     })
 }
 
@@ -343,86 +408,13 @@ pub async fn get_location(
         } => get_admin1_location(&mut *tx, user_id, country_code, admin1).await?,
     };
 
-    let thumbnail_id =
-        get_representative_thumbnail(&mut tx, &intermedia_location.media_item_ids).await?;
+    let media_item_ids: Vec<String> = intermedia_location
+        .items
+        .iter()
+        .map(|item| item.id.clone())
+        .collect();
 
-    let items = match &scope {
-        LocationScope::Place(id) => {
-            sqlx::query_as!(
-                LocationMediaItem,
-                r#"
-                SELECT
-                    m.id,
-                    m.is_video as "is_video!",
-                    m.has_thumbnails as "has_thumbnails!",
-                    m.duration_ms::INT,
-                    (m.width::real / m.height::real) AS "ratio!",
-                    g.latitude AS "latitude?",
-                    g.longitude AS "longitude?"
-                FROM media_item m
-                JOIN gps g ON m.id = g.media_item_id
-                WHERE m.user_id = $1 AND g.location_id = $2 AND m.deleted = false
-                ORDER BY m.sort_timestamp, id
-                "#,
-                user_id,
-                *id
-            )
-            .fetch_all(&mut *tx)
-            .await?
-        }
-        LocationScope::Country(code) => {
-            sqlx::query_as!(
-                LocationMediaItem,
-                r#"
-                SELECT
-                    m.id,
-                    m.is_video as "is_video!",
-                    m.has_thumbnails as "has_thumbnails!",
-                    m.duration_ms::INT,
-                    (m.width::real / m.height::real) AS "ratio!",
-                    g.latitude AS "latitude?",
-                    g.longitude AS "longitude?"
-                FROM media_item m
-                JOIN gps g ON m.id = g.media_item_id
-                JOIN location l ON g.location_id = l.id
-                WHERE m.user_id = $1 AND l.country_code = $2 AND m.deleted = false
-                ORDER BY m.sort_timestamp, id
-                "#,
-                user_id,
-                code
-            )
-            .fetch_all(&mut *tx)
-            .await?
-        }
-        LocationScope::Admin1 {
-            country_code,
-            admin1,
-        } => {
-            sqlx::query_as!(
-                LocationMediaItem,
-                r#"
-                SELECT
-                    m.id,
-                    m.is_video as "is_video!",
-                    m.has_thumbnails as "has_thumbnails!",
-                    m.duration_ms::INT,
-                    (m.width::real / m.height::real) AS "ratio!",
-                    g.latitude AS "latitude?",
-                    g.longitude AS "longitude?"
-                FROM media_item m
-                JOIN gps g ON m.id = g.media_item_id
-                JOIN location l ON g.location_id = l.id
-                WHERE m.user_id = $1 AND l.country_code = $2 AND l.admin1 = $3 AND m.deleted = false
-                ORDER BY m.sort_timestamp, id
-                "#,
-                user_id,
-                country_code,
-                admin1
-            )
-            .fetch_all(&mut *tx)
-            .await?
-        }
-    };
+    let thumbnail_id = get_representative_thumbnail(&mut tx, &media_item_ids).await?;
 
     tx.commit().await?;
 
@@ -434,9 +426,9 @@ pub async fn get_location(
             admin2: intermedia_location.admin2,
             country_code: intermedia_location.country_code,
             country_name: intermedia_location.country_name,
-            photo_count: items.len() as i64,
+            photo_count: intermedia_location.items.len() as i64,
             thumbnail_id,
         }),
-        items,
+        items: intermedia_location.items,
     })
 }
