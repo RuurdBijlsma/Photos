@@ -6,6 +6,7 @@ use app_state::{
     load_settings_from_path,
 };
 use color_eyre::eyre::{Result, eyre};
+use common_services::database::jobs::JobType;
 use reqwest::Client;
 use sqlx::PgPool;
 use std::path::PathBuf;
@@ -114,8 +115,13 @@ impl TestContext {
         let worker_pool = pool.clone();
         let worker_settings = settings.clone();
         let worker_handle = tokio::spawn(async move {
-            if let Err(e) =
-                worker::worker::create_worker(worker_pool, worker_settings, false, false).await
+            if let Err(e) = worker::worker::create_worker(
+                worker_pool,
+                worker_settings,
+                vec![JobType::IngestLlm],
+                false,
+            )
+            .await
             {
                 error!("Worker failed: {}", e);
             }
@@ -126,7 +132,8 @@ impl TestContext {
         let ml_worker_settings = settings.clone();
         let ml_worker_handle = tokio::spawn(async move {
             if let Err(e) =
-                worker::worker::create_worker(ml_worker_pool, ml_worker_settings, true, false).await
+                worker::worker::create_worker(ml_worker_pool, ml_worker_settings, vec![], false)
+                    .await
             {
                 error!("Worker failed: {}", e);
             }

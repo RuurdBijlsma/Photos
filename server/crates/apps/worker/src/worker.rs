@@ -3,6 +3,7 @@ use crate::handlers::handle_job;
 use crate::jobs::management::{claim_next_job, update_job_on_completion, update_job_on_failure};
 use app_state::AppSettings;
 use color_eyre::Result;
+use common_services::database::jobs::JobType;
 use common_services::utils::nice_id;
 use sqlx::PgPool;
 use std::time::Duration;
@@ -12,12 +13,15 @@ use tracing::info;
 pub async fn create_worker(
     pool: PgPool,
     settings: AppSettings,
-    handle_llm: bool,
+    excluded_job_types: Vec<JobType>,
     stop_on_sleep: bool,
 ) -> Result<()> {
     let worker_id = nice_id(8);
-    info!("🛠️ [Worker ID: {}] Starting.", worker_id);
-    let context = WorkerContext::new(pool, settings, worker_id.clone(), handle_llm).await?;
+    info!(
+        "🛠️ [Worker ID: {}, IgnoreJobs: {:?}] Starting...",
+        worker_id, excluded_job_types
+    );
+    let context = WorkerContext::new(pool, settings, worker_id.clone(), excluded_job_types).await?;
 
     run_worker_loop(&context, stop_on_sleep).await
 }

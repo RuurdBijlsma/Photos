@@ -1,5 +1,6 @@
 use app_state::AppSettings;
 use color_eyre::Result;
+use common_services::database::jobs::JobType;
 use common_services::s2s_client::S2SClient;
 use media_analyzer::MediaAnalyzer;
 use ml_analysis::VisualAnalyzer;
@@ -10,7 +11,7 @@ use std::sync::Arc;
 
 pub struct WorkerContext {
     pub worker_id: String,
-    pub handle_llm: bool,
+    pub excluded_job_types: Vec<JobType>,
     pub pool: PgPool,
     pub settings: AppSettings,
     pub media_analyzer: Arc<MediaAnalyzer>,
@@ -29,7 +30,7 @@ impl WorkerContext {
         pool: PgPool,
         settings: AppSettings,
         worker_id: String,
-        handle_llm: bool,
+        excluded_job_types: Vec<JobType>,
     ) -> Result<Self> {
         let embedder_model_id = &settings.ingest.analyzer.search.embedder_model_id.clone();
         let text_embedder =
@@ -38,7 +39,7 @@ impl WorkerContext {
                 .await?;
         Ok(Self {
             worker_id,
-            handle_llm,
+            excluded_job_types,
             pool,
             settings,
             media_analyzer: Arc::new(MediaAnalyzer::builder().build().await?),

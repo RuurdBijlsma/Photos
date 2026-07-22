@@ -231,26 +231,22 @@
 * ✅ remove exif from full photo response
 * ✅ write thumbnails to cache folder and symlink to thumbnails folder?
 * ✅ add photo search type: Panorama (use_panorama_viewer flag). Currently type=photo|video, add panorama
-* password reset flow (email) (make mail optional)
+* ✅ admin page
+* ✅ explore page
+  * ✅ stats over je fotos?
+  * ✅ most visited places
+  * ✅ sort by all kinds of fields (temp, altitude, lat/lon extremes, wind, shutter speed)
+  * ✅ photo distribution/histogram by day of  year, grouped by month/week?
+  * ✅ zelfde voor time of day?
+* ✅ photo viewer page
+  * ✅ implement different viewers
+  * ✅ find similar fotos view, misschien  een expandable ding in de info panel?
+* ✅ photo upload feature
 * nginx thumbnail hosting (optional maak setting voor Rust thumb hosting).
 * check of readme uitleg klopt met verse windows installatie & linux
 * better error if exiftool isnt there (worker wont work then)
 * improve speed of album/{id} endpoint
 * make single executable kind of that runs api, watcher, and worker, but have it sort of auto-scale based off number of jobs. So api, watcher, autoscaler, and if theres jobs, then N amount of workers.
-
-# High level TODO:
-
-* ✅ admin page
-* explore page
-  * stats over je fotos?
-  * most visited places
-  * sort by all kinds of fields (temp, altitude, lat/lon extremes, wind, shutter speed)
-  * photo distribution/histogram by day of  year, grouped by month/week?
-  * zelfde voor time of day?
-* ✅ photo viewer page
-  * ✅ implement different viewers
-  * ✅ find similar fotos view, misschien  een expandable ding in de info panel?
-* ✅ photo upload feature
 
 # post mvp TODO:
 

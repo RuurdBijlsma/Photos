@@ -15,6 +15,15 @@ pub async fn claim_next_job(context: &WorkerContext) -> Result<Option<Job>> {
     // Heartbeat interval is 1 minute
     // If job has last heartbeat at more than 150 seconds ago, worker is probably dead?
     let heartbeat_timeout_seconds = 150.;
+    let excluded_strings: Vec<String> = context
+        .excluded_job_types
+        .iter()
+        .filter_map(|jt| {
+            serde_json::to_value(jt)
+                .ok()
+                .and_then(|v| v.as_str().map(ToString::to_string))
+        })
+        .collect();
 
     let job = sqlx::query_as!(
         Job,
@@ -24,7 +33,7 @@ pub async fn claim_next_job(context: &WorkerContext) -> Result<Option<Job>> {
             WHERE
                 ((j.status = 'queued' AND j.scheduled_at <= now())
                 OR (j.status = 'running' AND j.last_heartbeat < now() - interval '1 second' * $2))
-              AND ($3 OR j.job_type NOT IN ('ingest_llm'))
+              AND j.job_type::text != ALL($3::text[])
               -- Check that dependent jobs for the same file are fully completed
               AND (
                   j.relative_path IS NULL
@@ -54,7 +63,7 @@ pub async fn claim_next_job(context: &WorkerContext) -> Result<Option<Job>> {
         "#,
         context.worker_id,
         heartbeat_timeout_seconds,
-        context.handle_llm
+        &excluded_strings as &[String]
     )
         .fetch_optional(&mut *tx)
         .await?;
@@ -113,7 +122,7 @@ async fn mark_job_cancelled(pool: &PgPool, job_id: i64) -> Result<()> {
 
 /// Marks a job as failed in the database.
 async fn mark_job_failed(pool: &PgPool, job_id: i64, last_error: &str) -> Result<()> {
-    alert!("â€¼ï¸  Marking job {} as failed: {}", job_id, last_error);
+    alert!("🚨 Marking job {} as failed: {}", job_id, last_error);
     sqlx::query!(
         "UPDATE jobs SET status = 'failed', finished_at = now(), last_error = $2, attempts = attempts + 1 WHERE id = $1",
         job_id,
@@ -131,7 +140,7 @@ async fn reschedule_for_retry(
     backoff_secs: i64,
     last_error: &str,
 ) -> Result<()> {
-    warn!("âš ï¸  Rescheduling job {}. Backoff: {}s", job_id, backoff_secs);
+    warn!("⚠️ Rescheduling job {}. Backoff: {}s", job_id, backoff_secs);
     println!("{last_error}");
     let scheduled_at = Utc::now() + Duration::seconds(backoff_secs);
     sqlx::query!(
@@ -148,7 +157,7 @@ async fn reschedule_for_retry(
 /// Reschedules a job because its dependencies are not met.
 async fn dependency_reschedule_job(pool: &PgPool, job_id: i64, backoff_secs: i64) -> Result<()> {
     info!(
-        "â ³ Dependency not met for job {}. Rescheduling in {}s.",
+        "⏳ Dependency not met for job {}. Rescheduling in {}s.",
         job_id, backoff_secs
     );
     let scheduled_at = Utc::now() + Duration::seconds(backoff_secs);
