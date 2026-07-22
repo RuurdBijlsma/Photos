@@ -63,14 +63,3 @@ export interface HistogramResponse {
   weekOfYear: WeekOfYearBucket[]
   hourOfDay: HourOfDayBucket[]
 }
-
-export interface VisitedLocation {
-  id: string
-  name: string
-  admin1: string
-  admin2: string
-  countryCode: string
-  countryName: string
-  photoCount: number
-  thumbnailId: string | null
-}

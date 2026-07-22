@@ -1,21 +1,24 @@
 use crate::api::album::service::get_representative_thumbnail;
 use crate::api::app_error::AppError;
-use common_types::pb::api::{VisitedLocation, LocationMediaItem, LocationDetailsResponse};
-use sqlx::PgPool;
+use common_types::pb::api::{LocationDetailsResponse, LocationMediaItem, VisitedLocation};
+use sqlx::{Executor, PgPool, Postgres};
 use std::collections::HashMap;
 
 pub enum LocationScope {
     Place(i32),
     Country(String),
-    Admin1 { country_code: String, admin1: String },
+    Admin1 {
+        country_code: String,
+        admin1: String,
+    },
 }
 
 impl LocationScope {
     pub fn parse(key: &str) -> Result<Self, AppError> {
         if let Some(rest) = key.strip_prefix("place:") {
-            let id = rest.parse::<i32>().map_err(|_| {
-                AppError::BadRequest("Invalid place ID format".to_owned())
-            })?;
+            let id = rest
+                .parse::<i32>()
+                .map_err(|_| AppError::BadRequest("Invalid place ID format".to_owned()))?;
             Ok(Self::Place(id))
         } else if let Some(rest) = key.strip_prefix("country:") {
             Ok(Self::Country(rest.to_string()))
@@ -32,9 +35,9 @@ impl LocationScope {
             })
         } else {
             // Backward-compatible fallback for plain numerical IDs
-            let id = key.parse::<i32>().map_err(|_| {
-                AppError::BadRequest("Invalid numeric location ID".to_owned())
-            })?;
+            let id = key
+                .parse::<i32>()
+                .map_err(|_| AppError::BadRequest("Invalid numeric location ID".to_owned()))?;
             Ok(Self::Place(id))
         }
     }
@@ -73,13 +76,16 @@ async fn resolve_locations(
         user_id,
         &loc_ids
     )
-        .fetch_all(&mut **tx)
-        .await?;
+    .fetch_all(&mut **tx)
+    .await?;
 
     // Group the media items by their location_id
     let mut loc_to_media: HashMap<i32, Vec<String>> = HashMap::new();
     for row in mappings {
-        loc_to_media.entry(row.location_id).or_default().push(row.media_id);
+        loc_to_media
+            .entry(row.location_id)
+            .or_default()
+            .push(row.media_id);
     }
 
     let mut resolved = Vec::with_capacity(raw_locs.len());
@@ -90,8 +96,8 @@ async fn resolve_locations(
         resolved.push(VisitedLocation {
             id: format!("place:{}", loc.id),
             name: loc.name,
-            admin1: loc.admin1,
-            admin2: loc.admin2,
+            admin1: Some(loc.admin1),
+            admin2: Some(loc.admin2),
             country_code: loc.country_code,
             country_name: loc.country_name,
             photo_count: loc.photo_count,
@@ -107,7 +113,7 @@ pub async fn get_visited_places(
 ) -> Result<Vec<VisitedLocation>, AppError> {
     let mut tx = pool.begin().await?;
 
-    let top_locations_rows = sqlx::query!(
+    let top_locations = sqlx::query_as!(RawLocation,
         r#"
         SELECT l.id, l.name, l.admin1, l.admin2, l.country_code, l.country_name, COUNT(*)::bigint as "photo_count!"
         FROM media_item m
@@ -123,28 +129,16 @@ pub async fn get_visited_places(
         .fetch_all(&mut *tx)
         .await?;
 
-    let top_locations: Vec<RawLocation> = top_locations_rows
-        .into_iter()
-        .map(|r| RawLocation {
-            id: r.id,
-            name: r.name,
-            admin1: r.admin1,
-            admin2: r.admin2,
-            country_code: r.country_code,
-            country_name: r.country_name,
-            photo_count: r.photo_count,
-        })
-        .collect();
-
     let mut top_10: Vec<RawLocation> = top_locations.iter().take(10).cloned().collect();
     fastrand::shuffle(&mut top_10);
     let common_locs_raw: Vec<RawLocation> = top_10.into_iter().take(3).collect();
 
-    let mut ranks_11_30: Vec<RawLocation> = top_locations.iter().skip(10).take(20).cloned().collect();
+    let mut ranks_11_30: Vec<RawLocation> =
+        top_locations.iter().skip(10).take(20).cloned().collect();
     fastrand::shuffle(&mut ranks_11_30);
     let rare_locs_raw: Vec<RawLocation> = ranks_11_30.into_iter().take(3).collect();
 
-    let legendary_locs_rows = sqlx::query!(
+    let mut legendary_locs_all = sqlx::query_as!(RawLocation,
         r#"
         SELECT l.id, l.name, l.admin1, l.admin2, l.country_code, l.country_name, COUNT(*)::bigint as "photo_count!"
         FROM media_item m
@@ -160,25 +154,12 @@ pub async fn get_visited_places(
     )
         .fetch_all(&mut *tx)
         .await?;
-
-    let mut legendary_locs_all: Vec<RawLocation> = legendary_locs_rows
-        .into_iter()
-        .map(|r| RawLocation {
-            id: r.id,
-            name: r.name,
-            admin1: r.admin1,
-            admin2: r.admin2,
-            country_code: r.country_code,
-            country_name: r.country_name,
-            photo_count: r.photo_count,
-        })
-        .collect();
-
     fastrand::shuffle(&mut legendary_locs_all);
     let legendary_locs_raw: Vec<RawLocation> = legendary_locs_all.into_iter().take(3).collect();
 
     // Retrieving Recent Destinations
-    let recent_destinations_rows = sqlx::query!(
+    let recent_destinations_raw = sqlx::query_as!(
+        RawLocation,
         r#"
         SELECT
             l.id,
@@ -199,21 +180,8 @@ pub async fn get_visited_places(
         "#,
         user_id
     )
-        .fetch_all(&mut *tx)
-        .await?;
-
-    let recent_destinations_raw: Vec<RawLocation> = recent_destinations_rows
-        .into_iter()
-        .map(|r| RawLocation {
-            id: r.id,
-            name: r.name,
-            admin1: r.admin1,
-            admin2: r.admin2,
-            country_code: r.country_code,
-            country_name: r.country_name,
-            photo_count: r.photo_count,
-        })
-        .collect();
+    .fetch_all(&mut *tx)
+    .await?;
 
     let common_locs = resolve_locations(&mut tx, user_id, common_locs_raw).await?;
     let rare_locs = resolve_locations(&mut tx, user_id, rare_locs_raw).await?;
@@ -227,9 +195,9 @@ pub async fn get_visited_places(
 
     for loc in common_locs
         .into_iter()
-        .chain(rare_locs.into_iter())
-        .chain(legendary_locs.into_iter())
-        .chain(recent_destinations.into_iter())
+        .chain(rare_locs)
+        .chain(legendary_locs)
+        .chain(recent_destinations)
     {
         if seen_ids.insert(loc.id.clone()) {
             all_locations.push(loc);
@@ -240,17 +208,21 @@ pub async fn get_visited_places(
     Ok(all_locations)
 }
 
-pub async fn get_location(
-    pool: &PgPool,
-    user_id: i32,
-    location_key: &str,
-) -> Result<LocationDetailsResponse, AppError> {
-    let scope = LocationScope::parse(location_key)?;
-    let mut tx = pool.begin().await?;
+struct IntermediateLocation {
+    name: String,
+    admin1: Option<String>,
+    admin2: Option<String>,
+    country_code: String,
+    country_name: String,
+    media_item_ids: Vec<String>,
+}
 
-    let (loc_name, loc_admin1, loc_admin2, loc_country_code, loc_country_name, photo_count, media_item_ids) = match &scope {
-        LocationScope::Place(id) => {
-            let rows = sqlx::query!(
+async fn get_place_location(
+    executor: impl Executor<'_, Database = Postgres>,
+    user_id: i32,
+    location_id: i32,
+) -> Result<IntermediateLocation, AppError> {
+    let rows = sqlx::query!(
                 r#"
                 SELECT m.id as "media_item_id!", l.name, l.admin1, l.admin2, l.country_code, l.country_name
                 FROM media_item m
@@ -259,80 +231,120 @@ pub async fn get_location(
                 WHERE m.user_id = $1 AND l.id = $2 AND m.deleted = false
                 "#,
                 user_id,
-                *id
+                location_id
             )
-                .fetch_all(&mut *tx)
-                .await?;
+        .fetch_all(executor)
+        .await?;
 
-            if rows.is_empty() {
-                return Err(AppError::NotFound(format!("Location {id} not found")));
-            }
+    if rows.is_empty() {
+        return Err(AppError::NotFound(format!(
+            "Location {location_id} not found"
+        )));
+    }
 
-            let first = &rows[0];
-            let name = first.name.clone();
-            let admin1 = first.admin1.clone();
-            let admin2 = first.admin2.clone();
-            let country_code = first.country_code.clone();
-            let country_name = first.country_name.clone();
-            let photo_count = rows.len() as i64;
-            let media_item_ids: Vec<String> = rows.into_iter().map(|r| r.media_item_id).collect();
+    let first = &rows[0];
 
-            (name, admin1, admin2, country_code, country_name, photo_count, media_item_ids)
-        }
-        LocationScope::Country(code) => {
-            let rows = sqlx::query!(
-                r#"
+    Ok(IntermediateLocation {
+        name: first.name.clone(),
+        admin1: Some(first.admin1.clone()),
+        admin2: Some(first.admin2.clone()),
+        country_code: first.country_code.clone(),
+        country_name: first.country_name.clone(),
+        media_item_ids: rows.into_iter().map(|r| r.media_item_id).collect(),
+    })
+}
+
+async fn get_country_location(
+    executor: impl Executor<'_, Database = Postgres>,
+    user_id: i32,
+    country_code: &str,
+) -> Result<IntermediateLocation, AppError> {
+    let rows = sqlx::query!(
+        r#"
                 SELECT m.id as "media_item_id!", l.country_name
                 FROM media_item m
                 JOIN gps g ON m.id = g.media_item_id
                 JOIN location l ON g.location_id = l.id
                 WHERE m.user_id = $1 AND l.country_code = $2 AND m.deleted = false
                 "#,
-                user_id,
-                code
-            )
-                .fetch_all(&mut *tx)
-                .await?;
+        user_id,
+        country_code
+    )
+    .fetch_all(executor)
+    .await?;
 
-            if rows.is_empty() {
-                return Err(AppError::NotFound(format!("Country {code} not found")));
-            }
+    if rows.is_empty() {
+        return Err(AppError::NotFound(format!(
+            "Country {country_code} not found"
+        )));
+    }
 
-            let country_name = rows[0].country_name.clone();
-            let photo_count = rows.len() as i64;
-            let media_item_ids: Vec<String> = rows.into_iter().map(|r| r.media_item_id).collect();
+    Ok(IntermediateLocation {
+        name: rows[0].country_name.clone(),
+        admin1: None,
+        admin2: None,
+        country_code: country_code.to_owned(),
+        country_name: rows[0].country_name.clone(),
+        media_item_ids: rows.into_iter().map(|r| r.media_item_id).collect(),
+    })
+}
 
-            (country_name.clone(), String::new(), String::new(), code.clone(), country_name, photo_count, media_item_ids)
-        }
-        LocationScope::Admin1 { country_code, admin1 } => {
-            let rows = sqlx::query!(
-                r#"
+async fn get_admin1_location(
+    executor: impl Executor<'_, Database = Postgres>,
+    user_id: i32,
+    country_code: &str,
+    admin1: &str,
+) -> Result<IntermediateLocation, AppError> {
+    let rows = sqlx::query!(
+        r#"
                 SELECT m.id as "media_item_id!", l.country_name
                 FROM media_item m
                 JOIN gps g ON m.id = g.media_item_id
                 JOIN location l ON g.location_id = l.id
                 WHERE m.user_id = $1 AND l.country_code = $2 AND l.admin1 = $3 AND m.deleted = false
                 "#,
-                user_id,
-                country_code,
-                admin1
-            )
-                .fetch_all(&mut *tx)
-                .await?;
+        user_id,
+        country_code,
+        admin1
+    )
+    .fetch_all(executor)
+    .await?;
 
-            if rows.is_empty() {
-                return Err(AppError::NotFound(format!("Region {admin1} in {country_code} not found")));
-            }
+    if rows.is_empty() {
+        return Err(AppError::NotFound(format!(
+            "Region {admin1} in {country_code} not found"
+        )));
+    }
 
-            let country_name = rows[0].country_name.clone();
-            let photo_count = rows.len() as i64;
-            let media_item_ids: Vec<String> = rows.into_iter().map(|r| r.media_item_id).collect();
+    Ok(IntermediateLocation {
+        name: rows[0].country_name.clone(),
+        admin1: Some(admin1.to_owned()),
+        admin2: None,
+        country_code: country_code.to_owned(),
+        country_name: rows[0].country_name.clone(),
+        media_item_ids: rows.into_iter().map(|r| r.media_item_id).collect(),
+    })
+}
 
-            (admin1.clone(), admin1.clone(), String::new(), country_code.clone(), country_name, photo_count, media_item_ids)
-        }
+pub async fn get_location(
+    pool: &PgPool,
+    user_id: i32,
+    location_key: &str,
+) -> Result<LocationDetailsResponse, AppError> {
+    let scope = LocationScope::parse(location_key)?;
+    let mut tx = pool.begin().await?;
+
+    let intermedia_location = match &scope {
+        LocationScope::Place(id) => get_place_location(&mut *tx, user_id, *id).await?,
+        LocationScope::Country(code) => get_country_location(&mut *tx, user_id, code).await?,
+        LocationScope::Admin1 {
+            country_code,
+            admin1,
+        } => get_admin1_location(&mut *tx, user_id, country_code, admin1).await?,
     };
 
-    let thumbnail_id = get_representative_thumbnail(&mut tx, &media_item_ids).await?;
+    let thumbnail_id =
+        get_representative_thumbnail(&mut tx, &intermedia_location.media_item_ids).await?;
 
     let items = match &scope {
         LocationScope::Place(id) => {
@@ -355,8 +367,8 @@ pub async fn get_location(
                 user_id,
                 *id
             )
-                .fetch_all(&mut *tx)
-                .await?
+            .fetch_all(&mut *tx)
+            .await?
         }
         LocationScope::Country(code) => {
             sqlx::query_as!(
@@ -379,10 +391,13 @@ pub async fn get_location(
                 user_id,
                 code
             )
-                .fetch_all(&mut *tx)
-                .await?
+            .fetch_all(&mut *tx)
+            .await?
         }
-        LocationScope::Admin1 { country_code, admin1 } => {
+        LocationScope::Admin1 {
+            country_code,
+            admin1,
+        } => {
             sqlx::query_as!(
                 LocationMediaItem,
                 r#"
@@ -404,8 +419,8 @@ pub async fn get_location(
                 country_code,
                 admin1
             )
-                .fetch_all(&mut *tx)
-                .await?
+            .fetch_all(&mut *tx)
+            .await?
         }
     };
 
@@ -414,12 +429,12 @@ pub async fn get_location(
     Ok(LocationDetailsResponse {
         location: Some(VisitedLocation {
             id: location_key.to_string(),
-            name: loc_name,
-            admin1: loc_admin1,
-            admin2: loc_admin2,
-            country_code: loc_country_code,
-            country_name: loc_country_name,
-            photo_count,
+            name: intermedia_location.name,
+            admin1: intermedia_location.admin1,
+            admin2: intermedia_location.admin2,
+            country_code: intermedia_location.country_code,
+            country_name: intermedia_location.country_name,
+            photo_count: items.len() as i64,
             thumbnail_id,
         }),
         items,

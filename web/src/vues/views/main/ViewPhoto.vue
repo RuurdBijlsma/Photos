@@ -28,7 +28,7 @@ import AddToAlbumCard from '@/vues/components/timeline/timeline-components/AddTo
 import { useUiHider } from '@/scripts/composables/useUiHider.ts'
 import { navigatorShare } from '@/scripts/sharing.ts'
 import PhotoGallery from '@/vues/components/viewer/components/PhotoGallery.vue'
-import { useStorage, useEventListener, useDebounceFn } from '@vueuse/core'
+import { useStorage, useEventListener } from '@vueuse/core'
 
 const props = withDefaults(
   defineProps<{
@@ -358,7 +358,7 @@ watch(isVideo, () => {
       :queue="orderedIds"
       :ratio="currentItemRatio"
       :resizing="isResizing"
-      @change-focus="(id) => changeMediaItem(id)"
+      @change-focus="(focusId) => changeMediaItem(focusId)"
     />
     <div v-if="showGallery && id" class="gallery-resize-handle" @pointerdown="startResize" />
     <div class="top-bar" @wheel="forwardWheel">

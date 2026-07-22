@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { ref, watch, nextTick, shallowRef } from 'vue'
 import { useResizeObserver } from '@vueuse/core'
-import type { VisitedLocation } from '@/scripts/types/api/explore.ts'
 import { useExploreStore } from '@/scripts/stores/exploreStore.ts'
 import ThumbnailImg from '@/vues/components/ui/ThumbnailImg.vue'
+import type { VisitedLocation } from '@/scripts/types/generated/timeline.ts'
 
 const props = defineProps<{
   locations: VisitedLocation[]

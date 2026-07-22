@@ -4,9 +4,11 @@ import type {
   PaginatedExploreTableResponse,
   ExploreTableParams,
   HistogramResponse,
-  VisitedLocation,
 } from '@/scripts/types/api/explore.ts'
-import { LocationDetailsResponse } from '@/scripts/types/generated/timeline.ts'
+import {
+  LocationDetailsResponse,
+  type VisitedLocation,
+} from '@/scripts/types/generated/timeline.ts'
 
 const exploreService = {
   /**

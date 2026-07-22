@@ -171,8 +171,8 @@ message StorageSummaryResponse {
 message VisitedLocation {
   string id = 1;
   string name = 2;
-  string admin1 = 3;
-  string admin2 = 4;
+  optional string admin1 = 3;
+  optional string admin2 = 4;
   string country_code = 5;
   string country_name = 6;
   int64 photo_count = 7;

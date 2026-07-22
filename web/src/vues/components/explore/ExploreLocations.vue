@@ -40,7 +40,7 @@ onMounted(async () => {
   padding: 24px;
   border: none !important;
   overflow: hidden;
-  min-height:318px;
+  min-height: 318px;
 }
 
 .card-header {

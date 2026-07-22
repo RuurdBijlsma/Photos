@@ -216,8 +216,8 @@ export interface StorageSummaryResponse {
 export interface VisitedLocation {
   id: string
   name: string
-  admin1: string
-  admin2: string
+  admin1?: string | undefined
+  admin2?: string | undefined
   countryCode: string
   countryName: string
   photoCount: number
@@ -2822,8 +2822,8 @@ function createBaseVisitedLocation(): VisitedLocation {
   return {
     id: '',
     name: '',
-    admin1: '',
-    admin2: '',
+    admin1: undefined,
+    admin2: undefined,
     countryCode: '',
     countryName: '',
     photoCount: 0,
@@ -2839,10 +2839,10 @@ export const VisitedLocation: MessageFns<VisitedLocation> = {
     if (message.name !== '') {
       writer.uint32(18).string(message.name)
     }
-    if (message.admin1 !== '') {
+    if (message.admin1 !== undefined) {
       writer.uint32(26).string(message.admin1)
     }
-    if (message.admin2 !== '') {
+    if (message.admin2 !== undefined) {
       writer.uint32(34).string(message.admin2)
     }
     if (message.countryCode !== '') {
@@ -2944,8 +2944,8 @@ export const VisitedLocation: MessageFns<VisitedLocation> = {
     return {
       id: isSet(object.id) ? globalThis.String(object.id) : '',
       name: isSet(object.name) ? globalThis.String(object.name) : '',
-      admin1: isSet(object.admin1) ? globalThis.String(object.admin1) : '',
-      admin2: isSet(object.admin2) ? globalThis.String(object.admin2) : '',
+      admin1: isSet(object.admin1) ? globalThis.String(object.admin1) : undefined,
+      admin2: isSet(object.admin2) ? globalThis.String(object.admin2) : undefined,
       countryCode: isSet(object.countryCode)
         ? globalThis.String(object.countryCode)
         : isSet(object.country_code)
@@ -2977,10 +2977,10 @@ export const VisitedLocation: MessageFns<VisitedLocation> = {
     if (message.name !== '') {
       obj.name = message.name
     }
-    if (message.admin1 !== '') {
+    if (message.admin1 !== undefined) {
       obj.admin1 = message.admin1
     }
-    if (message.admin2 !== '') {
+    if (message.admin2 !== undefined) {
       obj.admin2 = message.admin2
     }
     if (message.countryCode !== '') {
@@ -3005,8 +3005,8 @@ export const VisitedLocation: MessageFns<VisitedLocation> = {
     const message = createBaseVisitedLocation()
     message.id = object.id ?? ''
     message.name = object.name ?? ''
-    message.admin1 = object.admin1 ?? ''
-    message.admin2 = object.admin2 ?? ''
+    message.admin1 = object.admin1 ?? undefined
+    message.admin2 = object.admin2 ?? undefined
     message.countryCode = object.countryCode ?? ''
     message.countryName = object.countryName ?? ''
     message.photoCount = object.photoCount ?? 0

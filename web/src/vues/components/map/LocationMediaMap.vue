@@ -3,16 +3,11 @@ import { ref, watch, computed } from 'vue'
 import maplibregl from 'maplibre-gl'
 import BaseMap, { type StyleName } from '@/vues/components/map/BaseMap.vue'
 import type { LocationMediaItem } from '@/scripts/types/generated/timeline.ts'
-import { useSettingStore } from '@/scripts/stores/settingsStore.ts'
-import { useTheme } from 'vuetify/framework'
 import { useStorage } from '@vueuse/core'
 
 const props = defineProps<{
   items: LocationMediaItem[]
 }>()
-
-const settings = useSettingStore()
-const theme = useTheme()
 
 const mapInstance = ref<maplibregl.Map | null>(null)
 
