@@ -219,12 +219,11 @@ pub async fn get_user_ingest_jobs(
         count_builder.push(" AND status IN ('queued'::job_status, 'running'::job_status, 'failed'::job_status)");
     }
 
-    if let Some(search) = &query.search {
-        if !search.trim().is_empty() {
+    if let Some(search) = &query.search
+        && !search.trim().is_empty() {
             count_builder.push(" AND relative_path ILIKE ");
             count_builder.push_bind(format!("%{}%", search.trim()));
         }
-    }
 
     let count_query = count_builder.build_query_scalar::<i64>();
     let total = count_query.fetch_one(pool).await?;
@@ -258,12 +257,11 @@ pub async fn get_user_ingest_jobs(
         select_builder.push(" AND status IN ('queued'::job_status, 'running'::job_status, 'failed'::job_status)");
     }
 
-    if let Some(search) = &query.search {
-        if !search.trim().is_empty() {
+    if let Some(search) = &query.search
+        && !search.trim().is_empty() {
             select_builder.push(" AND relative_path ILIKE ");
             select_builder.push_bind(format!("%{}%", search.trim()));
         }
-    }
 
     select_builder.push(" ORDER BY id DESC LIMIT ");
     select_builder.push_bind(limit);

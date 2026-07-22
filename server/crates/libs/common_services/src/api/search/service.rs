@@ -479,6 +479,7 @@ fn has_active_filters(config: &SearchMediaConfig) -> bool {
         || config.negative_query.is_some()
 }
 
+#[allow(clippy::too_many_lines)]
 pub async fn get_search_suggestions(
     user_id: i32,
     pool: &PgPool,
