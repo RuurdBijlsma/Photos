@@ -4,7 +4,7 @@ use app_state::constants::{
 use app_state::{AppSettings, database_url};
 use color_eyre::eyre::Result;
 use common_services::database::get_db_pool;
-use sqlx::{Executor, PgPool};
+use sqlx::{PgPool};
 use std::fs;
 use std::net::TcpListener;
 use std::path::Path;
@@ -55,8 +55,9 @@ pub async fn create_test_database(
         .expect("Failed to clean up DB.");
 
     // 2. Create the new test database.
-    management_pool
-        .execute(format!("CREATE DATABASE \"{database_name}\"").as_str())
+    let create_query = format!("CREATE DATABASE \"{database_name}\"");
+    sqlx::raw_sql(sqlx::AssertSqlSafe(create_query.as_str()))
+        .execute(&management_pool)
         .await?;
 
     // 3. Connect to the newly created test database.
@@ -72,8 +73,9 @@ pub async fn create_test_database(
 }
 
 pub async fn force_drop_db(management_pool: &PgPool, db_name: &str) -> Result<()> {
-    let _ = management_pool
-        .execute(format!("DROP DATABASE \"{db_name}\" WITH (FORCE)").as_str())
+    let drop_query = format!("DROP DATABASE \"{db_name}\" WITH (FORCE)");
+    let _ = sqlx::raw_sql(sqlx::AssertSqlSafe(drop_query.as_str()))
+        .execute(management_pool)
         .await;
     Ok(())
 }

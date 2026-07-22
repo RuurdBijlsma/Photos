@@ -14,6 +14,7 @@ struct Args {
 }
 
 #[tokio::main]
+#[allow(clippy::large_futures)]
 async fn main() -> Result<()> {
     let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| "info,ort=warn".into());
     let subscriber = fmt::Subscriber::builder()

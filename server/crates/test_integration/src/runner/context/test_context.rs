@@ -149,7 +149,7 @@ impl TestContext {
     async fn wait_for_healthy_api(settings: &AppSettings, http_client: &Client) -> Result<()> {
         for attempt in 1..=20 {
             info!("Health check attempt {}...", attempt);
-            let health_url = format!("{}/health", &settings.api.public_url);
+            let health_url = format!("{}/health", settings.api.public_url);
             match http_client.get(&health_url).send().await {
                 Ok(response) if response.status().is_success() => {
                     info!("API is healthy!");

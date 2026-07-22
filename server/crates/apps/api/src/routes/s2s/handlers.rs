@@ -64,10 +64,7 @@ pub async fn download_file_handler(
         .to_string();
 
     let file = tokio::fs::File::open(&file_path).await.map_err(|_| {
-        AppError::NotFound(format!(
-            "File not found on disk for item {}",
-            media_item_id
-        ))
+        AppError::NotFound(format!("File not found on disk for item {media_item_id}"))
     })?;
 
     let stream = ReaderStream::new(file);
