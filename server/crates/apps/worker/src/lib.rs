@@ -13,3 +13,4 @@ pub mod handlers;
 pub mod jobs;
 pub mod macros;
 pub mod worker;
+mod graceful_exit;

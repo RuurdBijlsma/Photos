@@ -1,4 +1,5 @@
 use crate::context::WorkerContext;
+use crate::graceful_exit::get_kill_signal;
 use crate::handlers::handle_job;
 use crate::jobs::management::{claim_next_job, update_job_on_completion, update_job_on_failure};
 use app_state::AppSettings;
@@ -7,8 +8,7 @@ use common_services::database::jobs::JobType;
 use common_services::utils::nice_id;
 use sqlx::PgPool;
 use std::time::Duration;
-use tokio::time::sleep;
-use tracing::info;
+use tracing::{info};
 
 pub async fn create_worker(
     pool: PgPool,
@@ -22,8 +22,9 @@ pub async fn create_worker(
         worker_id, excluded_job_types
     );
     let context = WorkerContext::new(pool, settings, worker_id.clone(), excluded_job_types).await?;
+    let shutdown_rx = get_kill_signal();
 
-    run_worker_loop(&context, stop_on_sleep).await
+    run_worker_loop(&context, stop_on_sleep, shutdown_rx).await
 }
 
 /// The main loop for the worker process, continuously fetching and processing jobs.
@@ -32,10 +33,20 @@ pub async fn create_worker(
 ///
 /// This function will return an error if there is a problem communicating with the
 /// database when claiming or updating a job. The loop will terminate in such a case.
-pub async fn run_worker_loop(context: &WorkerContext, stop_on_sleep: bool) -> Result<()> {
+pub async fn run_worker_loop(
+    context: &WorkerContext,
+    stop_on_sleep: bool,
+    mut shutdown_rx: tokio::sync::watch::Receiver<bool>,
+) -> Result<()> {
     let mut sleeping = false;
 
     loop {
+        // Check if shutdown has been requested before claiming a new job
+        if *shutdown_rx.borrow() {
+            info!("Shutdown requested. Exiting worker loop.");
+            break;
+        }
+
         let maybe_job = claim_next_job(context).await?;
 
         if let Some(job) = maybe_job {
@@ -59,7 +70,16 @@ pub async fn run_worker_loop(context: &WorkerContext, stop_on_sleep: bool) -> Re
                     return Ok(());
                 }
             }
-            sleep(Duration::from_secs(3)).await;
+
+            // Sleep for 3 seconds or wake up early if a shutdown signal is received
+            tokio::select! {
+                _ = tokio::time::sleep(Duration::from_secs(3)) => {}
+                _ = shutdown_rx.changed() => {
+                    info!("Shutdown signal received during sleep. Exiting worker loop.");
+                    break;
+                }
+            }
         }
     }
+    Ok(())
 }
