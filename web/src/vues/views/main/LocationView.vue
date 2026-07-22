@@ -205,7 +205,6 @@ useRefreshFunction(() => {
   border-radius: 50px;
   border: 15px solid rgb(var(--v-theme-surface-container));
   border-right: 0;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
   background-color: rgb(var(--v-theme-surface-bright));
 }
 

@@ -167,7 +167,6 @@ watch(
   overflow: hidden;
   border-radius: 50px;
   border: 15px solid rgb(var(--v-theme-surface-container));
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
   margin-top: 0;
 }
 
