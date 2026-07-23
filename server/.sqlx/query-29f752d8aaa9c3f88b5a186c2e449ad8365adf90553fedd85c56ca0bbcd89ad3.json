@@ -6,12 +6,24 @@
       {
         "ordinal": 0,
         "name": "taken_at_local",
-        "type_info": "Timestamp"
+        "type_info": "Timestamp",
+        "origin": {
+          "Table": {
+            "table": "media_item",
+            "name": "taken_at_local"
+          }
+        }
       },
       {
         "ordinal": 1,
         "name": "timezone_offset_seconds",
-        "type_info": "Int4"
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "media_item",
+            "name": "timezone_offset_seconds"
+          }
+        }
       }
     ],
     "parameters": {

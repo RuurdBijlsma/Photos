@@ -6,12 +6,24 @@
       {
         "ordinal": 0,
         "name": "latitude",
-        "type_info": "Float8"
+        "type_info": "Float8",
+        "origin": {
+          "Table": {
+            "table": "gps",
+            "name": "latitude"
+          }
+        }
       },
       {
         "ordinal": 1,
         "name": "longitude",
-        "type_info": "Float8"
+        "type_info": "Float8",
+        "origin": {
+          "Table": {
+            "table": "gps",
+            "name": "longitude"
+          }
+        }
       }
     ],
     "parameters": {

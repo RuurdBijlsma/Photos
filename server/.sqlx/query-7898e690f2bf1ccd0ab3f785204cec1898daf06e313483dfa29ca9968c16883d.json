@@ -25,7 +25,8 @@
                 "sync_thumbnails",
                 "delayed_scan",
                 "generate_daily_cards",
-                "calc_system_stats"
+                "calc_system_stats",
+                "handle_web_upload"
               ]
             }
           }

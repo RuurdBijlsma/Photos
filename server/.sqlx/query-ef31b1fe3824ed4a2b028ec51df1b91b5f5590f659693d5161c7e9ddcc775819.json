@@ -6,22 +6,46 @@
       {
         "ordinal": 0,
         "name": "hash",
-        "type_info": "Text"
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "media_item",
+            "name": "hash"
+          }
+        }
       },
       {
         "ordinal": 1,
         "name": "rank",
-        "type_info": "Float8"
+        "type_info": "Float8",
+        "origin": {
+          "Table": {
+            "table": "album_media_item",
+            "name": "rank"
+          }
+        }
       },
       {
         "ordinal": 2,
         "name": "added_at",
-        "type_info": "Timestamptz"
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "album_media_item",
+            "name": "added_at"
+          }
+        }
       },
       {
         "ordinal": 3,
         "name": "added_by_user",
-        "type_info": "Int4"
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "album_media_item",
+            "name": "added_by_user"
+          }
+        }
       }
     ],
     "parameters": {

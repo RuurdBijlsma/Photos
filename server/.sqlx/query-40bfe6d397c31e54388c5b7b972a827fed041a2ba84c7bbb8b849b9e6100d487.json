@@ -6,12 +6,24 @@
       {
         "ordinal": 0,
         "name": "id",
-        "type_info": "Int8"
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "face",
+            "name": "id"
+          }
+        }
       },
       {
         "ordinal": 1,
         "name": "media_item_id",
-        "type_info": "Varchar"
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "visual_analysis",
+            "name": "media_item_id"
+          }
+        }
       },
       {
         "ordinal": 2,
@@ -21,32 +33,68 @@
             "name": "vector",
             "kind": "Simple"
           }
+        },
+        "origin": {
+          "Table": {
+            "table": "face",
+            "name": "embedding"
+          }
         }
       },
       {
         "ordinal": 3,
         "name": "position_x",
-        "type_info": "Float4"
+        "type_info": "Float4",
+        "origin": {
+          "Table": {
+            "table": "face",
+            "name": "position_x"
+          }
+        }
       },
       {
         "ordinal": 4,
         "name": "position_y",
-        "type_info": "Float4"
+        "type_info": "Float4",
+        "origin": {
+          "Table": {
+            "table": "face",
+            "name": "position_y"
+          }
+        }
       },
       {
         "ordinal": 5,
         "name": "width",
-        "type_info": "Float4"
+        "type_info": "Float4",
+        "origin": {
+          "Table": {
+            "table": "face",
+            "name": "width"
+          }
+        }
       },
       {
         "ordinal": 6,
         "name": "height",
-        "type_info": "Float4"
+        "type_info": "Float4",
+        "origin": {
+          "Table": {
+            "table": "face",
+            "name": "height"
+          }
+        }
       },
       {
         "ordinal": 7,
         "name": "percentage",
-        "type_info": "Int4"
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "visual_analysis",
+            "name": "percentage"
+          }
+        }
       }
     ],
     "parameters": {

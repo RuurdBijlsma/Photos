@@ -1,0 +1,44 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            EXTRACT(DOW FROM taken_at_local)::int AS \"dow?\",\n            EXTRACT(WEEK FROM taken_at_local)::int AS \"week?\",\n            EXTRACT(HOUR FROM taken_at_local)::int AS \"hour?\",\n            COUNT(*)::bigint AS \"count!\"\n        FROM media_item\n        WHERE user_id = $1 AND deleted = false\n        GROUP BY GROUPING SETS (\n            (EXTRACT(DOW FROM taken_at_local)::int),\n            (EXTRACT(WEEK FROM taken_at_local)::int),\n            (EXTRACT(HOUR FROM taken_at_local)::int)\n        )\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "dow?",
+        "type_info": "Int4",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 1,
+        "name": "week?",
+        "type_info": "Int4",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 2,
+        "name": "hour?",
+        "type_info": "Int4",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 3,
+        "name": "count!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4"
+      ]
+    },
+    "nullable": [
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "29f8c83e4d57fe5767be438117661cc042177bfefc119ee9e1155e77f47452cc"
+}

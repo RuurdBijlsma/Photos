@@ -6,37 +6,79 @@
       {
         "ordinal": 0,
         "name": "id",
-        "type_info": "Int4"
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "daily_card",
+            "name": "id"
+          }
+        }
       },
       {
         "ordinal": 1,
         "name": "card_date",
-        "type_info": "Date"
+        "type_info": "Date",
+        "origin": {
+          "Table": {
+            "table": "daily_card",
+            "name": "card_date"
+          }
+        }
       },
       {
         "ordinal": 2,
         "name": "card_type",
-        "type_info": "Text"
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "daily_card",
+            "name": "card_type"
+          }
+        }
       },
       {
         "ordinal": 3,
         "name": "title",
-        "type_info": "Text"
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "daily_card",
+            "name": "title"
+          }
+        }
       },
       {
         "ordinal": 4,
         "name": "subtitle",
-        "type_info": "Text"
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "daily_card",
+            "name": "subtitle"
+          }
+        }
       },
       {
         "ordinal": 5,
         "name": "thumbnail_media_item_id",
-        "type_info": "Varchar"
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "daily_card",
+            "name": "thumbnail_media_item_id"
+          }
+        }
       },
       {
         "ordinal": 6,
         "name": "payload",
-        "type_info": "Jsonb"
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "daily_card",
+            "name": "payload"
+          }
+        }
       }
     ],
     "parameters": {
