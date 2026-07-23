@@ -1,7 +1,7 @@
 use crate::runner::context::test_context::TestContext;
 use color_eyre::Result;
 use color_eyre::eyre::bail;
-use common_services::api::auth::interfaces::{LoginUser, Tokens};
+use common_services::api::auth::interfaces::LoginUser;
 use common_types::dev_constants::{EMAIL, PASSWORD};
 use std::path::PathBuf;
 use walkdir::WalkDir;
@@ -18,8 +18,22 @@ pub async fn login(context: &TestContext) -> Result<String> {
         .send()
         .await?;
     if response.status().is_success() {
-        let tokens: Tokens = response.json().await?;
-        Ok(tokens.access_token)
+        // Extract the access token from cookies for backward-compatible return value
+        let access_token = response
+            .headers()
+            .get_all(reqwest::header::SET_COOKIE)
+            .iter()
+            .filter_map(|h| h.to_str().ok())
+            .find(|s| s.starts_with("access_token="))
+            .and_then(|s| {
+                s.split(';')
+                    .next()?
+                    .split('=')
+                    .nth(1)
+                    .map(ToString::to_string)
+            })
+            .unwrap_or_default();
+        Ok(access_token)
     } else {
         bail!("{} - {}", response.status(), response.text().await?)
     }
