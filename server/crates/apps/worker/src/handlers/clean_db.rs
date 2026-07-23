@@ -81,7 +81,6 @@ async fn clean_old_upload_files(context: &WorkerContext) -> Result<()> {
         if !user_upload_folder.exists() {
             continue;
         }
-        dbg!(&user_upload_folder);
         for entry in WalkDir::new(&user_upload_folder)
             .contents_first(true)
             .into_iter()
