@@ -51,9 +51,7 @@ fn get_tus_handler(context: &ApiContext) -> TusHandler<FileStore, FileLocker> {
                     }
                     Ok(_) => {} // Ignore other hook events if they occur
                     Err(tokio::sync::broadcast::error::RecvError::Lagged(skipped)) => {
-                        tracing::warn!(
-                        "Upload event loop lagged. Skipped {skipped} events."
-                    );
+                        tracing::warn!("Upload event loop lagged. Skipped {skipped} events.");
                     }
                     Err(tokio::sync::broadcast::error::RecvError::Closed) => {
                         tracing::info!("Upload hook channel closed. Exiting event loop task.");

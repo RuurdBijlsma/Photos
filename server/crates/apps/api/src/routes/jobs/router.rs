@@ -1,8 +1,8 @@
 use crate::api_state::ApiContext;
 use crate::jobs::handlers::{
     cancel_job_handler, get_failed_ingest_jobs_handler, get_running_ingest_jobs_handler,
-    ingest_overview_handler, job_summary_handler, retry_ingest_job_handler, retry_job_handler,
-    scan_user_media_handler, get_user_ingest_jobs_handler,
+    get_user_ingest_jobs_handler, ingest_overview_handler, job_summary_handler,
+    retry_ingest_job_handler, retry_job_handler, scan_user_media_handler,
 };
 use axum::{
     Router,

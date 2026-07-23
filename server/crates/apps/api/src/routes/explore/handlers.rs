@@ -1,19 +1,17 @@
 use crate::api_state::ApiContext;
 use crate::auth::middlewares::user::ApiUser;
 use axum::extract::{Path, State};
+use axum::{Extension, Json};
 use axum_extra::extract::Query;
 use axum_extra::protobuf::Protobuf;
-use axum::{Extension, Json};
 use common_services::api::app_error::AppError;
 use common_services::api::explore::interfaces::{
     ExploreTableQuery, HistogramResponse, PaginatedExploreTableResponse,
 };
-use common_services::api::explore::service::{
-    get_explore_table, get_histograms,
-};
-use common_types::pb::api::{VisitedLocation, LocationDetailsResponse};
-use tracing::instrument;
 use common_services::api::explore::locations::{get_location, get_visited_places};
+use common_services::api::explore::service::{get_explore_table, get_histograms};
+use common_types::pb::api::{LocationDetailsResponse, VisitedLocation};
+use tracing::instrument;
 
 #[instrument(skip(context, user), err(Debug))]
 pub async fn get_explore_table_handler(

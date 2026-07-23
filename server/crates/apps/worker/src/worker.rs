@@ -8,7 +8,7 @@ use common_services::database::jobs::JobType;
 use common_services::utils::nice_id;
 use sqlx::PgPool;
 use std::time::Duration;
-use tracing::{info};
+use tracing::info;
 
 #[allow(clippy::large_futures)]
 pub async fn create_worker(
@@ -18,7 +18,14 @@ pub async fn create_worker(
     stop_on_sleep: bool,
 ) -> Result<()> {
     let shutdown_rx = get_kill_signal();
-    create_worker_with_shutdown(pool, settings, excluded_job_types, stop_on_sleep, shutdown_rx).await
+    create_worker_with_shutdown(
+        pool,
+        settings,
+        excluded_job_types,
+        stop_on_sleep,
+        shutdown_rx,
+    )
+    .await
 }
 
 #[allow(clippy::large_futures)]

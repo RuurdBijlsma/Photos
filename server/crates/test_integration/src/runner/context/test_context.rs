@@ -93,11 +93,7 @@ impl TestContext {
     fn spawn_services(
         pool: &PgPool,
         settings: &AppSettings,
-    ) -> (
-        JoinHandle<()>,
-        JoinHandle<()>,
-        JoinHandle<()>,
-    ) {
+    ) -> (JoinHandle<()>, JoinHandle<()>, JoinHandle<()>) {
         // Spawn API server
         let api_pool = pool.clone();
         let api_settings = settings.clone();
@@ -116,8 +112,7 @@ impl TestContext {
             config.cooldown_period_secs = 1;
             let (_shutdown_tx, shutdown_rx) = tokio::sync::watch::channel(false);
             if let Err(e) =
-                worker_scaler::start_scaler(scaler_pool, scaler_settings, config, shutdown_rx)
-                    .await
+                worker_scaler::start_scaler(scaler_pool, scaler_settings, config, shutdown_rx).await
             {
                 error!("Worker Scaler failed: {}", e);
             }

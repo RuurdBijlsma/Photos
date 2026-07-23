@@ -1,5 +1,8 @@
 use crate::api::app_error::AppError;
-use crate::api::explore::interfaces::{DayOfWeekBucket, ExploreMediaItem, ExploreTableQuery, HistogramResponse, HourOfDayBucket, PaginatedExploreTableResponse, WeekOfYearBucket};
+use crate::api::explore::interfaces::{
+    DayOfWeekBucket, ExploreMediaItem, ExploreTableQuery, HistogramResponse, HourOfDayBucket,
+    PaginatedExploreTableResponse, WeekOfYearBucket,
+};
 use sqlx::{PgPool, Postgres, QueryBuilder};
 
 pub struct ExploreSort {
@@ -204,8 +207,8 @@ pub async fn get_histograms(pool: &PgPool, user_id: i32) -> Result<HistogramResp
         "#,
         user_id
     )
-        .fetch_all(pool)
-        .await?;
+    .fetch_all(pool)
+    .await?;
 
     let mut day_of_week = Vec::new();
     let mut week_of_year = Vec::new();

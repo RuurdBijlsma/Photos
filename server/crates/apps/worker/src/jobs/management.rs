@@ -107,8 +107,8 @@ async fn mark_job_done(pool: &PgPool, job_id: i64) -> Result<()> {
         "UPDATE jobs SET status = 'done', finished_at = now() WHERE id = $1",
         job_id
     )
-        .execute(pool)
-        .await?;
+    .execute(pool)
+    .await?;
     Ok(())
 }
 

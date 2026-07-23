@@ -2,7 +2,7 @@ use app_state::{database_url, load_app_settings};
 use color_eyre::Result;
 use common_services::database::get_db_pool;
 use tracing::Level;
-use tracing_subscriber::{fmt, EnvFilter};
+use tracing_subscriber::{EnvFilter, fmt};
 use worker_scaler::config::ScalerConfig;
 use worker_scaler::start_scaler;
 
@@ -11,7 +11,7 @@ fn get_kill_signal() -> tokio::sync::watch::Receiver<bool> {
     tokio::spawn(async move {
         #[cfg(unix)]
         {
-            use tokio::signal::unix::{signal, SignalKind};
+            use tokio::signal::unix::{SignalKind, signal};
             let mut sigterm =
                 signal(SignalKind::terminate()).expect("Failed to register SIGTERM handler");
             let mut sigint =

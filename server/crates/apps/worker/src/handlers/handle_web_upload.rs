@@ -79,11 +79,13 @@ pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
         &user_upload_folder,
         &user_upload_folder.join(&sanitized_filename),
     )
-        .await;
+    .await;
 
     tokio::fs::create_dir_all(&user_upload_folder).await?;
 
-    let file_exists_at_destination = tokio::fs::try_exists(&destination_path).await.unwrap_or(false);
+    let file_exists_at_destination = tokio::fs::try_exists(&destination_path)
+        .await
+        .unwrap_or(false);
     let file_exists_at_source = tokio::fs::try_exists(&uploaded_file).await.unwrap_or(false);
 
     if !file_exists_at_source && file_exists_at_destination {
@@ -96,7 +98,7 @@ pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
             &user_upload_folder,
             &user_upload_folder.join(format!("{sanitized_filename}.uploading")),
         )
-            .await;
+        .await;
 
         if fs::rename(&uploaded_file, &destination_path).await.is_err() {
             fs::copy(&uploaded_file, &temp_destination_path).await?;
@@ -107,9 +109,14 @@ pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
 
     // Attempt to clean up the metadata file, but ignore failures if it was already deleted
     if let Err(e) = fs::remove_file(&uploaded_metadata_file).await
-        && e.kind() != std::io::ErrorKind::NotFound {
-            tracing::warn!("Failed to clean up metadata file {:?}: {}", uploaded_metadata_file, e);
-        }
+        && e.kind() != std::io::ErrorKind::NotFound
+    {
+        tracing::warn!(
+            "Failed to clean up metadata file {:?}: {}",
+            uploaded_metadata_file,
+            e
+        );
+    }
 
     enqueue_full_ingest(
         &context.pool,

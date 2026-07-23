@@ -13,11 +13,7 @@ pub async fn test_search_filters(context: &TestContext) -> Result<()> {
     let url = format!("{}/search", context.settings.api.public_url);
 
     // --- TEST 1: Basic Search ---
-    let res = client
-        .get(&url)
-        .query(&[("query", "photo")])
-        .send()
-        .await?;
+    let res = client.get(&url).query(&[("query", "photo")]).send().await?;
     assert_eq!(res.status(), StatusCode::OK);
     let bytes = res.bytes().await?;
     let search_res = SearchResponse::decode(Cursor::new(bytes))?;

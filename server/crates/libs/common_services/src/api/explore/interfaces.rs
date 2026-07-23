@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
 use chrono::NaiveDateTime;
+use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -74,12 +74,12 @@ pub struct DayOfWeekBucket {
 #[serde(rename_all = "camelCase")]
 pub struct WeekOfYearBucket {
     pub week: i32,
-    pub count: i64
+    pub count: i64,
 }
 
 #[derive(Serialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct HourOfDayBucket {
     pub hour: i32,
-    pub count: i64
+    pub count: i64,
 }

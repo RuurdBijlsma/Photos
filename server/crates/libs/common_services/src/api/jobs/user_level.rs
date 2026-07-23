@@ -1,5 +1,7 @@
 use crate::api::app_error::AppError;
-use crate::api::jobs::interfaces::{IngestOverviewResponse, JobInfo, UserJobsQuery, PaginatedJobsResponse};
+use crate::api::jobs::interfaces::{
+    IngestOverviewResponse, JobInfo, PaginatedJobsResponse, UserJobsQuery,
+};
 use crate::database::jobs::{JobStatus, JobType};
 use sqlx::{PgPool, Postgres, QueryBuilder};
 
@@ -195,7 +197,8 @@ pub async fn get_user_ingest_jobs(
     let offset = (page - 1) * limit;
 
     // 1. Build and execute total count query
-    let mut count_builder = QueryBuilder::<Postgres>::new("SELECT COUNT(*) FROM jobs WHERE user_id = ");
+    let mut count_builder =
+        QueryBuilder::<Postgres>::new("SELECT COUNT(*) FROM jobs WHERE user_id = ");
     count_builder.push_bind(user_id);
     count_builder.push(" AND job_type IN ('ingest_metadata'::job_type, 'ingest_thumbnails'::job_type, 'ingest_analysis'::job_type)");
 
@@ -216,14 +219,17 @@ pub async fn get_user_ingest_jobs(
             }
         }
     } else {
-        count_builder.push(" AND status IN ('queued'::job_status, 'running'::job_status, 'failed'::job_status)");
+        count_builder.push(
+            " AND status IN ('queued'::job_status, 'running'::job_status, 'failed'::job_status)",
+        );
     }
 
     if let Some(search) = &query.search
-        && !search.trim().is_empty() {
-            count_builder.push(" AND relative_path ILIKE ");
-            count_builder.push_bind(format!("%{}%", search.trim()));
-        }
+        && !search.trim().is_empty()
+    {
+        count_builder.push(" AND relative_path ILIKE ");
+        count_builder.push_bind(format!("%{}%", search.trim()));
+    }
 
     let count_query = count_builder.build_query_scalar::<i64>();
     let total = count_query.fetch_one(pool).await?;
@@ -232,7 +238,7 @@ pub async fn get_user_ingest_jobs(
     let mut select_builder = QueryBuilder::<Postgres>::new(
         "SELECT id, relative_path, user_id, job_type, payload, priority, status, attempts, \
          dependency_attempts, max_attempts, owner, started_at, finished_at, created_at, \
-         scheduled_at, last_heartbeat, last_error FROM jobs WHERE user_id = "
+         scheduled_at, last_heartbeat, last_error FROM jobs WHERE user_id = ",
     );
     select_builder.push_bind(user_id);
     select_builder.push(" AND job_type IN ('ingest_metadata'::job_type, 'ingest_thumbnails'::job_type, 'ingest_analysis'::job_type)");
@@ -254,14 +260,17 @@ pub async fn get_user_ingest_jobs(
             }
         }
     } else {
-        select_builder.push(" AND status IN ('queued'::job_status, 'running'::job_status, 'failed'::job_status)");
+        select_builder.push(
+            " AND status IN ('queued'::job_status, 'running'::job_status, 'failed'::job_status)",
+        );
     }
 
     if let Some(search) = &query.search
-        && !search.trim().is_empty() {
-            select_builder.push(" AND relative_path ILIKE ");
-            select_builder.push_bind(format!("%{}%", search.trim()));
-        }
+        && !search.trim().is_empty()
+    {
+        select_builder.push(" AND relative_path ILIKE ");
+        select_builder.push_bind(format!("%{}%", search.trim()));
+    }
 
     select_builder.push(" ORDER BY id DESC LIMIT ");
     select_builder.push_bind(limit);
@@ -278,4 +287,3 @@ pub async fn get_user_ingest_jobs(
         offset,
     })
 }
-

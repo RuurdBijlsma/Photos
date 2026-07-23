@@ -207,7 +207,11 @@ impl Scaler {
         ];
 
         for &profile in &priority {
-            if let Some(pos) = self.active_workers.iter().position(|w| w.profile == profile) {
+            if let Some(pos) = self
+                .active_workers
+                .iter()
+                .position(|w| w.profile == profile)
+            {
                 let worker = &self.active_workers[pos];
                 info!(
                     "📉 [Worker Scaler] Sending shutdown signal to worker: id={}, profile={:?}",

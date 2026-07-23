@@ -86,11 +86,7 @@ pub async fn test_login(context: &TestContext) -> Result<()> {
         .await?;
     let login_status = response.status();
 
-    let response = context
-        .http_client
-        .get(me_url)
-        .send()
-        .await?;
+    let response = context.http_client.get(me_url).send().await?;
     let me_status = response.status();
     let user: User = response.json().await?;
 
@@ -125,11 +121,7 @@ pub async fn test_refresh(context: &TestContext) -> Result<()> {
 
     // ACT
     // 2. Refresh session using stored cookie
-    let response = context
-        .http_client
-        .post(refresh_url)
-        .send()
-        .await?;
+    let response = context.http_client.post(refresh_url).send().await?;
 
     let status = response.status();
 
@@ -137,11 +129,7 @@ pub async fn test_refresh(context: &TestContext) -> Result<()> {
     assert_eq!(status, reqwest::StatusCode::OK);
 
     // 3. Verify access works with new cookie
-    let me_response = context
-        .http_client
-        .get(me_url)
-        .send()
-        .await?;
+    let me_response = context.http_client.get(me_url).send().await?;
 
     assert_eq!(me_response.status(), reqwest::StatusCode::OK);
 
@@ -168,21 +156,13 @@ pub async fn test_logout(context: &TestContext) -> Result<()> {
 
     // ACT
     // 2. Logout using cookie
-    let logout_response = context
-        .http_client
-        .post(logout_url)
-        .send()
-        .await?;
+    let logout_response = context.http_client.post(logout_url).send().await?;
 
     // ASSERT
     assert_eq!(logout_response.status(), reqwest::StatusCode::NO_CONTENT);
 
     // 3. Verify refresh is unauthorized after logout
-    let refresh_response = context
-        .http_client
-        .post(refresh_url)
-        .send()
-        .await?;
+    let refresh_response = context.http_client.post(refresh_url).send().await?;
 
     assert_eq!(refresh_response.status(), reqwest::StatusCode::UNAUTHORIZED);
 
