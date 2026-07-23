@@ -30,7 +30,7 @@ pub struct Scaler {
 
 impl Scaler {
     #[must_use]
-    pub fn new(pool: PgPool, settings: AppSettings, config: ScalerConfig) -> Self {
+    pub const fn new(pool: PgPool, settings: AppSettings, config: ScalerConfig) -> Self {
         Self {
             pool,
             settings,
@@ -102,23 +102,22 @@ impl Scaler {
 
         // Check Scale-Up Logic
         let cooldown = Duration::from_secs(self.config.cooldown_period_secs);
-        if let Some(last_spawn) = self.last_spawn_time {
-            if last_spawn.elapsed() < cooldown {
+        if let Some(last_spawn) = self.last_spawn_time
+            && last_spawn.elapsed() < cooldown {
                 return Ok(());
             }
-        }
 
         // Try scaling up in order of priority: Heavy -> Medium -> Light -> Llm
-        if self.try_spawn_profile(WorkerProfile::Heavy, demand.heavy_demand, headroom_mb)? {
+        if self.try_spawn_profile(WorkerProfile::Heavy, demand.heavy_demand, headroom_mb) {
             return Ok(());
         }
-        if self.try_spawn_profile(WorkerProfile::Medium, demand.medium_demand, headroom_mb)? {
+        if self.try_spawn_profile(WorkerProfile::Medium, demand.medium_demand, headroom_mb) {
             return Ok(());
         }
-        if self.try_spawn_profile(WorkerProfile::Light, demand.light_demand, headroom_mb)? {
+        if self.try_spawn_profile(WorkerProfile::Light, demand.light_demand, headroom_mb) {
             return Ok(());
         }
-        if self.try_spawn_profile(WorkerProfile::Llm, demand.llm_demand, headroom_mb)? {
+        if self.try_spawn_profile(WorkerProfile::Llm, demand.llm_demand, headroom_mb) {
             return Ok(());
         }
 
@@ -152,7 +151,7 @@ impl Scaler {
         profile: WorkerProfile,
         demand: usize,
         headroom_mb: u64,
-    ) -> Result<bool> {
+    ) -> bool {
         let active_count = self.count_active(profile);
         let max_count = self.config.max_workers(profile);
 
@@ -160,15 +159,15 @@ impl Scaler {
             && active_count < max_count
             && headroom_mb >= profile.estimated_ram_mb()
         {
-            self.spawn_worker(profile)?;
+            self.spawn_worker(profile);
             self.last_spawn_time = Some(Instant::now());
-            Ok(true)
+            true
         } else {
-            Ok(false)
+            false
         }
     }
 
-    fn spawn_worker(&mut self, profile: WorkerProfile) -> Result<()> {
+    fn spawn_worker(&mut self, profile: WorkerProfile) {
         self.worker_counter += 1;
         let worker_id = format!("scaler-w{}-{:?}", self.worker_counter, profile);
         let (shutdown_tx, shutdown_rx) = watch::channel(false);
@@ -193,11 +192,9 @@ impl Scaler {
             shutdown_tx,
             handle,
         });
-
-        Ok(())
     }
 
-    fn scale_down(&mut self) {
+    fn scale_down(&self) {
         // Find candidate to stop: prioritize Llm -> Heavy -> Medium -> Light
         let priority = [
             WorkerProfile::Llm,

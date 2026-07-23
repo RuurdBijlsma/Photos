@@ -40,11 +40,11 @@ impl WorkerContext {
         };
 
         // Load text_embedder IF the worker CAN run ClusterPhotos
-        let text_embedder = if !excluded_job_types.contains(&JobType::ClusterPhotos) {
+        let text_embedder = if excluded_job_types.contains(&JobType::ClusterPhotos) {
+            None
+        } else {
             let embedder = TextEmbedder::from_hf(embedder_model_id).build().await?;
             Some(Arc::new(embedder))
-        } else {
-            None
         };
 
         Ok(Self {

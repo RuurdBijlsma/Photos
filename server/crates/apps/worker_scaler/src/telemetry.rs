@@ -25,7 +25,7 @@ impl Telemetry {
     }
 
     /// Calculate the required memory buffer in MB based on settings.
-    /// Buffer is min(total_memory * buffer_pct, max_buffer_mb).
+    /// Buffer is `min(total_memory * buffer_pct, max_buffer_mb)`.
     #[must_use]
     pub fn required_memory_buffer_mb(&self, buffer_pct: f64, max_buffer_mb: u64) -> u64 {
         let pct_buffer = ((self.total_memory_mb as f64) * (buffer_pct / 100.0)) as u64;

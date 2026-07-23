@@ -14,7 +14,7 @@ pub async fn query_queue_demand(pool: &PgPool) -> color_eyre::Result<QueueDemand
     let heartbeat_timeout_seconds = 150.0;
 
     let rows = sqlx::query(
-        r#"
+        r"
         SELECT j.job_type::text AS job_type, COUNT(*)::bigint AS count
         FROM jobs j
         WHERE
@@ -33,7 +33,7 @@ pub async fn query_queue_demand(pool: &PgPool) -> color_eyre::Result<QueueDemand
               )
           )
         GROUP BY j.job_type
-        "#,
+        ",
     )
     .bind(heartbeat_timeout_seconds)
     .fetch_all(pool)
