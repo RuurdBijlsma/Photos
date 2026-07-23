@@ -8,7 +8,7 @@ use std::io::Cursor;
 
 pub async fn test_search_filters(context: &TestContext) -> Result<()> {
     // ARRANGE
-    let token = login(context).await?;
+    login(context).await?;
     let client = &context.http_client;
     let url = format!("{}/search", context.settings.api.public_url);
 
@@ -16,7 +16,6 @@ pub async fn test_search_filters(context: &TestContext) -> Result<()> {
     let res = client
         .get(&url)
         .query(&[("query", "photo")])
-        .bearer_auth(&token)
         .send()
         .await?;
     assert_eq!(res.status(), StatusCode::OK);
@@ -31,7 +30,6 @@ pub async fn test_search_filters(context: &TestContext) -> Result<()> {
     let res = client
         .get(&url)
         .query(&[("query", "photo"), ("mediaType", "photo")])
-        .bearer_auth(&token)
         .send()
         .await?;
     assert_eq!(res.status(), StatusCode::OK);
@@ -47,7 +45,6 @@ pub async fn test_search_filters(context: &TestContext) -> Result<()> {
     let res = client
         .get(&url)
         .query(&[("query", "video"), ("mediaType", "video")])
-        .bearer_auth(&token)
         .send()
         .await?;
     assert_eq!(res.status(), StatusCode::OK);
@@ -60,7 +57,6 @@ pub async fn test_search_filters(context: &TestContext) -> Result<()> {
     let res = client
         .get(&url)
         .query(&[("query", "photo"), ("sortBy", "date")])
-        .bearer_auth(&token)
         .send()
         .await?;
     assert_eq!(res.status(), StatusCode::OK);
@@ -71,7 +67,6 @@ pub async fn test_search_filters(context: &TestContext) -> Result<()> {
     let res = client
         .get(&url)
         .query(&[("query", "dog"), ("negativeQuery", "cat")])
-        .bearer_auth(&token)
         .send()
         .await?;
     assert_eq!(res.status(), StatusCode::OK);
@@ -84,7 +79,6 @@ pub async fn test_search_filters(context: &TestContext) -> Result<()> {
             ("startDate", "2020-01-01T00:00:00Z"),
             ("endDate", "2030-01-01T00:00:00Z"),
         ])
-        .bearer_auth(&token)
         .send()
         .await?;
     assert_eq!(res.status(), StatusCode::OK);
@@ -93,7 +87,6 @@ pub async fn test_search_filters(context: &TestContext) -> Result<()> {
     let res = client
         .get(&url)
         .query(&[("query", "photo"), ("countryCode", "NL")])
-        .bearer_auth(&token)
         .send()
         .await?;
     assert_eq!(res.status(), StatusCode::OK);

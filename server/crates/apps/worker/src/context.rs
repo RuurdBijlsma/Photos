@@ -22,11 +22,6 @@ pub struct WorkerContext {
 
 impl WorkerContext {
     /// Creates a new instance of `WorkerContext`.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if the creation of `MediaAnalyzer`,
-    /// `VisualAnalyzer`, or `TextEmbedder` fails.
     pub async fn new(
         pool: PgPool,
         settings: AppSettings,
@@ -35,17 +30,17 @@ impl WorkerContext {
     ) -> Result<Self> {
         let embedder_model_id = &settings.ingest.analyzer.search.embedder_model_id;
 
-        // Load visual_analyzer ONLY if both IngestLLM and IngestAnalysis are in excluded_job_types
-        let visual_analyzer = if excluded_job_types.contains(&JobType::IngestLlm)
-            && excluded_job_types.contains(&JobType::IngestAnalysis)
+        // Load visual_analyzer IF the worker CAN run IngestLlm OR IngestAnalysis
+        let visual_analyzer = if !excluded_job_types.contains(&JobType::IngestLlm)
+            || !excluded_job_types.contains(&JobType::IngestAnalysis)
         {
             Some(Arc::new(VisualAnalyzer::new(embedder_model_id).await?))
         } else {
             None
         };
 
-        // Load text_embedder ONLY if ClusterPhotos is in excluded_job_types
-        let text_embedder = if excluded_job_types.contains(&JobType::ClusterPhotos) {
+        // Load text_embedder IF the worker CAN run ClusterPhotos
+        let text_embedder = if !excluded_job_types.contains(&JobType::ClusterPhotos) {
             let embedder = TextEmbedder::from_hf(embedder_model_id).build().await?;
             Some(Arc::new(embedder))
         } else {

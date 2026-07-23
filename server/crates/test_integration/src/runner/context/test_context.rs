@@ -70,10 +70,8 @@ impl TestContext {
         let (api_handle, scaler_handle, watcher_handle) =
             Self::spawn_services(&main_pool, &settings);
 
-        // 4. Wait for the API to be ready to accept traffic with a cookie-enabled HTTP client
-        let http_client = Client::builder()
-            .cookie_store(true)
-            .build()?;
+        // 4. Wait for the API to be ready to accept traffic (with cookie store enabled)
+        let http_client = Client::builder().cookie_store(true).build()?;
         Self::wait_for_healthy_api(&settings, &http_client).await?;
 
         info!("Test environment is ready.");
@@ -116,9 +114,6 @@ impl TestContext {
             let mut config = worker_scaler::config::ScalerConfig::default();
             config.tick_interval_secs = 1;
             config.cooldown_period_secs = 1;
-            // Disable memory buffers to guarantee workers spawn during tests regardless of host memory load
-            config.system_memory_buffer_percentage = 0.0;
-            config.system_memory_buffer_maximum_mb = 0;
             let (_shutdown_tx, shutdown_rx) = tokio::sync::watch::channel(false);
             if let Err(e) =
                 worker_scaler::start_scaler(scaler_pool, scaler_settings, config, shutdown_rx)

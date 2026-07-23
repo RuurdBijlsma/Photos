@@ -19,7 +19,7 @@ use tracing::info;
 
 pub async fn test_album_lifecycle(context: &TestContext) -> Result<()> {
     // ARRANGE
-    let token = login(context).await?;
+    login(context).await?;
     let client = &context.http_client;
     let base_url = &context.settings.api.public_url;
 
@@ -33,7 +33,6 @@ pub async fn test_album_lifecycle(context: &TestContext) -> Result<()> {
 
     let response = client
         .post(format!("{base_url}/album"))
-        .bearer_auth(&token)
         .json(&create_payload)
         .send()
         .await?;
@@ -43,32 +42,24 @@ pub async fn test_album_lifecycle(context: &TestContext) -> Result<()> {
     assert_eq!(created_album.name, create_payload.name);
 
     // 2. List Albums
-    let response = client
-        .get(format!("{base_url}/album"))
-        .bearer_auth(&token)
-        .send()
-        .await?;
+    let response = client.get(format!("{base_url}/album")).send().await?;
 
     assert_eq!(response.status(), StatusCode::OK);
     let albums: Vec<Album> = response.json().await?;
     assert!(albums.iter().any(|a| a.id == created_album.id));
-
-    // 3. Get Album Details
-    // todo: get album details via /ratios, /ids, /by-month
 
     Ok(())
 }
 
 pub async fn test_update_album(context: &TestContext) -> Result<()> {
     // ARRANGE
-    let token = login(context).await?;
+    login(context).await?;
     let client = &context.http_client;
     let base_url = &context.settings.api.public_url;
 
     // Create an album first
     let created_album: Album = client
         .post(format!("{base_url}/album"))
-        .bearer_auth(&token)
         .json(&CreateAlbumRequest {
             name: "Original Name".to_string(),
             description: None,
@@ -90,7 +81,6 @@ pub async fn test_update_album(context: &TestContext) -> Result<()> {
 
     let response = client
         .put(format!("{base_url}/album/{}", created_album.id))
-        .bearer_auth(&token)
         .json(&update_payload)
         .send()
         .await?;
@@ -111,7 +101,7 @@ pub async fn test_update_album(context: &TestContext) -> Result<()> {
 
 pub async fn test_album_media_management(context: &TestContext) -> Result<()> {
     // ARRANGE
-    let token = login(context).await?;
+    login(context).await?;
     let client = &context.http_client;
     let base_url = &context.settings.api.public_url;
 
@@ -128,7 +118,6 @@ pub async fn test_album_media_management(context: &TestContext) -> Result<()> {
     // Create Album
     let album: Album = client
         .post(format!("{base_url}/album"))
-        .bearer_auth(&token)
         .json(&CreateAlbumRequest {
             name: "Media Test Album".to_string(),
             description: None,
@@ -143,7 +132,6 @@ pub async fn test_album_media_management(context: &TestContext) -> Result<()> {
     // 1. Add Media to Album
     let response = client
         .post(format!("{base_url}/album/{}/media", album.id))
-        .bearer_auth(&token)
         .json(&AddMediaToAlbumRequest {
             media_item_ids: vec![media_id.clone()],
         })
@@ -152,33 +140,24 @@ pub async fn test_album_media_management(context: &TestContext) -> Result<()> {
 
     assert_eq!(response.status(), StatusCode::OK);
 
-    // Verify addition via details
-    // todo verify with /ids, /ratios, /by-month, maybe just put back the get album details endpoint
-
     // 2. Remove Media from Album
     let response = client
         .delete(format!("{base_url}/album/{}/media/{}", album.id, media_id))
-        .bearer_auth(&token)
         .send()
         .await?;
 
     assert_eq!(response.status(), StatusCode::NO_CONTENT);
 
-    // Verify removal
-    // todo verify with /ids, /ratios, /by-month, maybe just put back the get album details endpoint
-
     Ok(())
 }
 
-#[allow(clippy::too_many_lines)]
 pub async fn test_album_sharing(context: &TestContext) -> Result<()> {
-    // # Generate JWT invite
     // ARRANGE
-    let token = login(context).await?;
+    login(context).await?;
     let client = &context.http_client;
     let base_url = &context.settings.api.public_url;
     let source_album_name = "Invite Test Album";
-    // Find a valid media item ID from DB
+
     let Some(media_id) = sqlx::query_scalar!("SELECT id FROM media_item LIMIT 1")
         .fetch_optional(&context.pool)
         .await?
@@ -188,7 +167,6 @@ pub async fn test_album_sharing(context: &TestContext) -> Result<()> {
 
     let album: Album = client
         .post(format!("{base_url}/album"))
-        .bearer_auth(&token)
         .json(&CreateAlbumRequest {
             name: source_album_name.to_string(),
             description: None,
@@ -199,10 +177,10 @@ pub async fn test_album_sharing(context: &TestContext) -> Result<()> {
         .await?
         .json()
         .await?;
+
     // Add Media to Album
     let response = client
         .post(format!("{base_url}/album/{}/media", album.id))
-        .bearer_auth(&token)
         .json(&AddMediaToAlbumRequest {
             media_item_ids: vec![media_id.clone()],
         })
@@ -213,7 +191,6 @@ pub async fn test_album_sharing(context: &TestContext) -> Result<()> {
     // ACT
     let response = client
         .get(format!("{base_url}/album/{}/invite", album.id))
-        .bearer_auth(&token)
         .send()
         .await?;
 
@@ -221,10 +198,9 @@ pub async fn test_album_sharing(context: &TestContext) -> Result<()> {
     assert_eq!(response.status(), StatusCode::OK);
     let invite_token: String = response.json().await?;
 
-    // # Check JWT invite
+    // Check JWT invite
     let response = client
         .post(format!("{base_url}/album/invite/check"))
-        .bearer_auth(&token)
         .json(&CheckInviteRequest {
             token: invite_token.clone(),
         })
@@ -239,12 +215,11 @@ pub async fn test_album_sharing(context: &TestContext) -> Result<()> {
         assert!(context.settings.ingest.media_root.join(&rel_path).exists());
     }
 
-    // # Accept JWT invite
+    // Accept JWT invite
     let imported_album_name = "My new imported album";
     let imported_album_description = "New description";
     let response = client
         .post(format!("{base_url}/album/invite/accept"))
-        .bearer_auth(&token)
         .json(&AcceptInviteRequest {
             token: invite_token.clone(),
             name: imported_album_name.to_owned(),
@@ -265,7 +240,6 @@ pub async fn test_album_sharing(context: &TestContext) -> Result<()> {
     let start_time = Instant::now();
     let timeout = Duration::from_mins(1);
     info!("Waiting for album import to complete.");
-    // todo: om een of andere reden wordt de import album item job niet opgepakt?
     loop {
         let album_content = AlbumStore::list_media_items(&context.pool, &album.id).await?;
         if !album_content.is_empty() {
@@ -290,6 +264,7 @@ pub async fn test_album_sharing(context: &TestContext) -> Result<()> {
     else {
         bail!("Remote user id set on imported media item");
     };
+
     {
         struct RemoteUser {
             user_id: i32,

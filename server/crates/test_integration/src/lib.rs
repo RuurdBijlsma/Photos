@@ -38,7 +38,7 @@ mod test_runner {
     use colored::*;
     use std::time::Instant;
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread", worker_threads = 8)]
     async fn integration_suite() -> Result<()> {
         setup_tracing_and_panic_handling();
         let context = TestContext::new().await?;

@@ -1,10 +1,10 @@
 use app_state::constants::{
     FACE_CLUSTERS_FOLDER, ON_DEMAND_THUMBNAIL_CACHE_FOLDER, PANO_FOLDER, THUMBNAILS_FOLDER,
 };
-use app_state::{AppSettings, database_url};
+use app_state::{AppSettings, database_url, init_app_data_folders};
 use color_eyre::eyre::Result;
 use common_services::database::get_db_pool;
-use sqlx::{PgPool};
+use sqlx::PgPool;
 use std::fs;
 use std::net::TcpListener;
 use std::path::Path;
@@ -16,10 +16,8 @@ pub fn create_test_settings(
     database_name: &str,
     base_settings: &AppSettings,
 ) -> Result<(AppSettings, TempDir, TempDir, String)> {
-    // 1. Load base settings from the test configuration file.
     let mut settings = base_settings.clone();
 
-    // 2. Create temporary directories for media and thumbnails.
     let media_dir = TempDir::new()?;
     let app_data_dir = TempDir::new()?;
     let app_data_path = app_data_dir.path();
@@ -35,7 +33,8 @@ pub fn create_test_settings(
         app_data_path.join(ON_DEMAND_THUMBNAIL_CACHE_FOLDER);
     settings.ingest.thumbnails_root = app_data_path.join(THUMBNAILS_FOLDER);
 
-    // 3. Update the database URL to point to our unique test database.
+    init_app_data_folders(&settings.ingest);
+
     let mut db_url = Url::parse(database_url())?;
     db_url.set_path(&format!("/{database_name}"));
 

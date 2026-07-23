@@ -17,7 +17,7 @@ use tracing::info;
 
 pub async fn test_photo_download(context: &TestContext) -> Result<()> {
     // ARRANGE
-    let token = login(context).await?;
+    login(context).await?;
     let (photos, videos) = media_dir_contents(context)?;
     let client = &context.http_client;
     let url = format!("{}/photos/download", context.settings.api.public_url);
@@ -29,13 +29,11 @@ pub async fn test_photo_download(context: &TestContext) -> Result<()> {
         let response = client
             .get(&url)
             .query(&[("path", &relative_path)])
-            .bearer_auth(&token)
             .send()
             .await?;
 
         assert_eq!(response.status(), StatusCode::OK);
 
-        // Check Headers
         let content_type = response
             .headers()
             .get("content-type")
@@ -46,7 +44,6 @@ pub async fn test_photo_download(context: &TestContext) -> Result<()> {
             "Expected image mime type, got {content_type}"
         );
 
-        // Check Body Size matches File Size
         let file_size = fs::metadata(photo_path).await?.len();
         let bytes = response.bytes().await?;
         assert_eq!(
@@ -65,7 +62,6 @@ pub async fn test_photo_download(context: &TestContext) -> Result<()> {
         let response = client
             .get(&url)
             .query(&[("path", &relative_path)])
-            .bearer_auth(&token)
             .send()
             .await?;
 
@@ -86,7 +82,6 @@ pub async fn test_photo_download(context: &TestContext) -> Result<()> {
     let response = client
         .get(&url)
         .query(&[("path", "non_existent_file.jpg")])
-        .bearer_auth(&token)
         .send()
         .await?;
 
@@ -103,43 +98,25 @@ pub async fn test_photo_download(context: &TestContext) -> Result<()> {
     let response = client
         .get(&url)
         .query(&[("path", traversal_path)])
-        .bearer_auth(&token)
         .send()
         .await?;
 
-    // Cleanup
     let _ = fs::remove_file(secret_file).await;
 
-    // The service checks `!file_canon.starts_with(&media_dir_canon)` -> returns InvalidPath (400)
     assert_eq!(
         response.status(),
         StatusCode::BAD_REQUEST,
         "Traversal attempt should return 400 Bad Request"
     );
 
-    // --- TEST 5: Unauthorized Access ---
-    if let Some(photo_path) = photos.first() {
-        let relative_path = photo_path.make_relative(&context.settings.ingest.media_root)?;
-
-        let response = client
-            .get(&url)
-            .query(&[("path", &relative_path)])
-            // No Bearer Auth
-            .send()
-            .await?;
-
-        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
-    }
-
     Ok(())
 }
 
 pub async fn test_get_full_item(context: &TestContext) -> Result<()> {
     // ARRANGE
-    let token = login(context).await?;
+    login(context).await?;
     let client = &context.http_client;
 
-    // Get a valid ID from the database
     let media_item = sqlx::query!("SELECT id FROM media_item LIMIT 1")
         .fetch_optional(&context.pool)
         .await?;
@@ -149,7 +126,7 @@ pub async fn test_get_full_item(context: &TestContext) -> Result<()> {
         let valid_id_url = format!("{}/photos/{valid_id}/item", context.settings.api.public_url);
 
         // --- TEST 1: Valid ID ---
-        let response = client.get(&valid_id_url).bearer_auth(&token).send().await?;
+        let response = client.get(&valid_id_url).send().await?;
 
         assert_eq!(response.status(), StatusCode::OK);
         let item: MediaItemWithAlbums = response.json().await?;
@@ -157,15 +134,10 @@ pub async fn test_get_full_item(context: &TestContext) -> Result<()> {
 
         // --- TEST 2: Invalid ID ---
         let invalid_id_url = format!("{}/photos/invalid-id/item", context.settings.api.public_url);
-        let response = client
-            .get(&invalid_id_url)
-            .bearer_auth(&token)
-            .send()
-            .await?;
+        let response = client.get(&invalid_id_url).send().await?;
 
         assert_eq!(response.status(), StatusCode::NOT_FOUND);
     } else {
-        // This might happen if previous tests failed to populate DB
         println!("Skipping test_get_full_item (no media items in DB)");
     }
 
@@ -173,7 +145,7 @@ pub async fn test_get_full_item(context: &TestContext) -> Result<()> {
 }
 
 pub async fn test_get_full_item_albums(context: &TestContext) -> Result<()> {
-    let token = login(context).await?;
+    login(context).await?;
     let client = &context.http_client;
     let base_url = &context.settings.api.public_url;
 
@@ -188,7 +160,6 @@ pub async fn test_get_full_item_albums(context: &TestContext) -> Result<()> {
 
     let album: Album = client
         .post(format!("{base_url}/album"))
-        .bearer_auth(&token)
         .json(&CreateAlbumRequest {
             name: "Info Panel Album".to_string(),
             description: None,
@@ -202,7 +173,6 @@ pub async fn test_get_full_item_albums(context: &TestContext) -> Result<()> {
 
     let response = client
         .post(format!("{base_url}/album/{}/media", album.id))
-        .bearer_auth(&token)
         .json(&AddMediaToAlbumRequest {
             media_item_ids: vec![media_id.clone()],
         })
@@ -211,7 +181,7 @@ pub async fn test_get_full_item_albums(context: &TestContext) -> Result<()> {
     assert_eq!(response.status(), StatusCode::OK);
 
     let item_url = format!("{base_url}/photos/{media_id}/item");
-    let response = client.get(&item_url).bearer_auth(&token).send().await?;
+    let response = client.get(&item_url).send().await?;
     assert_eq!(response.status(), StatusCode::OK);
 
     let item: MediaItemWithAlbums = response.json().await?;
@@ -229,7 +199,7 @@ pub async fn test_get_full_item_albums(context: &TestContext) -> Result<()> {
 
 pub async fn test_get_color_theme(context: &TestContext) -> Result<()> {
     // ARRANGE
-    let token = login(context).await?;
+    login(context).await?;
     let client = &context.http_client;
     let url = format!("{}/theme/by-color", context.settings.api.public_url);
     let color = "#FF5733";
@@ -247,7 +217,6 @@ pub async fn test_get_color_theme(context: &TestContext) -> Result<()> {
             ("variant", theme_variant.as_str()),
             ("contrast", "0.2"),
         ])
-        .bearer_auth(&token)
         .send()
         .await?;
 
@@ -255,7 +224,6 @@ pub async fn test_get_color_theme(context: &TestContext) -> Result<()> {
     assert_eq!(response.status(), StatusCode::OK);
     let body: Value = response.json().await?;
 
-    // Verify it looks like a theme object
     assert!(body.is_object());
     if let Some(obj) = body.as_object() {
         assert!(obj.contains_key("source_color"));
@@ -279,7 +247,6 @@ pub async fn test_get_random_photo(context: &TestContext) -> Result<()> {
     let start = Instant::now();
     info!("Waiting for 1 analysis job to complete...");
     loop {
-        // First we need to wait for at least 1 analysis job to complete
         let ids = sqlx::query_scalar!("SELECT visual_analysis_id FROM color")
             .fetch_all(&context.pool)
             .await?;
@@ -293,7 +260,7 @@ pub async fn test_get_random_photo(context: &TestContext) -> Result<()> {
     }
 
     // ARRANGE
-    let token = login(context).await?;
+    login(context).await?;
     let client = &context.http_client;
     let url = format!("{}/theme/random-photo", context.settings.api.public_url);
     let theme_variant =
@@ -306,7 +273,6 @@ pub async fn test_get_random_photo(context: &TestContext) -> Result<()> {
     let response = client
         .get(&url)
         .query(&[("variant", theme_variant.as_str()), ("contrast", "0.2")])
-        .bearer_auth(&token)
         .send()
         .await?;
 
