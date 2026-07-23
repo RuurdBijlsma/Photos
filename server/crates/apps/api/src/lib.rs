@@ -10,6 +10,7 @@
 )]
 
 pub mod api_state;
+mod cors;
 mod routes;
 mod server;
 

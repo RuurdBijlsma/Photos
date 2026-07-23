@@ -1,4 +1,3 @@
-<!-- File: src/vues/components/viewer/pano/PanoramaViewer.vue -->
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import type { PannellumConfig } from '@/scripts/types/api/pannellumConfig.js'

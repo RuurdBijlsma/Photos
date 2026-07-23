@@ -9,6 +9,8 @@ use sqlx::PgTransaction;
 
 pub struct OnThisDayCardGenerator;
 
+// todo: dont limit to just 1 "On this day" card if there's more available
+
 #[async_trait]
 #[allow(clippy::too_many_lines)]
 impl DailyCardGenerator for OnThisDayCardGenerator {

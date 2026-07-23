@@ -81,6 +81,7 @@ enum SuggestionType {
   SEARCH = 0;
   ALBUM = 1;
   PERSON = 2;
+  LOCATION = 3;
 }
 
 message SearchSuggestion {
@@ -164,4 +165,31 @@ message StorageSummaryResponse {
   int32 blurry_item_count = 4;
   int64 media_folder_size_bytes = 5;
   int64 app_data_folder_size_bytes = 6;
+}
+
+// --- Explore & Location Specific ---
+message VisitedLocation {
+  string id = 1;
+  string name = 2;
+  optional string admin1 = 3;
+  optional string admin2 = 4;
+  string country_code = 5;
+  string country_name = 6;
+  int64 photo_count = 7;
+  optional string thumbnail_id = 8;
+}
+
+message LocationMediaItem {
+  string id = 1;
+  bool is_video = 2;
+  bool has_thumbnails = 3;
+  optional int32 duration_ms = 4;
+  float ratio = 5;
+  optional double latitude = 6;
+  optional double longitude = 7;
+}
+
+message LocationDetailsResponse {
+  VisitedLocation location = 1;
+  repeated LocationMediaItem items = 2;
 }

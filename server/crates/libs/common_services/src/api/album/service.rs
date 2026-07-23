@@ -1,5 +1,6 @@
 use super::interfaces::{AcceptInviteRequest, AlbumShareClaims, AlbumSort, SharedMediaItem};
 use crate::api::app_error::AppError;
+use crate::api::user::service::find_required_by_id;
 use crate::database::album::album::{Album, AlbumRole, AlbumSummary};
 use crate::database::album::album_collaborator::AlbumCollaborator;
 use crate::database::album_store::AlbumStore;
@@ -430,7 +431,6 @@ pub async fn generate_invite(
     jwt_secret: String,
     album_id: &str,
     user_id: i32,
-    user_name: &str,
 ) -> Result<String, AppError> {
     // Permission Check: Only the owner can generate an invite.
     if !is_album_owner(pool, user_id, album_id).await? {
@@ -438,6 +438,7 @@ pub async fn generate_invite(
             "Only the album owner can generate an invitation.".to_string(),
         ));
     }
+    let user = find_required_by_id(pool, user_id).await?;
 
     let expires_at = (Utc::now()
         + Duration::minutes(constants().auth.album_invitation_expiry_minutes))
@@ -447,7 +448,7 @@ pub async fn generate_invite(
         iss: public_url.clone(),
         sub: album_id.to_owned(),
         exp: expires_at,
-        sharer_username: user_name.to_owned(),
+        sharer_username: user.name,
     };
 
     let token = encode(

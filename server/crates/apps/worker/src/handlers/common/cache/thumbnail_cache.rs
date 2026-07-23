@@ -63,7 +63,6 @@ pub async fn get_thumbnail_cache(
         if !thumbnails_dest.exists() {
             fs::create_dir_all(thumbnails_dest).await?;
         }
-        // Changed to link_or_copy_dir_contents:
         link_or_copy_dir_contents(&cached_thumbs, thumbnails_dest).await?;
     } else {
         return Ok(false);
@@ -76,7 +75,6 @@ pub async fn get_thumbnail_cache(
             if !pano_dest.exists() {
                 fs::create_dir_all(pano_dest).await?;
             }
-            // Changed to link_or_copy_dir_contents:
             link_or_copy_dir_contents(&cached_pano, pano_dest).await?;
         } else {
             return Ok(false);
@@ -109,7 +107,6 @@ pub async fn write_thumbnail_cache(
     if actual_has_panorama {
         let cached_pano = cache_item_dir.join("pano");
         fs::create_dir_all(&cached_pano).await?;
-        // Changed to link_or_copy_dir_contents:
         link_or_copy_dir_contents(pano_src, &cached_pano).await?;
     }
 

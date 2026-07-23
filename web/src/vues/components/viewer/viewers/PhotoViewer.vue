@@ -1,12 +1,13 @@
 <script setup lang="ts">
-import { ref, computed, watch, onUnmounted, nextTick, defineAsyncComponent } from 'vue'
+import { computed, defineAsyncComponent, nextTick, onUnmounted, ref, watch } from 'vue'
 import { useSettingStore } from '@/scripts/stores/settingsStore.ts'
 import { useMediaItemStore } from '@/scripts/stores/timeline/mediaItemStore.ts'
 import { useViewPhotoStore } from '@/scripts/stores/timeline/viewPhotoStore.ts'
 import mediaItemService from '@/scripts/services/mediaItemService.ts'
 import axios from 'axios'
-import { useTimeoutFn, useEventListener, useRafFn } from '@vueuse/core'
+import { useEventListener, useRafFn, useTimeoutFn } from '@vueuse/core'
 import apiClient from '@/scripts/services/api.ts'
+import type { PannellumConfig } from '@/scripts/types/api/pannellumConfig.ts'
 
 const PanoramaViewer = defineAsyncComponent(
   () => import('@/vues/components/viewer/components/PanoramaViewer.vue'),
@@ -17,6 +18,7 @@ const props = withDefaults(
     disableEventCapture: boolean
     mediaItemId: string
     showUi?: boolean
+    forcePano?: PannellumConfig | undefined
   }>(),
   {
     showUi: true,
@@ -37,6 +39,7 @@ const scale = ref(1)
 const translateX = ref(0)
 const translateY = ref(0)
 const containerRef = ref<HTMLElement | null>(null)
+const thumbRef = ref<HTMLImageElement | null>(null)
 const baseUrl = apiClient.defaults.baseURL
 
 const activePointers = new Map<number, PointerEvent>()
@@ -48,12 +51,14 @@ let startY = 0
 let startTranslateX = 0
 let startTranslateY = 0
 
-const fullImage = computed(() => mediaItemStore.mediaItems.get(props.mediaItemId))
+const fullImage = computed(() => mediaItemStore.anyMediaItems.get(props.mediaItemId))
 const generatedThumbsAvailable = computed(() => fullImage.value?.has_thumbnails ?? true)
 
 // Panorama states
-const isPanorama = computed(() => fullImage.value?.use_panorama_viewer ?? false)
-const panoramaConfig = computed(() => fullImage.value?.panorama_config)
+const isPanorama = computed(
+  () => props.forcePano !== undefined || (fullImage.value?.use_panorama_viewer ?? false),
+)
+const panoramaConfig = computed(() => props.forcePano ?? fullImage.value?.panorama_config)
 const is3DMode = ref(false)
 
 // Phase 1: Immediate Thumbnail URL (1440p)
@@ -344,21 +349,66 @@ function zoomToPoint(clientX: number, clientY: number, newScale: number) {
   }
 }
 
+function getImageAspectRatio(): number | null {
+  if (thumbRef.value && thumbRef.value.naturalWidth > 0 && thumbRef.value.naturalHeight > 0) {
+    return thumbRef.value.naturalWidth / thumbRef.value.naturalHeight
+  }
+  return null
+}
+
 function clampTranslations() {
   if (!containerRef.value) return
 
   const w = containerRef.value.clientWidth
   const h = containerRef.value.clientHeight
 
+  const aspectRatio = getImageAspectRatio()
+  const containerRatio = w / h
+
+  let drawnWidth = w
+  let drawnHeight = h
+
+  if (aspectRatio && aspectRatio > 0) {
+    if (aspectRatio > containerRatio) {
+      drawnWidth = w
+      drawnHeight = w / aspectRatio
+    } else {
+      drawnWidth = h * aspectRatio
+      drawnHeight = h
+    }
+  }
+
+  const paddingPx = scale.value < 1.4 ? 0 : scale.value * 40
+
+  // 1. Horizontal clamping
   if (scale.value <= 1) {
     translateX.value = 0
-    translateY.value = 0
-  } else {
-    const minX = w * (1 - scale.value)
-    const maxX = 0
-    const minY = h * (1 - scale.value)
-    const maxY = 0
+  } else if (drawnWidth * scale.value <= w) {
+    // Image is narrower than the viewport: Center it, but allow comfortable wiggle room
+    const center = (w / 2) * (1 - scale.value)
+    const minX = center - paddingPx
+    const maxX = center + paddingPx
     translateX.value = Math.max(minX, Math.min(maxX, translateX.value))
+  } else {
+    // Image is wider than the viewport: Allow panning, clamped with soft edge padding
+    const minX = w - paddingPx - ((w + drawnWidth) / 2) * scale.value
+    const maxX = paddingPx - ((w - drawnWidth) / 2) * scale.value
+    translateX.value = Math.max(minX, Math.min(maxX, translateX.value))
+  }
+
+  // 2. Vertical clamping
+  if (scale.value <= 1) {
+    translateY.value = 0
+  } else if (drawnHeight * scale.value <= h) {
+    // Image is shorter than the viewport: Center it, but allow comfortable wiggle room
+    const center = (h / 2) * (1 - scale.value)
+    const minY = center - paddingPx
+    const maxY = center + paddingPx
+    translateY.value = Math.max(minY, Math.min(maxY, translateY.value))
+  } else {
+    // Image is taller than the viewport: Allow panning, clamped with soft edge padding
+    const minY = h - paddingPx - ((h + drawnHeight) / 2) * scale.value
+    const maxY = paddingPx - ((h - drawnHeight) / 2) * scale.value
     translateY.value = Math.max(minY, Math.min(maxY, translateY.value))
   }
 }
@@ -487,19 +537,6 @@ function handleWheel(e: WheelEvent) {
   }
 }
 
-function handleDoubleClick(e: MouseEvent) {
-  if (props.disableEventCapture) return
-  if (e.button !== 0) return
-  if (scale.value > 1) {
-    scale.value = 1
-    translateX.value = 0
-    translateY.value = 0
-    setTransforming(false)
-  } else {
-    zoomToPoint(e.clientX, e.clientY, 3)
-  }
-}
-
 useEventListener(containerRef, 'wheel', handleWheel, { passive: false })
 </script>
 
@@ -515,7 +552,10 @@ useEventListener(containerRef, 'wheel', handleWheel, { passive: false })
 
     <!-- 3D mode: Instantiated when toggled to true -->
     <template v-if="is3DMode && panoramaConfig">
-      <PanoramaViewer :config="panoramaConfig" :base-url="`${baseUrl}hosted/pano/${mediaItemId}`" />
+      <PanoramaViewer
+        :config="panoramaConfig"
+        :base-url="`${baseUrl}/hosted/pano/${mediaItemId}`"
+      />
     </template>
 
     <div
@@ -527,14 +567,15 @@ useEventListener(containerRef, 'wheel', handleWheel, { passive: false })
       @pointermove="handlePointerMove"
       @pointerup="handlePointerUp"
       @pointercancel="handlePointerCancel"
-      @dblclick="handleDoubleClick"
     >
       <div class="image-wrapper" :style="transformStyle">
         <!-- Thumbnail layer at bottom -->
         <img
+          ref="thumbRef"
           class="image-tag thumbnail-img"
           :src="imageUrl"
           alt="Thumbnail image"
+          @load="clampTranslations"
           @dragstart.prevent
         />
 

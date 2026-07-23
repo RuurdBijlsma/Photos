@@ -2,49 +2,41 @@ import { defineStore } from 'pinia'
 import { useStorage } from '@vueuse/core'
 import type { ThemeType, ThemeVariant } from '@/scripts/constants.ts'
 
-export const USE_IMAGE_GLOW = false
-export const DARK_PHOTO_VIEWER = true
-export const LIGHT_PHOTO_VIEWER_MAP = true
-export const USE_BACKDROP_BLUR = true
 export const TIMELINE_ROW_HEIGHT = 320
-export const TIMELINE_USE_DAY_LABELS = false
-export const TIMELINE_ASYNC_IMAGE_DECODING = false
-export const THEME_STRING: ThemeType = 'system'
-export const ENABLE_LIGHT_THEME_TIME = '07:00'
-export const ENABLE_DARK_THEME_TIME = '19:00'
-export const USE_SUN_SCHEDULE = false
-export const USE_IMAGE_BACKGROUND = true
-export const CUSTOM_THEME_COLOR = '#462de8'
-export const CUSTOM_THEME_VARIANT: ThemeVariant = 'Expressive'
 export const CUSTOM_THEME_CONTRAST = 0.2
+export const UPLOAD_CONCURRENCY_LIMIT = 3
 
 export const useSettingStore = defineStore('settings', () => {
   // Theme -> Mode
-  const themeString = useStorage<ThemeType>('themeString', THEME_STRING)
-  const enableLightThemeTime = useStorage('enableLightThemeTime', ENABLE_LIGHT_THEME_TIME)
-  const enableDarkThemeTime = useStorage('enableDarkThemeTime', ENABLE_DARK_THEME_TIME)
-  const useSunSchedule = useStorage('useSunSchedule', USE_SUN_SCHEDULE)
+  const themeString = useStorage<ThemeType>('themeString', 'system')
+  const enableLightThemeTime = useStorage('enableLightThemeTime', '07:00')
+  const enableDarkThemeTime = useStorage('enableDarkThemeTime', '19:00')
+  const useSunSchedule = useStorage('useSunSchedule', false)
   // Theme -> Color
-  const useImageBackground = useStorage('useImageBackground', USE_IMAGE_BACKGROUND)
-  const customThemeColor = useStorage('customThemeColor', CUSTOM_THEME_COLOR)
-  const customThemeVariant = useStorage<ThemeVariant>('customThemeVariant', CUSTOM_THEME_VARIANT)
+  const useImageBackground = useStorage('useImageBackground', true)
+  const randomizeBackground = useStorage('randomizeBackground', true)
+  const customThemeColor = useStorage('customThemeColor', '#462de8')
+  const customThemeVariant = useStorage<ThemeVariant>('customThemeVariant', 'Expressive')
   const customThemeContrast = useStorage<number>('customThemeContrast', CUSTOM_THEME_CONTRAST)
   // UI -> Photo Viewer
-  const useImageGlow = useStorage('imageGlow', USE_IMAGE_GLOW)
-  const darkPhotoViewer = useStorage('darkPhotoViewer', DARK_PHOTO_VIEWER)
-  const lightPhotoViewerMap = useStorage('lightPhotoViewerMap', LIGHT_PHOTO_VIEWER_MAP)
+  const useImageGlow = useStorage('imageGlow', false)
+  const darkPhotoViewer = useStorage('darkPhotoViewer', true)
+  const lightPhotoViewerMap = useStorage('lightPhotoViewerMap', true)
   const playMotionPhotos = useStorage('playMotionPhotos', true)
   // UI -> General
-  const useBackdropBlur = useStorage('backdropBlur', USE_BACKDROP_BLUR)
+  const useBackdropBlur = useStorage('backdropBlur', true)
   // UI -> Timeline
   const timelineRowHeight = useStorage('timelineRowHeight', TIMELINE_ROW_HEIGHT)
-  const timelineUseDayLabels = useStorage('timelineUseDayLabels', TIMELINE_USE_DAY_LABELS)
-  const asyncImageDecoding = useStorage('timelineAsyncImageDecoding', TIMELINE_ASYNC_IMAGE_DECODING)
+  const timelineUseDayLabels = useStorage('timelineUseDayLabels', false)
+  const asyncImageDecoding = useStorage('timelineAsyncImageDecoding', false)
+  // Uploads
+  const uploadConcurrencyLimit = useStorage('uploadConcurrencyLimit', UPLOAD_CONCURRENCY_LIMIT)
 
   return {
     useImageGlow,
     useBackdropBlur,
     useImageBackground,
+    randomizeBackground,
     customThemeColor,
     customThemeVariant,
     customThemeContrast,
@@ -58,5 +50,6 @@ export const useSettingStore = defineStore('settings', () => {
     useSunSchedule,
     enableLightThemeTime,
     enableDarkThemeTime,
+    uploadConcurrencyLimit,
   }
 })

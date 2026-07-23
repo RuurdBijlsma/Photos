@@ -14,12 +14,14 @@ export interface Snack {
   id: string
   message: string
   icon?: string
-  color: 'success' | 'info' | 'warning' | 'error' | 'surface-variant' | string
+  color: 'success' | 'info' | 'warning' | 'error' | 'surface-container-high' | string
   timeout: number
   action?: SnackAction
   error?: Error
   errorData?: { error: string }
   timerId?: ReturnType<typeof setTimeout>
+  loading?: boolean
+  dismissable?: boolean
 }
 
 /** Input options when creating a snackbar */
@@ -30,6 +32,8 @@ export type SnackOptions = {
   action?: SnackAction
   icon?: string
   error?: unknown
+  loading?: boolean
+  dismissable?: boolean
 }
 
 // --- Store ---
@@ -43,25 +47,29 @@ export const useSnackbarsStore = defineStore('snackbars', () => {
   function remove(id: string) {
     const index = snackQueue.value.findIndex((s) => s.id === id)
     if (index > -1) {
-      clearTimeout(snackQueue.value[index]!.timerId)
+      if (snackQueue.value[index]!.timerId) {
+        clearTimeout(snackQueue.value[index]!.timerId)
+      }
       snackQueue.value.splice(index, 1)
     }
   }
 
   /**
-   * Adds a snackbar to the queue.
+   * Adds a snackbar to the queue and returns its ID.
    */
-  function enqueue(options: SnackOptions) {
+  function enqueue(options: SnackOptions): string {
     const id = crypto.randomUUID()
     const defaultTimeout = 10000
 
     const snack: Snack = {
       id,
       message: options.message,
-      color: options.color || 'surface-variant', // Changed from 'white' to adapt dynamically to light/dark themes
+      color: options.color || 'surface-container-high',
       timeout: options.timeout ?? defaultTimeout,
       action: options.action,
       icon: options.icon,
+      loading: options.loading ?? false,
+      dismissable: options.dismissable ?? true,
     }
 
     // Process Error objects if present
@@ -83,6 +91,49 @@ export const useSnackbarsStore = defineStore('snackbars', () => {
     snackQueue.value.push(snack)
 
     // Start timer
+    startTimer(snack)
+
+    return id
+  }
+
+  /**
+   * Updates an existing snackbar's properties by ID.
+   */
+  function update(id: string, updates: Partial<SnackOptions>) {
+    const index = snackQueue.value.findIndex((s) => s.id === id)
+    if (index === -1) return
+
+    const snack = snackQueue.value[index]!
+
+    if (snack.timerId) {
+      clearTimeout(snack.timerId)
+      snack.timerId = undefined
+    }
+
+    if (updates.message !== undefined) snack.message = updates.message
+    if (updates.color !== undefined) snack.color = updates.color
+    if (updates.timeout !== undefined) snack.timeout = updates.timeout
+    if (updates.action !== undefined) snack.action = updates.action
+    if (updates.icon !== undefined) snack.icon = updates.icon
+    if (updates.loading !== undefined) snack.loading = updates.loading
+    if (updates.dismissable !== undefined) snack.dismissable = updates.dismissable
+
+    // Handle updating error payloads
+    if (updates.error !== undefined) {
+      if (isAxiosError(updates.error)) {
+        snack.error = updates.error
+        snack.errorData = updates.error.response?.data
+      } else if (updates.error instanceof Error) {
+        snack.error = updates.error
+      } else if (updates.error) {
+        snack.error = new Error(String(updates.error))
+      } else {
+        snack.error = undefined
+        snack.errorData = undefined
+      }
+      if (!updates.color) snack.color = 'error'
+    }
+
     startTimer(snack)
   }
 
@@ -111,8 +162,8 @@ export const useSnackbarsStore = defineStore('snackbars', () => {
    */
   function resumeTimeout(id: string) {
     const snack = snackQueue.value.find((s) => s.id === id)
-    if (snack && !snack.timerId) {
-      // Give it a bit more time if the user was reading it
+    // Only resume if the snackbar actually has a standard expiring timeout
+    if (snack && snack.timeout > 0 && !snack.timerId) {
       const remaining = Math.max(snack.timeout / 2, 2000)
       snack.timerId = setTimeout(() => {
         remove(snack.id)
@@ -122,21 +173,20 @@ export const useSnackbarsStore = defineStore('snackbars', () => {
 
   // --- Convenience Helpers ---
 
-  function info(message: string, action?: SnackAction) {
-    // Changed color from 'white' to 'info' to ensure dynamic, high-contrast theme compliance
-    enqueue({ message, color: 'info', icon: 'mdi-information-outline', action })
+  function info(message: string, action?: SnackAction): string {
+    return enqueue({ message, color: 'info', icon: 'mdi-information-outline', action })
   }
 
-  function success(message: string, action?: SnackAction) {
-    enqueue({ message, color: 'success', icon: 'mdi-check', action })
+  function success(message: string, action?: SnackAction): string {
+    return enqueue({ message, color: 'success', icon: 'mdi-check', action })
   }
 
-  function warning(message: string, action?: SnackAction) {
-    enqueue({ message, color: 'warning', icon: 'mdi-alert', action })
+  function warning(message: string, action?: SnackAction): string {
+    return enqueue({ message, color: 'warning', icon: 'mdi-alert', action })
   }
 
-  function error(message: string, error?: unknown, action?: SnackAction) {
-    enqueue({
+  function error(message: string, error?: unknown, action?: SnackAction): string {
+    return enqueue({
       message,
       error,
       color: 'error',
@@ -146,14 +196,30 @@ export const useSnackbarsStore = defineStore('snackbars', () => {
     })
   }
 
+  /**
+   * Spawns a persistent, loading snackbar that is non-dismissable by default.
+   */
+  function loading(message: string, action?: SnackAction): string {
+    return enqueue({
+      message,
+      color: 'info',
+      timeout: 0,
+      dismissable: false,
+      loading: true,
+      action,
+    })
+  }
+
   return {
     snackQueue,
     remove,
     enqueue,
+    update,
     info,
     success,
     warning,
     error,
+    loading,
     pauseTimeout,
     resumeTimeout,
   }

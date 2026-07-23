@@ -1,15 +1,14 @@
 use crate::api_state::ApiContext;
-use crate::auth::middlewares::common::{decode_token, extract_context, extract_token};
+use crate::auth::middlewares::common::{decode_token, extract_access_token, extract_context};
+use crate::auth::middlewares::user::ApiUser;
 use axum::{
     extract::{FromRequestParts, State},
     http::request::Parts,
 };
 use common_services::api::auth::error::AuthError;
-use common_services::database::app_user::User;
-use common_services::database::user_store::UserStore;
 
 #[derive(Clone, Debug)]
-pub struct OptionalUser(pub Option<User>);
+pub struct OptionalUser(pub Option<ApiUser>);
 
 impl<S> FromRequestParts<S> for OptionalUser
 where
@@ -19,13 +18,15 @@ where
     type Rejection = AuthError;
 
     async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
-        match extract_token(parts) {
+        match extract_access_token(parts) {
             Ok(token) => {
                 let context = extract_context(parts, state).await?;
                 let claims = decode_token(&token, &context.settings.secrets.jwt)?;
-                let user = UserStore::find_by_id(&context.pool, claims.sub)
-                    .await?
-                    .ok_or(AuthError::UserNotFound)?;
+                let user = ApiUser {
+                    expiry: claims.exp,
+                    id: claims.sub,
+                    role: claims.role,
+                };
                 parts.extensions.insert(Self(Some(user.clone())));
                 Ok(Self(Some(user)))
             }

@@ -11,6 +11,12 @@
             "name": "vector",
             "kind": "Simple"
           }
+        },
+        "origin": {
+          "Table": {
+            "table": "key_vector_store",
+            "name": "vector"
+          }
         }
       }
     ],

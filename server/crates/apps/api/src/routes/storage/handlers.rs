@@ -1,4 +1,5 @@
 use crate::api_state::ApiContext;
+use crate::auth::middlewares::user::ApiUser;
 use axum::Extension;
 use axum::extract::State;
 use axum_extra::protobuf::Protobuf;
@@ -6,36 +7,32 @@ use common_services::api::app_error::AppError;
 use common_services::api::system::storage::{
     get_blurry_storage_items, get_large_storage_items, get_storage_summary,
 };
-use common_services::database::app_user::User;
 use common_types::pb::api::{StorageReviewResponse, StorageSummaryResponse};
+use sqlx::PgPool;
 use tracing::instrument;
 
 #[instrument(skip(context, user), err(Debug))]
 pub async fn storage_summary_handler(
     State(context): State<ApiContext>,
-    Extension(user): Extension<User>,
+    Extension(user): Extension<ApiUser>,
 ) -> Result<Protobuf<StorageSummaryResponse>, AppError> {
     Ok(Protobuf(
         get_storage_summary(&context.pool, &context.settings.ingest, user.id).await?,
     ))
 }
 
-#[instrument(skip(context, user), err(Debug))]
+#[instrument(skip(pool, user), err(Debug))]
 pub async fn storage_review_handler(
-    State(context): State<ApiContext>,
-    Extension(user): Extension<User>,
+    State(pool): State<PgPool>,
+    Extension(user): Extension<ApiUser>,
 ) -> Result<Protobuf<StorageReviewResponse>, AppError> {
-    Ok(Protobuf(
-        get_large_storage_items(&context.pool, user.id).await?,
-    ))
+    Ok(Protobuf(get_large_storage_items(&pool, user.id).await?))
 }
 
-#[instrument(skip(context, user), err(Debug))]
+#[instrument(skip(pool, user), err(Debug))]
 pub async fn storage_blurry_handler(
-    State(context): State<ApiContext>,
-    Extension(user): Extension<User>,
+    State(pool): State<PgPool>,
+    Extension(user): Extension<ApiUser>,
 ) -> Result<Protobuf<StorageReviewResponse>, AppError> {
-    Ok(Protobuf(
-        get_blurry_storage_items(&context.pool, user.id).await?,
-    ))
+    Ok(Protobuf(get_blurry_storage_items(&pool, user.id).await?))
 }

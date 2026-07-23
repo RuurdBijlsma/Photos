@@ -22,12 +22,6 @@ import JobsAdmin from '@/vues/components/admin/JobsAdmin.vue'
         <v-divider />
       </div>
       <jobs-admin />
-
-      <!-- Section: Placeholder Other Settings -->
-      <section class="placeholder-section">
-        <h3 class="placeholder-title">Other Admin stuff Placeholder</h3>
-        <p class="placeholder-desc">Hello world</p>
-      </section>
     </div>
   </main-layout-container>
 </template>

@@ -1,0 +1,21 @@
+[package]
+name = "worker_scaler"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+app_state = { path = "../../libs/app_state" }
+common_services = { path = "../../libs/common_services" }
+worker = { path = "../worker" }
+sqlx = { version = "0.9.0", features = ["runtime-tokio", "tls-native-tls", "postgres", "chrono", "macros", "json"] }
+tokio = { version = "1.47.1", features = ["full"] }
+color-eyre = "0.6.5"
+tracing = "0.1.41"
+tracing-subscriber = { version = "0.3.22", features = ["env-filter"] }
+sysinfo = "0.33.1"
+clap = { version = "4.5.48", features = ["derive"] }
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.145"
+
+[features]
+load-dynamic = ["worker/load-dynamic"]

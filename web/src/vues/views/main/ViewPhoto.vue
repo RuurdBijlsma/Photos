@@ -1,19 +1,34 @@
 <script setup lang="ts">
 import { useRoute, useRouter } from 'vue-router'
-import { computed, onBeforeUnmount, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useSettingStore } from '@/scripts/stores/settingsStore.ts'
 import { useMediaItemStore } from '@/scripts/stores/timeline/mediaItemStore.ts'
 import { useSelectionStore } from '@/scripts/stores/timeline/selectionStore.ts'
 import { useViewPhotoStore } from '@/scripts/stores/timeline/viewPhotoStore.ts'
 import MediaViewer from '@/vues/components/viewer/MediaViewer.vue'
-import { TimelineItem } from '@/scripts/types/generated/timeline.ts'
-import { useTimelineStore } from '@/scripts/stores/timeline/timelineStore.ts'
-import { useEventListener } from '@vueuse/core'
+import {
+  type SimpleTimelineItem,
+  type StorageReviewItem,
+  TimelineItem,
+} from '@/scripts/types/generated/timeline.ts'
 import MediaInfoPanel from '@/vues/components/viewer/components/MediaInfoPanel.vue'
-import { makeDateTimeString, makeLocationString } from '@/scripts/utils.ts'
+import {
+  copyToClipboard,
+  isMobileDevice,
+  makeDateTimeString,
+  makeLocationString,
+} from '@/scripts/utils.ts'
 import { useDialogStore } from '@/scripts/stores/dialogStore.ts'
 import { useAuthStore } from '@/scripts/stores/authStore.ts'
 import { useTheme } from 'vuetify/framework'
+import { useDownloadStore } from '@/scripts/stores/downloadStore.ts'
+import { useBinStore } from '@/scripts/stores/binStore.ts'
+import { useProfileStore } from '@/scripts/stores/profileStore.ts'
+import AddToAlbumCard from '@/vues/components/timeline/timeline-components/AddToAlbumCard.vue'
+import { useUiHider } from '@/scripts/composables/useUiHider.ts'
+import { navigatorShare } from '@/scripts/sharing.ts'
+import PhotoGallery from '@/vues/components/viewer/components/PhotoGallery.vue'
+import { useStorage, useEventListener } from '@vueuse/core'
 
 const props = withDefaults(
   defineProps<{
@@ -32,35 +47,64 @@ const route = useRoute()
 const router = useRouter()
 const theme = useTheme()
 const mediaItemStore = useMediaItemStore()
-const timelineStore = useTimelineStore()
+const downloadStore = useDownloadStore()
 const settings = useSettingStore()
 const selectionStore = useSelectionStore()
 const viewPhotoStore = useViewPhotoStore()
 const dialogs = useDialogStore()
 const authStore = useAuthStore()
+const binStore = useBinStore()
+const profileStore = useProfileStore()
 
 const showRightButton = ref(false)
 const showLeftButton = ref(false)
 const persistentInfo = ref(false)
-const hideSeconds = ref(7)
 const infoMenuOpen = ref(false)
 const optionsOpen = ref(false)
 const isZoomed = ref(false)
 const isPanoActive = ref(false)
+const showAddToAlbum = ref(false)
+const isSharing = ref(false)
 
-const showUI = computed(() => hideSeconds.value > 0)
-const hideTimer = setInterval(() => {
-  hideSeconds.value--
-  if (infoMenuOpen.value || optionsOpen.value) {
-    hideSeconds.value = 10
+const photoGalleryHeight = useStorage('view-photo-gallery-height', 100)
+const showGallery = useStorage('show-view-photo-gallery', false)
+
+const isResizing = ref(false)
+let startY = 0
+let startHeight = 0
+
+function startResize(e: PointerEvent) {
+  e.preventDefault()
+  isResizing.value = true
+  startY = e.clientY
+  startHeight = photoGalleryHeight.value
+}
+
+function handleResize(e: PointerEvent) {
+  if (!isResizing.value) return
+  const deltaY = startY - e.clientY
+  let newHeight = startHeight + deltaY
+  if (newHeight < 5) {
+    showGallery.value = false
+    stopResize()
+    return
   }
-}, 1000)
+  newHeight = Math.max(50, Math.min(300, newHeight))
+  photoGalleryHeight.value = newHeight
+}
 
-useEventListener(document, 'mousemove', () => {
-  hideSeconds.value = 10
-})
-useEventListener(document, 'click', () => {
-  hideSeconds.value = 10
+function stopResize() {
+  if (isResizing.value) {
+    isResizing.value = false
+  }
+}
+
+useEventListener(window, 'pointermove', handleResize)
+useEventListener(window, 'pointerup', stopResize)
+useEventListener(document, 'keydown', handleKeyDown)
+
+const { showUI } = useUiHider(10, () => {
+  return infoMenuOpen.value || optionsOpen.value
 })
 
 const id = computed(() => {
@@ -126,14 +170,47 @@ const albumsForCurrentItem = computed(() => {
   return mediaItemStore.getAlbumsForMediaItem(id.value)
 })
 
-const timelineItem = computed<TimelineItem | undefined>(() => {
-  if (!id.value) return undefined
-  return timelineStore.mediaItemsMap.get(id.value)
-})
+const timelineItem = computed<TimelineItem | SimpleTimelineItem | StorageReviewItem | undefined>(
+  () => {
+    if (!id.value) return undefined
+    return viewPhotoStore.idsMetadata.get(id.value)
+  },
+)
 
 const isVideo = computed<boolean>(
   () => fullImage.value?.is_video ?? timelineItem.value?.isVideo ?? false,
 )
+
+const currentItemRatio = computed(() => {
+  if (fullImage.value) return fullImage.value.width / fullImage.value.height
+  return 1
+})
+
+function forwardWheel(e: WheelEvent) {
+  // Find the interactive pan container inside the photo viewer
+  const zoomPanContainer = document.querySelector('.zoom-pan-container')
+  if (!zoomPanContainer) return
+
+  // Prevent default page scroll actions
+  e.preventDefault()
+
+  // Replicate and dispatch the wheel event downward with matching coordinate context
+  const forwardedEvent = new WheelEvent('wheel', {
+    clientX: e.clientX,
+    clientY: e.clientY,
+    deltaX: e.deltaX,
+    deltaY: e.deltaY,
+    deltaMode: e.deltaMode,
+    ctrlKey: e.ctrlKey,
+    metaKey: e.metaKey,
+    shiftKey: e.shiftKey,
+    altKey: e.altKey,
+    bubbles: true,
+    cancelable: true,
+  })
+
+  zoomPanContainer.dispatchEvent(forwardedEvent)
+}
 
 async function initialize() {
   const loadingId = id.value
@@ -157,15 +234,19 @@ function handleKeyDown(e: KeyboardEvent) {
   if (dialogs.anyVisible) return
   if (e.key === 'ArrowLeft' && prevId.value) {
     e.preventDefault()
-    router.replace({ path: `${viewPhotoStore.viewLink}${prevId.value}`, query: route.query })
+    changeMediaItem(prevId.value)
   } else if (e.key === 'ArrowRight' && nextId.value) {
     e.preventDefault()
-    router.replace({ path: `${viewPhotoStore.viewLink}${nextId.value}`, query: route.query })
+    changeMediaItem(nextId.value)
   } else if (e.key === 'Escape') {
     e.preventDefault()
     e.stopPropagation()
     router.push(parentLocation.value)
   }
+}
+
+async function changeMediaItem(mediaItemId: string) {
+  await router.replace({ path: `${viewPhotoStore.viewLink}${mediaItemId}`, query: route.query })
 }
 
 function prefetchMediaItem(mediaItemId: string) {
@@ -176,9 +257,45 @@ function prefetchMediaItem(mediaItemId: string) {
   }
 }
 
-onBeforeUnmount(() => clearInterval(hideTimer))
-onMounted(() => document.addEventListener('keydown', handleKeyDown))
-onUnmounted(() => document.removeEventListener('keydown', handleKeyDown))
+async function moveToBin() {
+  const onDeleteMoveToId = nextId.value ?? prevId.value
+
+  const binId = id.value
+  if (!binId) return
+  await binStore.softDeleteItems([binId])
+  if (onDeleteMoveToId) {
+    changeMediaItem(onDeleteMoveToId)
+  } else {
+    await router.push(parentLocation.value)
+  }
+}
+
+function shareMedia() {
+  const idShare = id.value
+  if (!idShare) return
+  if (isMobileDevice())
+    navigatorShare(
+      idShare,
+      isVideo.value,
+      fullImage.value?.has_thumbnails,
+      fullImage.value?.filename,
+      fullImage.value?.use_panorama_viewer,
+    )
+  else {
+    const isPano = fullImage.value?.use_panorama_viewer ?? false
+    const shareLetter = isVideo.value ? 'v' : isPano ? 'pano' : 'p'
+    const shareUrl = `${window.location.origin}/share/${shareLetter}/${id.value}`
+    copyToClipboard(shareUrl)
+  }
+}
+
+function goNext() {
+  changeMediaItem(nextId.value)
+}
+
+function goPrev() {
+  changeMediaItem(prevId.value)
+}
 
 // Pre-fetch
 watch(prevId, () => {
@@ -225,8 +342,26 @@ watch(isVideo, () => {
       class="photo-viewer"
       @zoom-change="isZoomed = $event"
       @pano-active="isPanoActive = $event"
+      :elemental-fullscreen="false"
+      :style="{
+        height: `calc(100% - ${showGallery ? photoGalleryHeight : 0}px)`,
+      }"
     />
-    <div class="top-bar">
+    <photo-gallery
+      :height="photoGalleryHeight"
+      :style="{
+        height: photoGalleryHeight + 'px',
+      }"
+      class="photo-gallery"
+      v-if="showGallery && id"
+      :focus-id="id"
+      :queue="orderedIds"
+      :ratio="currentItemRatio"
+      :resizing="isResizing"
+      @change-focus="(focusId) => changeMediaItem(focusId)"
+    />
+    <div v-if="showGallery && id" class="gallery-resize-handle" @pointerdown="startResize" />
+    <div class="top-bar" @wheel="forwardWheel">
       <div class="left-buttons">
         <v-btn
           :to="parentLocation"
@@ -238,6 +373,7 @@ watch(isVideo, () => {
         <v-btn
           rounded="xl"
           icon="mdi-view-gallery-outline"
+          @click="showGallery = !showGallery"
           variant="plain"
           v-tooltip="{ text: 'Toggle gallery', location: 'bottom', attach: true, width: 140 }"
         />
@@ -341,18 +477,17 @@ watch(isVideo, () => {
         <template v-if="authStore.isAuthenticated">
           <v-btn
             rounded="xl"
+            @click="shareMedia"
+            :loading="isSharing"
             icon="mdi-share-variant-outline"
             variant="plain"
             v-tooltip="{ text: 'Share', location: 'bottom', attach: true, width: 140 }"
           />
           <v-btn
             rounded="xl"
-            icon="mdi-heart-outline"
-            variant="plain"
-            v-tooltip="{ text: 'Favourite', location: 'bottom', attach: true, width: 140 }"
-          />
-          <v-btn
-            rounded="xl"
+            v-if="id"
+            :loading="downloadStore.downloadingIds.has(id)"
+            @click="downloadStore.downloadItem(id)"
             icon="mdi-cloud-download-outline"
             variant="plain"
             v-tooltip="{ text: 'Download', location: 'bottom', attach: true, width: 140 }"
@@ -361,6 +496,9 @@ watch(isVideo, () => {
             rounded="xl"
             icon="mdi-trash-can-outline"
             variant="plain"
+            v-if="id"
+            @click="moveToBin()"
+            :loading="binStore.softDeleteLoading"
             v-tooltip="{ text: 'Move to bin', location: 'bottom', attach: true, width: 140 }"
           />
           <v-menu v-model="optionsOpen">
@@ -368,7 +506,23 @@ watch(isVideo, () => {
               <v-btn rounded="xl" icon="mdi-dots-horizontal" variant="plain" v-bind="props" />
             </template>
             <v-list>
-              <v-list-item>Hiiii</v-list-item>
+              <v-list-item :to="`/search?mode=similar&ids=${id}`">Find similar images</v-list-item>
+              <v-list-item v-if="id" @click="profileStore.setProfilePic(id)">
+                Set as profile picture
+              </v-list-item>
+              <v-menu
+                v-if="id"
+                v-model="showAddToAlbum"
+                :close-on-content-click="false"
+                location="left"
+                :offset="[10, 94]"
+              >
+                <template v-slot:activator="{ props }">
+                  <v-list-item v-bind="props"> Add to album </v-list-item>
+                </template>
+
+                <add-to-album-card :ids-to-add="[id]" />
+              </v-menu>
             </v-list>
           </v-menu>
         </template>
@@ -378,9 +532,10 @@ watch(isVideo, () => {
       v-if="prevId !== null"
       class="prev-area"
       :class="{ 'zoomed-nav': isZoomed || isPanoActive }"
-      @click="router.replace({ path: `${viewPhotoStore.viewLink}${prevId}`, query: route.query })"
+      @click="goPrev()"
       @mouseenter="showLeftButton = true"
       @mouseleave="showLeftButton = false"
+      @wheel="forwardWheel"
     >
       <v-btn
         class="nav-btn"
@@ -395,9 +550,10 @@ watch(isVideo, () => {
       v-if="nextId !== null"
       class="next-area"
       :class="{ 'zoomed-nav': isZoomed || isPanoActive }"
-      @click="router.replace({ path: `${viewPhotoStore.viewLink}${nextId}`, query: route.query })"
+      @click="goNext()"
       @mouseenter="showRightButton = true"
       @mouseleave="showRightButton = false"
+      @wheel="forwardWheel"
     >
       <v-btn
         class="nav-btn"
@@ -434,12 +590,29 @@ watch(isVideo, () => {
 
 .photo-viewer {
   width: 100%;
-  height: 100%;
   position: absolute;
   top: 0;
   left: 0;
   z-index: 1500;
   background-color: rgb(var(--bg));
+}
+
+.photo-gallery {
+  width: 100%;
+  bottom: 0;
+  left: 0;
+  z-index: 1500;
+  position: absolute;
+}
+
+.gallery-resize-handle {
+  position: absolute;
+  bottom: calc(v-bind(photoGalleryHeight) * 1px - 8px);
+  left: 0;
+  width: 100%;
+  height: 12px;
+  cursor: ns-resize;
+  z-index: 1510;
 }
 
 .top-bar {
@@ -555,9 +728,8 @@ watch(isVideo, () => {
   right: 0;
   top: 70px;
   height: calc(100% - 190px);
-  width: 20%;
+  width: 33%;
   min-width: 92px;
-  max-width: 150px;
   cursor: pointer;
   display: flex;
   justify-content: flex-end;
@@ -571,9 +743,8 @@ watch(isVideo, () => {
   left: 0;
   top: 70px;
   height: calc(100% - 190px);
-  width: 20%;
+  width: 33%;
   min-width: 92px;
-  max-width: 150px;
   cursor: pointer;
   display: flex;
   justify-content: flex-start;

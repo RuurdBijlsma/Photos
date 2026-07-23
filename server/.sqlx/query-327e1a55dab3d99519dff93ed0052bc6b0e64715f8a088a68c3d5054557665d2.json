@@ -6,7 +6,13 @@
       {
         "ordinal": 0,
         "name": "media_item_id",
-        "type_info": "Varchar"
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "media_item",
+            "name": "id"
+          }
+        }
       },
       {
         "ordinal": 1,
@@ -15,6 +21,12 @@
           "Custom": {
             "name": "vector",
             "kind": "Simple"
+          }
+        },
+        "origin": {
+          "Table": {
+            "table": "visual_analysis",
+            "name": "embedding"
           }
         }
       }

@@ -1,13 +1,13 @@
 use crate::runner::context::test_context::TestContext;
 use color_eyre::Result;
 use color_eyre::eyre::bail;
-use common_services::api::auth::interfaces::{LoginUser, Tokens};
+use common_services::api::auth::interfaces::LoginUser;
 use common_types::dev_constants::{EMAIL, PASSWORD};
 use std::path::PathBuf;
 use walkdir::WalkDir;
 
-pub async fn login(context: &TestContext) -> Result<String> {
-    let url = format!("{}/auth/login", &context.settings.api.public_url);
+pub async fn login(context: &TestContext) -> Result<()> {
+    let url = format!("{}/auth/login", context.settings.api.public_url);
     let response = context
         .http_client
         .post(url)
@@ -17,9 +17,9 @@ pub async fn login(context: &TestContext) -> Result<String> {
         })
         .send()
         .await?;
+
     if response.status().is_success() {
-        let tokens: Tokens = response.json().await?;
-        Ok(tokens.access_token)
+        Ok(())
     } else {
         bail!("{} - {}", response.status(), response.text().await?)
     }

@@ -157,7 +157,18 @@ const previewSwatches = [
             <v-switch
               color="primary"
               v-model="settings.useImageBackground"
-              label="Use random photo as background"
+              label="Use photo as background"
+              hide-details
+              inset
+              density="comfortable"
+              class="background-switch"
+            />
+
+            <v-switch
+              v-if="settings.useImageBackground"
+              color="primary"
+              v-model="settings.randomizeBackground"
+              label="Randomize background photo on refresh"
               hide-details
               inset
               density="comfortable"

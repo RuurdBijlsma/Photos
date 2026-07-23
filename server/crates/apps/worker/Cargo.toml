@@ -9,15 +9,15 @@ common_types = { path = "../../libs/common_types" }
 common_services = { path = "../../libs/common_services" }
 generate_thumbnails = { path = "../../libs/generate_thumbnails" }
 ml_analysis = { path = "../../libs/ml_analysis" }
-media_analyzer = "0.10.0"
-sqlx = { version = "0.8.6", features = ["runtime-tokio-native-tls", "postgres", "chrono", "macros", "json", "uuid"] }
+media_analyzer = "0.10.4"
+sqlx = { version = "0.9.0", features = ["runtime-tokio", "tls-native-tls", "postgres", "chrono", "macros", "json", "uuid"] }
 tokio = { version = "1.47.1", features = ["full"] }
 color-eyre = "0.6.5"
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.22", features = ["env-filter"] }
 chrono = "0.4.42"
 serde_json = "1.0.145"
-pgvector = { version = "0.4", features = ["sqlx", "serde"] }
+pgvector = { version = "0.4.2", features = ["sqlx", "serde"] }
 clap = { version = "4.5.48", features = ["derive"] }
 walkdir = "2.5.0"
 rand = "0.10.1"
@@ -33,6 +33,7 @@ tempfile = "3.23.0"
 itertools = "0.14.0"
 open_clip_inference = { version = "0.4.0" }
 async-trait = "0.1.89"
+fileloft-core = "0.3.0"
 
 [features]
 load-dynamic = ["common_services/load-dynamic", "ml_analysis/load-dynamic", "common_types/load-dynamic", "open_clip_inference/load-dynamic"] # -> Load ONNXRuntime dynamically instead of statically

@@ -17,6 +17,12 @@
               ]
             }
           }
+        },
+        "origin": {
+          "Table": {
+            "table": "album_collaborator",
+            "name": "role"
+          }
         }
       }
     ],

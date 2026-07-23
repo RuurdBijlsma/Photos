@@ -16,6 +16,9 @@ use tracing::warn;
 
 /// Reads the thumbnails directory and returns a set of all subdirectory names (media item IDs).
 async fn get_thumbnail_folders(thumbnail_folder: &Path) -> Result<HashSet<String>> {
+    if !thumbnail_folder.exists() {
+        fs::create_dir_all(thumbnail_folder).await?;
+    }
     let mut set = HashSet::new();
     let mut entries = fs::read_dir(thumbnail_folder).await?;
     while let Some(entry) = entries.next_entry().await? {

@@ -6,27 +6,57 @@
       {
         "ordinal": 0,
         "name": "hash",
-        "type_info": "Text"
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "media_item",
+            "name": "hash"
+          }
+        }
       },
       {
         "ordinal": 1,
         "name": "media_item_id",
-        "type_info": "Varchar"
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "media_features",
+            "name": "media_item_id"
+          }
+        }
       },
       {
         "ordinal": 2,
         "name": "use_panorama_viewer",
-        "type_info": "Bool"
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "media_item",
+            "name": "use_panorama_viewer"
+          }
+        }
       },
       {
         "ordinal": 3,
         "name": "orientation",
-        "type_info": "Int4"
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "media_item",
+            "name": "orientation"
+          }
+        }
       },
       {
         "ordinal": 4,
         "name": "is_motion_photo",
-        "type_info": "Bool"
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "media_features",
+            "name": "is_motion_photo"
+          }
+        }
       }
     ],
     "parameters": {

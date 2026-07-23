@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
+import { useEventListener } from '@vueuse/core'
 import { useTimelineStore } from '@/scripts/stores/timeline/timelineStore.ts'
 
 interface DateRange {
@@ -206,9 +207,6 @@ function handleTrackMouseDown(e: MouseEvent, target: 'left' | 'right') {
   e.preventDefault()
   activeHandle.value = resolveOverlappedHandle(target, e.clientX)
   dragStart.value = null
-
-  window.addEventListener('mousemove', onMouseMove)
-  window.addEventListener('mouseup', onMouseUp)
 }
 
 function handleRangeMouseDown(e: MouseEvent) {
@@ -219,9 +217,6 @@ function handleRangeMouseDown(e: MouseEvent) {
     leftIndex: leftIndex.value,
     rightIndex: rightIndex.value,
   }
-
-  window.addEventListener('mousemove', onMouseMove)
-  window.addEventListener('mouseup', onMouseUp)
 }
 
 function onMouseMove(e: MouseEvent) {
@@ -267,8 +262,6 @@ function onMouseMove(e: MouseEvent) {
 function onMouseUp() {
   activeHandle.value = null
   dragStart.value = null
-  window.removeEventListener('mousemove', onMouseMove)
-  window.removeEventListener('mouseup', onMouseUp)
   updateRange(false)
 }
 
@@ -278,9 +271,6 @@ function handleTrackTouchStart(e: TouchEvent, target: 'left' | 'right') {
   const touch = e.touches[0]
   activeHandle.value = touch ? resolveOverlappedHandle(target, touch.clientX) : target
   dragStart.value = null
-
-  window.addEventListener('touchmove', onTouchMove)
-  window.addEventListener('touchend', onTouchEnd)
 }
 
 function handleRangeTouchStart(e: TouchEvent) {
@@ -294,9 +284,6 @@ function handleRangeTouchStart(e: TouchEvent) {
     leftIndex: leftIndex.value,
     rightIndex: rightIndex.value,
   }
-
-  window.addEventListener('touchmove', onTouchMove)
-  window.addEventListener('touchend', onTouchEnd)
 }
 
 function onTouchMove(e: TouchEvent) {
@@ -346,14 +333,17 @@ function onTouchMove(e: TouchEvent) {
   }
 }
 
-// Touch end
 function onTouchEnd() {
   activeHandle.value = null
   dragStart.value = null
-  window.removeEventListener('touchmove', onTouchMove)
-  window.removeEventListener('touchend', onTouchEnd)
   updateRange(false)
 }
+
+// VueUse global event listeners (auto-unmounted when component is destroyed)
+useEventListener(window, 'mousemove', onMouseMove)
+useEventListener(window, 'mouseup', onMouseUp)
+useEventListener(window, 'touchmove', onTouchMove, { passive: true })
+useEventListener(window, 'touchend', onTouchEnd)
 
 function updateRange(isDragging = false) {
   if (chronologicalRatios.value.length === 0) return

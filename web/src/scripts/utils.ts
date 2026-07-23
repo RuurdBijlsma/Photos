@@ -2,6 +2,28 @@ import { THUMBNAIL_SIZES, VIDEO_SIZES, WEATHER_ICONS } from '@/scripts/constants
 import { useSnackbarsStore } from '@/scripts/stores/snackbarStore.ts'
 import type { Location } from '@/scripts/types/api/fullPhoto.ts'
 import { type RemovableRef, StorageSerializers, useStorage } from '@vueuse/core'
+import type { AxiosResponseHeaders, RawAxiosResponseHeaders } from 'axios'
+
+export function filenameFromHeaders(headers?: RawAxiosResponseHeaders | AxiosResponseHeaders) {
+  const contentDisposition = headers?.['content-disposition'] || headers?.['Content-Disposition']
+  if (contentDisposition) {
+    const match = contentDisposition.match(/filename\*?=(?:UTF-8'')?['"]?([^;\r\n"']+)['"]?/i)
+    if (match && match[1]) {
+      return decodeURIComponent(match[1])
+    }
+  }
+}
+
+export function downloadBlob(blob: Blob, filename?: string) {
+  const url = window.URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  if (filename) link.download = filename
+  link.click()
+  setTimeout(() => {
+    window.URL.revokeObjectURL(url)
+  }, 60000)
+}
 
 export function prettyBytes(bytes: number, decimals = 2): string {
   if (bytes === 0) return '0 B'
@@ -65,6 +87,13 @@ export const stringToColor = (
   return `hsl(${hue}, ${saturation}%, ${lightness}%)`
 }
 
+export function isMobileDevice(): boolean {
+  if (typeof navigator === 'undefined') {
+    return false
+  }
+  return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)
+}
+
 export async function copyToClipboard(text: string) {
   const snackbarStore = useSnackbarsStore()
   try {
@@ -119,15 +148,18 @@ export function getWeatherIcon(condition: string, isDaytime: boolean): string {
   return new URL(`../assets/img/weather/${iconName}`, import.meta.url).href
 }
 
+export function makeTimeString(date: Date) {
+  const hours = String(date.getHours())
+  const minutes = String(date.getMinutes()).padStart(2, '0')
+  return `${hours}:${minutes}`
+}
+
 export function makeDateTimeString(date: Date) {
   const day = date.getDate()
   const month = date.toLocaleString('en-GB', { month: 'long' })
   const year = date.getFullYear()
 
-  const hours = String(date.getHours()).padStart(2, '0')
-  const minutes = String(date.getMinutes()).padStart(2, '0')
-
-  return `${day} ${month} ${year} at ${hours}:${minutes}`
+  return `${day} ${month} ${year} at ${makeTimeString(date)}`
 }
 
 export function makeLocationString(location: Location, components = 2) {
@@ -176,4 +208,15 @@ export function useObjStorage<T>(
 export function caps(str: string) {
   if (str.length === 0) return str
   return str[0].toUpperCase() + str.slice(1)
+}
+
+export function arrayToMap<T extends { id: string }>(items: readonly T[]): Map<string, T> {
+  const map = new Map<string, T>()
+
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i]
+    map.set(item.id, item)
+  }
+
+  return map
 }

@@ -2,8 +2,8 @@
 import type { SimpleTimelineItem, TimelineItem } from '@/scripts/types/generated/timeline.ts'
 import { toHms } from '@/scripts/utils.ts'
 import { useSelectionStore } from '@/scripts/stores/timeline/selectionStore.ts'
-import { useRoute } from 'vue-router'
 import type { LocationQuery } from 'vue-router'
+import { useRoute } from 'vue-router'
 import { computed, nextTick, ref } from 'vue'
 import mediaItemService from '@/scripts/services/mediaItemService.ts'
 
@@ -94,6 +94,7 @@ function selectItem(e: PointerEvent) {
         playsinline
         :width="width"
         :height="height"
+        :crossorigin="mediaItem?.hasThumbnails ? undefined : 'use-credentials'"
         :src="mediaItemService.getVideo(id, 480, !mediaItem?.hasThumbnails)"
       />
 
@@ -186,6 +187,7 @@ function selectItem(e: PointerEvent) {
 
 .check-item-selecting {
   display: none;
+  transform: translateY(-2px);
 }
 
 .selecting-overlay {
@@ -249,6 +251,7 @@ function selectItem(e: PointerEvent) {
 
 .check-item {
   display: none;
+  transform: translateY(-2px);
 }
 
 .checkbox:hover .check-item {

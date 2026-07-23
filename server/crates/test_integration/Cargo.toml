@@ -7,6 +7,7 @@ edition = "2024"
 api = { path = "../apps/api" }
 watcher = { path = "../apps/watcher" }
 worker = { path = "../apps/worker" }
+worker_scaler = { path = "../apps/worker_scaler" }
 app_state = { path = "../libs/app_state" }
 common_services = { path = "../libs/common_services" }
 common_types = { path = "../libs/common_types" }
@@ -15,9 +16,9 @@ tracing = "0.1.40"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter", "fmt"] }
 tokio = { version = "1.35.1", features = ["full"] }
 color-eyre = "0.6.2"
-sqlx = { version = "0.8.6", features = ["runtime-tokio-native-tls", "postgres", "chrono", "macros", "json", "uuid"] }
+sqlx = { version = "0.9.0", features = ["runtime-tokio", "tls-native-tls", "postgres", "chrono", "macros", "json", "uuid"] }
 tempfile = "3.9.0"
-reqwest = { version = "0.13.2", features = ["json", "query"] }
+reqwest = { version = "0.13.2", features = ["json", "query", "cookies"] }
 url = "2.5.7"
 colored = "3.0.0"
 chrono = { version = "0.4.42", features = ["serde"] }
@@ -29,4 +30,4 @@ futures-util = "0.3.31"
 material-color-utils = "0.1.3"
 
 [features]
-load-dynamic = ["api/load-dynamic", "worker/load-dynamic", "common_services/load-dynamic", "common_types/load-dynamic"]
+load-dynamic = ["api/load-dynamic", "worker/load-dynamic", "worker_scaler/load-dynamic", "common_services/load-dynamic", "common_types/load-dynamic"]

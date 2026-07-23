@@ -22,7 +22,8 @@ export const useDailyCardStore = defineStore('dailyCard', () => {
   })
   const completedCards = useObjStorage<number[]>('dailyCompletedCards', [])
 
-  const todayDate = ref(new Date().toISOString().substring(0, 10))
+  // O Canada
+  const todayDate = ref(new Date().toLocaleDateString('en-CA'))
   const todayCards = computed(() => cardsByDate.value[todayDate.value])
 
   function getPayloadItems(card: DailyCardResponse): CollectionMediaItem[] {
@@ -32,7 +33,7 @@ export const useDailyCardStore = defineStore('dailyCard', () => {
   }
 
   async function fetchDailyCards() {
-    const today = new Date().toISOString().substring(0, 10)
+    const today = new Date().toLocaleDateString('en-CA')
     todayDate.value = today
     await fetchCardsForDate(today)
     requestIdleCallback(() => {

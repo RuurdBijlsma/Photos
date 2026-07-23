@@ -13,6 +13,7 @@ pub mod cluster_faces;
 pub mod cluster_photos;
 pub mod delayed_scan;
 pub mod generate_daily_cards;
+pub mod handle_web_upload;
 pub mod import_album_item;
 pub mod ingest_analysis;
 pub mod ingest_llm;
@@ -51,6 +52,7 @@ pub async fn handle_job(context: &WorkerContext, job: &Job) -> Result<JobResult>
         JobType::ClusterFaces => cluster_faces::handle(context, job).await,
         JobType::ClusterPhotos => cluster_photos::handle(context, job).await,
         JobType::SyncThumbnails => sync_thumbnails::handle(context, job).await,
+        JobType::HandleWebUpload => handle_web_upload::handle(context, job).await,
         JobType::CalcSystemStats => calc_system_stats::handle(context, job).await,
         JobType::ImportAlbumItem => import_album_item::handle(context, job).await,
         JobType::GenerateDailyCards => generate_daily_cards::handle(context, job).await,

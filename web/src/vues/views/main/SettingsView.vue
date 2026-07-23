@@ -4,6 +4,7 @@ import ThemeSettings from '@/vues/components/settings/ThemeSettings.vue'
 import InterfaceSettings from '@/vues/components/settings/InterfaceSettings.vue'
 import { DEFAULT_BG_URL, useBackgroundStore } from '@/scripts/stores/backgroundStore.ts'
 import BackupSettings from '@/vues/components/settings/BackupSettings.vue'
+import UploadSettings from '@/vues/components/settings/UploadSettings.vue'
 
 const backgroundStore = useBackgroundStore()
 </script>
@@ -39,29 +40,20 @@ const backgroundStore = useBackgroundStore()
 
       <interface-settings />
 
-      <!-- Section: Backup & Restore -->
       <div class="divider-flex">
         <v-divider />
-        <span>Backup & Restore</span>
+        <span>Application settings</span>
         <v-divider />
       </div>
 
-      <backup-settings />
+      <upload-settings class="mb-6" />
 
-      <!-- Section: Placeholder Other Settings -->
-      <section class="placeholder-section">
-        <h3 class="placeholder-title">Other Settings Placeholder</h3>
-        <p class="placeholder-desc">Hello world</p>
-      </section>
+      <backup-settings />
     </div>
   </main-layout-container>
 </template>
 
 <style scoped>
-.settings {
-  overflow-y: auto;
-}
-
 .settings-content {
   max-width: 1400px;
   margin: 0 auto;

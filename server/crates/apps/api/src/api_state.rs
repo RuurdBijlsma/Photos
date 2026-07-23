@@ -1,18 +1,15 @@
-use crate::timeline::websocket::MediaPayload;
 use app_state::{AppSettings, IngestSettings};
 use axum::extract::FromRef;
 use common_services::s2s_client::S2SClient;
 use open_clip_inference::{TextEmbedder, VisionEmbedder};
 use sqlx::PgPool;
 use std::sync::Arc;
-use tokio::sync::broadcast;
 
 #[derive(Clone, Debug)]
 pub struct ApiContext {
     pub pool: PgPool,
     pub s2s_client: S2SClient,
     pub settings: AppSettings,
-    pub timeline_broadcaster: broadcast::Sender<Arc<MediaPayload>>,
     pub text_embedder: Arc<TextEmbedder>,
     pub vision_embedder: Arc<VisionEmbedder>,
 }

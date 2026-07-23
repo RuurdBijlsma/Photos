@@ -101,10 +101,13 @@ async fn get_llm_data(
     let images_to_analyze =
         get_images_to_analyze(context, file_path, media_item_id, percentages, None);
     let mut analyses = Vec::new();
+    let visual_analyzer = context
+        .visual_analyzer
+        .clone()
+        .ok_or_else(|| eyre!("No visual_analyzer on worker that picked up ingest_llm job"))?;
 
     for (percentage, image_path) in images_to_analyze {
-        let analysis_result = context
-            .visual_analyzer
+        let analysis_result = visual_analyzer
             .llm_analysis(&context.settings.ingest.analyzer, &image_path, percentage)
             .await?;
         analyses.push(analysis_result);

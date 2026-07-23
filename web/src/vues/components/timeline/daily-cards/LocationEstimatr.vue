@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { ref, computed, watch, onUnmounted, nextTick } from 'vue'
+import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { useEventListener } from '@vueuse/core'
 import type { CollectionMediaItem, DailyCardResponse } from '@/scripts/types/api/dailyCards.ts'
 import { useObjStorage } from '@/scripts/utils.ts'
 import mediaItemService from '@/scripts/services/mediaItemService.ts'
-import BaseMap from '@/vues/components/map/BaseMap.vue'
 import type { StyleName } from '@/vues/components/map/BaseMap.vue'
+import BaseMap from '@/vues/components/map/BaseMap.vue'
 import maplibregl from 'maplibre-gl'
 import { useDailyCardStore } from '@/scripts/stores/timeline/dailyCardStore.ts'
 import MediaViewer from '@/vues/components/viewer/MediaViewer.vue'
@@ -92,6 +93,20 @@ let startY = 0
 let startWidth = 0
 let startHeight = 0
 
+// Register listeners synchronously at setup level so VueUse handles auto-cleanup on unmount
+useEventListener(document, 'mousemove', (e) => {
+  if (isResizing) handleResize(e)
+})
+useEventListener(document, 'mouseup', () => {
+  if (isResizing) stopResize()
+})
+useEventListener(document, 'touchmove', (e) => {
+  if (isResizing) handleResizeTouch(e)
+})
+useEventListener(document, 'touchend', () => {
+  if (isResizing) stopResizeTouch()
+})
+
 // Stable map options to prevent viewport resets when switching style layers
 const stableMapOptions = {
   center: { lon: 5, lat: 20 },
@@ -177,9 +192,6 @@ function startResize(e: MouseEvent) {
   startY = e.clientY
   startWidth = mapWidth.value
   startHeight = mapHeight.value
-
-  document.addEventListener('mousemove', handleResize)
-  document.addEventListener('mouseup', stopResize)
   e.preventDefault()
 }
 
@@ -198,8 +210,6 @@ function handleResize(e: MouseEvent) {
 
 function stopResize() {
   isResizing = false
-  document.removeEventListener('mousemove', handleResize)
-  document.removeEventListener('mouseup', stopResize)
 }
 
 function startResizeTouch(e: TouchEvent) {
@@ -209,9 +219,6 @@ function startResizeTouch(e: TouchEvent) {
   startY = e.touches[0].clientY
   startWidth = mapWidth.value
   startHeight = mapHeight.value
-
-  document.addEventListener('touchmove', handleResizeTouch)
-  document.addEventListener('touchend', stopResizeTouch)
   e.preventDefault()
 }
 
@@ -230,8 +237,6 @@ function handleResizeTouch(e: TouchEvent) {
 
 function stopResizeTouch() {
   isResizing = false
-  document.removeEventListener('touchmove', handleResizeTouch)
-  document.removeEventListener('touchend', stopResizeTouch)
 }
 
 // Distance & Score Calculations
@@ -678,6 +683,7 @@ onUnmounted(() => {
           :show-ui="true"
           :is-video="currentMediaItem.isVideo"
           :muted="false"
+          :elemental-fullscreen="false"
         />
       </div>
 
@@ -1327,9 +1333,7 @@ onUnmounted(() => {
 </style>
 
 <style>
-/*
-  For generated MapLibre GL Markers
-*/
+/* For generated MapLibre GL Markers */
 .actual-pin-marker {
   width: 52px;
   height: 60px;

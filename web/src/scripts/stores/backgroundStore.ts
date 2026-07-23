@@ -45,6 +45,7 @@ export const useBackgroundStore = defineStore('background', () => {
   }
 
   async function fetchAndCacheNextBackground(force = false) {
+    if (!settings.randomizeBackground && !force) return
     if (hasFetchedForThisSession.value && !force) return
     hasFetchedForThisSession.value = true
 
@@ -188,10 +189,36 @@ export const useBackgroundStore = defineStore('background', () => {
     } else {
       await setCorrectTheme()
     }
-    if (settings.useImageBackground && authStore.isAuthenticated) {
+    if (settings.useImageBackground && authStore.isAuthenticated && settings.randomizeBackground) {
       fetchAndCacheNextBackground(true)
     }
   })
+
+  watch(
+    () => settings.randomizeBackground,
+    (isRandomizing) => {
+      if (!isRandomizing) {
+        // Freeze the current background in localStorage so it persists across refreshes
+        if (backgroundTheme.value) {
+          const currentData: CachedBackgroundData = {
+            url: backgroundUrl.value,
+            theme: backgroundTheme.value,
+            variant: settings.customThemeVariant,
+            contrast: settings.customThemeContrast,
+          }
+          localStorage.setItem(BG_CACHE_KEY, JSON.stringify(currentData))
+          console.log('Randomization disabled. Froze current background.')
+        } else {
+          localStorage.removeItem(BG_CACHE_KEY)
+        }
+      } else {
+        // Randomization turned back on; pre-fetch a next background
+        if (authStore.isAuthenticated) {
+          fetchAndCacheNextBackground(true)
+        }
+      }
+    },
+  )
 
   const throttledTheme = useThrottleFn(setCorrectTheme, 50, true, true)
 

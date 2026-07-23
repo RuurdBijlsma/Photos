@@ -1,0 +1,95 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            l.id,\n            l.name,\n            l.admin1,\n            l.admin2,\n            l.country_code,\n            l.country_name,\n            COUNT(*)::bigint as \"photo_count!\"\n        FROM media_item m\n        JOIN gps g ON m.id = g.media_item_id\n        JOIN location l ON g.location_id = l.id\n        WHERE m.user_id = $1 AND m.deleted = false\n        GROUP BY l.id, l.name, l.admin1, l.admin2, l.country_code, l.country_name\n        HAVING COUNT(*) >= 3\n        ORDER BY MIN(m.sort_timestamp) DESC, l.id DESC\n        LIMIT 3\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "location",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "name",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "location",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "admin1",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "location",
+            "name": "admin1"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "admin2",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "location",
+            "name": "admin2"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "country_code",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "location",
+            "name": "country_code"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "country_name",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "location",
+            "name": "country_name"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "photo_count!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      null
+    ]
+  },
+  "hash": "99d5ccab61119587105530f17aad931761b1a5ab3b0475ca075c6d5c946aac1b"
+}

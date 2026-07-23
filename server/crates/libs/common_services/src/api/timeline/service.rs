@@ -1,17 +1,16 @@
 use crate::api::app_error::AppError;
 use crate::api::timeline::interfaces::SortDirection;
-use crate::database::app_user::User;
 use chrono::NaiveDate;
 use common_types::pb::api::{
     TimelineItem, TimelineItemsResponse, TimelineMonthItems, TimelineMonthRatios,
     TimelineRatiosResponse,
 };
-use sqlx::PgPool;
+use sqlx::{AssertSqlSafe, PgPool};
 use std::collections::HashMap;
 
 /// Fetches a timeline of media item ratios, grouped by month.
 pub async fn get_timeline_ratios(
-    user: &User,
+    user_id: i32,
     pool: &PgPool,
     sort_direction: SortDirection,
 ) -> Result<TimelineRatiosResponse, AppError> {
@@ -30,8 +29,8 @@ pub async fn get_timeline_ratios(
         sort_direction.as_sql()
     );
 
-    let months = sqlx::query_as::<_, TimelineMonthRatios>(&sql)
-        .bind(user.id)
+    let months = sqlx::query_as::<_, TimelineMonthRatios>(AssertSqlSafe(sql))
+        .bind(user_id)
         .fetch_all(pool)
         .await?;
 
@@ -40,7 +39,7 @@ pub async fn get_timeline_ratios(
 
 /// Fetches a timeline of media item ids.
 pub async fn get_timeline_ids(
-    user: &User,
+    user_id: i32,
     pool: &PgPool,
     sort_direction: SortDirection,
 ) -> Result<Vec<String>, AppError> {
@@ -53,8 +52,8 @@ pub async fn get_timeline_ids(
         sort_direction.as_sql()
     );
 
-    let ids = sqlx::query_scalar::<_, Vec<String>>(&sql)
-        .bind(user.id)
+    let ids = sqlx::query_scalar::<_, Vec<String>>(AssertSqlSafe(sql))
+        .bind(user_id)
         .fetch_one(pool)
         .await?;
 
@@ -63,7 +62,7 @@ pub async fn get_timeline_ids(
 
 /// Fetches media items for a given list of month IDs, grouped by month.
 pub async fn get_photos_by_month(
-    user: &User,
+    user_id: i32,
     pool: &PgPool,
     month_ids: &[NaiveDate],
     sort_direction: SortDirection,
@@ -88,8 +87,8 @@ pub async fn get_photos_by_month(
         sort_direction.as_sql()
     );
 
-    let items = sqlx::query_as::<_, TimelineItem>(&sql)
-        .bind(user.id)
+    let items = sqlx::query_as::<_, TimelineItem>(AssertSqlSafe(sql))
+        .bind(user_id)
         .bind(month_ids)
         .fetch_all(pool)
         .await?;

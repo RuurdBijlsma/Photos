@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useWindowSize } from '@vueuse/core'
 import type { DailyCardResponse } from '@/scripts/types/api/dailyCards.ts'
@@ -330,6 +330,7 @@ onUnmounted(() => {
               muted
               class="story-media"
               @ended="nextSlide"
+              :crossorigin="currentItem.hasThumbnails ? undefined : 'use-credentials'"
             />
             <img v-else :src="currentImageUrl" class="story-media" alt="Story Slide" />
           </div>

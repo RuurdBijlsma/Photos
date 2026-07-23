@@ -20,25 +20,43 @@ where
     }
 }
 
-/// Get auth token from Authorization Header.
-pub fn extract_token(parts: &Parts) -> Result<String, AuthError> {
-    let auth_header = parts
+/// Parses a specific cookie's value from the HTTP request headers.
+pub fn extract_cookie_value(parts: &Parts, cookie_name: &str) -> Option<String> {
+    parts
         .headers
-        .get(header::AUTHORIZATION)
-        .and_then(|v| v.to_str().ok())
-        .ok_or(AuthError::MissingToken)?;
+        .get(header::COOKIE)?
+        .to_str()
+        .ok()?
+        .split(';')
+        .map(str::trim)
+        .find(|cookie| cookie.starts_with(&format!("{cookie_name}=")))
+        .and_then(|cookie| {
+            let mut key_val = cookie.splitn(2, '=');
+            key_val.next(); // Skip cookie name
+            key_val.next().map(ToString::to_string)
+        })
+}
 
-    auth_header
-        .strip_prefix("Bearer ")
-        .map(ToOwned::to_owned)
-        .ok_or(AuthError::InvalidToken)
+pub fn extract_access_token(parts: &Parts) -> Result<String, AuthError> {
+    extract_cookie_value(parts, "access_token").ok_or(AuthError::MissingToken)
+}
+
+pub fn extract_refresh_token(parts: &Parts) -> Result<String, AuthError> {
+    extract_cookie_value(parts, "refresh_token").ok_or(AuthError::MissingToken)
+}
+
+pub fn extract_token(parts: &Parts) -> Result<String, AuthError> {
+    extract_access_token(parts)
 }
 
 pub fn decode_token(token: &str, jwt_secret: &str) -> Result<AuthClaims, AuthError> {
+    let mut validation = Validation::default();
+    validation.set_audience(&["api"]);
+
     decode::<AuthClaims>(
         token,
         &DecodingKey::from_secret(jwt_secret.as_ref()),
-        &Validation::default(),
+        &validation,
     )
     .map(|data| data.claims)
     .map_err(|_| AuthError::InvalidToken)

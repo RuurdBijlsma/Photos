@@ -5,7 +5,6 @@ import binService from '@/scripts/services/binService.ts'
 import { useSnackbarsStore } from '@/scripts/stores/snackbarStore.ts'
 import { useDialogStore } from '@/scripts/stores/dialogStore.ts'
 import { useSelectionStore } from '@/scripts/stores/timeline/selectionStore.ts'
-import { useRouter } from 'vue-router'
 import { useAlbumStore } from '@/scripts/stores/albumStore.ts'
 import { useRefreshStore } from '@/scripts/stores/refreshStore.ts'
 import { usePeopleStore } from '@/scripts/stores/peopleStore.ts'
@@ -17,7 +16,6 @@ export const useBinStore = defineStore('bin', () => {
   const albumStore = useAlbumStore()
   const peopleStore = usePeopleStore()
   const refreshStore = useRefreshStore()
-  const router = useRouter()
 
   const binItems = shallowRef<SimpleTimelineItem[]>([])
   const isLoading = ref(false)
@@ -52,10 +50,8 @@ export const useBinStore = defineStore('bin', () => {
         message: `${ids.length} item${ids.length === 1 ? '' : 's'} moved to bin`,
         icon: 'mdi-delete',
         action: {
-          label: 'Bin',
-          onClick: () => {
-            router.push({ path: '/bin' })
-          },
+          label: 'Undo',
+          onClick: () => restoreItems(ids),
         },
       })
       callForRefresh()

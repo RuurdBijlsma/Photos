@@ -41,6 +41,15 @@ pub struct JobsQuery {
     pub filter: Vec<String>,
 }
 
+#[derive(Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct UserJobsQuery {
+    pub page: Option<i64>,
+    pub limit: Option<i64>,
+    pub status: Option<String>,
+    pub search: Option<String>,
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct PaginatedJobsResponse {

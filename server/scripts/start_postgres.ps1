@@ -3,7 +3,6 @@
 # =============================================================================
 
 # --- Configuration ---
-# You can change these values to suit your project.
 $containerName = "photos-db-dev"
 $dbName = "photos"
 $dbUser = "photos_user"

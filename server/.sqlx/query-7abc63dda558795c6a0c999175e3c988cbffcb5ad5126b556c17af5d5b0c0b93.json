@@ -25,9 +25,16 @@
                 "sync_thumbnails",
                 "delayed_scan",
                 "generate_daily_cards",
-                "calc_system_stats"
+                "calc_system_stats",
+                "handle_web_upload"
               ]
             }
+          }
+        },
+        "origin": {
+          "Table": {
+            "table": "jobs",
+            "name": "job_type"
           }
         }
       },
@@ -47,12 +54,19 @@
               ]
             }
           }
+        },
+        "origin": {
+          "Table": {
+            "table": "jobs",
+            "name": "status"
+          }
         }
       },
       {
         "ordinal": 2,
         "name": "count!",
-        "type_info": "Int8"
+        "type_info": "Int8",
+        "origin": "Expression"
       }
     ],
     "parameters": {

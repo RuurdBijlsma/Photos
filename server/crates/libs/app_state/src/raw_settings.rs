@@ -116,6 +116,7 @@ pub struct ApiSettings {
     pub port: u32,
     pub allowed_origins: Vec<String>,
     pub public_url: String,
+    pub cookie_secure: bool,
     pub rate_limiting: RateLimitingSettings,
 }
 
@@ -158,6 +159,7 @@ pub struct AuthConstants {
     pub access_token_expiry_minutes: i64,
     pub refresh_token_expiry_days: i64,
     pub album_invitation_expiry_minutes: i64,
+    pub upload_token_expiry_minutes: i64,
 }
 
 #[derive(Debug, Deserialize, Clone, Serialize)]

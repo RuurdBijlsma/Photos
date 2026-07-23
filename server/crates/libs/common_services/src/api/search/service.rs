@@ -1,12 +1,12 @@
 use crate::api::app_error::AppError;
 use crate::api::search::cache::{get_cached_image_embedding, get_cached_text_embedding};
 use crate::api::search::interfaces::{
-    SearchFilterRanges, SearchImage, SearchMediaConfig, SearchMediaType, SearchSortBy,
+    SearchFilterRanges, SearchMediaConfig, SearchMediaType, SearchSortBy, VisionQuery,
 };
 use crate::api::search::search_variants::{
     advanced_search_media, basic_search_media, filter_only_search_media,
 };
-use crate::database::app_user::User;
+use color_eyre::eyre::eyre;
 use common_types::pb::api::{
     SearchSuggestion, SearchSuggestionsResponse, SimpleTimelineItem, SuggestionType,
 };
@@ -16,7 +16,7 @@ use sqlx::PgPool;
 use std::sync::Arc;
 
 pub async fn search_media(
-    user: &User,
+    user_id: i32,
     pool: &PgPool,
     embedder: Arc<TextEmbedder>,
     query: Option<String>,
@@ -25,7 +25,7 @@ pub async fn search_media(
     let query = query.unwrap_or_default();
     if query.trim().is_empty() {
         if has_active_filters(&config) {
-            return filter_only_search_media(user, pool, config).await;
+            return filter_only_search_media(user_id, pool, config).await;
         }
         return Ok(vec![]);
     }
@@ -38,27 +38,80 @@ pub async fn search_media(
         && config.person_ids.is_empty()
         && config.country_codes.is_empty()
     {
-        basic_search_media(user, pool, embedder, &query, config).await
+        basic_search_media(user_id, pool, embedder, &query, config).await
     } else {
-        advanced_search_media(user, pool, embedder, &query, config).await
+        advanced_search_media(user_id, pool, embedder, &query, config).await
     }
 }
 
-#[allow(clippy::too_many_lines)]
-pub async fn search_by_image(
-    user: &User,
+pub async fn search_by_media_items(
+    user_id: i32,
     pool: &PgPool,
     text_embedder: Arc<TextEmbedder>,
     vision_embedder: Arc<VisionEmbedder>,
     query: Option<String>,
-    img: SearchImage,
     config: SearchMediaConfig,
+    media_item_ids: &[String],
+) -> Result<Vec<SimpleTimelineItem>, AppError> {
+    if media_item_ids.is_empty() {
+        return Ok(vec![]);
+    }
+
+    // Query the database to calculate the average embedding vector of the specified media items
+    let row = sqlx::query!(
+        r#"
+        SELECT AVG(embedding)::vector as "embedding: Vector"
+        FROM visual_analysis
+        WHERE user_id = $1 AND media_item_id = ANY($2) AND deleted = false
+        "#,
+        user_id,
+        media_item_ids
+    )
+    .fetch_one(pool)
+    .await?;
+
+    let avg_embedding = row
+        .embedding
+        .ok_or_else(|| {
+            AppError::Internal(eyre!("No embeddings found for the specified media items"))
+        })?
+        .to_vec();
+
+    // Perform search using the combined average vector
+    search_by_image(
+        user_id,
+        pool,
+        text_embedder,
+        vision_embedder,
+        query,
+        VisionQuery::Embedding(avg_embedding),
+        config,
+        media_item_ids.to_vec(),
+    )
+    .await
+}
+
+#[allow(clippy::too_many_lines, clippy::too_many_arguments)]
+pub async fn search_by_image(
+    user_id: i32,
+    pool: &PgPool,
+    text_embedder: Arc<TextEmbedder>,
+    vision_embedder: Arc<VisionEmbedder>,
+    query: Option<String>,
+    img: VisionQuery,
+    config: SearchMediaConfig,
+    exclude_ids: Vec<String>,
 ) -> Result<Vec<SimpleTimelineItem>, AppError> {
     // 1. Spawn vision embedding (CPU-bound / blocking task)
     let pool_clone = pool.clone();
     let model_id_clone = config.embedder_model_id.clone();
     let image_task = tokio::spawn(async move {
-        get_cached_image_embedding(img, &model_id_clone, &pool_clone, vision_embedder).await
+        match img {
+            VisionQuery::Raw(img) => {
+                get_cached_image_embedding(img, &model_id_clone, &pool_clone, vision_embedder).await
+            }
+            VisionQuery::Embedding(vector) => Ok(vector),
+        }
     });
 
     // 2. Spawn optional text query embedding task
@@ -182,6 +235,7 @@ pub async fn search_by_image(
                   JOIN person p ON fc.person_id = p.id
                   WHERE va.media_item_id = mi.id AND p.id = ANY($13)
               ) >= (CASE WHEN $16 THEN cardinality($13) ELSE 1 END))
+              AND (cardinality($19::text[]) = 0 OR NOT (mi.id = ANY($19)))
         ),
         fts AS (
             SELECT
@@ -251,7 +305,7 @@ pub async fn search_by_image(
         LIMIT $5 OFFSET $17
              "#,
             fts_query,                // $1
-            user.id,                  // $2
+            user_id,                  // $2
             vector_param as _,        // $3
             candidate_limit,          // $4
             limit,                    // $5
@@ -267,7 +321,8 @@ pub async fn search_by_image(
             semantic_score_threshold, // $15
             config.all_faces_required, // $16
             offset,                    // $17
-            is_panorama_filter         // $18
+            is_panorama_filter,        // $18
+            &exclude_ids,       // $19
         )
             .fetch_all(pool)
             .await?;
@@ -300,6 +355,7 @@ pub async fn search_by_image(
                       JOIN person p ON fc.person_id = p.id
                       WHERE va.media_item_id = mi.id AND p.id = ANY($9)
                   ) >= (CASE WHEN $12 THEN cardinality($9) ELSE 1 END))
+                  AND (cardinality($15::text[]) = 0 OR NOT (mi.id = ANY($15)))
             ),
             vec AS (
                 SELECT DISTINCT ON (media_item_id)
@@ -334,7 +390,7 @@ pub async fn search_by_image(
                 mi.sort_timestamp DESC
             LIMIT $4 OFFSET $13
             "#,
-            user.id,                   // $1
+            user_id,                   // $1
             vector_param as _,         // $2
             candidate_limit as i32,    // $3
             limit,                     // $4
@@ -348,6 +404,7 @@ pub async fn search_by_image(
             config.all_faces_required, // $12
             offset,                    // $13
             is_panorama_filter,        // $14
+            &exclude_ids,              // $15
         )
         .fetch_all(pool)
         .await?;
@@ -357,7 +414,7 @@ pub async fn search_by_image(
 }
 
 pub async fn search_filter_ranges(
-    user: &User,
+    user_id: i32,
     pool: &PgPool,
 ) -> Result<SearchFilterRanges, AppError> {
     let months_task = sqlx::query!(
@@ -368,7 +425,7 @@ pub async fn search_filter_ranges(
           AND deleted = false
         ORDER BY month_id
         "#,
-        user.id
+        user_id
     )
     .fetch_all(pool);
     let countries_task = sqlx::query!(
@@ -380,7 +437,7 @@ pub async fn search_filter_ranges(
         WHERE mi.user_id = $1 AND mi.deleted = false
         ORDER BY l.country_name
         "#,
-        user.id
+        user_id
     )
     .fetch_all(pool);
     let people_task = sqlx::query!(
@@ -390,7 +447,7 @@ pub async fn search_filter_ranges(
         WHERE user_id = $1 AND name IS NOT NULL AND name != ''
         ORDER BY name
         "#,
-        user.id
+        user_id
     )
     .fetch_all(pool);
 
@@ -422,8 +479,9 @@ fn has_active_filters(config: &SearchMediaConfig) -> bool {
         || config.negative_query.is_some()
 }
 
+#[allow(clippy::too_many_lines)]
 pub async fn get_search_suggestions(
-    user: &User,
+    user_id: i32,
     pool: &PgPool,
     query: &str,
     limit: Option<i64>,
@@ -461,18 +519,35 @@ pub async fn get_search_suggestions(
 
             UNION ALL
 
-            (SELECT loc.val as suggestion, COUNT(DISTINCT g.media_item_id) as photo_count, 'SEARCH' as "type!", NULL as "id"
-            FROM (
-                SELECT id, name as val FROM location WHERE name ILIKE $2
-                UNION
-                SELECT id, admin1 as val FROM location WHERE admin1 ILIKE $2
-                UNION
-                SELECT id, country_name as val FROM location WHERE country_name ILIKE $2
-            ) loc
-            JOIN gps g ON g.location_id = loc.id
+            -- Country Suggestions
+            (SELECT l.country_name as suggestion, COUNT(DISTINCT g.media_item_id) as photo_count, 'LOCATION' as "type!", ('country:' || l.country_code) as "id"
+            FROM location l
+            JOIN gps g ON g.location_id = l.id
             JOIN media_item mi ON g.media_item_id = mi.id
-            WHERE mi.user_id = $1 AND mi.deleted = false
-            GROUP BY loc.val
+            WHERE mi.user_id = $1 AND mi.deleted = false AND l.country_name ILIKE $2 AND l.country_name != ''
+            GROUP BY l.country_name, l.country_code
+            LIMIT $3 * 2)
+
+            UNION ALL
+
+            -- Admin1 Region Suggestions
+            (SELECT l.admin1 as suggestion, COUNT(DISTINCT g.media_item_id) as photo_count, 'LOCATION' as "type!", ('admin1:' || l.country_code || ':' || l.admin1) as "id"
+            FROM location l
+            JOIN gps g ON g.location_id = l.id
+            JOIN media_item mi ON g.media_item_id = mi.id
+            WHERE mi.user_id = $1 AND mi.deleted = false AND l.admin1 ILIKE $2 AND l.admin1 != ''
+            GROUP BY l.admin1, l.country_code
+            LIMIT $3 * 2)
+
+            UNION ALL
+
+            -- Place/Town Suggestions
+            (SELECT l.name as suggestion, COUNT(DISTINCT g.media_item_id) as photo_count, 'LOCATION' as "type!", ('place:' || MIN(l.id)) as "id"
+            FROM location l
+            JOIN gps g ON g.location_id = l.id
+            JOIN media_item mi ON g.media_item_id = mi.id
+            WHERE mi.user_id = $1 AND mi.deleted = false AND l.name ILIKE $2 AND l.name != ''
+            GROUP BY l.name
             LIMIT $3 * 2)
 
             UNION ALL
@@ -501,10 +576,18 @@ pub async fn get_search_suggestions(
         SELECT suggestion as "suggestion!", "type!" as "type!", "id" as "id?", SUM(photo_count)::int8 as "photo_count!"
         FROM matched_terms
         GROUP BY suggestion, "type!", "id"
-        ORDER BY (CASE WHEN "type!" = 'ALBUM' THEN 0 ELSE (CASE WHEN "type!" = 'PERSON' THEN 1 ELSE 2 END) END), "photo_count!" DESC, suggestion ASC
+        ORDER BY
+            (CASE
+                WHEN "type!" = 'ALBUM' THEN 0
+                WHEN "type!" = 'PERSON' THEN 1
+                WHEN "type!" = 'LOCATION' THEN 2
+                ELSE 3
+            END),
+            "photo_count!" DESC,
+            suggestion ASC
         LIMIT $3
         "#,
-        user.id,
+        user_id,
         ilike_query,
         limit as i32
     )
@@ -519,6 +602,7 @@ pub async fn get_search_suggestions(
                 suggestion_type: match row.r#type.as_str() {
                     "ALBUM" => SuggestionType::Album as i32,
                     "PERSON" => SuggestionType::Person as i32,
+                    "LOCATION" => SuggestionType::Location as i32,
                     _ => SuggestionType::Search as i32,
                 },
                 id: row.id,
@@ -528,7 +612,7 @@ pub async fn get_search_suggestions(
 }
 
 pub async fn get_random_search_suggestion(
-    user: &User,
+    user_id: i32,
     pool: &PgPool,
 ) -> Result<Option<String>, AppError> {
     let rows = sqlx::query!(
@@ -618,7 +702,7 @@ pub async fn get_random_search_suggestion(
         -- This endpoint doesn't have to be fast anyway
         LIMIT 500
         "#,
-        user.id
+        user_id
     )
     .fetch_all(pool)
     .await?;

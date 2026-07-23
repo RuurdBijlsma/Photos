@@ -1,6 +1,5 @@
 use crate::api::app_error::AppError;
 use crate::api::theme::interfaces::RandomPhotoResponse;
-use crate::database::app_user::User;
 use material_color_utils::dynamic::variant::Variant;
 use material_color_utils::theme_from_color;
 use material_color_utils::utils::color_utils::Argb;
@@ -14,7 +13,7 @@ use tracing::warn;
 ///
 /// Returns an error if either of the database queries fail.
 pub async fn random_photo_theme(
-    user: &User,
+    user_id: i32,
     pool: &PgPool,
     variant: Variant,
     contrast_level: f64,
@@ -30,14 +29,14 @@ pub async fn random_photo_theme(
           AND mi.deleted = false
           AND cardinality(cd.prominent_colors) > 0
         "#,
-        user.id
+        user_id
     )
     .fetch_one(pool)
     .await?
     .unwrap_or(0); // Default to 0 if count is NULL
 
     if count == 0 {
-        warn!("No photos with color data for user {}", user.id);
+        warn!("No photos with color data for user {}", user_id);
         return Ok(None);
     }
 
@@ -61,7 +60,7 @@ pub async fn random_photo_theme(
         LIMIT 1
         OFFSET $2
         "#,
-        user.id,
+        user_id,
         random_offset
     )
     .fetch_optional(pool)
@@ -71,7 +70,7 @@ pub async fn random_photo_theme(
         // This can happen in a race condition if photos are deleted between the COUNT and this query.
         warn!(
             "No photo found at offset {} for user {}",
-            random_offset, user.id
+            random_offset, user_id
         );
         return Ok(None);
     };

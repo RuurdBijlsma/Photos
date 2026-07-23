@@ -17,6 +17,8 @@ const showFilters = ref(false)
 
 // URL Source of Truth
 const query = computed(() => (route.query.query as string) || '')
+const isSimilarSearch = computed(() => route.query.mode === 'similar' && !!route.query.ids)
+
 const filterMediaType = computed({
   get: () => (route.query.type as 'all' | 'photo' | 'video' | 'panorama') || 'all',
   set: (val) => updateURL({ type: val === 'all' ? undefined : val }),
@@ -203,8 +205,10 @@ const hasFilters = computed(() => {
   )
 })
 
-const isFilterOnlyBrowse = computed(() => !query.value && hasFilters.value)
-const isEmptySearch = computed(() => !query.value && !hasFilters.value)
+const isFilterOnlyBrowse = computed(
+  () => !query.value && hasFilters.value && !isSimilarSearch.value,
+)
+const isEmptySearch = computed(() => !query.value && !hasFilters.value && !isSimilarSearch.value)
 
 const debouncedPush = useDebounceFn((query: Record<string, string>) => {
   router.push({ query })

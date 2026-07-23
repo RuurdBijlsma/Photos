@@ -4,9 +4,8 @@ import { useRoute } from 'vue-router'
 import { useResizeObserver } from '@vueuse/core'
 import { useVirtualizer } from '@tanstack/vue-virtual'
 import MainLayoutContainer from '@/vues/components/MainLayoutContainer.vue'
-import mediaItemService from '@/scripts/services/mediaItemService.ts'
 import storageService from '@/scripts/services/storageService.ts'
-import { prettyBytes } from '@/scripts/utils.ts'
+import { arrayToMap, prettyBytes } from '@/scripts/utils.ts'
 import { useDialogStore } from '@/scripts/stores/dialogStore.ts'
 import { useSnackbarsStore } from '@/scripts/stores/snackbarStore.ts'
 import type { StorageReviewItem } from '@/scripts/types/generated/timeline.ts'
@@ -14,18 +13,18 @@ import { useBinStore } from '@/scripts/stores/binStore.ts'
 import { useViewPhotoStore } from '@/scripts/stores/timeline/viewPhotoStore.ts'
 import StorageReviewCard from '@/vues/components/ui/StorageReviewCard.vue'
 import { useRefreshFunction } from '@/scripts/composables/useRefreshFunction.ts'
+import { useDownloadStore } from '@/scripts/stores/downloadStore.ts'
 
 const route = useRoute()
 const dialogStore = useDialogStore()
 const snackbarStore = useSnackbarsStore()
 const binStore = useBinStore()
 const viewPhotoStore = useViewPhotoStore()
+const downloadStore = useDownloadStore()
 
 const items = ref<StorageReviewItem[]>([])
 const loading = ref(false)
 const actionLoading = ref(false)
-const batchDownloading = ref(false)
-const downloadingIds = ref<Set<string>>(new Set())
 const selected = ref<Set<string>>(new Set())
 const scrollContainer = useTemplateRef('scrollContainer')
 const containerWidth = ref(0)
@@ -85,21 +84,12 @@ const virtualRows = computed(() => rowVirtualizer.value.getVirtualItems())
 const virtualGridHeight = computed(() => rowVirtualizer.value.getTotalSize())
 
 function toggleItem(id: string) {
-  const next = new Set(selected.value)
-  if (next.has(id)) next.delete(id)
-  else next.add(id)
-  selected.value = next
+  if (selected.value.has(id)) selected.value.delete(id)
+  else selected.value.add(id)
 }
 
 function toggleAll() {
   selected.value = allSelected.value ? new Set() : new Set(items.value.map((item) => item.id))
-}
-
-function setDownloading(id: string, value: boolean) {
-  const next = new Set(downloadingIds.value)
-  if (value) next.add(id)
-  else next.delete(id)
-  downloadingIds.value = next
 }
 
 async function loadItems() {
@@ -119,50 +109,9 @@ async function loadItems() {
   }
 }
 
-async function downloadItem(item: StorageReviewItem) {
-  if (downloadingIds.value.has(item.id)) return
-  setDownloading(item.id, true)
-  try {
-    const response = await mediaItemService.downloadMediaFileById(item.id)
-    let filename = item.filename
-    const contentDisposition =
-      response.headers?.['content-disposition'] || response.headers?.['Content-Disposition']
-    if (contentDisposition) {
-      const match = contentDisposition.match(/filename\*?=(?:UTF-8'')?['"]?([^;\r\n"']+)['"]?/i)
-      if (match && match[1]) {
-        filename = decodeURIComponent(match[1])
-      }
-    }
-    const url = window.URL.createObjectURL(response.data)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = filename
-    link.click()
-    window.URL.revokeObjectURL(url)
-    snackbarStore.enqueue({ message: 'Download started', icon: 'mdi-download-outline' })
-  } catch (e) {
-    snackbarStore.error('Could not download item', e)
-  } finally {
-    setDownloading(item.id, false)
-  }
-}
-
 async function downloadSelected() {
-  // Evaluated on demand instead of inside an active computed watcher
   const targetItems = items.value.filter((item) => selected.value.has(item.id))
-  if (batchDownloading.value || targetItems.length === 0) return
-  batchDownloading.value = true
-  snackbarStore.enqueue({
-    message: `Preparing ${targetItems.length} download${targetItems.length === 1 ? '' : 's'}`,
-    icon: 'mdi-download-outline',
-  })
-  try {
-    for (const item of targetItems) {
-      await downloadItem(item)
-    }
-  } finally {
-    batchDownloading.value = false
-  }
+  await downloadStore.multiDownloadItems(targetItems.map((t) => t.id))
 }
 
 async function deleteItems(ids: string[]) {
@@ -189,6 +138,9 @@ watch(
   [items, () => mode.value],
   () => {
     viewPhotoStore.ids = items.value.map((i) => i.id)
+    requestIdleCallback(() => {
+      viewPhotoStore.idsMetadata = arrayToMap(items.value)
+    })
     viewPhotoStore.viewLink =
       mode.value === 'blurry' ? '/storage/blurry/view/' : '/storage/review/view/'
   },
@@ -231,7 +183,7 @@ useRefreshFunction(() => loadItems())
               rounded="xl"
               class="text-none delete-btn"
               :loading="actionLoading"
-              :disabled="selected.size === 0 || batchDownloading"
+              :disabled="selected.size === 0 || downloadStore.anyDownloading"
               @click="deleteItems([...selected])"
             >
               Delete
@@ -243,8 +195,8 @@ useRefreshFunction(() => loadItems())
               prepend-icon="mdi-download-outline"
               rounded="xl"
               class="text-none stable-btn"
-              :loading="batchDownloading"
-              :disabled="actionLoading || downloadingIds.size > 0"
+              :loading="downloadStore.anyDownloading"
+              :disabled="actionLoading || downloadStore.downloadingIds.size > 0"
               @click="downloadSelected"
             >
               Download
@@ -304,11 +256,11 @@ useRefreshFunction(() => loadItems())
               :tile-width="tileWidth"
               :is-selected="selected.has(item.id)"
               :is-selecting="selected.size > 0"
-              :is-downloading="downloadingIds.has(item.id)"
+              :is-downloading="downloadStore.downloadingIds.has(item.id)"
               :action-loading="actionLoading"
-              :batch-downloading="batchDownloading"
+              :zip-downloading="downloadStore.zipDownloading"
               @toggle="toggleItem(item.id)"
-              @download="downloadItem(item)"
+              @download="downloadStore.downloadItem(item.id)"
               @delete="deleteItems([item.id])"
             />
           </div>

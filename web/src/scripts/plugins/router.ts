@@ -6,7 +6,7 @@ import { useAuthStore } from '@/scripts/stores/authStore.ts'
 import { useTimelineStore } from '@/scripts/stores/timeline/timelineStore.ts'
 
 const ViewPhoto = () => import('@/vues/views/main/ViewPhoto.vue')
-
+// todo: set <title> based on which page you're viewing
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
@@ -27,6 +27,12 @@ const router = createRouter({
               component: ViewPhoto,
             },
           ],
+        },
+        {
+          path: 'share/:viewerType/:mediaId',
+          name: 'share',
+          meta: { requiresAuth: false },
+          component: () => import('@/vues/views/main/ShareView.vue'),
         },
         {
           path: 'daily/:cardId',
@@ -78,6 +84,25 @@ const router = createRouter({
           path: 'explore',
           name: 'explore',
           component: () => import('@/vues/views/main/ExploreView.vue'),
+          children: [
+            {
+              path: 'view/:mediaId',
+              name: 'view-photo-explore',
+              component: ViewPhoto,
+            },
+          ],
+        },
+        {
+          path: 'explore/location/:locationId',
+          name: 'explore-location-view',
+          component: () => import('@/vues/views/main/LocationView.vue'),
+          children: [
+            {
+              path: 'view/:mediaId',
+              name: 'view-photo-explore-location',
+              component: ViewPhoto,
+            },
+          ],
         },
         {
           path: 'bin',
@@ -224,7 +249,7 @@ const router = createRouter({
   ],
 })
 
-let userRefreshed = false
+let sessionChecked = false // Tracks if cold-start authentication has been resolved
 let onAuthHandled = false
 
 export function registerNavigationGuard() {
@@ -234,21 +259,16 @@ export function registerNavigationGuard() {
     const authStore = useAuthStore()
 
     // --- Authentication Initialization ---
-    // If we have a token but no user data, attempt to fetch it. This is crucial for page reloads.
-    if (authStore.accessToken && !authStore.user) {
+    // Cold-start check: determine active session on page reload via standard cookie authorization
+    if (!sessionChecked) {
+      sessionChecked = true
       try {
         await authStore.fetchCurrentUser()
       } catch (error) {
-        // If the token is invalid, the fetch will fail. Log the user out completely.
-        console.error('Session restore failed:', error)
-        await authStore.logout()
-        // No need to proceed further, just go to login.
-        console.warn('[router -> 1] redirect to /login')
-        return { name: 'login' }
+        console.warn('Session restore failed or no active session:', error)
+        // Ensure client state is completely cleared on failed load
+        await authStore.logout(false)
       }
-    } else if (authStore.accessToken && authStore.user && !userRefreshed) {
-      userRefreshed = true
-      requestIdleCallback(() => authStore.fetchCurrentUser())
     }
 
     // --- Get Fresh Auth State ---

@@ -1,6 +1,7 @@
 use crate::api::app_error::AppError;
 use crate::api::photos::interfaces::UpdateMediaItemRequest;
-use crate::database::app_user::{User, UserRole};
+use crate::database::app_user::UserRole;
+use crate::database::cached_store::cached_store;
 use crate::database::media_item_store::MediaItemStore;
 use crate::database::{UpdateField, UpdateMediaItemPayload, with_fallback_timezone};
 use app_state::{IngestSettings, MakeRelativePath};
@@ -35,7 +36,9 @@ use tracing::{debug, warn};
 /// or response building error occurs.
 pub async fn download_media_file(
     ingestion: &IngestSettings,
-    user: &User,
+    user_id: i32,
+    user_role: UserRole,
+    user_media_folder: Option<String>,
     path: &str,
 ) -> Result<Response<Body>, AppError> {
     // Path Validation
@@ -65,18 +68,18 @@ pub async fn download_media_file(
 
     // Authorization
     let relative_path = file_canon.make_relative_canon(&ingestion.media_root_canon)?;
-    if user.role != UserRole::Admin {
-        let Some(user_media_folder) = &user.media_folder else {
+    if user_role != UserRole::Admin {
+        let Some(user_media_folder) = &user_media_folder else {
             warn!(
                 "Access denied for user {}: No media folder assigned.",
-                user.id
+                user_id
             );
             return Err(AppError::Forbidden("Denied".to_owned()));
         };
         if !relative_path.starts_with(user_media_folder) {
             warn!(
                 "Access denied for user {}: Attempted to access path outside their media folder.",
-                user.id
+                user_id
             );
             return Err(AppError::Forbidden("Denied".to_owned()));
         }
@@ -344,17 +347,24 @@ fn quick_image_resize(path: &Path, file_bytes: &[u8], size: i32) -> Result<Vec<u
 pub async fn stream_video_file(
     pool: &PgPool,
     ingest_settings: &IngestSettings,
+    user_id: i32,
+    user_role: UserRole,
     media_item_id: &str,
     range_header: Option<Range>,
 ) -> Result<Response<Body>, AppError> {
-    let Some(rel_path) = MediaItemStore::find_relative_path_by_id(pool, media_item_id).await?
-    else {
-        return Err(AppError::NotFound(media_item_id.to_owned()));
-    };
-    let media_path = ingest_settings.media_root.join(&rel_path);
+    let item = cached_store()
+        .get_rel_path_and_user_id_for_media_item(pool, media_item_id)
+        .await?;
+
+    // Confirm ownership or admin privilege
+    if item.user_id != user_id && user_role != UserRole::Admin {
+        return Err(AppError::Forbidden("Denied".to_owned()));
+    }
+
+    let media_path = ingest_settings.media_root.join(&item.relative_path);
     let mut file = File::open(&media_path)
         .await
-        .map_err(|_| AppError::Internal(eyre!("Failed to open vide file")))?;
+        .map_err(|_| AppError::Internal(eyre!("Failed to open video file")))?;
     let metadata = file
         .metadata()
         .await

@@ -1,27 +1,33 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, useTemplateRef, watch } from 'vue'
 import { useEventListener, useStorage } from '@vueuse/core'
 import { useMediaItemStore } from '@/scripts/stores/timeline/mediaItemStore.ts'
 import mediaItemService from '@/scripts/services/mediaItemService.ts'
 import { VIDEO_SIZES } from '@/scripts/constants.ts'
 import { getVideoHeight, toHms, useObjStorage } from '@/scripts/utils.ts'
 import VideoProgressSlider from '@/vues/components/viewer/components/VideoProgressSlider.vue'
+import { useAuthStore } from '@/scripts/stores/authStore.ts'
 
 const props = withDefaults(
   defineProps<{
     mediaItemId: string
     muted: boolean
     showUi?: boolean
+    autoplay?: boolean
+    elementalFullscreen: boolean
   }>(),
   {
     showUi: true,
+    autoplay: true,
   },
 )
 
 const mediaItemStore = useMediaItemStore()
+const authStore = useAuthStore()
 
 // Video Element Reference
-const videoRef = ref<HTMLVideoElement | null>(null)
+const videoEl = useTemplateRef('videoElement')
+const videoContainerEl = useTemplateRef('videoViewer')
 const fps = computed(() => fullImage.value?.media_features?.video_fps || 30)
 
 // Playback States
@@ -39,14 +45,34 @@ let overlayTimeout: ReturnType<typeof setTimeout> | null = null
 const savedVolume = useStorage<number>('video-player-volume', 1.0)
 const isMuted = useStorage<boolean>('video-player-muted', false)
 
+// Playback Speed State (Persisted with useStorage)
+const savedPlaybackRate = useStorage<number>('video-player-playback-rate', 1.0)
+const playbackRates = [3.0, 2.0, 1.5, 1.0, 0.5, 0.25]
+
+const currentPlaybackRate = computed<number>({
+  get() {
+    return savedPlaybackRate.value
+  },
+  set(val: number) {
+    savedPlaybackRate.value = val
+    if (videoEl.value) {
+      videoEl.value.playbackRate = val
+    }
+  },
+})
+
+// Settings Menu Open State
+const settingsMenuOpen = ref(false)
+
 // Fullscreen State
 const isFullscreen = ref(false)
 
 // Fetch metadata from the Pinia store if it is missing
-const fullImage = computed(() => mediaItemStore.mediaItems.get(props.mediaItemId))
+const fullImage = computed(() => mediaItemStore.anyMediaItems.get(props.mediaItemId))
 const hasThumbnails = computed(() => fullImage.value?.has_thumbnails ?? true)
 
 const isSourceAvailable = computed(() => {
+  if (!authStore.isAuthenticated) return false
   const mimeType = fullImage.value?.media_features?.mime_type
   return isVideoStreamable(mimeType)
 })
@@ -58,30 +84,29 @@ const sourceHeight = computed(() => {
 
 // Quality State (Persisted with useStorage)
 const defaultQuality = getVideoHeight(screen.height)
-const savedQuality = useObjStorage<number | string>('video-player-quality', defaultQuality)
+const savedQuality = useObjStorage<number | 'source'>('video-player-quality', defaultQuality)
 const sortedVideoSizes = [...VIDEO_SIZES].sort((a, b) => b - a)
 
-const currentQuality = computed<number | string>({
+const currentQuality = computed<number | 'source'>({
   get() {
-    if (!hasThumbnails.value) {
-      if (isSourceAvailable.value) {
-        return 'source'
+    const saved = savedQuality.value
+    if (!fullImage.value) {
+      // If metadata is not loaded yet, assume the saved quality is available
+      return saved || defaultQuality
+    }
+
+    if (authStore.isAuthenticated) {
+      if (!hasThumbnails.value) return 'source'
+      if (saved === 'source') {
+        if (isSourceAvailable.value) return 'source'
+        return sortedVideoSizes[0]
       }
-      return defaultQuality
     }
-    if (savedQuality.value === 'source') {
-      if (isSourceAvailable.value) {
-        return 'source'
-      }
-      return sortedVideoSizes[0] ?? defaultQuality
-    }
-    const numQuality = Number(savedQuality.value)
-    if (VIDEO_SIZES.includes(numQuality)) {
-      return numQuality
-    }
+    const numQuality = Number(saved)
+    if (VIDEO_SIZES.includes(numQuality)) return numQuality
     return defaultQuality
   },
-  set(val: number | string) {
+  set(val: number | 'source') {
     savedQuality.value = val
   },
 })
@@ -92,6 +117,9 @@ const videoUrl = computed(() => {
     return mediaItemService.getVideo(props.mediaItemId, 0, true)
   }
   const onDemand = !hasThumbnails.value
+  if (onDemand && !authStore.isAuthenticated) {
+    return null
+  }
   return mediaItemService.getVideo(props.mediaItemId, currentQuality.value as number, onDemand)
 })
 
@@ -99,12 +127,18 @@ const videoUrl = computed(() => {
 const timeToRestore = ref<number | null>(null)
 const isPlayingOnQualityChange = ref<boolean | null>(null)
 
-function onQualitySelect(size: number | string) {
-  if (videoRef.value) {
-    timeToRestore.value = videoRef.value.currentTime
-    isPlayingOnQualityChange.value = !videoRef.value.paused
+function onQualitySelect(size: number | 'source') {
+  if (videoEl.value) {
+    timeToRestore.value = videoEl.value.currentTime
+    isPlayingOnQualityChange.value = !videoEl.value.paused
   }
   currentQuality.value = size
+  settingsMenuOpen.value = false
+}
+
+function onPlaybackRateSelect(rate: number) {
+  currentPlaybackRate.value = rate
+  settingsMenuOpen.value = false
 }
 
 // Native browser-streamable support check
@@ -132,8 +166,8 @@ function triggerOverlay(action: 'play' | 'pause') {
 
 // Queries current media buffering intervals directly from the browser instance
 function updateBufferedProgress() {
-  if (videoRef.value) {
-    const b = videoRef.value.buffered
+  if (videoEl.value) {
+    const b = videoEl.value.buffered
     const ranges: Array<{ start: number; end: number }> = []
     for (let i = 0; i < b.length; i++) {
       ranges.push({
@@ -146,36 +180,22 @@ function updateBufferedProgress() {
 }
 
 function onLoadedMetadata() {
-  if (videoRef.value) {
-    duration.value = videoRef.value.duration || 0
+  if (videoEl.value) {
+    duration.value = videoEl.value.duration || 0
     if (timeToRestore.value !== null) {
-      videoRef.value.currentTime = timeToRestore.value
+      videoEl.value.currentTime = timeToRestore.value
       currentTime.value = timeToRestore.value
       timeToRestore.value = null
     }
+    videoEl.value.playbackRate = currentPlaybackRate.value
     updateBufferedProgress()
   }
 }
 
-// Watch for mediaItemId changes and fetch if not present in the current view context
-watch(
-  () => props.mediaItemId,
-  async (newId) => {
-    if (newId && !mediaItemStore.mediaItems.has(newId)) {
-      try {
-        await mediaItemStore.fetchMediaItem(newId)
-      } catch (e) {
-        console.error('Failed to fetch media item for video viewer:', e)
-      }
-    }
-  },
-  { immediate: true },
-)
-
 // Helper to trigger safe programmatic playback
 function playVideo() {
-  if (videoRef.value) {
-    videoRef.value.play().catch((err) => {
+  if (videoEl.value) {
+    videoEl.value.play().catch((err) => {
       console.warn('Playback failed or was blocked by browser:', err)
     })
   }
@@ -187,17 +207,18 @@ watch(
   () => {
     bufferedRanges.value = [] // Reset buffering indicator layout
     nextTick(() => {
-      if (videoRef.value) {
+      if (videoEl.value) {
         const shouldPlay =
           isPlayingOnQualityChange.value !== null ? isPlayingOnQualityChange.value : true
 
-        videoRef.value.load()
+        videoEl.value.load()
 
         if (shouldPlay) {
           playVideo()
         } else {
-          videoRef.value.pause()
+          videoEl.value.pause()
         }
+        videoEl.value.playbackRate = currentPlaybackRate.value
 
         isPlayingOnQualityChange.value = null
       }
@@ -210,9 +231,9 @@ watch(
 watch(
   [savedVolume, isMuted],
   () => {
-    if (videoRef.value) {
-      videoRef.value.volume = savedVolume.value
-      videoRef.value.muted = isMuted.value
+    if (videoEl.value) {
+      videoEl.value.volume = savedVolume.value
+      videoEl.value.muted = isMuted.value
     }
   },
   { immediate: true },
@@ -231,8 +252,8 @@ watch(
 let animationFrameId: number | null = null
 
 function updateProgressSmoothly() {
-  if (videoRef.value && !videoRef.value.paused) {
-    currentTime.value = videoRef.value.currentTime
+  if (videoEl.value && !videoEl.value.paused) {
+    currentTime.value = videoEl.value.currentTime
     updateBufferedProgress()
     animationFrameId = requestAnimationFrame(updateProgressSmoothly)
   }
@@ -255,8 +276,8 @@ function onPause() {
 
 // Fallback listener for captures while paused
 function onTimeUpdate() {
-  if (videoRef.value && videoRef.value.paused) {
-    currentTime.value = videoRef.value.currentTime
+  if (videoEl.value && videoEl.value.paused) {
+    currentTime.value = videoEl.value.currentTime
   }
   updateBufferedProgress()
 }
@@ -267,39 +288,39 @@ function onProgress() {
 
 // Playback Controls
 function togglePlay(showOverlay = false) {
-  if (!videoRef.value) return
-  if (videoRef.value.paused) {
+  if (!videoEl.value) return
+  if (videoEl.value.paused) {
     playVideo()
     if (showOverlay) triggerOverlay('play')
   } else {
-    videoRef.value.pause()
+    videoEl.value.pause()
     if (showOverlay) triggerOverlay('pause')
   }
 }
 
 // Seeking Control Helpers
 function seekBy(seconds: number) {
-  if (!videoRef.value) return
-  let target = videoRef.value.currentTime + seconds
+  if (!videoEl.value) return
+  let target = videoEl.value.currentTime + seconds
   if (target < 0) target = 0
   if (target > duration.value) target = duration.value
-  videoRef.value.currentTime = target
+  videoEl.value.currentTime = target
   currentTime.value = target
 }
 
 function stepFrame(direction: number) {
-  if (!videoRef.value) return
+  if (!videoEl.value) return
   const frameDuration = 1 / fps.value
-  let target = videoRef.value.currentTime + direction * frameDuration
+  let target = videoEl.value.currentTime + direction * frameDuration
   if (target < 0) target = 0
   if (target > duration.value) target = duration.value
-  videoRef.value.currentTime = target
+  videoEl.value.currentTime = target
   currentTime.value = target
 }
 
 function onSeekInput(val: number) {
-  if (videoRef.value) {
-    videoRef.value.currentTime = val
+  if (videoEl.value) {
+    videoEl.value.currentTime = val
     currentTime.value = val
   }
 }
@@ -329,9 +350,16 @@ function adjustVolume(amount: number) {
 // Fullscreen API Handling (Syncs state on browser escape/system fullscreen change)
 function toggleFullscreen() {
   if (!document.fullscreenElement) {
-    document.documentElement.requestFullscreen().catch((err) => {
-      console.error('Failed to enter fullscreen mode:', err)
-    })
+    console.log('elemental', props.elementalFullscreen, videoContainerEl.value)
+    if (props.elementalFullscreen && videoContainerEl.value) {
+      videoContainerEl.value.requestFullscreen().catch((err) => {
+        console.error('Failed to enter fullscreen mode:', err)
+      })
+    } else {
+      document.documentElement.requestFullscreen().catch((err) => {
+        console.error('Failed to enter fullscreen mode:', err)
+      })
+    }
   } else {
     document.exitFullscreen()
   }
@@ -378,16 +406,20 @@ function handleKeyDown(e: KeyboardEvent) {
       toggleFullscreen()
       break
     case ',':
-      if (videoRef.value?.paused) {
+      if (videoEl.value?.paused) {
         e.preventDefault()
         stepFrame(-1)
       }
       break
     case '.':
-      if (videoRef.value?.paused) {
+      if (videoEl.value?.paused) {
         e.preventDefault()
         stepFrame(1)
       }
+      break
+    case 'f11':
+      e.preventDefault()
+      toggleFullscreen()
       break
   }
 }
@@ -400,7 +432,7 @@ const volumeIcon = computed(() => {
 
 onMounted(() => {
   document.addEventListener('fullscreenchange', onFullscreenChange)
-  if (videoRef.value && isPlaying.value === false) {
+  if (videoEl.value && isPlaying.value === false && props.autoplay) {
     playVideo()
   }
 })
@@ -417,13 +449,14 @@ useEventListener(window, 'keydown', handleKeyDown)
 </script>
 
 <template>
-  <div class="video-viewer">
-    <!-- Video element (stretches to fill page while maintaining aspect ratio) -->
+  <div class="video-viewer" ref="videoViewer">
     <video
-      ref="videoRef"
+      v-if="videoUrl"
+      ref="videoElement"
       class="video-element"
       :src="videoUrl"
       :muted="isMuted"
+      :crossorigin="currentQuality === 'source' ? 'use-credentials' : undefined"
       loop
       playsinline
       @loadedmetadata="onLoadedMetadata"
@@ -434,6 +467,9 @@ useEventListener(window, 'keydown', handleKeyDown)
       @click="togglePlay(true)"
       @dblclick="toggleFullscreen"
     />
+    <div v-else class="still-processing">
+      <span>Video is still processing, check back later to watch it</span>
+    </div>
 
     <!-- Play/Pause Overlay Indication -->
     <div v-if="overlayAction" :key="overlayTrigger" class="play-pause-overlay">
@@ -490,34 +526,92 @@ useEventListener(window, 'keydown', handleKeyDown)
 
         <!-- Right Island Capsule -->
         <div class="control-island right-island">
-          <!-- Quality Selector Menu -->
-          <v-menu v-if="hasThumbnails || isSourceAvailable" location="top center">
+          <!-- Quality & Speed Settings Menu -->
+          <v-menu
+            :attach="elementalFullscreen && isFullscreen"
+            v-if="hasThumbnails || isSourceAvailable"
+            v-model="settingsMenuOpen"
+            location="top center"
+            :close-on-content-click="false"
+          >
             <template v-slot:activator="{ props }">
               <v-btn variant="plain" icon="mdi-cog-outline" rounded="xl" v-bind="props" />
             </template>
-            <v-list class="quality-menu-list">
-              <v-list-item
-                v-if="isSourceAvailable"
-                value="source"
-                @click="onQualitySelect('source')"
-                :active="currentQuality === 'source'"
+            <v-list class="settings-menu-list">
+              <!-- Submenu 1: Playback Speed -->
+              <v-menu
+                location="left top"
+                open-on-hover
+                :close-on-content-click="true"
+                :attach="elementalFullscreen && isFullscreen"
               >
-                <v-list-item-title class="menu-text">
-                  {{ sourceHeight }}p <span class="source-label">(source)</span>
-                </v-list-item-title>
-              </v-list-item>
+                <template v-slot:activator="{ props: speedMenuProps }">
+                  <v-list-item v-bind="speedMenuProps" class="menu-item-with-chevron">
+                    <v-list-item-title class="menu-text">Playback speed</v-list-item-title>
+                    <template v-slot:append>
+                      <span class="current-setting-label">{{ currentPlaybackRate }}x</span>
+                      <v-icon icon="mdi-chevron-right" size="small" class="ml-1" />
+                    </template>
+                  </v-list-item>
+                </template>
+                <v-list class="submenu-list">
+                  <v-list-item
+                    v-for="rate in playbackRates"
+                    :key="rate"
+                    :value="rate"
+                    @click="onPlaybackRateSelect(rate)"
+                    :active="currentPlaybackRate === rate"
+                  >
+                    <v-list-item-title class="menu-text">{{ rate }}x</v-list-item-title>
+                  </v-list-item>
+                </v-list>
+              </v-menu>
 
-              <template v-if="hasThumbnails">
-                <v-list-item
-                  v-for="size in sortedVideoSizes"
-                  :key="size"
-                  :value="size"
-                  @click="onQualitySelect(size)"
-                  :active="currentQuality === size"
-                >
-                  <v-list-item-title class="menu-text">{{ size }}p</v-list-item-title>
-                </v-list-item>
-              </template>
+              <!-- Submenu 2: Quality -->
+              <v-menu
+                location="left top"
+                open-on-hover
+                :close-on-content-click="true"
+                :attach="elementalFullscreen && isFullscreen"
+              >
+                <template v-slot:activator="{ props: qualityMenuProps }">
+                  <v-list-item v-bind="qualityMenuProps" class="menu-item-with-chevron">
+                    <v-list-item-title class="menu-text">Quality</v-list-item-title>
+                    <template v-slot:append>
+                      <span class="current-setting-label">
+                        {{
+                          currentQuality === 'source' ? `${sourceHeight}p` : `${currentQuality}p`
+                        }}
+                      </span>
+                      <v-icon icon="mdi-chevron-right" size="small" class="ml-1" />
+                    </template>
+                  </v-list-item>
+                </template>
+                <v-list class="submenu-list">
+                  <v-list-item
+                    v-if="isSourceAvailable"
+                    value="source"
+                    @click="onQualitySelect('source')"
+                    :active="currentQuality === 'source'"
+                  >
+                    <v-list-item-title class="menu-text">
+                      {{ sourceHeight }}p <span class="source-label">(source)</span>
+                    </v-list-item-title>
+                  </v-list-item>
+
+                  <template v-if="hasThumbnails">
+                    <v-list-item
+                      v-for="size in sortedVideoSizes"
+                      :key="size"
+                      :value="size"
+                      @click="onQualitySelect(size)"
+                      :active="currentQuality === size"
+                    >
+                      <v-list-item-title class="menu-text">{{ size }}p</v-list-item-title>
+                    </v-list-item>
+                  </template>
+                </v-list>
+              </v-menu>
             </v-list>
           </v-menu>
           <v-btn v-else variant="plain" icon="mdi-cog-outline" rounded="xl" disabled />
@@ -556,6 +650,14 @@ useEventListener(window, 'keydown', handleKeyDown)
   width: 100%;
   height: 100%;
   object-fit: contain;
+}
+
+.still-processing {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  place-items: center;
+  place-content: center;
 }
 
 /* Play/Pause Center Indicator */
@@ -693,9 +795,23 @@ body.backdrop-blur .control-island:hover {
   margin-right: 15px;
 }
 
+.settings-menu-list {
+  min-width: 220px;
+}
+
+.submenu-list {
+  min-width: 140px;
+}
+
 .menu-text {
   font-family: Jost, sans-serif;
   font-weight: 500;
+}
+
+.current-setting-label {
+  font-family: Jost, sans-serif;
+  font-size: 13px;
+  opacity: 0.6;
 }
 
 .source-label {

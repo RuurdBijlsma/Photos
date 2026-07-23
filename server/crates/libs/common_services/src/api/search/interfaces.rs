@@ -77,3 +77,8 @@ pub struct SearchImage {
     pub session_id: Uuid,
     pub image: Option<DynamicImage>,
 }
+
+pub enum VisionQuery {
+    Raw(SearchImage),
+    Embedding(Vec<f32>),
+}

@@ -26,7 +26,7 @@ const currentSortDirection = useStorage<'asc' | 'desc'>('cameraLibrarySortDirect
 const sortFields = [
   { title: 'Brand', field: 'make' },
   { title: 'Model', field: 'model' },
-  { title: 'Photos count', field: 'photoCount' },
+  { title: 'Photo count', field: 'photoCount' },
 ]
 
 const currentSortFieldTitle = computed(() => {

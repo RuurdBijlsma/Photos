@@ -1,4 +1,5 @@
 pub mod album_store;
+pub mod cached_store;
 pub mod key_json_store;
 pub mod key_vector_store;
 pub mod media_item_store;

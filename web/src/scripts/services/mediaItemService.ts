@@ -7,6 +7,7 @@ import type { Album } from '@/scripts/types/api/album.ts'
 import type { UpdateMediaItemRequest } from '@/scripts/types/api/mediaItem.ts'
 import { MapPhotosResponse } from '@/scripts/types/generated/timeline.ts'
 import type { ThemeVariant } from '@/scripts/constants.ts'
+import type { PannellumConfig } from '@/scripts/types/api/pannellumConfig.ts'
 
 const mediaItemService = {
   update(id: string, payload: UpdateMediaItemRequest) {
@@ -75,6 +76,13 @@ const mediaItemService = {
     })
   },
 
+  downloadMediaZip(ids: string[]): Promise<AxiosResponse<Blob>> {
+    return apiClient.get<Blob>('/photos/download/zip', {
+      params: { ids: ids.join(',') },
+      responseType: 'blob',
+    })
+  },
+
   getMotionVideo(id: string | null | undefined): string {
     if (id === null || id === undefined) return ''
     const baseUrl = apiClient.defaults.baseURL
@@ -89,6 +97,10 @@ const mediaItemService = {
     })
     const buffer = new Uint8Array(response.data)
     return MapPhotosResponse.decode(buffer)
+  },
+
+  async getPanoConfig(id: string): Promise<AxiosResponse<PannellumConfig>> {
+    return apiClient.get<PannellumConfig>(`/photos/${id}/pano-config`)
   },
 }
 

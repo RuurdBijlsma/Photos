@@ -6,7 +6,7 @@ import { useSettingStore } from '@/scripts/stores/settingsStore.js'
 import { computed, defineAsyncComponent, ref, watch } from 'vue'
 import { DAYS, MONTHS } from '@/scripts/constants.js'
 import MediaWeatherInfo from '@/vues/components/viewer/components/MediaWeatherInfo.vue'
-import { caps, prettyBytes, toHms } from '@/scripts/utils.js'
+import { caps, makeTimeString, prettyBytes, toHms } from '@/scripts/utils.js'
 import EditDateTimeCard from '@/vues/components/viewer/components/EditDateTimeCard.vue'
 import { useAuthStore } from '@/scripts/stores/authStore.js'
 import type { SharedMediaItem } from '@/scripts/types/api/album.js'
@@ -53,8 +53,8 @@ const takenAtDateMyTz = computed(() => {
 
 function dateComponents(date: Date) {
   const day = DAYS[date.getDay()]
-  const dateString = `${date.getDate()}-${MONTHS[date.getMonth()].substring(0, 3)}-${date.getFullYear().toString().substring(2)}`
-  const time = `${date.getHours()}:${date.getMinutes()}`
+  const dateString = `${date.getDate()} ${MONTHS[date.getMonth()].substring(0, 3)} ${date.getFullYear()}`
+  const time = makeTimeString(date)
 
   return { day, dateString, time }
 }

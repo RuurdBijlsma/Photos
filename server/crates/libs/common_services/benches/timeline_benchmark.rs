@@ -45,14 +45,14 @@ fn bench_timeline(c: &mut Criterion) {
     // 1. Benchmark Ratios
     c.bench_function("get_timeline_ratios_desc", |b| {
         b.to_async(&rt).iter(|| async {
-            get_timeline_ratios(&user, &pool, SortDirection::Desc)
+            get_timeline_ratios(user.id, &pool, SortDirection::Desc)
                 .await
                 .unwrap();
         });
     });
     c.bench_function("get_timeline_ratios_asc", |b| {
         b.to_async(&rt).iter(|| async {
-            get_timeline_ratios(&user, &pool, SortDirection::Asc)
+            get_timeline_ratios(user.id, &pool, SortDirection::Asc)
                 .await
                 .unwrap();
         });
@@ -61,14 +61,14 @@ fn bench_timeline(c: &mut Criterion) {
     // 2. Benchmark IDs
     c.bench_function("get_timeline_ids_desc", |b| {
         b.to_async(&rt).iter(|| async {
-            get_timeline_ids(&user, &pool, SortDirection::Desc)
+            get_timeline_ids(user.id, &pool, SortDirection::Desc)
                 .await
                 .unwrap();
         });
     });
     c.bench_function("get_timeline_ids_asc", |b| {
         b.to_async(&rt).iter(|| async {
-            get_timeline_ids(&user, &pool, SortDirection::Asc)
+            get_timeline_ids(user.id, &pool, SortDirection::Asc)
                 .await
                 .unwrap();
         });
@@ -83,14 +83,14 @@ fn bench_timeline(c: &mut Criterion) {
 
     c.bench_function("get_photos_by_month_desc", |b| {
         b.to_async(&rt).iter(|| async {
-            get_photos_by_month(&user, &pool, &month_ids, SortDirection::Desc)
+            get_photos_by_month(user.id, &pool, &month_ids, SortDirection::Desc)
                 .await
                 .unwrap();
         });
     });
     c.bench_function("get_photos_by_month_asc", |b| {
         b.to_async(&rt).iter(|| async {
-            get_photos_by_month(&user, &pool, &month_ids, SortDirection::Asc)
+            get_photos_by_month(user.id, &pool, &month_ids, SortDirection::Asc)
                 .await
                 .unwrap();
         });

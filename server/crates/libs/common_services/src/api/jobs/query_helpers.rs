@@ -141,7 +141,7 @@ pub fn parse_sort(sort_str: &str) -> Result<JobSort, AppError> {
     Ok(JobSort { column, direction })
 }
 
-pub fn apply_filters(builder: &mut QueryBuilder<'_, Postgres>, filters: &[JobFilter]) {
+pub fn apply_filters(builder: &mut QueryBuilder<Postgres>, filters: &[JobFilter]) {
     if !filters.is_empty() {
         builder.push(" WHERE ");
         for (i, filter) in filters.iter().enumerate() {

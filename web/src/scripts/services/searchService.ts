@@ -15,6 +15,21 @@ const searchService = {
     return SearchResponse.decode(buffer)
   },
 
+  async searchByMediaItems(
+    mediaItemIds: string[],
+    params: SearchParams,
+    signal?: AbortSignal,
+  ): Promise<SearchResponse> {
+    console.log('Search by media items with params', mediaItemIds, params)
+    const response = await apiClient.get(`/search/media-items/${mediaItemIds.join(',')}`, {
+      params,
+      responseType: 'arraybuffer',
+      signal,
+    })
+    const buffer = new Uint8Array(response.data)
+    return SearchResponse.decode(buffer)
+  },
+
   async suggestions(query: string, limit?: number): Promise<SearchSuggestionsResponse> {
     const response = await apiClient.get('/search/suggestions', {
       params: { query, limit },

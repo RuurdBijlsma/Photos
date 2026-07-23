@@ -10,7 +10,6 @@ use crate::database::user_store::UserStore;
 use crate::job_queue::enqueue_full_scan;
 use crate::utils::nice_id;
 use app_state::{IngestSettings, MakeRelativePath, constants};
-use axum::Json;
 use axum::http::StatusCode;
 use chrono::{Duration, Utc};
 use jsonwebtoken::{EncodingKey, Header, encode};
@@ -142,6 +141,7 @@ pub fn create_access_token(
         sub: user_id,
         role,
         exp,
+        aud: "api".to_owned(),
     };
     let access_token = encode(
         &Header::default(),
@@ -153,12 +153,12 @@ pub fn create_access_token(
     Ok((access_token, exp as u64))
 }
 
-/// Handles refresh token rotation, invalidating the old token and issuing a new pair.
+/// Handles refresh token rotation, invalidating the old token and returning a new pair of tokens.
 pub async fn refresh_tokens(
     pool: &PgPool,
     jwt_secret: &str,
     raw_token: &str,
-) -> Result<Json<Tokens>, AppError> {
+) -> Result<Tokens, AppError> {
     let (selector, verifier_bytes) = split_refresh_token(raw_token)?;
     let record = sqlx::query!(
         "SELECT user_id, verifier_hash FROM refresh_token
@@ -179,7 +179,7 @@ pub async fn refresh_tokens(
         )
         .execute(pool)
         .await
-        .ok(); // Ignore error if deletion fails
+        .ok();
         return Err(AppError::Unauthorized("Invalid token".to_owned()));
     }
 
@@ -198,11 +198,11 @@ pub async fn refresh_tokens(
     tx.commit().await?;
 
     let (access_token, expiry) = create_access_token(jwt_secret, record.user_id, user_role)?;
-    Ok(Json(Tokens {
+    Ok(Tokens {
         expiry,
         access_token,
         refresh_token: new_parts.raw_token,
-    }))
+    })
 }
 
 /// Deletes the refresh token matching the provided one, effectively logging out the user.
