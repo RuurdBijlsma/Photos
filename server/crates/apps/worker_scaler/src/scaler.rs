@@ -103,9 +103,10 @@ impl Scaler {
         // Check Scale-Up Logic
         let cooldown = Duration::from_secs(self.config.cooldown_period_secs);
         if let Some(last_spawn) = self.last_spawn_time
-            && last_spawn.elapsed() < cooldown {
-                return Ok(());
-            }
+            && last_spawn.elapsed() < cooldown
+        {
+            return Ok(());
+        }
 
         // Try scaling up in order of priority: Heavy -> Medium -> Light -> Llm
         if self.try_spawn_profile(WorkerProfile::Heavy, demand.heavy_demand, headroom_mb) {

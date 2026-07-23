@@ -7,7 +7,7 @@
     clippy::cast_possible_truncation,
     clippy::cast_precision_loss,
     clippy::missing_panics_doc,
-    clippy::large_futures,
+    clippy::large_futures
 )]
 
 pub mod config;

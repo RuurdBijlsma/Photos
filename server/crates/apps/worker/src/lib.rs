@@ -6,7 +6,7 @@
     clippy::cast_possible_wrap,
     clippy::cast_possible_truncation,
     clippy::missing_panics_doc,
-    clippy::large_futures,
+    clippy::large_futures
 )]
 
 pub mod context;
