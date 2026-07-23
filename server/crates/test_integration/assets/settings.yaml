@@ -74,11 +74,11 @@ api:
   port: 9475
   allowed_origins:
     - "http://localhost:5173"
-    - "https://localhost:5173"
     - "http://localhost:3000"
     - "http://127.0.0.1:3000"
     - "https://ruurdbijlsma.github.io"
   public_url: "http://localhost:9475"
+  cookie_secure: false
   rate_limiting:
     req_per_second: 30
     burst_size: 30

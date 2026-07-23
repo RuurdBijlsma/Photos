@@ -6,7 +6,6 @@ use app_state::{
     load_settings_from_path,
 };
 use color_eyre::eyre::{Result, eyre};
-use common_services::database::jobs::JobType;
 use reqwest::Client;
 use sqlx::PgPool;
 use std::path::PathBuf;
@@ -38,8 +37,7 @@ pub struct TestContext {
     media_dir: TempDir,
     thumbnail_dir: TempDir,
     api_handle: JoinHandle<()>,
-    worker_handle: JoinHandle<()>,
-    ml_worker_handle: JoinHandle<()>,
+    scaler_handle: JoinHandle<()>,
     watcher_handle: JoinHandle<()>,
 }
 
@@ -69,7 +67,7 @@ impl TestContext {
         copy_dir_recursive(&assets_source_path, media_dir.path())?;
 
         // 3. Spawn application components as background tasks
-        let (api_handle, worker_handle, ml_worker_handle, watcher_handle) =
+        let (api_handle, scaler_handle, watcher_handle) =
             Self::spawn_services(&main_pool, &settings);
 
         // 4. Wait for the API to be ready to accept traffic
@@ -86,18 +84,16 @@ impl TestContext {
             media_dir,
             thumbnail_dir,
             api_handle,
-            worker_handle,
-            ml_worker_handle,
+            scaler_handle,
             watcher_handle,
         })
     }
 
-    /// Spawns the API, worker, and watcher services as background tokio tasks.
+    /// Spawns the API, worker scaler, and watcher services as background tokio tasks.
     fn spawn_services(
         pool: &PgPool,
         settings: &AppSettings,
     ) -> (
-        JoinHandle<()>,
         JoinHandle<()>,
         JoinHandle<()>,
         JoinHandle<()>,
@@ -111,31 +107,19 @@ impl TestContext {
             }
         });
 
-        // Spawn Worker
-        let worker_pool = pool.clone();
-        let worker_settings = settings.clone();
-        let worker_handle = tokio::spawn(async move {
-            if let Err(e) = worker::worker::create_worker(
-                worker_pool,
-                worker_settings,
-                vec![JobType::IngestLlm],
-                false,
-            )
-            .await
-            {
-                error!("Worker failed: {}", e);
-            }
-        });
-
-        // Spawn Worker 2
-        let ml_worker_pool = pool.clone();
-        let ml_worker_settings = settings.clone();
-        let ml_worker_handle = tokio::spawn(async move {
+        // Spawn Worker Scaler
+        let scaler_pool = pool.clone();
+        let scaler_settings = settings.clone();
+        let scaler_handle = tokio::spawn(async move {
+            let mut config = worker_scaler::config::ScalerConfig::default();
+            config.tick_interval_secs = 1;
+            config.cooldown_period_secs = 1;
+            let (_shutdown_tx, shutdown_rx) = tokio::sync::watch::channel(false);
             if let Err(e) =
-                worker::worker::create_worker(ml_worker_pool, ml_worker_settings, vec![], false)
+                worker_scaler::start_scaler(scaler_pool, scaler_settings, config, shutdown_rx)
                     .await
             {
-                error!("Worker failed: {}", e);
+                error!("Worker Scaler failed: {}", e);
             }
         });
 
@@ -149,7 +133,7 @@ impl TestContext {
             }
         });
 
-        (api_handle, worker_handle, ml_worker_handle, watcher_handle)
+        (api_handle, scaler_handle, watcher_handle)
     }
 
     /// Polls the `/health` endpoint until it receives a successful response or times out.
@@ -184,8 +168,7 @@ impl Drop for TestContext {
     fn drop(&mut self) {
         // Abort background tasks
         self.api_handle.abort();
-        self.worker_handle.abort();
-        self.ml_worker_handle.abort();
+        self.scaler_handle.abort();
         self.watcher_handle.abort();
 
         // Drop the test database

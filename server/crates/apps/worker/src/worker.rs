@@ -10,11 +10,24 @@ use sqlx::PgPool;
 use std::time::Duration;
 use tracing::{info};
 
+#[allow(clippy::large_futures)]
 pub async fn create_worker(
     pool: PgPool,
     settings: AppSettings,
     excluded_job_types: Vec<JobType>,
     stop_on_sleep: bool,
+) -> Result<()> {
+    let shutdown_rx = get_kill_signal();
+    create_worker_with_shutdown(pool, settings, excluded_job_types, stop_on_sleep, shutdown_rx).await
+}
+
+#[allow(clippy::large_futures)]
+pub async fn create_worker_with_shutdown(
+    pool: PgPool,
+    settings: AppSettings,
+    excluded_job_types: Vec<JobType>,
+    stop_on_sleep: bool,
+    shutdown_rx: tokio::sync::watch::Receiver<bool>,
 ) -> Result<()> {
     let worker_id = nice_id(8);
     info!(
@@ -22,7 +35,6 @@ pub async fn create_worker(
         worker_id, excluded_job_types
     );
     let context = WorkerContext::new(pool, settings, worker_id.clone(), excluded_job_types).await?;
-    let shutdown_rx = get_kill_signal();
 
     run_worker_loop(&context, stop_on_sleep, shutdown_rx).await
 }

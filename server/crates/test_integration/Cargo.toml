@@ -7,6 +7,7 @@ edition = "2024"
 api = { path = "../apps/api" }
 watcher = { path = "../apps/watcher" }
 worker = { path = "../apps/worker" }
+worker_scaler = { path = "../apps/worker_scaler" }
 app_state = { path = "../libs/app_state" }
 common_services = { path = "../libs/common_services" }
 common_types = { path = "../libs/common_types" }
@@ -29,4 +30,4 @@ futures-util = "0.3.31"
 material-color-utils = "0.1.3"
 
 [features]
-load-dynamic = ["api/load-dynamic", "worker/load-dynamic", "common_services/load-dynamic", "common_types/load-dynamic"]
+load-dynamic = ["api/load-dynamic", "worker/load-dynamic", "worker_scaler/load-dynamic", "common_services/load-dynamic", "common_types/load-dynamic"]

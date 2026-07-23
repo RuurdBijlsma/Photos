@@ -16,7 +16,7 @@ pub struct Job {
     pub dependency_attempts: i32,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Type, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Type, Serialize, Deserialize)]
 #[sqlx(type_name = "job_type", rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
 pub enum JobType {
