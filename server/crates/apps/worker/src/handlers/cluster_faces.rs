@@ -2,6 +2,7 @@ use crate::context::WorkerContext;
 use crate::handlers::JobResult;
 use crate::handlers::common::clustering::{self, ClusterEntity};
 use crate::handlers::common::utils::get_images_to_analyze;
+use chrono::{DateTime, Utc};
 use color_eyre::{Result, eyre::eyre};
 use common_services::api::album::service::get_representative_thumbnail;
 use common_services::database::jobs::Job;
@@ -15,7 +16,6 @@ use itertools::Itertools;
 use pgvector::Vector;
 use sqlx::{PgPool, Transaction, query, query_as};
 use std::collections::{HashMap, HashSet};
-use chrono::{DateTime, Utc};
 use tempfile::Builder;
 use tracing::info;
 
@@ -191,7 +191,7 @@ async fn upsert_and_link(
     clusters: HashMap<usize, Vec<&FaceToCluster>>,
     new_centroids: &[Vec<f32>],
     cluster_map: &HashMap<usize, String>, // Map of cluster_idx -> face_cluster.id (String)
-    snapshot_time: DateTime<Utc>
+    snapshot_time: DateTime<Utc>,
 ) -> Result<()> {
     for (cluster_idx, faces_in_cluster) in clusters {
         let face_ids: Vec<i64> = faces_in_cluster.iter().map(|f| f.id).collect();
@@ -343,7 +343,7 @@ pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
             );
             continue;
         }
-        
+
         let snapshot_time: DateTime<Utc> = Utc::now();
         let existing_clusters = fetch_existing_clusters(&context.pool, user_id).await?;
         let items_to_cluster = fetch_embeddings(&context.pool, user_id).await?;
@@ -374,7 +374,7 @@ pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
             new_clusters,
             &new_centroids,
             &cluster_map,
-            snapshot_time
+            snapshot_time,
         )
         .await?;
 
