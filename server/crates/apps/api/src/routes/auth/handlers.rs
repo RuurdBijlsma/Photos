@@ -13,6 +13,7 @@ use common_services::database::app_user::{User, UserInvite};
 use common_services::database::user_store::UserStore;
 use sqlx::PgPool;
 use tracing::instrument;
+use app_state::constants;
 
 /// Formats standard `HttpOnly` cookie properties consistently.
 #[must_use]
@@ -40,8 +41,8 @@ pub async fn login(
     store_refresh_token(&context.pool, user.id, &token_parts).await?;
 
     let secure = context.settings.api.cookie_secure;
-    let access_exp = app_state::constants().auth.access_token_expiry_minutes * 60;
-    let refresh_exp = app_state::constants().auth.refresh_token_expiry_days * 24 * 3600;
+    let access_exp = constants().auth.access_token_expiry_minutes * 60;
+    let refresh_exp = constants().auth.refresh_token_expiry_days * 24 * 3600;
 
     let access_cookie = make_cookie("access_token", &access_token, Some(access_exp), secure);
     let refresh_cookie = make_cookie(
@@ -91,8 +92,8 @@ pub async fn refresh_session(
         refresh_tokens(&context.pool, &context.settings.secrets.jwt, &refresh_token).await?;
 
     let secure = context.settings.api.cookie_secure;
-    let access_exp = app_state::constants().auth.access_token_expiry_minutes * 60;
-    let refresh_exp = app_state::constants().auth.refresh_token_expiry_days * 24 * 3600;
+    let access_exp = constants().auth.access_token_expiry_minutes * 60;
+    let refresh_exp = constants().auth.refresh_token_expiry_days * 24 * 3600;
 
     let access_cookie = make_cookie(
         "access_token",

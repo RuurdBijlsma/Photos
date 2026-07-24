@@ -1,10 +1,10 @@
-use app_state::AppSettings;
 use app_state::constants::WORKER_HEARTBEAT_SECONDS;
+use app_state::AppSettings;
 use common_services::database::jobs::JobType;
-use sqlx::{PgPool, Row};
+use sqlx::PgPool;
 use std::collections::HashMap;
 
-pub async fn query_queue_demand(
+pub async fn get_demand(
     pool: &PgPool,
     settings: &AppSettings,
 ) -> color_eyre::Result<HashMap<String, usize>> {
@@ -44,35 +44,26 @@ pub async fn query_queue_demand(
         .collect();
 
     let mut profile_demand: HashMap<String, usize> = HashMap::new();
-    for profile_name in settings.scaler.profiles.keys() {
-        profile_demand.insert(profile_name.clone(), 0);
+    for profile in &settings.scaler.profiles {
+        profile_demand.insert(profile.name.clone(), 0);
     }
 
-    // Dynamic routing: map queued jobs to the cheapest capable profile configured
+    // Dynamic routing: map queued jobs to the cheapest capable profile configured.
     for (job_type, count) in available_jobs_with_count {
-        let mut capable_profiles: Vec<(&String, &app_state::ProfileSettings)> = settings
+        if let Some(best_fit_profile) = settings
             .scaler
             .profiles
             .iter()
-            .filter(|(_, p_settings)| {
-                let is_excluded = p_settings.excluded_jobs.iter().any(|ex_job| {
-                    if let Ok(ex_jt) = serde_json::from_str::<JobType>(&format!("\"{ex_job}\"")) {
-                        ex_jt == job_type
-                    } else {
-                        false
-                    }
-                });
-                !is_excluded
+            .filter(|profile| {
+                !profile.excluded_jobs.iter().any(|excluded| {
+                    JobType::parse_from_str(excluded)
+                        .is_ok_and(|excluded_type| excluded_type == job_type)
+                })
             })
-            .collect();
-
-        // Sort ascending by RAM footprint to select the cheapest compatible worker
-        capable_profiles.sort_by_key(|(_, p_settings)| p_settings.estimated_ram_mb);
-
-        if let Some((cheapest_profile, _)) = capable_profiles.first() {
-            if let Some(demand_value) = profile_demand.get_mut(*cheapest_profile) {
-                *demand_value += count;
-            }
+            .min_by_key(|profile| profile.estimated_ram_mb)
+            && let Some(demand) = profile_demand.get_mut(&best_fit_profile.name)
+        {
+            *demand += count;
         }
     }
 

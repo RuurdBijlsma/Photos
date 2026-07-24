@@ -1,3 +1,4 @@
+use app_state::ScalerSettings;
 use sysinfo::System;
 
 #[derive(Debug, Clone)]
@@ -27,15 +28,17 @@ impl Telemetry {
     /// Calculate the required memory buffer in MB based on settings.
     /// Buffer is `min(total_memory * buffer_pct, max_buffer_mb)`.
     #[must_use]
-    pub fn required_memory_buffer_mb(&self, buffer_pct: f64, max_buffer_mb: u64) -> u64 {
-        let pct_buffer = ((self.total_memory_mb as f64) * (buffer_pct / 100.0)) as u64;
-        pct_buffer.min(max_buffer_mb)
+    pub fn required_memory_buffer_mb(&self, scaler_settings: &ScalerSettings) -> u64 {
+        let pct_buffer = ((self.total_memory_mb as f64)
+            * (scaler_settings.system_memory_buffer_percentage / 100.0))
+            as u64;
+        pct_buffer.min(scaler_settings.system_memory_buffer_maximum_mb)
     }
 
     /// Calculates available RAM headroom above the required buffer.
     #[must_use]
-    pub fn memory_headroom_mb(&self, buffer_pct: f64, max_buffer_mb: u64) -> u64 {
-        let required = self.required_memory_buffer_mb(buffer_pct, max_buffer_mb);
+    pub fn memory_headroom_mb(&self, scaler_settings: &ScalerSettings) -> u64 {
+        let required = self.required_memory_buffer_mb(scaler_settings);
         self.available_memory_mb.saturating_sub(required)
     }
 }

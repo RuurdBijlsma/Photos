@@ -47,11 +47,6 @@ pub async fn create_worker_with_shutdown(
 }
 
 /// The main loop for the worker process, continuously fetching and processing jobs.
-///
-/// # Errors
-///
-/// This function will return an error if there is a problem communicating with the
-/// database when claiming or updating a job. The loop will terminate in such a case.
 pub async fn run_worker_loop(
     context: &WorkerContext,
     stop_on_sleep: bool,
@@ -60,7 +55,6 @@ pub async fn run_worker_loop(
     let mut sleeping = false;
 
     loop {
-        // Check if shutdown has been requested before claiming a new job
         if *shutdown_rx.borrow() {
             info!("Shutdown requested. Exiting worker loop.");
             break;
@@ -90,7 +84,6 @@ pub async fn run_worker_loop(
                 }
             }
 
-            // Sleep for 3 seconds or wake up early if a shutdown signal is received
             tokio::select! {
                 () = tokio::time::sleep(Duration::from_secs(3)) => {}
                 _ = shutdown_rx.changed() => {

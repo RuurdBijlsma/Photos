@@ -107,14 +107,9 @@ impl TestContext {
         let scaler_pool = pool.clone();
         let scaler_settings = settings.clone();
         let scaler_handle = tokio::spawn(async move {
-            let config = worker_scaler::config::ScalerConfig {
-                tick_interval_secs: 1,
-                cooldown_period_secs: 1,
-                ..Default::default()
-            };
             let (_shutdown_tx, shutdown_rx) = tokio::sync::watch::channel(false);
             if let Err(e) =
-                worker_scaler::start_scaler(scaler_pool, scaler_settings, config, shutdown_rx).await
+                worker_scaler::start_scaler(scaler_pool, scaler_settings, shutdown_rx).await
             {
                 error!("Worker Scaler failed: {}", e);
             }

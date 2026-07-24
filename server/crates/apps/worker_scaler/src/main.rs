@@ -4,7 +4,6 @@ use common_services::database::get_db_pool;
 use tracing::Level;
 use tracing_subscriber::{EnvFilter, fmt};
 use worker::graceful_exit::get_kill_signal;
-use worker_scaler::config::ScalerConfig;
 use worker_scaler::start_scaler;
 
 #[tokio::main]
@@ -20,10 +19,9 @@ async fn main() -> Result<()> {
 
     let settings = load_app_settings()?;
     let pool = get_db_pool(database_url(), false).await?;
-    let config = ScalerConfig::default();
     let shutdown_rx = get_kill_signal();
 
-    start_scaler(pool, settings, config, shutdown_rx).await?;
+    start_scaler(pool, settings, shutdown_rx).await?;
 
     Ok(())
 }

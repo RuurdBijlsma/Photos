@@ -39,6 +39,10 @@ pub enum JobType {
 }
 
 impl JobType {
+    pub fn parse_from_str(v:&str) -> serde_json::Result<Self> {
+        serde_json::from_str::<Self>(&format!("\"{v}\""))
+    }
+
     #[must_use]
     pub const fn get_priority(&self, is_video: bool) -> i32 {
         match self {

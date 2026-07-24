@@ -8,13 +8,13 @@ use common_services::database::jobs::JobType;
 use common_services::database::jobs::{Job, JobStatus};
 use sqlx::{Executor, PgPool, Postgres};
 use tracing::{info, warn};
+use app_state::constants::WORKER_HEARTBEAT_SECONDS;
 
 /// Atomically claims the next available job from the queue.
 pub async fn claim_next_job(context: &WorkerContext) -> Result<Option<Job>> {
     let mut tx = context.pool.begin().await?;
     // Heartbeat interval is 1 minute
     // If job has last heartbeat at more than 150 seconds ago, worker is probably dead?
-    let heartbeat_timeout_seconds = 150.;
     let excluded_strings: Vec<String> = context
         .excluded_job_types
         .iter()
@@ -47,7 +47,7 @@ pub async fn claim_next_job(context: &WorkerContext) -> Result<Option<Job>> {
                         )
                   )
               )
-            ORDER BY j.priority ASC, j.relative_path DESC, j.scheduled_at ASC, j.created_at ASC
+            ORDER BY j.priority, j.relative_path DESC, j.scheduled_at, j.created_at
             FOR UPDATE SKIP LOCKED
             LIMIT 1
         )
@@ -62,7 +62,7 @@ pub async fn claim_next_job(context: &WorkerContext) -> Result<Option<Job>> {
         RETURNING jobs.id, jobs.payload, jobs.relative_path, jobs.job_type AS "job_type!: JobType", jobs.priority, jobs.user_id, jobs.attempts, jobs.max_attempts, jobs.dependency_attempts
         "#,
         context.worker_id,
-        heartbeat_timeout_seconds,
+        WORKER_HEARTBEAT_SECONDS,
         &excluded_strings as &[String]
     )
         .fetch_optional(&mut *tx)

@@ -1,3 +1,4 @@
+pub const WORKER_HEARTBEAT_SECONDS: f64 = 150.;
 pub const ALBUM_IMPORT_FOLDER: &str = "import";
 pub const USER_UPLOAD_FOLDER: &str = "uploads";
 
