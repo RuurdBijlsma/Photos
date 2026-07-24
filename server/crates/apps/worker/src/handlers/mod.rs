@@ -11,7 +11,6 @@ pub mod calc_system_stats;
 pub mod clean_db;
 pub mod cluster_faces;
 pub mod cluster_photos;
-pub mod delayed_scan;
 pub mod generate_daily_cards;
 pub mod handle_web_upload;
 pub mod import_album_item;
@@ -44,7 +43,6 @@ pub async fn handle_job(context: &WorkerContext, job: &Job) -> Result<JobResult>
         JobType::Remove => remove::handle(context, job).await,
         JobType::Scan => scan::handle(context, job).await,
         JobType::CleanDb => clean_db::handle(context, job).await,
-        JobType::DelayedScan => delayed_scan::handle(context, job).await,
         JobType::ClusterFaces => cluster_faces::handle(context, job).await,
         JobType::ClusterPhotos => cluster_photos::handle(context, job).await,
         JobType::SyncThumbnails => sync_thumbnails::handle(context, job).await,

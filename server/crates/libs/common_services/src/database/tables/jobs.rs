@@ -27,7 +27,6 @@ pub enum JobType {
     Remove,
     Scan,
     CleanDb,
-    DelayedScan,
     ClusterFaces,
     ClusterPhotos,
     SyncThumbnails,
@@ -78,7 +77,6 @@ impl JobType {
             Self::ClusterFaces => 120,
             Self::ClusterPhotos => 130,
             Self::SyncThumbnails => 140,
-            Self::DelayedScan => 150,
             Self::GenerateDailyCards => 160,
             Self::HandleWebUpload => 10,
         }
