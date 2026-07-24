@@ -44,7 +44,6 @@ impl Scaler {
 
         loop {
             if *shutdown_rx.borrow() {
-                info!("🛑 Shutdown requested. Stopping scaler and all workers...");
                 self.shutdown_all_workers().await;
                 break;
             }
@@ -56,7 +55,6 @@ impl Scaler {
             tokio::select! {
                 () = tokio::time::sleep(tick_duration) => {}
                 _ = shutdown_rx.changed() => {
-                    info!("🛑 Shutdown signal received during sleep. Stopping scaler...");
                     self.shutdown_all_workers().await;
                     break;
                 }
@@ -109,6 +107,7 @@ impl Scaler {
     }
 
     fn clean_up_sleeping_workers(&mut self) {
+        let mut removed_any = false;
         let mut i = 0;
         while i < self.active_workers.len() {
             if self.active_workers[i].handle.is_finished() {
@@ -117,9 +116,14 @@ impl Scaler {
                     "🧹 Worker finished: id={}, profile={:?}",
                     worker.id, worker.profile
                 );
+                removed_any = true;
             } else {
                 i += 1;
             }
+        }
+
+        if removed_any {
+            self.log_worker_state_change("[💤] Worker exited due to no active jobs");
         }
     }
 
@@ -145,7 +149,7 @@ impl Scaler {
             .collect();
 
         let handle = tokio::spawn(async move {
-            create_worker_with_shutdown(pool, settings, excluded_jobs, false, shutdown_rx).await
+            create_worker_with_shutdown(pool, settings, excluded_jobs, true, shutdown_rx).await
         });
 
         self.active_workers.push(ActiveWorker {
@@ -188,6 +192,9 @@ impl Scaler {
     }
 
     async fn shutdown_all_workers(&mut self) {
+        if self.active_workers.is_empty() {
+            return;
+        }
         info!(
             "🛑 Requesting graceful shutdown for all {} active workers...",
             self.active_workers.len()
@@ -198,7 +205,6 @@ impl Scaler {
         for worker in self.active_workers.drain(..) {
             let _ = worker.handle.await;
         }
-        self.log_worker_state_change("[💤] All workers stopped");
     }
 
     fn log_worker_state_change(&self, event_description: &str) {
