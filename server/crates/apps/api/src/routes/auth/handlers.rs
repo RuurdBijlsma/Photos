@@ -1,5 +1,6 @@
 use crate::api_state::ApiContext;
 use crate::auth::middlewares::user::ApiUser;
+use app_state::constants;
 use axum::response::{IntoResponse, Response};
 use axum::{Extension, Json, extract::State, http::StatusCode};
 use common_services::api::app_error::AppError;
@@ -13,7 +14,6 @@ use common_services::database::app_user::{User, UserInvite};
 use common_services::database::user_store::UserStore;
 use sqlx::PgPool;
 use tracing::instrument;
-use app_state::constants;
 
 /// Formats standard `HttpOnly` cookie properties consistently.
 #[must_use]

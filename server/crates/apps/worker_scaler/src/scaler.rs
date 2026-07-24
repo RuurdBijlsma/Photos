@@ -7,7 +7,7 @@ use sqlx::PgPool;
 use std::time::{Duration, Instant};
 use tokio::sync::watch;
 use tokio::task::JoinHandle;
-use tracing::{error, info, info_span, warn, Instrument};
+use tracing::{Instrument, error, info, info_span, warn};
 use worker::worker::create_worker_with_shutdown;
 
 pub struct ActiveWorker {
@@ -114,7 +114,7 @@ impl Scaler {
     }
 
     fn clean_up_sleeping_workers(&mut self) {
-        let mut removed_any = false;
+        let mut removed_count = 0;
         let mut i = 0;
         while i < self.active_workers.len() {
             if self.active_workers[i].handle.is_finished() {
@@ -123,14 +123,18 @@ impl Scaler {
                     "🧹 Worker finished: id={}, profile={:?}",
                     worker.id, worker.profile
                 );
-                removed_any = true;
+                removed_count += 1;
             } else {
                 i += 1;
             }
         }
 
-        if removed_any {
-            self.log_worker_state_change("[💤] Worker exited due to no active jobs");
+        if removed_count > 0 {
+            self.log_worker_state_change(&format!(
+                "[🚪] {} worker{} exited due to no active jobs",
+                removed_count,
+                if removed_count == 1 { "" } else { "s" }
+            ));
         }
     }
 
@@ -140,8 +144,6 @@ impl Scaler {
             .filter(|w| w.profile == profile_name)
             .count()
     }
-
-
 
     fn spawn_worker(&mut self, profile: &ProfileSettings) {
         self.worker_counter += 1;
@@ -167,7 +169,7 @@ impl Scaler {
                 true,
                 shutdown_rx,
             )
-                .await
+            .await
         });
 
         self.active_workers.push(ActiveWorker {

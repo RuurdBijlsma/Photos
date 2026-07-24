@@ -1,6 +1,7 @@
 use crate::context::WorkerContext;
 use crate::handlers::JobResult;
 use crate::macros::backoff_seconds;
+use app_state::constants::WORKER_HEARTBEAT_SECONDS;
 use chrono::{Duration, Utc};
 use color_eyre::{Report, Result};
 use common_services::alert;
@@ -8,7 +9,6 @@ use common_services::database::jobs::JobType;
 use common_services::database::jobs::{Job, JobStatus};
 use sqlx::{Executor, PgPool, Postgres};
 use tracing::{info, warn};
-use app_state::constants::WORKER_HEARTBEAT_SECONDS;
 
 /// Atomically claims the next available job from the queue.
 pub async fn claim_next_job(context: &WorkerContext) -> Result<Option<Job>> {

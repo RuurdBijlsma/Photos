@@ -39,7 +39,7 @@ pub enum JobType {
 }
 
 impl JobType {
-    pub fn parse_from_str(v:&str) -> serde_json::Result<Self> {
+    pub fn parse_from_str(v: &str) -> serde_json::Result<Self> {
         serde_json::from_str::<Self>(&format!("\"{v}\""))
     }
 

@@ -8,7 +8,7 @@ use common_services::database::jobs::JobType;
 use common_services::utils::nice_id;
 use sqlx::PgPool;
 use std::time::Duration;
-use tracing::{info, info_span, Instrument};
+use tracing::{Instrument, info, info_span};
 
 #[allow(clippy::large_futures)]
 pub async fn create_worker(

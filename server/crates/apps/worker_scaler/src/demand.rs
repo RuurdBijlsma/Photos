@@ -1,5 +1,5 @@
-use app_state::constants::WORKER_HEARTBEAT_SECONDS;
 use app_state::AppSettings;
+use app_state::constants::WORKER_HEARTBEAT_SECONDS;
 use common_services::database::jobs::JobType;
 use sqlx::PgPool;
 use std::collections::HashMap;
