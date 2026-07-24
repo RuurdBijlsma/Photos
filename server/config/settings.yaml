@@ -137,6 +137,7 @@ scaler:
       excluded_jobs:
         - "ingest_llm"
         - "ingest_thumbnails"
+        - "cluster_photos"
     heavy:
       priority: 3
       estimated_ram_mb: 1000

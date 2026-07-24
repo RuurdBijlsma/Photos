@@ -100,13 +100,22 @@ impl Scaler {
             let max_count = profile.max_workers;
             let profile_demand = demand.get(&profile.name).copied().unwrap_or(0);
 
-            if profile_demand > active_count
-                && active_count < max_count
-                && headroom_mb >= profile.estimated_ram_mb
-            {
-                self.spawn_worker(&profile);
-                self.last_spawn_time = Some(Instant::now());
-                return Ok(());
+            if profile_demand > active_count {
+                if active_count >= max_count {
+                    info!(
+                        "Demand for '{}' ({}) exceeds active ({}), but max_workers ({}) reached.",
+                        profile.name, profile_demand, active_count, max_count
+                    );
+                } else if headroom_mb < profile.estimated_ram_mb {
+                    warn!(
+                        "Demand for '{}' ({}) exists, but headroom ({} MB) is below estimated RAM ({} MB).",
+                        profile.name, profile_demand, headroom_mb, profile.estimated_ram_mb
+                    );
+                } else {
+                    self.spawn_worker(&profile);
+                    self.last_spawn_time = Some(Instant::now());
+                    return Ok(());
+                }
             }
         }
 

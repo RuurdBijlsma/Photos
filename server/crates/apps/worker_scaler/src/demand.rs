@@ -21,17 +21,24 @@ pub async fn get_demand(
         WHERE
             ((j.status = 'queued' AND j.scheduled_at <= now())
             OR (j.status = 'running' AND j.last_heartbeat < now() - interval '1 second' * $1))
+
+          -- Path-scoped phase check
           AND (
               j.relative_path IS NULL
               OR NOT EXISTS (
                   SELECT 1 FROM jobs dep
                   WHERE dep.relative_path = j.relative_path
-                    AND dep.status != 'done'
-                    AND (
-                        (j.job_type = 'ingest_thumbnails' AND dep.job_type = 'ingest_metadata')
-                        OR (j.job_type IN ('ingest_analysis', 'ingest_llm') AND dep.job_type IN ('ingest_metadata', 'ingest_thumbnails'))
-                    )
+                    AND dep.phase < j.phase
+                    AND ((dep.status = 'queued' AND dep.scheduled_at <= now()) OR dep.status = 'running')
               )
+          )
+
+          -- Global-scoped: ANY lower-phase job blocks global jobs, or lower-phase global jobs block path jobs
+          AND NOT EXISTS (
+              SELECT 1 FROM jobs dep
+              WHERE dep.phase < j.phase
+                AND ((dep.status = 'queued' AND dep.scheduled_at <= now()) OR dep.status = 'running')
+                AND (dep.scope = 'global' OR j.scope = 'global')
           )
         GROUP BY j.job_type
         "#,
