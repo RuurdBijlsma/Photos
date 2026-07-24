@@ -7,7 +7,7 @@ use sqlx::PgPool;
 use std::time::{Duration, Instant};
 use tokio::sync::watch;
 use tokio::task::JoinHandle;
-use tracing::{error, info, warn};
+use tracing::{error, info, info_span, warn, Instrument};
 use worker::worker::create_worker_with_shutdown;
 
 pub struct ActiveWorker {
@@ -39,6 +39,13 @@ impl Scaler {
     }
 
     pub async fn run(&mut self, mut shutdown_rx: watch::Receiver<bool>) -> Result<()> {
+        let scaler_span = info_span!("scaler");
+        self.run_inner(&mut shutdown_rx)
+            .instrument(scaler_span)
+            .await
+    }
+
+    async fn run_inner(&mut self, shutdown_rx: &mut watch::Receiver<bool>) -> Result<()> {
         info!("⚖️ Starting scaler...");
         let tick_duration = Duration::from_secs(self.settings.scaler.tick_interval_secs);
 
@@ -134,6 +141,8 @@ impl Scaler {
             .count()
     }
 
+
+
     fn spawn_worker(&mut self, profile: &ProfileSettings) {
         self.worker_counter += 1;
         let worker_id = format!("w{}-{}", self.worker_counter, profile.name);
@@ -148,8 +157,17 @@ impl Scaler {
             .filter_map(|job_str| JobType::parse_from_str(job_str).ok())
             .collect();
 
+        let worker_id_clone = worker_id.clone();
         let handle = tokio::spawn(async move {
-            create_worker_with_shutdown(pool, settings, excluded_jobs, true, shutdown_rx).await
+            create_worker_with_shutdown(
+                pool,
+                settings,
+                worker_id_clone,
+                excluded_jobs,
+                true,
+                shutdown_rx,
+            )
+                .await
         });
 
         self.active_workers.push(ActiveWorker {
@@ -160,7 +178,6 @@ impl Scaler {
             handle,
         });
 
-        // The " " after ➕ is needed for it to render right for some reason
         self.log_worker_state_change(&format!("[➕ ] Spawned {} worker", profile.name));
     }
 
@@ -222,7 +239,7 @@ impl Scaler {
         let total = self.active_workers.len();
 
         info!(
-            "🔄 State Change: {} | Total Active: {} [{}]",
+            "{} | Total Active: {} [{}]",
             event_description,
             total,
             profile_counts_str.join(", ")

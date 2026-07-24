@@ -33,10 +33,6 @@ pub enum JobResult {
 }
 
 /// Dispatches a job to its corresponding handler and manages its lifecycle.
-///
-/// # Errors
-///
-/// This function will return an error if the specific job handler fails during execution.
 pub async fn handle_job(context: &WorkerContext, job: &Job) -> Result<JobResult> {
     let heartbeat_handle = start_heartbeat_loop(&context.pool, job.id);
 

@@ -8,7 +8,7 @@ use common_services::database::jobs::JobType;
 use common_services::utils::nice_id;
 use sqlx::PgPool;
 use std::time::Duration;
-use tracing::info;
+use tracing::{info, info_span, Instrument};
 
 #[allow(clippy::large_futures)]
 pub async fn create_worker(
@@ -21,6 +21,7 @@ pub async fn create_worker(
     create_worker_with_shutdown(
         pool,
         settings,
+        nice_id(8),
         excluded_job_types,
         stop_on_sleep,
         shutdown_rx,
@@ -32,18 +33,20 @@ pub async fn create_worker(
 pub async fn create_worker_with_shutdown(
     pool: PgPool,
     settings: AppSettings,
+    worker_id: String,
     excluded_job_types: Vec<JobType>,
     stop_on_sleep: bool,
     shutdown_rx: tokio::sync::watch::Receiver<bool>,
 ) -> Result<()> {
-    let worker_id = nice_id(8);
+    let worker_span = info_span!("", id = %worker_id);
     info!(
         "🛠️ [Worker ID: {}, IgnoreJobs: {:?}] Starting...",
         worker_id, excluded_job_types
     );
     let context = WorkerContext::new(pool, settings, worker_id.clone(), excluded_job_types).await?;
-
-    run_worker_loop(&context, stop_on_sleep, shutdown_rx).await
+    run_worker_loop(&context, stop_on_sleep, shutdown_rx)
+        .instrument(worker_span)
+        .await
 }
 
 /// The main loop for the worker process, continuously fetching and processing jobs.
