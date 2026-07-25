@@ -1,0 +1,30 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            j.job_type::text AS \"job_type!: JobType\",\n            COUNT(*)::bigint AS \"count!\"\n        FROM jobs j\n        WHERE\n            ((j.status = 'queued' AND j.scheduled_at <= now())\n            OR (j.status = 'running' AND j.last_heartbeat < now() - interval '1 second' * $1))\n\n          -- Path-scoped phase check\n          AND (\n              j.relative_path IS NULL\n              OR NOT EXISTS (\n                  SELECT 1 FROM jobs dep\n                  WHERE dep.relative_path = j.relative_path\n                    AND dep.phase < j.phase\n                    AND ((dep.status = 'queued' AND dep.scheduled_at <= now()) OR dep.status = 'running')\n              )\n          )\n\n          -- Global-scoped: ANY lower-phase job blocks global jobs, or lower-phase global jobs block path jobs\n          AND NOT EXISTS (\n              SELECT 1 FROM jobs dep\n              WHERE dep.phase < j.phase\n                AND ((dep.status = 'queued' AND dep.scheduled_at <= now()) OR dep.status = 'running')\n                AND (dep.scope = 'global' OR j.scope = 'global')\n          )\n        GROUP BY j.job_type\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "job_type!: JobType",
+        "type_info": "Text",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 1,
+        "name": "count!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Float8"
+      ]
+    },
+    "nullable": [
+      null,
+      null
+    ]
+  },
+  "hash": "8a7209387a4c7cef38f0d0bebec3d780d1af28883e505c4a09cfb34f554b9419"
+}
