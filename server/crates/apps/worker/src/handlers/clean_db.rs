@@ -1,6 +1,6 @@
 use crate::context::WorkerContext;
 use crate::handlers::JobResult;
-use app_state::constants::USER_UPLOAD_FOLDER;
+use app_state::constants::{TUS_LOCKS_FOLDER, TUS_UPLOADS_FOLDER, USER_UPLOAD_FOLDER};
 use chrono::Utc;
 use color_eyre::Result;
 use common_services::database::jobs::Job;
@@ -81,7 +81,6 @@ async fn clean_old_upload_files(context: &WorkerContext) -> Result<()> {
         if !user_upload_folder.exists() {
             continue;
         }
-        dbg!(&user_upload_folder);
         for entry in WalkDir::new(&user_upload_folder)
             .contents_first(true)
             .into_iter()
@@ -102,8 +101,8 @@ async fn clean_old_upload_files(context: &WorkerContext) -> Result<()> {
 
     // Clean up old files in TUS folders (uploads & locks)
     let app_data_root = &context.settings.ingest.app_data_root;
-    let tus_uploads = app_data_root.join(app_state::constants::TUS_UPLOADS_FOLDER);
-    let tus_locks = app_data_root.join(app_state::constants::TUS_LOCKS_FOLDER);
+    let tus_uploads = app_data_root.join(TUS_UPLOADS_FOLDER);
+    let tus_locks = app_data_root.join(TUS_LOCKS_FOLDER);
 
     for dir in &[tus_uploads, tus_locks] {
         if !dir.exists() {

@@ -21,12 +21,12 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: '23'
+          node-version-file: 'web/package.json'
           cache: 'npm'
           cache-dependency-path: 'web/package-lock.json'
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Run oxlint
         run: npm run lint:oxlint

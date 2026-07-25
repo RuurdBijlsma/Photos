@@ -113,3 +113,39 @@ daily_cards:
     max_cards: 3
   estimatr:
     rounds_per_day: 3
+
+scaler:
+  tick_interval_secs: 5
+  cooldown_period_secs: 10
+  system_memory_buffer_percentage: 10.0
+  system_memory_buffer_maximum_mb: 2000
+  profiles:
+    light:
+      priority: 1
+      estimated_ram_mb: 100
+      max_workers: 10
+      excluded_jobs:
+        - "ingest_thumbnails"
+        - "ingest_analysis"
+        - "ingest_llm"
+        - "cluster_faces"
+        - "cluster_photos"
+    medium:
+      priority: 2
+      estimated_ram_mb: 500
+      max_workers: 5
+      excluded_jobs:
+        - "ingest_llm"
+        - "ingest_thumbnails"
+        - "cluster_photos"
+    heavy:
+      priority: 3
+      estimated_ram_mb: 1000
+      max_workers: 2
+      excluded_jobs:
+        - "ingest_llm"
+    llm:
+      priority: 4
+      estimated_ram_mb: 6000
+      max_workers: 0
+      excluded_jobs: []

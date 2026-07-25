@@ -1,3 +1,4 @@
+use crate::api_state::ApiContext;
 use crate::auth::middlewares::user::ApiUser;
 use axum::extract::{Path, State};
 use axum::{Extension, Json};
@@ -9,9 +10,11 @@ use common_services::api::jobs::interfaces::{
 };
 use common_services::api::jobs::service::{cancel_job, get_job_overview, retry_job};
 use common_services::api::jobs::user_level::{
-    enqueue_scan_job, get_failed_ingest_jobs, get_running_ingest_jobs, get_user_ingest_jobs,
+    get_failed_ingest_jobs, get_running_ingest_jobs, get_user_ingest_jobs,
     get_user_ingest_overview, retry_user_job,
 };
+use common_services::database::jobs::JobType;
+use common_services::job_queue::enqueue_job;
 use sqlx::PgPool;
 use tracing::instrument;
 
@@ -71,12 +74,15 @@ pub async fn get_failed_ingest_jobs_handler(
     Ok(Json(jobs))
 }
 
-#[instrument(skip(pool, user), err(Debug))]
+#[instrument(skip(context, user), err(Debug))]
 pub async fn scan_user_media_handler(
-    State(pool): State<PgPool>,
+    State(context): State<ApiContext>,
     Extension(user): Extension<ApiUser>,
 ) -> Result<Json<()>, AppError> {
-    enqueue_scan_job(&pool, user.id).await?;
+    enqueue_job::<()>(&context.pool, &context.settings.ingest, JobType::Scan)
+        .user_id(user.id)
+        .call()
+        .await?;
     Ok(Json(()))
 }
 

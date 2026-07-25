@@ -302,8 +302,12 @@ async fn needs_clustering(pool: &PgPool, user_id: i32) -> Result<bool> {
                     -- Check if any media items were created or updated since the last run
                     -- Soft deletions are also detected, actual row deletions are not
                     EXISTS (
-                        SELECT 1 FROM media_item
-                        WHERE user_id = $1 AND updated_at > (SELECT last_run_time FROM last_run)
+                        SELECT 1 FROM visual_analysis va
+                        WHERE va.user_id = $1 AND va.created_at > (SELECT last_run_time FROM last_run)
+                    )
+                    OR EXISTS (
+                        SELECT 1 FROM media_item mi
+                        WHERE mi.user_id = $1 AND mi.updated_at > (SELECT last_run_time FROM last_run)
                     )
             END AS "needs_run!"
         "#,

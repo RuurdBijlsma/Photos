@@ -1,7 +1,8 @@
 CREATE TYPE job_type AS ENUM ('ingest_metadata', 'ingest_thumbnails', 'ingest_analysis', 'ingest_llm',
     'remove', 'scan', 'clean_db', 'cluster_faces', 'cluster_photos', 'import_album_item', 'update_global_centroid',
-    'sync_thumbnails', 'delayed_scan', 'generate_daily_cards', 'calc_system_stats', 'handle_web_upload');
+    'sync_thumbnails', 'generate_daily_cards', 'calc_system_stats', 'handle_web_upload');
 CREATE TYPE job_status AS ENUM ('queued', 'running', 'failed', 'done', 'cancelled');
+CREATE TYPE job_scope AS ENUM ('path', 'global');
 
 CREATE TABLE jobs
 (
@@ -9,6 +10,8 @@ CREATE TABLE jobs
     relative_path       TEXT,                                  -- references files table
     user_id             INT REFERENCES app_user (id) ON DELETE CASCADE,
     job_type            job_type    NOT NULL,
+    scope               job_scope   NOT NULL,
+    phase               INT         NOT NULL,
     payload             JSONB,                                 -- For storing extra job parameters
     priority            INT         NOT NULL DEFAULT 100,      -- lower = higher priority
     status              job_status  NOT NULL DEFAULT 'queued', -- queued, running, failed, done, cancelled
@@ -36,6 +39,16 @@ CREATE UNIQUE INDEX uq_jobs_active_job
 -- For the job claiming worker
 CREATE INDEX idx_jobs_claim_active
     ON jobs (priority ASC, relative_path DESC, scheduled_at ASC, created_at ASC) WHERE status IN ('queued', 'running');
+
+-- For path-level phase checks
+CREATE INDEX idx_jobs_active_path_phase
+    ON jobs (relative_path, phase)
+    WHERE status IN ('queued', 'running');
+
+-- For global phase checks
+CREATE INDEX idx_jobs_active_global_phase
+    ON jobs (phase, scope)
+    WHERE status IN ('queued', 'running');
 
 -- For general application queries
 CREATE INDEX jobs_active_relative_path_idx ON jobs (relative_path);

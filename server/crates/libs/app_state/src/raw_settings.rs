@@ -1,16 +1,17 @@
 use material_color_utils::dynamic::variant::Variant;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::path::PathBuf;
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct RawSettings {
-    /// Folder with source photos and video
     pub ingest: RawIngestSettings,
     pub logging: LoggingSettings,
     pub api: ApiSettings,
     pub secrets: SecretSettings,
     pub constants: RawConstants,
     pub daily_cards: DailyCardsSettings,
+    pub scaler: RawScalerSettings,
 }
 
 /// Defines paths for media and thumbnail storage.
@@ -177,4 +178,21 @@ pub struct CardLimits {
 #[derive(Debug, Deserialize, Clone, Serialize)]
 pub struct EstimatrSettings {
     pub rounds_per_day: i64,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct RawProfileSettings {
+    pub priority: i32,
+    pub estimated_ram_mb: u64,
+    pub max_workers: usize,
+    pub excluded_jobs: Vec<String>,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct RawScalerSettings {
+    pub tick_interval_secs: u64,
+    pub cooldown_period_secs: u64,
+    pub system_memory_buffer_percentage: f64,
+    pub system_memory_buffer_maximum_mb: u64,
+    pub profiles: HashMap<String, RawProfileSettings>,
 }

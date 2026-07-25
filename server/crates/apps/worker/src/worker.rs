@@ -8,7 +8,7 @@ use common_services::database::jobs::JobType;
 use common_services::utils::nice_id;
 use sqlx::PgPool;
 use std::time::Duration;
-use tracing::info;
+use tracing::{Instrument, info, info_span};
 
 #[allow(clippy::large_futures)]
 pub async fn create_worker(
@@ -21,6 +21,7 @@ pub async fn create_worker(
     create_worker_with_shutdown(
         pool,
         settings,
+        nice_id(8),
         excluded_job_types,
         stop_on_sleep,
         shutdown_rx,
@@ -32,26 +33,23 @@ pub async fn create_worker(
 pub async fn create_worker_with_shutdown(
     pool: PgPool,
     settings: AppSettings,
+    worker_id: String,
     excluded_job_types: Vec<JobType>,
     stop_on_sleep: bool,
     shutdown_rx: tokio::sync::watch::Receiver<bool>,
 ) -> Result<()> {
-    let worker_id = nice_id(8);
+    let worker_span = info_span!("", id = %worker_id);
     info!(
         "🛠️ [Worker ID: {}, IgnoreJobs: {:?}] Starting...",
         worker_id, excluded_job_types
     );
     let context = WorkerContext::new(pool, settings, worker_id.clone(), excluded_job_types).await?;
-
-    run_worker_loop(&context, stop_on_sleep, shutdown_rx).await
+    run_worker_loop(&context, stop_on_sleep, shutdown_rx)
+        .instrument(worker_span)
+        .await
 }
 
 /// The main loop for the worker process, continuously fetching and processing jobs.
-///
-/// # Errors
-///
-/// This function will return an error if there is a problem communicating with the
-/// database when claiming or updating a job. The loop will terminate in such a case.
 pub async fn run_worker_loop(
     context: &WorkerContext,
     stop_on_sleep: bool,
@@ -60,7 +58,6 @@ pub async fn run_worker_loop(
     let mut sleeping = false;
 
     loop {
-        // Check if shutdown has been requested before claiming a new job
         if *shutdown_rx.borrow() {
             info!("Shutdown requested. Exiting worker loop.");
             break;
@@ -90,7 +87,6 @@ pub async fn run_worker_loop(
                 }
             }
 
-            // Sleep for 3 seconds or wake up early if a shutdown signal is received
             tokio::select! {
                 () = tokio::time::sleep(Duration::from_secs(3)) => {}
                 _ = shutdown_rx.changed() => {

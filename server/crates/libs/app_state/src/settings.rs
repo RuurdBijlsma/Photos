@@ -19,6 +19,7 @@ pub struct AppSettings {
     pub api: ApiSettings,
     pub secrets: SecretSettings,
     pub daily_cards: DailyCardsSettings,
+    pub scaler: ScalerSettings,
 }
 
 /// Defines paths for media and thumbnail storage.
@@ -65,12 +66,35 @@ impl From<RawSettings> for AppSettings {
             cache_root,
         };
 
+        let mut scaler_profiles: Vec<ProfileSettings> = raw
+            .scaler
+            .profiles
+            .into_iter()
+            .map(|(k, v)| ProfileSettings {
+                name: k,
+                priority: v.priority,
+                estimated_ram_mb: v.estimated_ram_mb,
+                max_workers: v.max_workers,
+                excluded_jobs: v.excluded_jobs,
+            })
+            .collect();
+        scaler_profiles.sort_by_key(|b| std::cmp::Reverse(b.priority));
+
+        let scaler = ScalerSettings {
+            tick_interval_secs: raw.scaler.tick_interval_secs,
+            cooldown_period_secs: raw.scaler.cooldown_period_secs,
+            system_memory_buffer_percentage: raw.scaler.system_memory_buffer_percentage,
+            system_memory_buffer_maximum_mb: raw.scaler.system_memory_buffer_maximum_mb,
+            profiles: scaler_profiles,
+        };
+
         Self {
             ingest,
             logging: raw.logging,
             api: raw.api,
             secrets: raw.secrets,
             daily_cards: raw.daily_cards,
+            scaler,
         }
     }
 }
@@ -193,4 +217,22 @@ impl IngestSettings {
         let exist = self.thumbs_exist(file, &media_item_id, None, false)?;
         Ok(exist)
     }
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct ScalerSettings {
+    pub tick_interval_secs: u64,
+    pub cooldown_period_secs: u64,
+    pub system_memory_buffer_percentage: f64,
+    pub system_memory_buffer_maximum_mb: u64,
+    pub profiles: Vec<ProfileSettings>, // sorted by priority, descending
+}
+
+#[derive(Debug, Clone, Deserialize, Hash, PartialEq, Eq)]
+pub struct ProfileSettings {
+    pub name: String,
+    pub priority: i32,
+    pub estimated_ram_mb: u64,
+    pub max_workers: usize,
+    pub excluded_jobs: Vec<String>,
 }

@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        WITH last_run AS (\n            SELECT MAX(updated_at) AS last_run_time\n            FROM photo_cluster\n            WHERE user_id = $1\n        )\n        SELECT\n            CASE\n                -- If there is no record of previous runs, clustering must run\n                WHEN (SELECT last_run_time FROM last_run) IS NULL THEN TRUE\n                ELSE\n                    -- Check if any media items were created or updated since the last run\n                    -- Soft deletions are also detected, actual row deletions are not\n                    EXISTS (\n                        SELECT 1 FROM visual_analysis va\n                        WHERE va.user_id = $1 AND va.created_at > (SELECT last_run_time FROM last_run)\n                    )\n                    OR EXISTS (\n                        SELECT 1 FROM media_item mi\n                        WHERE mi.user_id = $1 AND mi.updated_at > (SELECT last_run_time FROM last_run)\n                    )\n            END AS \"needs_run!\"\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "needs_run!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "4b5b594b3f1a4a556a3d32fd5323048e873c85833fbf781ea0299c98aa4042c9"
+}

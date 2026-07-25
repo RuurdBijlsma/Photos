@@ -1,20 +1,18 @@
 use crate::context::WorkerContext;
 use crate::handlers::JobResult;
 use crate::macros::backoff_seconds;
+use app_state::constants::WORKER_HEARTBEAT_SECONDS;
 use chrono::{Duration, Utc};
 use color_eyre::{Report, Result};
 use common_services::alert;
-use common_services::database::jobs::JobType;
-use common_services::database::jobs::{Job, JobStatus};
+use common_services::database::jobs::{Job, JobScope, JobStatus, JobType};
 use sqlx::{Executor, PgPool, Postgres};
 use tracing::{info, warn};
 
-/// Atomically claims the next available job from the queue.
+/// Atomically claims the next available job from the queue based on phase and scope ordering.
 pub async fn claim_next_job(context: &WorkerContext) -> Result<Option<Job>> {
     let mut tx = context.pool.begin().await?;
-    // Heartbeat interval is 1 minute
-    // If job has last heartbeat at more than 150 seconds ago, worker is probably dead?
-    let heartbeat_timeout_seconds = 150.;
+
     let excluded_strings: Vec<String> = context
         .excluded_job_types
         .iter()
@@ -34,20 +32,26 @@ pub async fn claim_next_job(context: &WorkerContext) -> Result<Option<Job>> {
                 ((j.status = 'queued' AND j.scheduled_at <= now())
                 OR (j.status = 'running' AND j.last_heartbeat < now() - interval '1 second' * $2))
               AND j.job_type::text != ALL($3::text[])
-              -- Check that dependent jobs for the same file are fully completed
+
+              -- Path-scoped phase check
               AND (
                   j.relative_path IS NULL
                   OR NOT EXISTS (
                       SELECT 1 FROM jobs dep
                       WHERE dep.relative_path = j.relative_path
-                        AND dep.status != 'done'
-                        AND (
-                            (j.job_type = 'ingest_thumbnails' AND dep.job_type = 'ingest_metadata')
-                            OR (j.job_type IN ('ingest_analysis', 'ingest_llm') AND dep.job_type IN ('ingest_metadata', 'ingest_thumbnails'))
-                        )
+                        AND dep.phase < j.phase
+                        AND ((dep.status = 'queued' AND dep.scheduled_at <= now()) OR dep.status = 'running')
                   )
               )
-            ORDER BY j.priority ASC, j.relative_path DESC, j.scheduled_at ASC, j.created_at ASC
+
+              -- Global-scoped: ANY lower-phase job blocks global jobs, or lower-phase global jobs block path jobs
+              AND NOT EXISTS (
+                  SELECT 1 FROM jobs dep
+                  WHERE dep.phase < j.phase
+                    AND ((dep.status = 'queued' AND dep.scheduled_at <= now()) OR dep.status = 'running')
+                    AND (dep.scope = 'global' OR j.scope = 'global')
+              )
+            ORDER BY j.priority, j.relative_path DESC, j.scheduled_at, j.created_at
             FOR UPDATE SKIP LOCKED
             LIMIT 1
         )
@@ -59,10 +63,20 @@ pub async fn claim_next_job(context: &WorkerContext) -> Result<Option<Job>> {
             attempts = CASE WHEN jobs.status = 'running' THEN jobs.attempts + 1 ELSE jobs.attempts END
         FROM candidate
         WHERE jobs.id = candidate.id
-        RETURNING jobs.id, jobs.payload, jobs.relative_path, jobs.job_type AS "job_type!: JobType", jobs.priority, jobs.user_id, jobs.attempts, jobs.max_attempts, jobs.dependency_attempts
+        RETURNING jobs.id,
+                  jobs.payload,
+                  jobs.relative_path,
+                  jobs.job_type AS "job_type!: JobType",
+                  jobs.scope AS "scope!: JobScope",
+                  jobs.phase,
+                  jobs.priority,
+                  jobs.user_id,
+                  jobs.attempts,
+                  jobs.max_attempts,
+                  jobs.dependency_attempts
         "#,
         context.worker_id,
-        heartbeat_timeout_seconds,
+        WORKER_HEARTBEAT_SECONDS,
         &excluded_strings as &[String]
     )
         .fetch_optional(&mut *tx)

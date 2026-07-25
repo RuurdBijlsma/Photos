@@ -10028,7 +10028,6 @@ name = "worker_scaler"
 version = "0.1.0"
 dependencies = [
  "app_state",
- "clap",
  "color-eyre",
  "common_services",
  "serde",

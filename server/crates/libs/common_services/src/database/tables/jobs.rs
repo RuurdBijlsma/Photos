@@ -10,10 +10,20 @@ pub struct Job {
     pub relative_path: Option<String>,
     pub user_id: Option<i32>,
     pub job_type: JobType,
+    pub scope: JobScope,
+    pub phase: i32,
     pub priority: i32,
     pub attempts: i32,
     pub max_attempts: i32,
     pub dependency_attempts: i32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Type, Serialize, Deserialize)]
+#[sqlx(type_name = "job_scope", rename_all = "snake_case")]
+#[serde(rename_all = "snake_case")]
+pub enum JobScope {
+    Path,
+    Global,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Type, Serialize, Deserialize)]
@@ -27,7 +37,6 @@ pub enum JobType {
     Remove,
     Scan,
     CleanDb,
-    DelayedScan,
     ClusterFaces,
     ClusterPhotos,
     SyncThumbnails,
@@ -39,6 +48,56 @@ pub enum JobType {
 }
 
 impl JobType {
+    pub fn parse_from_str(v: &str) -> serde_json::Result<Self> {
+        serde_json::from_str::<Self>(&format!("\"{v}\""))
+    }
+
+    #[must_use]
+    // Jobs won't get picked up when there's still jobs available to be picked up with a lower phase.
+    // Example: IngestMetadata _for a file_ will always complete before IngestThumbnails is picked up _for that file_
+    // Example 2: ClusterPhotos will always wait for all ingest jobs to be done before being picked up
+    //            Because it is global scope (not path scoped), and it has a higher phase than the ingest jobs.
+    pub const fn phase(&self) -> i32 {
+        match self {
+            Self::Remove => 5,
+            Self::HandleWebUpload => 10,
+            Self::IngestMetadata => 20,
+            Self::IngestThumbnails => 30,
+            Self::IngestAnalysis => 40,
+            Self::ClusterFaces
+            | Self::ClusterPhotos
+            | Self::Scan
+            | Self::CleanDb
+            | Self::ImportAlbumItem
+            | Self::SyncThumbnails => 50,
+            Self::UpdateGlobalCentroid | Self::CalcSystemStats => 60,
+            Self::GenerateDailyCards => 80,
+            Self::IngestLlm => 100_000,
+        }
+    }
+
+    #[must_use]
+    pub const fn scope(&self) -> JobScope {
+        match self {
+            Self::IngestMetadata
+            | Self::IngestThumbnails
+            | Self::IngestAnalysis
+            | Self::IngestLlm
+            | Self::Remove => JobScope::Path,
+
+            Self::Scan
+            | Self::HandleWebUpload
+            | Self::ImportAlbumItem
+            | Self::CleanDb
+            | Self::UpdateGlobalCentroid
+            | Self::CalcSystemStats
+            | Self::ClusterFaces
+            | Self::ClusterPhotos
+            | Self::SyncThumbnails
+            | Self::GenerateDailyCards => JobScope::Global,
+        }
+    }
+
     #[must_use]
     pub const fn get_priority(&self, is_video: bool) -> i32 {
         match self {
@@ -68,13 +127,11 @@ impl JobType {
             Self::CleanDb => 20,
             Self::ImportAlbumItem => 25,
             Self::Scan => 70,
-            // These can be done after ingest analysis is done
             Self::UpdateGlobalCentroid => 100,
             Self::CalcSystemStats => 110,
             Self::ClusterFaces => 120,
             Self::ClusterPhotos => 130,
             Self::SyncThumbnails => 140,
-            Self::DelayedScan => 150,
             Self::GenerateDailyCards => 160,
             Self::HandleWebUpload => 10,
         }

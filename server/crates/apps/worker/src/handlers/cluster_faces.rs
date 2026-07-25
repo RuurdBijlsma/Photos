@@ -2,6 +2,7 @@ use crate::context::WorkerContext;
 use crate::handlers::JobResult;
 use crate::handlers::common::clustering::{self, ClusterEntity};
 use crate::handlers::common::utils::get_images_to_analyze;
+use chrono::{DateTime, Utc};
 use color_eyre::{Result, eyre::eyre};
 use common_services::api::album::service::get_representative_thumbnail;
 use common_services::database::jobs::Job;
@@ -190,6 +191,7 @@ async fn upsert_and_link(
     clusters: HashMap<usize, Vec<&FaceToCluster>>,
     new_centroids: &[Vec<f32>],
     cluster_map: &HashMap<usize, String>, // Map of cluster_idx -> face_cluster.id (String)
+    snapshot_time: DateTime<Utc>,
 ) -> Result<()> {
     for (cluster_idx, faces_in_cluster) in clusters {
         let face_ids: Vec<i64> = faces_in_cluster.iter().map(|f| f.id).collect();
@@ -200,8 +202,10 @@ async fn upsert_and_link(
 
         let cluster_id = if let Some(existing_cluster_id) = cluster_map.get(&cluster_idx) {
             // Update existing cluster
-            query("UPDATE face_cluster SET centroid = $1, updated_at = now() WHERE id = $2")
+            query("UPDATE face_cluster SET centroid = $1, thumb_media_item_id = $2, updated_at = $3 WHERE id = $4")
                 .bind(new_centroid)
+                .bind(&representative_face.media_item_id)
+                .bind(snapshot_time)
                 .bind(existing_cluster_id)
                 .execute(&mut **tx)
                 .await?;
@@ -219,12 +223,13 @@ async fn upsert_and_link(
             .execute(&mut **tx)
             .await?;
 
-            query("INSERT INTO face_cluster (id, user_id, person_id, centroid, thumb_media_item_id) VALUES ($1, $2, $3, $4, $5)")
+            query("INSERT INTO face_cluster (id, user_id, person_id, centroid, thumb_media_item_id, updated_at) VALUES ($1, $2, $3, $4, $5, $6)")
                 .bind(&new_cluster_id)
                 .bind(user_id)
                 .bind(&new_person_id)
                 .bind(new_centroid)
                 .bind(&representative_face.media_item_id)
+                .bind(snapshot_time)
                 .execute(&mut **tx)
                 .await?;
 
@@ -309,8 +314,12 @@ async fn needs_clustering(pool: &PgPool, user_id: i32) -> Result<bool> {
                     -- Check if any media items were created or updated since the last run
                     -- Soft deletions are also detected, actual row deletions are not
                     EXISTS (
-                        SELECT 1 FROM media_item
-                        WHERE user_id = $1 AND updated_at > (SELECT last_run_time FROM last_run)
+                        SELECT 1 FROM visual_analysis va
+                        WHERE va.user_id = $1 AND va.created_at > (SELECT last_run_time FROM last_run)
+                    )
+                    OR EXISTS (
+                        SELECT 1 FROM media_item mi
+                        WHERE mi.user_id = $1 AND mi.updated_at > (SELECT last_run_time FROM last_run)
                     )
             END AS "needs_run!"
         "#,
@@ -335,6 +344,7 @@ pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
             continue;
         }
 
+        let snapshot_time: DateTime<Utc> = Utc::now();
         let existing_clusters = fetch_existing_clusters(&context.pool, user_id).await?;
         let items_to_cluster = fetch_embeddings(&context.pool, user_id).await?;
         if items_to_cluster.len() < MIN_ITEMS_TO_CLUSTER {
@@ -364,6 +374,7 @@ pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
             new_clusters,
             &new_centroids,
             &cluster_map,
+            snapshot_time,
         )
         .await?;
 

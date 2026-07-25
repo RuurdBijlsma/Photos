@@ -1,6 +1,7 @@
 use tokio::sync::watch::Receiver;
 use tracing::{error, info};
 
+#[must_use]
 pub fn get_kill_signal() -> Receiver<bool> {
     let (shutdown_tx, shutdown_rx) = tokio::sync::watch::channel(false);
     tokio::spawn(async move {

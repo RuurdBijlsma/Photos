@@ -1,4 +1,4 @@
-use crate::database::jobs::{JobStatus, JobType};
+use crate::database::jobs::{JobScope, JobStatus, JobType};
 use app_state::IngestSettings;
 use bon::builder;
 use chrono::{DateTime, Utc};
@@ -40,12 +40,15 @@ pub async fn enqueue_job<T: Serialize + Send + Sync>(
     let is_video = relative_path
         .as_ref()
         .is_some_and(|p| settings.is_video_file(&settings.media_root.join(p)));
+
     let priority = job_type.get_priority(is_video);
+    let scope = job_type.scope();
+    let phase = job_type.phase();
 
     let result = sqlx::query!(
         r#"
-        INSERT INTO jobs (relative_path, job_type, priority, user_id, payload, scheduled_at)
-        VALUES ($1, $2, $3, $4, $5, COALESCE($6, now()))
+        INSERT INTO jobs (relative_path, job_type, priority, scope, phase, user_id, payload, scheduled_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, COALESCE($8, now()))
         -- THIS PART MUST MATCH THE INDEX DEFINITION EXACTLY
         ON CONFLICT (job_type, coalesce(user_id, -1), coalesce(md5(payload::text), ''), coalesce(relative_path, ''))
         WHERE (status IN ('queued', 'running'))
@@ -54,6 +57,8 @@ pub async fn enqueue_job<T: Serialize + Send + Sync>(
         relative_path.as_deref(),
         job_type as JobType,
         priority,
+        scope as JobScope,
+        phase,
         user_id,
         json_payload,
         scheduled_at,
@@ -85,10 +90,6 @@ pub async fn enqueue_full_scan(
     target_user_id: i32,
 ) -> Result<()> {
     enqueue_job::<()>(pool, settings, JobType::Scan)
-        .user_id(target_user_id)
-        .call()
-        .await?;
-    enqueue_job::<()>(pool, settings, JobType::DelayedScan)
         .user_id(target_user_id)
         .call()
         .await?;
@@ -229,40 +230,49 @@ pub async fn bulk_enqueue_full_ingest(
         return Ok(());
     }
 
-    let mut all_paths = Vec::with_capacity(relative_paths.len() * 3);
-    let mut all_types = Vec::with_capacity(relative_paths.len() * 3);
-    let mut all_priorities = Vec::with_capacity(relative_paths.len() * 3);
+    let job_types = [
+        JobType::IngestMetadata,
+        JobType::IngestThumbnails,
+        JobType::IngestAnalysis,
+        JobType::IngestLlm,
+    ];
+    let capacity = relative_paths.len() * job_types.len();
+
+    let mut all_paths = Vec::with_capacity(capacity);
+    let mut all_types = Vec::with_capacity(capacity);
+    let mut all_scopes = Vec::with_capacity(capacity);
+    let mut all_phases = Vec::with_capacity(capacity);
+    let mut all_priorities = Vec::with_capacity(capacity);
 
     for path in relative_paths {
         let file_path = ingest_settings.media_root.join(path);
         let is_video = ingest_settings.is_video_file(&file_path);
 
-        for job_type in [
-            JobType::IngestMetadata,
-            JobType::IngestThumbnails,
-            JobType::IngestAnalysis,
-            JobType::IngestLlm,
-        ] {
+        for job_type in job_types {
             all_paths.push(path.clone());
             all_types.push(job_type);
+            all_scopes.push(job_type.scope());
+            all_phases.push(job_type.phase());
             all_priorities.push(job_type.get_priority(is_video));
         }
     }
 
     let status_str = format!("{:?}", JobStatus::Queued).to_lowercase();
-    let statuses = vec![status_str; all_paths.len()];
+    let statuses = vec![status_str; capacity];
 
     sqlx::query!(
         r#"
-        INSERT INTO jobs (relative_path, job_type, priority, user_id, status)
+        INSERT INTO jobs (relative_path, job_type, priority, scope, phase, user_id, status)
         SELECT
             u.path,
             u.jt::job_type,
             u.pri,
+            u.sc::job_scope,
+            u.ph,
             u.uid,
             u.stat::job_status
-        FROM UNNEST($1::text[], $2::text[], $3::int[], $4::int[], $5::text[])
-          AS u(path, jt, pri, uid, stat)
+        FROM UNNEST($1::text[], $2::text[], $3::int[], $4::job_scope[], $5::int[], $6::int[], $7::text[])
+          AS u(path, jt, pri, sc, ph, uid, stat)
         ON CONFLICT (job_type, coalesce(user_id, -1), coalesce(md5(payload::text), ''), coalesce(relative_path, ''))
         WHERE (status IN ('queued', 'running'))
         DO NOTHING
@@ -270,7 +280,9 @@ pub async fn bulk_enqueue_full_ingest(
         &all_paths,
         &all_types as &[_],
         &all_priorities,
-        &vec![user_id; all_paths.len()],
+        &all_scopes as &[_],
+        &all_phases,
+        &vec![user_id; capacity],
         &statuses,
     )
         .execute(pool)
