@@ -137,23 +137,6 @@ pub async fn get_failed_ingest_jobs(pool: &PgPool, user_id: i32) -> Result<Vec<J
     Ok(jobs)
 }
 
-/// Triggers a scan by enqueuing a scanning job.
-/// Utilizes ON CONFLICT DO NOTHING to deduplicate duplicate requests gracefully.
-pub async fn enqueue_scan_job(pool: &PgPool, user_id: i32) -> Result<(), AppError> {
-    sqlx::query!(
-        r#"
-        INSERT INTO jobs (job_type, user_id, status)
-        VALUES ('scan'::job_type, $1, 'queued'::job_status)
-        ON CONFLICT DO NOTHING
-        "#,
-        user_id
-    )
-    .execute(pool)
-    .await?;
-
-    Ok(())
-}
-
 /// Scopes retry requests safely to the authorized user's own ingestion pipeline.
 pub async fn retry_user_job(pool: &PgPool, job_id: i64, user_id: i32) -> Result<(), AppError> {
     let result = sqlx::query!(
