@@ -38,9 +38,6 @@ services:
       - ${APP_DATA_LOCATION}:/app_data
 
   scaler:
-    build:
-      context: ./server
-      dockerfile: Dockerfile
     image: photos-server:latest
     container_name: photos_scaler
     restart: always
@@ -60,9 +57,6 @@ services:
       - ${APP_DATA_LOCATION}:/app_data
 
   watcher:
-    build:
-      context: ./server
-      dockerfile: Dockerfile
     image: photos-server:latest
     container_name: photos_watcher
     restart: always

@@ -1,5 +1,5 @@
 # ==========================================
-# 1. Chef Planner Stage
+# Chef Planner Stage
 # ==========================================
 FROM rust:1.97.1-slim-bookworm AS planner
 WORKDIR /app
@@ -9,12 +9,12 @@ COPY . .
 RUN cargo chef prepare --recipe-path recipe.json
 
 # ==========================================
-# 2. Dependency Caching Stage
+# Application Build Stage
 # ==========================================
-FROM rust:1.97.1-slim-bookworm AS cacher
+FROM rust:1.97.1-slim-bookworm AS builder
 WORKDIR /app
 
-# Install build dependencies
+# Install native build dependencies & C headers
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     pkg-config \
@@ -26,53 +26,36 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 RUN cargo install cargo-chef
-COPY --from=planner /app/recipe.json recipe.json
 
-# Build only third-party dependencies (this layer is cached unless Cargo.lock changes)
+# Copy recipe and cook dependencies
+COPY --from=planner /app/recipe.json recipe.json
 RUN cargo chef cook --release --recipe-path recipe.json
 
-# ==========================================
-# 3. Application Build Stage
-# ==========================================
-FROM rust:1.97.1-slim-bookworm AS builder
-WORKDIR /app
-
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    pkg-config \
-    libssl-dev \
-    libfontconfig1-dev \
-    protobuf-compiler \
-    nasm \
-    libheif-dev \
-    && rm -rf /var/lib/apt/lists/*
-
-# Copy built dependency artifacts from cacher stage
-COPY --from=cacher /app/target target
-COPY --from=cacher /usr/local/cargo /usr/local/cargo
+# Copy source code and build final binaries
 COPY . .
-
-# Offline SQLx query validation
 ENV SQLX_OFFLINE=true
 RUN cargo build --release --bin api --bin worker_scaler --bin watcher
 
 # ==========================================
-# 4. Minimal Runtime Stage
+# Minimal Runtime Stage
 # ==========================================
 FROM debian:bookworm-slim AS runtime
 WORKDIR /app
 
-# Install runtime system tools and libraries
+# Install runtime tools and shared dynamic libraries
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     libssl3 \
     ffmpeg \
     exiftool \
     libheif1 \
+    libde265-0 \
+    x265 \
+    libaom0 \
     libfontconfig1 \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy compiled binaries from builder stage
+# Copy compiled binaries
 COPY --from=builder /app/target/release/api /usr/local/bin/photos-api
 COPY --from=builder /app/target/release/worker_scaler /usr/local/bin/photos-scaler
 COPY --from=builder /app/target/release/watcher /usr/local/bin/photos-watcher
@@ -80,8 +63,6 @@ COPY --from=builder /app/target/release/watcher /usr/local/bin/photos-watcher
 # Copy default config template
 COPY config/settings.yaml /app/config/settings.yaml
 
-# Expose default API port
 EXPOSE 9475
 
-# Default binary to run if unspecified
 CMD ["photos-api"]
