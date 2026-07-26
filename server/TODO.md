@@ -247,6 +247,7 @@
 * better error if exiftool isnt there (worker wont work then)
 * improve speed of album/{id} endpoint
 * make single executable kind of that runs api, watcher, and worker, but have it sort of auto-scale based off number of jobs. So api, watcher, autoscaler, and if theres jobs, then N amount of workers.
+* static link to libheif, nasm, any other system dep where possible
 
 # post mvp TODO:
 

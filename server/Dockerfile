@@ -14,10 +14,11 @@ RUN cargo chef prepare --recipe-path recipe.json
 FROM rust:1.97.1-slim-bookworm AS cacher
 WORKDIR /app
 
-# Install build dependencies required for C/C++ libraries and ONNX/heif bindings
+# Install build dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     pkg-config \
+    libssl-dev \
     libfontconfig1-dev \
     protobuf-compiler \
     nasm \
@@ -39,6 +40,7 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     pkg-config \
+    libssl-dev \
     libfontconfig1-dev \
     protobuf-compiler \
     nasm \
@@ -50,7 +52,7 @@ COPY --from=cacher /app/target target
 COPY --from=cacher /usr/local/cargo /usr/local/cargo
 COPY . .
 
-# Offline SQLx query validation if using sqlx-data.json, otherwise standard build
+# Offline SQLx query validation
 ENV SQLX_OFFLINE=true
 RUN cargo build --release --bin api --bin worker_scaler --bin watcher
 
@@ -63,6 +65,7 @@ WORKDIR /app
 # Install runtime system tools and libraries
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
+    libssl3 \
     ffmpeg \
     exiftool \
     libheif1 \
