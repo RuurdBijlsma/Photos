@@ -1,0 +1,13 @@
+node_modules/
+dist/
+.git/
+
+# Git history & environment files
+.git/
+.gitignore
+.env
+*.log
+
+# IDE & OS files
+.idea/
+.vscode/
