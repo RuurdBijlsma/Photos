@@ -1,19 +1,21 @@
-use app_state::AppSettings;
 use app_state::constants::WORKER_HEARTBEAT_SECONDS;
 use common_services::database::jobs::JobType;
 use sqlx::PgPool;
 use std::collections::HashMap;
 
+/// Queries the database for all currently claimable jobs and returns a mapping
+/// of `JobType` to available job count.
 pub async fn get_demand(
     pool: &PgPool,
-    settings: &AppSettings,
-) -> color_eyre::Result<HashMap<String, usize>> {
+) -> color_eyre::Result<HashMap<JobType, usize>> {
     struct JobCount {
         pub job_type: JobType,
         pub count: i64,
     }
 
-    let available_jobs_with_count: HashMap<JobType, usize> = sqlx::query_as!(JobCount, r#"
+    let available_jobs_with_count: HashMap<JobType, usize> = sqlx::query_as!(
+        JobCount,
+        r#"
         SELECT
             j.job_type::text AS "job_type!: JobType",
             COUNT(*)::bigint AS "count!"
@@ -50,29 +52,5 @@ pub async fn get_demand(
         .map(|jc| (jc.job_type, jc.count as usize))
         .collect();
 
-    let mut profile_demand: HashMap<String, usize> = HashMap::new();
-    for profile in &settings.scaler.profiles {
-        profile_demand.insert(profile.name.clone(), 0);
-    }
-
-    // Dynamic routing: map queued jobs to the cheapest capable profile configured.
-    for (job_type, count) in available_jobs_with_count {
-        if let Some(best_fit_profile) = settings
-            .scaler
-            .profiles
-            .iter()
-            .filter(|profile| {
-                !profile.excluded_jobs.iter().any(|excluded| {
-                    JobType::parse_from_str(excluded)
-                        .is_ok_and(|excluded_type| excluded_type == job_type)
-                })
-            })
-            .min_by_key(|profile| profile.estimated_ram_mb)
-            && let Some(demand) = profile_demand.get_mut(&best_fit_profile.name)
-        {
-            *demand += count;
-        }
-    }
-
-    Ok(profile_demand)
+    Ok(available_jobs_with_count)
 }

@@ -73,7 +73,7 @@ impl Scaler {
 
     async fn tick(&mut self) -> Result<()> {
         self.clean_up_sleeping_workers();
-        let demand = get_demand(&self.pool, &self.settings).await?;
+        let demand = get_demand(&self.pool).await?;
         let telemetry = Telemetry::fetch();
 
         let headroom_mb = telemetry.memory_headroom_mb(&self.settings.scaler);
@@ -87,7 +87,7 @@ impl Scaler {
             return Ok(());
         }
 
-        // stop if last worker spawn was too recent
+        // Stop if last worker spawn was too recent
         let cooldown = Duration::from_secs(self.settings.scaler.cooldown_period_secs);
         if let Some(last_spawn) = self.last_spawn_time
             && last_spawn.elapsed() < cooldown
@@ -95,23 +95,43 @@ impl Scaler {
             return Ok(());
         }
 
-        for profile in self.settings.scaler.profiles.clone() {
-            let active_count = self.count_active(&profile.name);
-            let max_count = profile.max_workers;
-            let profile_demand = demand.get(&profile.name).copied().unwrap_or(0);
+        // If there are no jobs in demand, return early
+        if demand.is_empty() || !demand.values().any(|&c| c > 0) {
+            return Ok(());
+        }
 
-            if profile_demand > active_count {
-                if headroom_mb < profile.estimated_ram_mb {
-                    warn!(
-                        "Demand for '{}' ({}) exists, but headroom ({} MB) is below estimated RAM ({} MB).",
-                        profile.name, profile_demand, headroom_mb, profile.estimated_ram_mb
-                    );
-                } else if active_count < max_count {
-                    self.spawn_worker(&profile);
-                    self.last_spawn_time = Some(Instant::now());
-                    return Ok(());
+        // Find the most capable candidate profile that:
+        // 1. Is allowed by max_workers limits
+        // 2. Fits within available memory headroom
+        // 3. Can pick up at least one job type currently in demand
+        let best_profile = self
+            .settings
+            .scaler
+            .profiles
+            .iter()
+            .filter(|profile| {
+                let active_count = self.count_active(&profile.name);
+                if profile.max_workers == 0 || active_count >= profile.max_workers {
+                    return false;
                 }
-            }
+
+                if headroom_mb < profile.estimated_ram_mb {
+                    return false;
+                }
+
+                // Check if profile can handle at least one job type currently in demand
+                demand.iter().any(|(&job_type, &count)| {
+                    count > 0
+                        && !profile.excluded_jobs.iter().any(|excluded| {
+                            JobType::parse_from_str(excluded).ok() == Some(job_type)
+                        })
+                })
+            })
+            .max_by_key(|profile| profile.priority);
+
+        if let Some(profile) = best_profile.cloned() {
+            self.spawn_worker(&profile);
+            self.last_spawn_time = Some(Instant::now());
         }
 
         Ok(())
