@@ -5,9 +5,7 @@ use std::collections::HashMap;
 
 /// Queries the database for all currently claimable jobs and returns a mapping
 /// of `JobType` to available job count.
-pub async fn get_demand(
-    pool: &PgPool,
-) -> color_eyre::Result<HashMap<JobType, usize>> {
+pub async fn get_demand(pool: &PgPool) -> color_eyre::Result<HashMap<JobType, usize>> {
     struct JobCount {
         pub job_type: JobType,
         pub count: i64,

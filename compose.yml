@@ -32,7 +32,7 @@ services:
       APP__INGEST__MEDIA_FOLDER: /media
       APP__INGEST__APP_DATA_FOLDER: /app_data
       APP__API__HOST: "0.0.0.0"
-      APP__API__PORT: "9475"
+      APP__API__PORT: "5272"
     volumes:
       - ${MEDIA_LOCATION}:/media
       - ${APP_DATA_LOCATION}:/app_data
@@ -83,7 +83,7 @@ services:
     container_name: photos_web
     restart: always
     ports:
-      - "${WEB_PORT:-8080}:80"
+      - "${WEB_PORT:-9475}:80"
     depends_on:
       - api
 

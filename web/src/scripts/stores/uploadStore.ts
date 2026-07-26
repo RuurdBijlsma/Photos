@@ -2,7 +2,7 @@ import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
 import * as tus from 'tus-js-client'
 import uploadService from '@/scripts/services/uploadService.ts'
-import apiClient from '@/scripts/services/api.ts'
+import apiClient, { SERVER_BASE_URL } from '@/scripts/services/api.ts'
 import { useSettingStore } from '@/scripts/stores/settingsStore.ts'
 
 export interface UploadItem {
@@ -115,7 +115,8 @@ export const useUploadStore = defineStore('upload', () => {
       return
     }
 
-    const endpoint = `${apiClient.defaults.baseURL}/files`
+    // todo: maybe broken with new /api/ prefix in backend
+    const endpoint = `${SERVER_BASE_URL}/files`
 
     const uploadInstance = new tus.Upload(file, {
       endpoint,

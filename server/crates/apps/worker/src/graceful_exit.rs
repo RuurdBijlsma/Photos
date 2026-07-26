@@ -1,5 +1,5 @@
 use tokio::sync::watch::Receiver;
-use tracing::{error, info};
+use tracing::info;
 
 #[must_use]
 pub fn get_kill_signal() -> Receiver<bool> {
@@ -24,7 +24,7 @@ pub fn get_kill_signal() -> Receiver<bool> {
         #[cfg(not(unix))]
         {
             if let Err(e) = tokio::signal::ctrl_c().await {
-                error!("Failed to register Ctrl-C handler: {}", e);
+                info!("Failed to register Ctrl-C handler: {}", e);
             } else {
                 info!("Received Ctrl-C, initiating graceful shutdown...");
             }

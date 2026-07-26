@@ -1,5 +1,5 @@
 import type { AxiosResponse } from 'axios'
-import apiClient from './api.ts'
+import apiClient, { SERVER_BASE_URL } from './api.ts'
 import type { RandomPhotoResponse } from '@/scripts/types/api/photos.ts'
 import type { MediaItemWithAlbums } from '@/scripts/types/api/fullPhoto.ts'
 import type { Theme } from '@/scripts/types/themeColor.ts'
@@ -19,19 +19,22 @@ const mediaItemService = {
     size: number,
     onDemand: boolean | undefined,
   ): string {
-    if (id === null || id === undefined) return ''
-    const baseUrl = apiClient.defaults.baseURL
-    const path = onDemand
-      ? `/photos/${id}/thumbnail?size=${size}`
-      : `/thumbnails/${id}/${size}p.avif`
-    return new URL(path, baseUrl).href
+    if (!id) return ''
+    return onDemand
+      ? `${SERVER_BASE_URL}/api/photos/${id}/thumbnail?size=${size}`
+      : `${SERVER_BASE_URL}/thumbnails/${id}/${size}p.avif`
   },
 
   getVideo(id: string | null | undefined, size: number, onDemand: boolean | undefined): string {
-    if (id === null || id === undefined) return ''
-    const baseUrl = apiClient.defaults.baseURL
-    const path = onDemand ? `/photos/${id}/video` : `/thumbnails/${id}/${size}p.webm`
-    return new URL(path, baseUrl).href
+    if (!id) return ''
+    return onDemand
+      ? `${SERVER_BASE_URL}/api/photos/${id}/video`
+      : `${SERVER_BASE_URL}/thumbnails/${id}/${size}p.webm`
+  },
+
+  getMotionVideo(id: string | null | undefined): string {
+    if (!id) return ''
+    return `${SERVER_BASE_URL}/thumbnails/${id}/motion.mp4`
   },
 
   getRandomPhoto(
@@ -57,11 +60,6 @@ const mediaItemService = {
     return apiClient.get<MediaItemWithAlbums>(`/photos/${id}/item`)
   },
 
-  /**
-   * Downloads a full media file from the server as a Blob.
-   * @param relative_path The relative path of the media file to download.
-   * @returns A promise that resolves to the Axios response containing the file as a Blob.
-   */
   downloadMediaFile(relative_path: string): Promise<AxiosResponse<Blob>> {
     return apiClient.get<Blob>('/photos/download', {
       params: { path: relative_path },
@@ -81,13 +79,6 @@ const mediaItemService = {
       params: { ids: ids.join(',') },
       responseType: 'blob',
     })
-  },
-
-  getMotionVideo(id: string | null | undefined): string {
-    if (id === null || id === undefined) return ''
-    const baseUrl = apiClient.defaults.baseURL
-    const path = `/thumbnails/${id}/motion.mp4`
-    return new URL(path, baseUrl).href
   },
 
   async listMapPhotos(startDate?: string, endDate?: string): Promise<MapPhotosResponse> {

@@ -18,7 +18,7 @@
 # --- Configuration ---
 # Set the URL for your project's OpenAPI JSON specification.
 # If this is an empty string (""), the script will skip the OpenAPI prompt.
-$openApiUrl = "http://127.0.0.1:9475/openapi.json"
+$openApiUrl = "http://127.0.0.1:5272/openapi.json"
 
 # Add patterns to ignore beyond what's in .gitignore.
 # These use the .gitignore pattern format.

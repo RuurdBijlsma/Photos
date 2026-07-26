@@ -1,4 +1,4 @@
-import apiClient from '@/scripts/services/api.ts'
+import apiClient, { SERVER_BASE_URL } from '@/scripts/services/api.ts'
 import { copyToClipboard, getThumbnailHeight, getVideoHeight } from '@/scripts/utils.ts'
 
 export async function navigatorShare(
@@ -23,20 +23,18 @@ export async function navigatorShare(
     hasThumbnails = hasThumbnails ?? true
     const onDemand = !hasThumbnails
 
-    let url = ''
+    let path = ''
     if (isVideo) {
-      const baseUrl = apiClient.defaults.baseURL
       const vidHeight = getVideoHeight(1440)
-      const path = onDemand ? `/photos/${id}/video` : `/hosted/thumbnails/${id}/${vidHeight}p.webm`
-      url = new URL(path, baseUrl).href
+      path = onDemand ? `/api/photos/${id}/video` : `/hosted/thumbnails/${id}/${vidHeight}p.webm`
     } else {
-      const baseUrl = apiClient.defaults.baseURL
       const thumbHeight = getThumbnailHeight(1440)
-      const path = onDemand
-        ? `/photos/${id}/thumbnail?size=${thumbHeight}`
+      path = onDemand
+        ? `/api/photos/${id}/thumbnail?size=${thumbHeight}`
         : `/hosted/thumbnails/${id}/${thumbHeight}p.avif`
-      url = new URL(path, baseUrl).href
     }
+
+    const url = `${SERVER_BASE_URL}${path}`
 
     if (!url) {
       throw new Error('Unable to resolve media source URL.')

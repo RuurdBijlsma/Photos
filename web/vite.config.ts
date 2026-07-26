@@ -13,6 +13,23 @@ const repoName = 'Photos'
 export default defineConfig({
   // Conditionally set the base path for GitHub Pages deployment
   base: process.env.GITHUB_PAGES ? `/${repoName}/` : '/',
+  server: {
+    proxy: {
+      '/api': {
+        target: 'http://localhost:5272',
+        changeOrigin: true,
+        ws: true,
+      },
+      '/thumbnails': {
+        target: 'http://localhost:5272',
+        changeOrigin: true,
+      },
+      '/hosted': {
+        target: 'http://localhost:5272',
+        changeOrigin: true,
+      },
+    },
+  },
   plugins: [
     vue(),
     vueJsx(),

@@ -49,14 +49,17 @@ use common_services::database::app_user::UserRole;
 
 // --- Router Construction ---
 pub fn create_router(api_state: ApiContext) -> Router {
-    Router::new()
+    let api_routes = Router::new()
         .merge(public_routes(
             &api_state,
             &api_state.settings.api.rate_limiting,
         ))
         .merge(protected_routes(api_state.clone()))
         .merge(auth_optional_routes(api_state.clone()))
-        .merge(admin_routes(api_state.clone()))
+        .merge(admin_routes(api_state.clone()));
+
+    Router::new()
+        .nest("/api", api_routes)
         .with_state(api_state)
 }
 

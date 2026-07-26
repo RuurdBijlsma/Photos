@@ -88,6 +88,6 @@ COPY assets /app/assets
 # Copy migrations to /usr/local/bin/migrations so apps can find it
 COPY migrations /usr/local/bin/migrations
 
-EXPOSE 9475
+EXPOSE 5272
 
 CMD ["photos-api"]
