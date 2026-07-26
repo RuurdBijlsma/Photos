@@ -1,7 +1,7 @@
 # ==========================================
 # 1. Chef Planner Stage
 # ==========================================
-FROM rust:1.85-slim-bookworm AS planner
+FROM rust:1.97.1-slim-bookworm AS planner
 WORKDIR /app
 RUN cargo install cargo-chef
 
@@ -11,7 +11,7 @@ RUN cargo chef prepare --recipe-path recipe.json
 # ==========================================
 # 2. Dependency Caching Stage
 # ==========================================
-FROM rust:1.85-slim-bookworm AS cacher
+FROM rust:1.97.1-slim-bookworm AS cacher
 WORKDIR /app
 
 # Install build dependencies required for C/C++ libraries and ONNX/heif bindings
@@ -33,7 +33,7 @@ RUN cargo chef cook --release --recipe-path recipe.json
 # ==========================================
 # 3. Application Build Stage
 # ==========================================
-FROM rust:1.85-slim-bookworm AS builder
+FROM rust:1.97.1-slim-bookworm AS builder
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
