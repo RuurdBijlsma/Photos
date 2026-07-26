@@ -56,19 +56,19 @@ RUN cargo build --release --bin api --bin worker_scaler --bin watcher
 # ==========================================
 # 3. Minimal Runtime Stage
 # ==========================================
-FROM debian:bookworm-slim AS runtime
+FROM debian:trixie-slim AS runtime
 WORKDIR /app
 
-# Install runtime utilities and dynamic codec libraries
+# Install runtime utilities and dynamic codec libraries matching Trixie glibc
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     ffmpeg \
     exiftool \
     libfontconfig1 \
-    libde265-0 \
+    libde265-dev \
     libx265-dev \
-    libaom3 \
-    libwebp7 \
+    libaom-dev \
+    libwebp-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy compiled libheif shared libraries from builder
