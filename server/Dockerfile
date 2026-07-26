@@ -80,8 +80,13 @@ COPY --from=builder /app/target/release/api /usr/local/bin/photos-api
 COPY --from=builder /app/target/release/worker_scaler /usr/local/bin/photos-scaler
 COPY --from=builder /app/target/release/watcher /usr/local/bin/photos-watcher
 
-# Copy default configuration file
+# Copy configuration and assets to /app
 COPY config/settings.yaml /app/config/settings.yaml
+COPY migrations /app/migrations
+COPY assets /app/assets
+
+# Copy migrations to /usr/local/bin/migrations so apps can find it
+COPY migrations /usr/local/bin/migrations
 
 EXPOSE 9475
 
