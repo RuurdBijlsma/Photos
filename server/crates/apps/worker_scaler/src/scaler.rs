@@ -79,9 +79,7 @@ impl Scaler {
     /// Performs a tick and returns `true` if the system is completely idle.
     async fn tick(&mut self) -> Result<bool> {
         self.clean_up_sleeping_workers();
-        let now = Instant::now();
         let demand = get_demand(&self.pool).await?;
-        println!("DEMAND {:?}", now.elapsed());
         let telemetry = Telemetry::fetch();
 
         let headroom_mb = telemetry.memory_headroom_mb(&self.settings.scaler);
@@ -135,7 +133,6 @@ impl Scaler {
             self.spawn_worker(&profile);
             self.last_spawn_time = Some(Instant::now());
         }
-
         Ok(is_idle)
     }
 

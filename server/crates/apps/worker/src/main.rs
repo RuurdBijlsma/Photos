@@ -22,7 +22,9 @@ fn parse_job_type(s: &str) -> Result<JobType, String> {
 #[tokio::main]
 #[allow(clippy::large_futures)]
 async fn main() -> Result<()> {
-    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| "info,ort=warn".into());
+    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| {
+        "info,ort=warn,xet_client=warn,xet_data=warn,xet_runtime=warn,xet=warn".into()
+    });
     let subscriber = fmt::Subscriber::builder()
         .with_max_level(Level::INFO)
         .with_env_filter(filter)

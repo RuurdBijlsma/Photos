@@ -23,11 +23,18 @@ pub struct VisualAnalyzer {
 
 impl VisualAnalyzer {
     /// Creates a new instance of the `VisualAnalyzer`.
-    pub async fn new(embedder_model_id: &str) -> color_eyre::Result<Self> {
+    pub async fn new(embedder_model_id: &str, cache_folder: &Path) -> color_eyre::Result<Self> {
         let llm = LlamaClient::with_base_url("http://localhost:8080").build();
-        let embedder = VisionEmbedder::from_hf(embedder_model_id).build().await?;
-        let face_analyzer = FaceAnalyzer::from_hf().build().await?;
+        let embedder = VisionEmbedder::from_hf(embedder_model_id)
+            .cache_dir(cache_folder)
+            .build()
+            .await?;
+        let face_analyzer = FaceAnalyzer::from_hf()
+            .cache_dir(cache_folder)
+            .build()
+            .await?;
         let object_detector = ObjectDetector::from_hf(DetectorType::PromptFree)
+            .cache_dir(cache_folder)
             .scale(ModelScale::Large)
             .include_mask(false)
             .build()

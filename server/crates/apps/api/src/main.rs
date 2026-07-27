@@ -16,7 +16,7 @@ struct Args {
 #[tokio::main]
 async fn main() -> Result<()> {
     let filter = EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| "info,ort=warn,api=debug,tower_http=debug".into());
+        .unwrap_or_else(|_| "info,ort=warn,api=debug,tower_http=debug,xet_client=warn,xet_data=warn,xet_runtime=warn,xet=warn".into());
     let subscriber = fmt::Subscriber::builder()
         .with_max_level(Level::INFO)
         .with_env_filter(filter)
