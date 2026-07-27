@@ -47,7 +47,6 @@ impl Scaler {
 
     async fn run_inner(&mut self, shutdown_rx: &mut watch::Receiver<bool>) -> Result<()> {
         info!("⚖️ Starting scaler...");
-        let tick_duration = Duration::from_secs(self.settings.scaler.tick_interval_secs);
 
         loop {
             if *shutdown_rx.borrow() {
@@ -55,12 +54,23 @@ impl Scaler {
                 break;
             }
 
-            if let Err(e) = self.tick().await {
-                error!("🚨 Error during scaler tick: {e}");
-            }
+            // Perform scaler tick
+            let tick_delay = match self.tick().await {
+                Ok(idle) => {
+                    if idle {
+                        Duration::from_secs(self.settings.scaler.tick_interval_secs)
+                    } else {
+                        Duration::from_secs(1)
+                    }
+                }
+                Err(e) => {
+                    error!("🚨 Error during scaler tick: {e}");
+                    Duration::from_secs(self.settings.scaler.tick_interval_secs)
+                }
+            };
 
             tokio::select! {
-                () = tokio::time::sleep(tick_duration) => {}
+                () = tokio::time::sleep(tick_delay) => {}
                 _ = shutdown_rx.changed() => {
                     self.shutdown_all_workers().await;
                     break;
@@ -71,7 +81,8 @@ impl Scaler {
         Ok(())
     }
 
-    async fn tick(&mut self) -> Result<()> {
+    /// Performs a tick and returns `true` if the system is completely idle.
+    async fn tick(&mut self) -> Result<bool> {
         self.clean_up_sleeping_workers();
         let now = Instant::now();
         let demand = get_demand(&self.pool).await?;
@@ -86,20 +97,14 @@ impl Scaler {
                 telemetry.available_memory_mb, buffer_mb
             );
             self.scale_down();
-            return Ok(());
+            return Ok(false);
         }
 
-        // Stop if last worker spawn was too recent
-        let cooldown = Duration::from_secs(self.settings.scaler.cooldown_period_secs);
-        if let Some(last_spawn) = self.last_spawn_time
-            && last_spawn.elapsed() < cooldown
-        {
-            return Ok(());
-        }
+        let has_demand = !demand.is_empty() && demand.values().any(|&c| c > 0);
+        let is_idle = !has_demand && self.active_workers.is_empty();
 
-        // If there are no jobs in demand, return early
-        if demand.is_empty() || !demand.values().any(|&c| c > 0) {
-            return Ok(());
+        if !has_demand {
+            return Ok(is_idle);
         }
 
         // Find the most capable candidate profile that:
@@ -136,7 +141,7 @@ impl Scaler {
             self.last_spawn_time = Some(Instant::now());
         }
 
-        Ok(())
+        Ok(is_idle)
     }
 
     fn clean_up_sleeping_workers(&mut self) {

@@ -191,7 +191,6 @@ pub struct RawProfileSettings {
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct RawScalerSettings {
     pub tick_interval_secs: u64,
-    pub cooldown_period_secs: u64,
     pub system_memory_buffer_percentage: f64,
     pub system_memory_buffer_maximum_mb: u64,
     pub profiles: HashMap<String, RawProfileSettings>,

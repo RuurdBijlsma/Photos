@@ -82,7 +82,6 @@ impl From<RawSettings> for AppSettings {
 
         let scaler = ScalerSettings {
             tick_interval_secs: raw.scaler.tick_interval_secs,
-            cooldown_period_secs: raw.scaler.cooldown_period_secs,
             system_memory_buffer_percentage: raw.scaler.system_memory_buffer_percentage,
             system_memory_buffer_maximum_mb: raw.scaler.system_memory_buffer_maximum_mb,
             profiles: scaler_profiles,
@@ -222,7 +221,6 @@ impl IngestSettings {
 #[derive(Debug, Clone, Deserialize)]
 pub struct ScalerSettings {
     pub tick_interval_secs: u64,
-    pub cooldown_period_secs: u64,
     pub system_memory_buffer_percentage: f64,
     pub system_memory_buffer_maximum_mb: u64,
     pub profiles: Vec<ProfileSettings>, // sorted by priority, descending
