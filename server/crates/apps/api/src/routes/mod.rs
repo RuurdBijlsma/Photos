@@ -58,9 +58,7 @@ pub fn create_router(api_state: ApiContext) -> Router {
         .merge(auth_optional_routes(api_state.clone()))
         .merge(admin_routes(api_state.clone()));
 
-    Router::new()
-        .nest("/api", api_routes)
-        .with_state(api_state)
+    Router::new().nest("/api", api_routes).with_state(api_state)
 }
 
 fn public_routes(

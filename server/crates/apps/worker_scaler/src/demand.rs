@@ -53,11 +53,11 @@ pub async fn get_demand(pool: &PgPool) -> color_eyre::Result<HashMap<JobType, us
         "#,
         WORKER_HEARTBEAT_SECONDS
     )
-        .fetch_all(pool)
-        .await?
-        .into_iter()
-        .map(|jc| (jc.job_type, jc.count as usize))
-        .collect();
+    .fetch_all(pool)
+    .await?
+    .into_iter()
+    .map(|jc| (jc.job_type, jc.count as usize))
+    .collect();
 
     Ok(available_jobs_with_count)
 }
