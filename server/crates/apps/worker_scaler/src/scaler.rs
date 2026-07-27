@@ -48,35 +48,30 @@ impl Scaler {
     async fn run_inner(&mut self, shutdown_rx: &mut watch::Receiver<bool>) -> Result<()> {
         info!("⚖️ Starting scaler...");
 
+        let normal_delay = Duration::from_secs(self.settings.scaler.tick_interval_secs);
+        let busy_delay = Duration::from_secs(2);
+
         loop {
             if *shutdown_rx.borrow() {
-                self.shutdown_all_workers().await;
                 break;
             }
 
-            // Perform scaler tick
             let tick_delay = match self.tick().await {
-                Ok(idle) => {
-                    if idle {
-                        Duration::from_secs(self.settings.scaler.tick_interval_secs)
-                    } else {
-                        Duration::from_secs(1)
-                    }
-                }
+                Ok(true) => normal_delay,
+                Ok(false) => busy_delay,
                 Err(e) => {
                     error!("🚨 Error during scaler tick: {e}");
-                    Duration::from_secs(self.settings.scaler.tick_interval_secs)
+                    normal_delay
                 }
             };
 
             tokio::select! {
                 () = tokio::time::sleep(tick_delay) => {}
-                _ = shutdown_rx.changed() => {
-                    self.shutdown_all_workers().await;
-                    break;
-                }
+                _ = shutdown_rx.changed() => break,
             }
         }
+
+        self.shutdown_all_workers().await;
 
         Ok(())
     }
