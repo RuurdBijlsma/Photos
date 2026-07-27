@@ -14,32 +14,41 @@ pub async fn get_demand(pool: &PgPool) -> color_eyre::Result<HashMap<JobType, us
     let available_jobs_with_count: HashMap<JobType, usize> = sqlx::query_as!(
         JobCount,
         r#"
+        WITH active_jobs AS (
+            SELECT relative_path, job_type, scope, phase, status, last_heartbeat
+            FROM jobs
+            WHERE status = 'running' OR (status = 'queued' AND scheduled_at <= now())
+        ),
+        phase_limits AS (
+            SELECT
+                MIN(phase) AS min_all_phase,
+                MIN(phase) FILTER (WHERE scope = 'global') AS min_global_phase
+            FROM active_jobs
+        ),
+        path_limits AS (
+            SELECT relative_path, MIN(phase) AS min_path_phase
+            FROM active_jobs
+            WHERE relative_path IS NOT NULL
+            GROUP BY relative_path
+        )
         SELECT
             j.job_type::text AS "job_type!: JobType",
             COUNT(*)::bigint AS "count!"
-        FROM jobs j
+        FROM active_jobs j
+        CROSS JOIN phase_limits pl
+        LEFT JOIN path_limits pl_path ON j.relative_path = pl_path.relative_path
         WHERE
-            ((j.status = 'queued' AND j.scheduled_at <= now())
-            OR (j.status = 'running' AND j.last_heartbeat < now() - interval '1 second' * $1))
+            -- Claimable check: queued OR stale running
+            (j.status = 'queued' OR j.last_heartbeat < now() - interval '1 second' * $1)
 
-          -- Path-scoped phase check
-          AND (
-              j.relative_path IS NULL
-              OR NOT EXISTS (
-                  SELECT 1 FROM jobs dep
-                  WHERE dep.relative_path = j.relative_path
-                    AND dep.phase < j.phase
-                    AND ((dep.status = 'queued' AND dep.scheduled_at <= now()) OR dep.status = 'running')
-              )
-          )
+            -- Global phase check: no active job can have lower phase than a global job
+            AND (j.scope != 'global' OR j.phase <= pl.min_all_phase)
 
-          -- Global-scoped: ANY lower-phase job blocks global jobs, or lower-phase global jobs block path jobs
-          AND NOT EXISTS (
-              SELECT 1 FROM jobs dep
-              WHERE dep.phase < j.phase
-                AND ((dep.status = 'queued' AND dep.scheduled_at <= now()) OR dep.status = 'running')
-                AND (dep.scope = 'global' OR j.scope = 'global')
-          )
+            -- Path phase check: path job cannot be blocked by global or same-path lower phase jobs
+            AND (j.scope != 'path' OR (
+                (pl.min_global_phase IS NULL OR j.phase <= pl.min_global_phase)
+                AND (j.relative_path IS NULL OR j.phase <= pl_path.min_path_phase)
+            ))
         GROUP BY j.job_type
         "#,
         WORKER_HEARTBEAT_SECONDS
