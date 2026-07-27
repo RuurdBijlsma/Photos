@@ -73,7 +73,9 @@ impl Scaler {
 
     async fn tick(&mut self) -> Result<()> {
         self.clean_up_sleeping_workers();
+        let now = Instant::now();
         let demand = get_demand(&self.pool).await?;
+        println!("DEMAND {:?}", now.elapsed());
         let telemetry = Telemetry::fetch();
 
         let headroom_mb = telemetry.memory_headroom_mb(&self.settings.scaler);
