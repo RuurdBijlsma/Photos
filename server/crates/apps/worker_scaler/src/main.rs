@@ -9,7 +9,9 @@ use worker_scaler::start_scaler;
 #[tokio::main]
 #[allow(clippy::large_futures)]
 async fn main() -> Result<()> {
-    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| "info,ort=warn".into());
+    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| {
+        "info,ort=warn,xet_client=warn,xet_data=warn,xet_runtime=warn,xet=warn".into()
+    });
     let subscriber = fmt::Subscriber::builder()
         .with_max_level(Level::INFO)
         .with_env_filter(filter)
@@ -18,7 +20,7 @@ async fn main() -> Result<()> {
     color_eyre::install()?;
 
     let settings = load_app_settings()?;
-    let pool = get_db_pool(database_url(), false).await?;
+    let pool = get_db_pool(database_url(), true).await?;
     let shutdown_rx = get_kill_signal();
 
     start_scaler(pool, settings, shutdown_rx).await?;

@@ -2,7 +2,7 @@ import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
 import * as tus from 'tus-js-client'
 import uploadService from '@/scripts/services/uploadService.ts'
-import apiClient, { SERVER_BASE_URL } from '@/scripts/services/api.ts'
+import { SERVER_BASE_URL } from '@/scripts/services/api.ts'
 import { useSettingStore } from '@/scripts/stores/settingsStore.ts'
 
 export interface UploadItem {

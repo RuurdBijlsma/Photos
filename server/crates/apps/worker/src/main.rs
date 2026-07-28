@@ -33,7 +33,7 @@ async fn main() -> Result<()> {
     color_eyre::install()?;
 
     let settings = load_app_settings()?;
-    let pool = get_db_pool(database_url(), false).await?;
+    let pool = get_db_pool(database_url(), true).await?;
     create_worker(pool, settings, Args::parse().exclude, false).await?;
 
     Ok(())
