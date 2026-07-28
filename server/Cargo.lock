@@ -1222,6 +1222,7 @@ dependencies = [
  "tokio",
  "tokio-util",
  "tracing",
+ "tracing-subscriber",
  "url",
  "walkdir",
 ]
@@ -10494,6 +10495,7 @@ dependencies = [
  "rand 0.10.2",
  "rayon",
  "reqwest 0.13.4",
+ "rkyv",
  "sanitize-filename",
  "serde",
  "serde_json",
