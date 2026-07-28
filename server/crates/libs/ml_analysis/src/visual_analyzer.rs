@@ -13,6 +13,7 @@ use open_clip_inference::VisionEmbedder;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tempfile::Builder;
+use tracing::info;
 
 pub struct VisualAnalyzer {
     pub llm_client: LlamaClient,
@@ -25,14 +26,17 @@ impl VisualAnalyzer {
     /// Creates a new instance of the `VisualAnalyzer`.
     pub async fn new(embedder_model_id: &str, cache_folder: &Path) -> color_eyre::Result<Self> {
         let llm = LlamaClient::with_base_url("http://localhost:8080").build();
+        info!("Loading CLIP vision embedder...");
         let embedder = VisionEmbedder::from_hf(embedder_model_id)
             .cache_dir(cache_folder)
             .build()
             .await?;
+        info!("Loading Face Analyzer model...");
         let face_analyzer = FaceAnalyzer::from_hf()
             .cache_dir(cache_folder)
             .build()
             .await?;
+        info!("Loading Object Detector model...");
         let object_detector = ObjectDetector::from_hf(DetectorType::PromptFree)
             .cache_dir(cache_folder)
             .scale(ModelScale::Large)

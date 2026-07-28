@@ -18,7 +18,7 @@ and search.
 * **Exiftool**: https://exiftool.org/install.html [ubuntu: `sudo apt install libimage-exiftool-perl`]
 * **Rust** to compile the backend
 * **Postgres** database set up with `pgvector` installed, docker/podman command for this available in `./scripts/start_postgres.ps1`.
-* **libheif** Ubuntu: `sudo apt install libheif1 libheif-dev libde265-0 x265 libaom0`, For Windows, see below
+* **libheif** Ubuntu: `sudo apt install libheif1 libheif-dev libde265-0 x265`, For Windows, see below
 
 ### libheif - Windows
 
