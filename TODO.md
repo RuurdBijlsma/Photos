@@ -37,3 +37,4 @@
 * arm docker build in release process
 * watcher errors when there's no users
 * make setup to host only backend, frontend could be gh pages or something?
+* add TZ env var to example.env and make sure it's used
