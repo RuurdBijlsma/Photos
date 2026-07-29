@@ -90,7 +90,7 @@ const formattedSpeed = computed(() => {
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   background-color: rgb(var(--v-theme-surface-container-low));
   min-width: 140px;
-  min-height:206px;
+  min-height: 206px;
 }
 
 @keyframes pulse-glow {
