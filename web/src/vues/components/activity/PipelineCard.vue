@@ -21,8 +21,12 @@ const props = withDefaults(
   },
 )
 
+const MINIMUM_TO_SHOW_ETA = 5
+
 const showMetrics = computed(() => {
-  return props.toGo > 50 && props.itemsPerSecond !== null && props.itemsPerSecond > 0
+  return (
+    props.toGo > MINIMUM_TO_SHOW_ETA && props.itemsPerSecond !== null && props.itemsPerSecond > 0
+  )
 })
 
 const formattedEta = computed(() => {

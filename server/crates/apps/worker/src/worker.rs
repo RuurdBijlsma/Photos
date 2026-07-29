@@ -85,8 +85,6 @@ pub async fn run_worker_loop(
                 return Ok(());
             }
 
-            info!("💤 No jobs, sleeping temporarily...");
-
             tokio::select! {
                 () = tokio::time::sleep(Duration::from_secs(3)) => {}
                 _ = shutdown_rx.changed() => {
