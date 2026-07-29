@@ -55,7 +55,7 @@ pub async fn run_worker_loop(
     stop_on_sleep: bool,
     mut shutdown_rx: tokio::sync::watch::Receiver<bool>,
 ) -> Result<()> {
-    let mut sleeping = false;
+    let mut sleepiness: u32 = 0;
 
     loop {
         if *shutdown_rx.borrow() {
@@ -66,7 +66,7 @@ pub async fn run_worker_loop(
         let maybe_job = claim_next_job(context).await?;
 
         if let Some(job) = maybe_job {
-            sleeping = false;
+            sleepiness = 0;
             info!(
                 "🐜 Picked up {:?} job: {:?}",
                 job.job_type, job.relative_path
@@ -79,13 +79,13 @@ pub async fn run_worker_loop(
                 Err(e) => update_job_on_failure(&context.pool, &job, &e).await?,
             }
         } else {
-            if !sleeping {
-                sleeping = true;
+            sleepiness += 1;
+            if stop_on_sleep && sleepiness >= 2 {
                 info!("💤 No jobs, going to sleep...");
-                if stop_on_sleep {
-                    return Ok(());
-                }
+                return Ok(());
             }
+
+            info!("💤 No jobs, sleeping temporarily...");
 
             tokio::select! {
                 () = tokio::time::sleep(Duration::from_secs(3)) => {}
