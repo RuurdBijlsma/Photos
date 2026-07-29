@@ -2,6 +2,7 @@ use crate::context::WorkerContext;
 use crate::handlers::JobResult;
 use crate::handlers::common::cache::tag_vocab_cache::{load_tag_vocab_cache, save_tag_vocab_cache};
 use crate::handlers::common::clustering::{self, ClusterEntity};
+use app_state::constants::TAG_VOCAB_FOLDER;
 use color_eyre::Result;
 use color_eyre::eyre::eyre;
 use common_services::api::album::service::get_representative_thumbnail;
@@ -17,7 +18,6 @@ use std::path::Path;
 use std::time::Instant;
 use tokio::fs;
 use tracing::info;
-use app_state::constants::TAG_VOCAB_FOLDER;
 
 const ENTITY_NAME: &str = "photo";
 const MIN_ITEMS_TO_CLUSTER: usize = 4;

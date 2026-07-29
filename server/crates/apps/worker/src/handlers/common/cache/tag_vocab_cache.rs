@@ -1,4 +1,4 @@
-use app_state::constants::{VOCAB_CACHE_FOLDER};
+use app_state::constants::VOCAB_CACHE_FOLDER;
 use color_eyre::Result;
 use rkyv::{Archive, Deserialize, Serialize, access, deserialize, rancor::Error, to_bytes};
 use std::collections::HashMap;
@@ -73,9 +73,10 @@ pub async fn save_tag_vocab_cache(model_id: &str, cache: &HashMap<String, Vec<f3
     let path = get_cache_file_path(model_id);
 
     if let Some(parent) = path.parent()
-        && !parent.exists() {
-            fs::create_dir_all(parent).await?;
-        }
+        && !parent.exists()
+    {
+        fs::create_dir_all(parent).await?;
+    }
 
     let payload = CachedTagVocabResult {
         version: TAG_VOCAB_CACHE_VERSION,

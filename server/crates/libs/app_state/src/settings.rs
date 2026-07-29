@@ -1,4 +1,7 @@
-use crate::constants::{CACHE_FOLDER, FACE_CLUSTERS_FOLDER, HUGGINGFACE_CACHE_FOLDER, ON_DEMAND_THUMBNAIL_CACHE_FOLDER, PANO_FOLDER, THUMBNAILS_FOLDER};
+use crate::constants::{
+    CACHE_FOLDER, FACE_CLUSTERS_FOLDER, HUGGINGFACE_CACHE_FOLDER, ON_DEMAND_THUMBNAIL_CACHE_FOLDER,
+    PANO_FOLDER, THUMBNAILS_FOLDER,
+};
 use crate::{
     AnalyzerSettings, ApiSettings, DailyCardsSettings, FileDetectionSettings, LoggingSettings,
     MakeRelativePath, RawSettings, SecretSettings, ThumbnailSettings,
