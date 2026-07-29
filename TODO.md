@@ -22,6 +22,8 @@
 * update <title> on navigation
 * i dont see Source quality in podman hosted video
 * With 1 drive the nav bar storage overview is kinda ugly
+* GH pages release should be triggered by GH release, not push to main
+* improve loading indicator for albums & cameras (perhaps also people)
 
 # SERVER
 
