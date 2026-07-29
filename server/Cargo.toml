@@ -17,3 +17,11 @@ members = [
     # Integration tests
     "crates/test_integration"
 ]
+
+[profile.release-docker]
+inherits = "release"
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

@@ -31,7 +31,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libwebp-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Compile libheif v1.23.1 from source (satisfies libheif-sys requirement >= 1.21)
+# Compile libheif from source (we need newer version than in apt)
 RUN curl -L https://github.com/strukturag/libheif/releases/download/v1.23.1/libheif-1.23.1.tar.gz | tar xz \
     && cd libheif-1.23.1 && mkdir build && cd build \
     && cmake .. -DCMAKE_BUILD_TYPE=Release -DWITH_EXAMPLES=OFF -DWITH_RAV1E=OFF -DWITH_SVT_AV1=OFF \
@@ -44,14 +44,14 @@ ENV LD_LIBRARY_PATH=/usr/local/lib
 
 RUN cargo install cargo-chef
 
-# Copy recipe and cook dependencies (cached unless Cargo.lock changes)
+# Copy recipe and cook dependencies
 COPY --from=planner /app/recipe.json recipe.json
-RUN cargo chef cook --release --recipe-path recipe.json
+RUN cargo chef cook --profile release-docker --recipe-path recipe.json
 
 # Copy source code and build final binaries
 COPY . .
 ENV SQLX_OFFLINE=true
-RUN cargo build --release --bin api --bin worker_scaler --bin watcher
+RUN cargo build --profile release-docker --bin api --bin worker_scaler --bin watcher
 
 # ==========================================
 # 3. Minimal Runtime Stage
@@ -65,10 +65,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
     exiftool \
     libfontconfig1 \
-    libde265-dev \
-    libx265-dev \
-    libaom-dev \
-    libwebp-dev \
+    libde265-0 \
+    libx265-215 \
+    libaom3 \
+    libwebp7 \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy compiled libheif shared libraries from builder
@@ -76,17 +76,15 @@ COPY --from=builder /usr/local/lib/libheif* /usr/local/lib/
 RUN ldconfig
 
 # Copy compiled Rust binaries
-COPY --from=builder /app/target/release/api /usr/local/bin/photos-api
-COPY --from=builder /app/target/release/worker_scaler /usr/local/bin/photos-scaler
-COPY --from=builder /app/target/release/watcher /usr/local/bin/photos-watcher
+COPY --from=builder /app/target/release-docker/api /usr/local/bin/photos-api
+COPY --from=builder /app/target/release-docker/worker_scaler /usr/local/bin/photos-scaler
+COPY --from=builder /app/target/release-docker/watcher /usr/local/bin/photos-watcher
 
-# Copy configuration and assets to /app
+# Copy config and assets to /app
 COPY config/settings.yaml /app/config/settings.yaml
 COPY migrations /app/migrations
-COPY assets /app/assets
-
-# Copy migrations to /usr/local/bin/migrations so apps can find it
 COPY migrations /usr/local/bin/migrations
+COPY assets /app/assets
 
 EXPOSE 5272
 
