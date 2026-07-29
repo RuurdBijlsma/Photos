@@ -38,31 +38,50 @@
 
 # Install
 
-## 1. Create a directory for the application
+1. **Create a directory for the application**
 
-```bash
-mkdir photos-app && cd photos-app
-```
+   ```bash
+   mkdir photos-app && cd photos-app
+   ```
 
-## 2. Download the docker-compose.yml and example.env
+2. **Download the Docker Compose file and example environment file**
 
-```bash
-wget https://github.com/ruurdbijlsma/Photos/releases/latest/download/compose.yml
-wget -O .env https://github.com/ruurdbijlsma/Photos/releases/latest/download/example.env
-```
+   ```bash
+   wget https://github.com/ruurdbijlsma/Photos/releases/latest/download/compose.yml
+   wget -O .env https://github.com/ruurdbijlsma/Photos/releases/latest/download/example.env
+   ```
 
-## 3. Edit .env to set your MEDIA_LOCATION and JWT_SECRET, then run:
+3. **Edit `.env`**
 
-docker compose up -d
+   Set at least:
+    - `MEDIA_LOCATION`
+    - `JWT_SECRET`
 
-## 4. Wait for app to come online, takes longer the first launch
+4. **Start the application**
 
-## 5. Visit in browser at http://localhost:9475
+   ```bash
+   docker compose up -d
+   ```
 
-## 6. Create an account (register). This account will be the administrator.
+5. **Wait for startup**
 
-## 7. Go through initial setup wizard, verify drives look right, pick user folder
+   The first launch may take a few minutes.
 
-* user folder must be subfolder of mounted media folder if you want multiple user support
+6. **Open the application**
 
-## 8. Click start processing, your photos and videos will appear on the timeline
+   Visit http://localhost:9475 in your browser.
+
+7. **Create an administrator account**
+
+   Register your first account. It will automatically become the administrator.
+
+8. **Complete the setup wizard**
+
+   Verify that your media drives are detected correctly and choose a user folder.
+
+   > **Note:** The user folder must be a subdirectory of your mounted media folder if you want to support multiple
+   users.
+
+9. **Start processing**
+
+   Click "Start Processing". Your photos and videos will begin appearing in the timeline.
