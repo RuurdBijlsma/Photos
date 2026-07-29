@@ -164,8 +164,8 @@ async fn load_tag_embeddings(
                 "DELETE FROM cluster_tags WHERE tag = ANY($1::varchar[])",
                 &tags_to_delete
             )
-                .execute(&mut *tx)
-                .await?;
+            .execute(&mut *tx)
+            .await?;
         }
 
         if !new_embeddings.is_empty() {

@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::types::Json;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct MediaItemIdAndHash{
+pub struct MediaItemIdAndHash {
     pub media_item_id: String,
     pub hash: String,
 }
