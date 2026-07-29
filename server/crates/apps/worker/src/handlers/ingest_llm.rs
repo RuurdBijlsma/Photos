@@ -88,7 +88,7 @@ async fn get_cached_llm_data(
     }
     let analyses = get_llm_data(context, file_path, media_item_id, percentages).await?;
     if context.settings.ingest.enable_cache {
-        write_llm_cache(&context.settings.ingest.cache_root, &file_hash, &analyses).await?;
+        write_llm_cache(&context.settings.ingest.cache_root, file_hash, &analyses).await?;
     }
 
     Ok(analyses)

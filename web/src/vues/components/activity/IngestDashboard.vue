@@ -6,11 +6,23 @@ import { useAuthStore } from '@/scripts/stores/authStore.ts'
 import RunningJobPill from '@/vues/components/activity/RunningJobPill.vue'
 import ShowSelectedFolder from '@/vues/components/onboarding/ShowSelectedFolder.vue'
 import type { JobInfo } from '@/scripts/types/api/admin.ts'
-import { prettyBytes } from '@/scripts/utils.ts'
+import { prettyBytes, ProcessingRateTracker } from '@/scripts/utils.ts'
+import PipelineCard from '@/vues/components/activity/PipelineCard.vue'
 
 const ingestStore = useIngestJobsStore()
 const uploadStore = useUploadStore()
 const authStore = useAuthStore()
+
+// Rate tracking
+const uploadRateTracker = new ProcessingRateTracker()
+const metadataRateTracker = new ProcessingRateTracker()
+const thumbnailsRateTracker = new ProcessingRateTracker()
+const analysisRateTracker = new ProcessingRateTracker()
+
+const uploadSpeed = ref(0)
+const metadataSpeed = ref(0)
+const thumbnailsSpeed = ref(0)
+const analysisSpeed = ref(0)
 
 // Scan state
 const isScanning = ref(false)
@@ -100,6 +112,10 @@ const uploadFailedCount = computed(
   () => uploadStore.uploads.filter((u) => u.status === 'failed').length,
 )
 const uploadTotalCount = computed(() => uploadStore.uploads.length)
+const uploadToGoCount = computed(() => {
+  return uploadStore.uploads.filter((u) => u.status === 'pending' || u.status === 'uploading')
+    .length
+})
 
 const uploadProgress = computed(() => {
   if (uploadTotalCount.value === 0) return 100
@@ -154,6 +170,76 @@ const isUploadActive = computed(() => uploadStore.isUploading)
 const isMetadataActive = computed(() => computeIngestRemaining('metadata') > 0)
 const isThumbnailsActive = computed(() => computeIngestRemaining('thumbnails') > 0)
 const isAnalysisActive = computed(() => computeIngestRemaining('analysis') > 0)
+
+// Track processing rate speeds
+watch(
+  () => uploadSuccessCount.value + uploadFailedCount.value,
+  (completed) => {
+    uploadSpeed.value = uploadRateTracker.update(completed)
+  },
+  { immediate: true },
+)
+
+watch(
+  () => ingestStore.overview,
+  (overview) => {
+    if (!overview) return
+    metadataSpeed.value = metadataRateTracker.update(overview.metadata?.done ?? 0)
+    thumbnailsSpeed.value = thumbnailsRateTracker.update(overview.thumbnails?.done ?? 0)
+    analysisSpeed.value = analysisRateTracker.update(overview.analysis?.done ?? 0)
+  },
+  { deep: true, immediate: true },
+)
+
+const pipelineSteps = computed(() => [
+  {
+    key: 'upload',
+    label: 'Upload',
+    icon: 'mdi-cloud-upload-outline',
+    progress: uploadProgress.value,
+    statusText: uploadToGoText.value,
+    isActive: isUploadActive.value,
+    toGo: uploadToGoCount.value,
+    speed: uploadSpeed.value,
+    tooltip:
+      uploadTotalCount.value > 0
+        ? `${uploadSuccessCount.value + uploadFailedCount.value} / ${uploadTotalCount.value}`
+        : '',
+  },
+  {
+    key: 'metadata',
+    label: 'Metadata',
+    icon: 'mdi-file-document-outline',
+    progress: metadataProgress.value,
+    statusText: metadataToGoText.value,
+    isActive: isMetadataActive.value,
+    toGo: computeIngestRemaining('metadata'),
+    speed: metadataSpeed.value,
+    tooltip: '',
+  },
+  {
+    key: 'thumbnails',
+    label: 'Thumbnails',
+    icon: 'mdi-image-outline',
+    progress: thumbnailsProgress.value,
+    statusText: thumbnailsToGoText.value,
+    isActive: isThumbnailsActive.value,
+    toGo: computeIngestRemaining('thumbnails'),
+    speed: thumbnailsSpeed.value,
+    tooltip: '',
+  },
+  {
+    key: 'analysis',
+    label: 'Analysis',
+    icon: 'mdi-magnify',
+    progress: analysisProgress.value,
+    statusText: analysisToGoText.value,
+    isActive: isAnalysisActive.value,
+    toGo: computeIngestRemaining('analysis'),
+    speed: analysisSpeed.value,
+    tooltip: '',
+  },
+])
 
 // Scan handlers
 async function handleScan() {
@@ -289,112 +375,22 @@ onUnmounted(() => {
     <!-- Top Pipeline Section -->
     <section class="pipeline-section">
       <div class="pipeline-row">
-        <!-- Upload circle -->
-        <div
-          class="pipeline-step-wrapper"
-          v-tooltip="{
-            location: 'top',
-            text: `${uploadSuccessCount + uploadFailedCount} / ${uploadTotalCount}`,
-            disabled: uploadTotalCount === 0,
-          }"
-        >
-          <div class="pipeline-step-card" :class="{ active: isUploadActive }">
-            <v-progress-circular
-              :model-value="uploadProgress"
-              color="primary"
-              size="88"
-              width="6"
-              class="pipeline-circle"
-            >
-              <div class="circle-inner">
-                <v-icon size="default">mdi-cloud-upload-outline</v-icon>
-                <span class="circle-pct">{{ uploadProgress }}%</span>
-              </div>
-            </v-progress-circular>
-            <div class="step-details">
-              <span class="step-label">Upload</span>
-              <span class="step-status">{{ uploadToGoText }}</span>
-            </div>
+        <template v-for="(step, index) in pipelineSteps" :key="step.key">
+          <pipeline-card
+            :label="step.label"
+            :icon="step.icon"
+            :progress="step.progress"
+            :status="step.statusText"
+            :is-active="step.isActive"
+            :to-go="step.toGo"
+            :items-per-second="step.speed"
+            :tooltip-text="step.tooltip"
+          />
+
+          <div v-if="index < pipelineSteps.length - 1" class="pipeline-arrow">
+            <v-icon size="large">mdi-chevron-right</v-icon>
           </div>
-        </div>
-
-        <div class="pipeline-arrow">
-          <v-icon size="large">mdi-chevron-right</v-icon>
-        </div>
-
-        <!-- Metadata circle -->
-        <div class="pipeline-step-wrapper">
-          <div class="pipeline-step-card" :class="{ active: isMetadataActive }">
-            <v-progress-circular
-              :model-value="metadataProgress"
-              color="primary"
-              size="88"
-              width="6"
-              class="pipeline-circle"
-            >
-              <div class="circle-inner">
-                <v-icon size="default">mdi-file-document-outline</v-icon>
-                <span class="circle-pct">{{ metadataProgress }}%</span>
-              </div>
-            </v-progress-circular>
-            <div class="step-details">
-              <span class="step-label">Metadata</span>
-              <span class="step-status">{{ metadataToGoText }}</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="pipeline-arrow">
-          <v-icon size="large">mdi-chevron-right</v-icon>
-        </div>
-
-        <!-- Thumbnails circle -->
-        <div class="pipeline-step-wrapper">
-          <div class="pipeline-step-card" :class="{ active: isThumbnailsActive }">
-            <v-progress-circular
-              :model-value="thumbnailsProgress"
-              color="primary"
-              size="88"
-              width="6"
-              class="pipeline-circle"
-            >
-              <div class="circle-inner">
-                <v-icon size="default">mdi-image-outline</v-icon>
-                <span class="circle-pct">{{ thumbnailsProgress }}%</span>
-              </div>
-            </v-progress-circular>
-            <div class="step-details">
-              <span class="step-label">Thumbnails</span>
-              <span class="step-status">{{ thumbnailsToGoText }}</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="pipeline-arrow">
-          <v-icon size="large">mdi-chevron-right</v-icon>
-        </div>
-
-        <!-- Analysis circle -->
-        <div class="pipeline-step-wrapper">
-          <div class="pipeline-step-card" :class="{ active: isAnalysisActive }">
-            <v-progress-circular
-              :model-value="analysisProgress"
-              color="primary"
-              size="88"
-              width="6"
-              class="pipeline-circle"
-            >
-              <div class="circle-inner">
-                <v-icon size="default">mdi-magnify</v-icon>
-                <span class="circle-pct">{{ analysisProgress }}%</span>
-              </div>
-            </v-progress-circular>
-            <div class="step-details">
-              <span class="step-label">Analysis</span>
-              <span class="step-status">{{ analysisToGoText }}</span>
-            </div>
-          </div>
-        </div>
+        </template>
       </div>
     </section>
 
@@ -823,78 +819,6 @@ onUnmounted(() => {
   justify-content: space-evenly;
   flex-wrap: wrap;
   gap: 16px;
-}
-
-.pipeline-step-wrapper {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-.pipeline-step-card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 16px 24px;
-  border-radius: 24px;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  background-color: rgb(var(--v-theme-surface-container-low));
-  min-width: 140px;
-}
-
-@keyframes pulse-glow {
-  0% {
-    box-shadow: 0 0 0 0 rgba(var(--v-theme-primary), 0.2);
-  }
-  70% {
-    box-shadow: 0 0 0 10px rgba(var(--v-theme-primary), 0);
-  }
-  100% {
-    box-shadow: 0 0 0 0 rgba(var(--v-theme-primary), 0);
-  }
-}
-
-.pipeline-step-card.active {
-  border: 1.5px solid rgba(var(--v-theme-primary), 0.3);
-  animation: pulse-glow 2s infinite;
-}
-
-.pipeline-circle {
-  background-color: rgb(var(--v-theme-surface-container-low));
-  border-radius: 50%;
-}
-
-.circle-inner {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-}
-
-.circle-pct {
-  font-size: 0.75rem;
-  font-weight: 700;
-  margin-top: 2px;
-}
-
-.step-details {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  margin-top: 8px;
-}
-
-.step-label {
-  font-size: 0.9rem;
-  font-weight: 700;
-  color: rgb(var(--v-theme-on-surface));
-}
-
-.step-status {
-  font-size: 0.75rem;
-  font-weight: 500;
-  color: rgba(var(--v-theme-on-surface), 0.6);
 }
 
 .pipeline-arrow {

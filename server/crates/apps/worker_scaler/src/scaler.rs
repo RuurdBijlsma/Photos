@@ -49,7 +49,7 @@ impl Scaler {
         info!("⚖️ Starting scaler...");
 
         let normal_delay = Duration::from_secs(self.settings.scaler.tick_interval_secs);
-        let busy_delay = Duration::from_secs(2);
+        let busy_delay = Duration::from_secs(self.settings.scaler.quick_tick_interval_secs);
 
         loop {
             if *shutdown_rx.borrow() {

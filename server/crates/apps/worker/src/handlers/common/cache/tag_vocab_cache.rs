@@ -1,3 +1,4 @@
+use app_state::constants::{VOCAB_CACHE_FOLDER};
 use color_eyre::Result;
 use rkyv::{Archive, Deserialize, Serialize, access, deserialize, rancor::Error, to_bytes};
 use std::collections::HashMap;
@@ -5,7 +6,6 @@ use std::path::{Path, PathBuf};
 use tokio::fs;
 use tracing::{debug, warn};
 
-const STATIC_CACHE_DIR: &str = "assets/static-cache/tag-vocab";
 const TAG_VOCAB_CACHE_VERSION: u32 = 1;
 
 #[derive(Archive, Deserialize, Serialize, Debug)]
@@ -16,7 +16,7 @@ pub struct CachedTagVocabResult {
 
 fn get_cache_file_path(model_id: &str) -> PathBuf {
     let sanitized = model_id.replace(['/', '\\', ':', ' '], "_");
-    Path::new(STATIC_CACHE_DIR).join(format!("{sanitized}.bin"))
+    Path::new(VOCAB_CACHE_FOLDER).join(format!("{sanitized}.bin"))
 }
 
 pub async fn load_tag_vocab_cache(model_id: &str) -> Result<HashMap<String, Vec<f32>>> {
@@ -72,11 +72,10 @@ pub async fn load_tag_vocab_cache(model_id: &str) -> Result<HashMap<String, Vec<
 pub async fn save_tag_vocab_cache(model_id: &str, cache: &HashMap<String, Vec<f32>>) -> Result<()> {
     let path = get_cache_file_path(model_id);
 
-    if let Some(parent) = path.parent() {
-        if !parent.exists() {
+    if let Some(parent) = path.parent()
+        && !parent.exists() {
             fs::create_dir_all(parent).await?;
         }
-    }
 
     let payload = CachedTagVocabResult {
         version: TAG_VOCAB_CACHE_VERSION,

@@ -81,6 +81,7 @@ logging:
       open_clip_inference: warn
       object_detector: warn
       face_id: warn
+      sqlx: warn
 
 api:
   host: "0.0.0.0"
@@ -128,7 +129,8 @@ daily_cards:
     rounds_per_day: 3
 
 scaler:
-  tick_interval_secs: 5
+  tick_interval_secs: 10
+  quick_tick_interval_secs: 3
   system_memory_buffer_percentage: 5.0
   system_memory_buffer_maximum_mb: 1000
   profiles:

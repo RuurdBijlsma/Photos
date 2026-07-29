@@ -17,6 +17,7 @@ use std::path::Path;
 use std::time::Instant;
 use tokio::fs;
 use tracing::info;
+use app_state::constants::TAG_VOCAB_FOLDER;
 
 const ENTITY_NAME: &str = "photo";
 const MIN_ITEMS_TO_CLUSTER: usize = 4;
@@ -34,7 +35,7 @@ impl ClusterEntity for ExistingPhotoCluster {
 
 async fn load_vocab_labels() -> Result<Vec<String>> {
     let mut labels = Vec::new();
-    let dir = Path::new("assets/tag-vocab");
+    let dir = Path::new(TAG_VOCAB_FOLDER);
     if dir.exists() && dir.is_dir() {
         let mut entries = fs::read_dir(dir).await?;
         while let Some(entry) = entries.next_entry().await? {

@@ -1,7 +1,4 @@
-use crate::constants::{
-    CACHE_FOLDER, FACE_CLUSTERS_FOLDER, HUGGINGFACE_CACHE_FOLDER, ON_DEMAND_THUMBNAIL_CACHE_FOLDER,
-    PANO_FOLDER, THUMBNAILS_FOLDER,
-};
+use crate::constants::{CACHE_FOLDER, FACE_CLUSTERS_FOLDER, HUGGINGFACE_CACHE_FOLDER, ON_DEMAND_THUMBNAIL_CACHE_FOLDER, PANO_FOLDER, THUMBNAILS_FOLDER};
 use crate::{
     AnalyzerSettings, ApiSettings, DailyCardsSettings, FileDetectionSettings, LoggingSettings,
     MakeRelativePath, RawSettings, SecretSettings, ThumbnailSettings,
@@ -85,6 +82,7 @@ impl From<RawSettings> for AppSettings {
 
         let scaler = ScalerSettings {
             tick_interval_secs: raw.scaler.tick_interval_secs,
+            quick_tick_interval_secs: raw.scaler.quick_tick_interval_secs,
             system_memory_buffer_percentage: raw.scaler.system_memory_buffer_percentage,
             system_memory_buffer_maximum_mb: raw.scaler.system_memory_buffer_maximum_mb,
             profiles: scaler_profiles,
@@ -224,6 +222,7 @@ impl IngestSettings {
 #[derive(Debug, Clone, Deserialize)]
 pub struct ScalerSettings {
     pub tick_interval_secs: u64,
+    pub quick_tick_interval_secs: u64,
     pub system_memory_buffer_percentage: f64,
     pub system_memory_buffer_maximum_mb: u64,
     pub profiles: Vec<ProfileSettings>, // sorted by priority, descending

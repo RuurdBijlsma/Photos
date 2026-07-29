@@ -1,3 +1,4 @@
+use app_state::load_app_settings;
 use color_eyre::Result;
 use colored::*;
 use std::future::Future;
@@ -94,7 +95,9 @@ where
 }
 
 pub fn setup_tracing_and_panic_handling() {
-    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| TRACING_FILTER.into());
+    let settings = load_app_settings().expect("Can't load settings");
+    let filter = EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| settings.logging.filters.to_filter_string().into());
 
     let subscriber = fmt::Subscriber::builder()
         .with_max_level(Level::INFO)
