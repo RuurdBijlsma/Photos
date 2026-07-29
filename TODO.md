@@ -20,6 +20,7 @@
   dan naar de timeline gaat? Want de map date filter heeft dan al de ratios opgevraagd in de timelineStore.
 * settings page heeft geen visible scrollbar
 * update <title> on navigation
+* uploads dont work on podman
 
 # SERVER
 
