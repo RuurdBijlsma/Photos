@@ -20,6 +20,10 @@
   dan naar de timeline gaat? Want de map date filter heeft dan al de ratios opgevraagd in de timelineStore.
 * settings page heeft geen visible scrollbar
 * update <title> on navigation
+* i dont see Source quality in podman hosted video
+* With 1 drive the nav bar storage overview is kinda ugly
+* GH pages release should be triggered by GH release, not push to main
+* improve loading indicator for albums & cameras (perhaps also people)
 
 # SERVER
 
@@ -39,3 +43,4 @@
 * watcher errors when there's no users
 * make setup to host only backend, frontend could be gh pages or something?
 * add TZ env var to example.env and make sure it's used
+* uploads dont work on podman
