@@ -27,7 +27,7 @@
 <p align="center">
   <img src=".github/screenshots/photo-view.png" alt="Photo View">
   <br>
-  <em>Photo info</em>
+  <em>Photo viewer with info panel</em>
 </p>
 
 <p align="center">
