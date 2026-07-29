@@ -27,34 +27,39 @@ CREATE TABLE jobs
     last_error          TEXT
 );
 
--- Prevent duplicate jobs that aren't finished yet.
+-- Unique constraint for active job deduplication (used by ON CONFLICT)
 CREATE UNIQUE INDEX uq_jobs_active_job
     ON jobs (
              job_type,
              coalesce(user_id, -1),
              coalesce(md5(payload::text), ''),
              coalesce(relative_path, '')
-        ) WHERE (status IN ('queued', 'running'));
+        ) WHERE status IN ('queued', 'running');
 
--- For the job claiming worker
+-- Fast candidate selection for workers (covers ORDER BY in claim_next_job)
 CREATE INDEX idx_jobs_claim_active
-    ON jobs (priority ASC, relative_path DESC, scheduled_at ASC, created_at ASC) WHERE status IN ('queued', 'running');
+    ON jobs (priority ASC, relative_path DESC, scheduled_at ASC, created_at ASC)
+    WHERE status IN ('queued', 'running');
 
--- For path-level phase checks
+-- Fast path-level phase calculations (used by path_limits CTE in claim/demand queries)
 CREATE INDEX idx_jobs_active_path_phase
     ON jobs (relative_path, phase)
     WHERE status IN ('queued', 'running');
 
--- For global phase checks
+-- Fast global/overall phase calculations (used by phase_limits CTE in claim/demand queries)
 CREATE INDEX idx_jobs_active_global_phase
-    ON jobs (phase, scope)
+    ON jobs (scope, phase)
     WHERE status IN ('queued', 'running');
 
--- For general application queries
-CREATE INDEX jobs_active_relative_path_idx ON jobs (relative_path);
+-- Fast path lookup for job cancellations and per-job logic
+CREATE INDEX idx_jobs_active_relative_path
+    ON jobs (relative_path)
+    WHERE status IN ('queued', 'running');
+
+-- User filtering (e.g., full scan enqueueing)
 CREATE INDEX idx_jobs_user_id ON jobs (user_id);
 
--- For monitoring/dashboarding that doesn't exist yet
+-- Dashboard / Monitoring
 CREATE INDEX jobs_status_priority_idx ON jobs (status, priority, scheduled_at, created_at);
 
 -- For performance when filtering/sorting by job type or timestamp

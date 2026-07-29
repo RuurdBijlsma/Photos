@@ -105,9 +105,27 @@ pub struct VideoThumbOptions {
 }
 
 /// Logging configuration.
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct LoggingSettings {
-    pub level: String,
+    pub filters: LoggingFilterSettings,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct LoggingFilterSettings {
+    pub main: String,
+    pub targets: HashMap<String, String>,
+}
+
+impl LoggingFilterSettings {
+    /// Formats the logging filters into an `EnvFilter` compatible directive string (e.g., "info,api=debug,ort=warn").
+    #[must_use]
+    pub fn to_filter_string(&self) -> String {
+        let mut parts = vec![self.main.clone()];
+        for (target, level) in &self.targets {
+            parts.push(format!("{target}={level}"));
+        }
+        parts.join(",")
+    }
 }
 
 /// Configuration for the API server.
@@ -191,7 +209,7 @@ pub struct RawProfileSettings {
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct RawScalerSettings {
     pub tick_interval_secs: u64,
-    pub cooldown_period_secs: u64,
+    pub quick_tick_interval_secs: u64,
     pub system_memory_buffer_percentage: f64,
     pub system_memory_buffer_maximum_mb: u64,
     pub profiles: HashMap<String, RawProfileSettings>,

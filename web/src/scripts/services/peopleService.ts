@@ -1,21 +1,17 @@
-import apiClient from './api.ts'
+import apiClient, { SERVER_BASE_URL } from './api.ts'
 import { FullPersonMediaResponse, ListPeopleResponse } from '@/scripts/types/generated/timeline.ts'
 import type { AxiosResponse } from 'axios'
 import type { MergePersonRequest, UpdatePersonRequest } from '@/scripts/types/api/people.ts'
 
 const peopleService = {
   getFaceThumbnail(clusterId: string | null | undefined): string {
-    if (clusterId === null || clusterId === undefined) return ''
-    const baseUrl = apiClient.defaults.baseURL
-    const path = `/hosted/face-clusters/${clusterId}.webp`
-    return new URL(path, baseUrl).href
+    if (!clusterId) return ''
+    return `${SERVER_BASE_URL}/hosted/face-clusters/${clusterId}.webp`
   },
 
   getPersonThumbnail(personId: string | null | undefined): string {
-    if (personId === null || personId === undefined) return ''
-    const baseUrl = apiClient.defaults.baseURL
-    const path = `/people/${personId}/thumbnail`
-    return new URL(path, baseUrl).href
+    if (!personId) return ''
+    return `${SERVER_BASE_URL}/api/people/${personId}/thumbnail`
   },
 
   async list(): Promise<ListPeopleResponse> {

@@ -1,8 +1,11 @@
 import axios, { type AxiosError, type InternalAxiosRequestConfig } from 'axios'
 import { useAuthStore } from '@/scripts/stores/authStore.ts'
 
+// Ensure no trailing slash on server root URL
+export const SERVER_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
+
 const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:9475',
+  baseURL: `${SERVER_BASE_URL}/api`,
   headers: {
     'Content-Type': 'application/json',
   },

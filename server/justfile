@@ -31,6 +31,7 @@ test:
 
 bench:
     cargo bench --bench system_bench --features load-dynamic
-run:
-    cargo run --example visualize --profile release --features load-dynamic
+
+run api:
+    cargo run --bin api --profile release --features load-dynamic
 

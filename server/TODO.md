@@ -60,7 +60,7 @@
 * ✅ [BUG] pending media items seems to be not used again
 * ✅ worker does not output logs to stdout anymore.
 * ✅ store_media en store_visual_analysis (met de macros) moet in common_services/database
-* ✅ make invite check work with "localhost:9475" instead of "http://localhost:9475" and make it work with https. (it
+* ✅ make invite check work with "localhost:5272" instead of "http://localhost:5272" and make it work with https. (it
   currently assumes http).
 * ✅ improve OCR
 * ✅ [BUG] scan enqueues duplicate jobs if the photo isn't processed yet.
@@ -247,6 +247,7 @@
 * better error if exiftool isnt there (worker wont work then)
 * improve speed of album/{id} endpoint
 * make single executable kind of that runs api, watcher, and worker, but have it sort of auto-scale based off number of jobs. So api, watcher, autoscaler, and if theres jobs, then N amount of workers.
+* static link to libheif, nasm, any other system dep where possible
 
 # post mvp TODO:
 

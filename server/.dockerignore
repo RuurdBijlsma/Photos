@@ -1,22 +1,17 @@
-# Rust build artifacts and caches
+# Rust build target folder
 target/
 
-# User-generated media, thumbnails, and analysis output
+# Application runtime data & test media
+app_data/
 media_dir/
 thumbnails/
-face_clusters_output/
-photo_clusters_output/
 
-# IDE configuration
-.idea/
-
-# Development scripts not needed in the container image
-scripts/
-
-# Logs and environment files
-*.log
-.env
-example.env
-
-# Git directory
+# Git history & environment files
 .git/
+.gitignore
+.env
+*.log
+
+# IDE & OS files
+.idea/
+.vscode/

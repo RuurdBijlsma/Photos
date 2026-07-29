@@ -20,7 +20,7 @@ useEventListener('beforeunload', handleBeforeUnload)
   <main-layout-container class="activity-scroll-view">
     <div class="activity-content">
       <header class="activity-header mb-6">
-        <h1 class="activity-title">Library import status</h1>
+        <h1 class="activity-title">Library import</h1>
         <p class="activity-subtitle">
           Monitor your server's metadata extraction, image processing, and analysis pipelines.
         </p>

@@ -1,6 +1,6 @@
 use crate::constants::{
-    CACHE_FOLDER, FACE_CLUSTERS_FOLDER, ON_DEMAND_THUMBNAIL_CACHE_FOLDER, PANO_FOLDER,
-    THUMBNAILS_FOLDER,
+    CACHE_FOLDER, FACE_CLUSTERS_FOLDER, HUGGINGFACE_CACHE_FOLDER, ON_DEMAND_THUMBNAIL_CACHE_FOLDER,
+    PANO_FOLDER, THUMBNAILS_FOLDER,
 };
 use crate::{
     AnalyzerSettings, ApiSettings, DailyCardsSettings, FileDetectionSettings, LoggingSettings,
@@ -32,6 +32,7 @@ pub struct IngestSettings {
     pub on_demand_thumbs_cache_root: PathBuf,
     pub cache_root: PathBuf,
     pub pano_root: PathBuf,
+    pub hf_cache_root: PathBuf,
     pub face_clusters_root: PathBuf,
     pub enable_cache: bool,
     pub analyzer: AnalyzerSettings,
@@ -51,6 +52,7 @@ impl From<RawSettings> for AppSettings {
         let cache_root = app_data_root.join(CACHE_FOLDER);
         let face_clusters_root = app_data_root.join(FACE_CLUSTERS_FOLDER);
         let thumbnails_root = app_data_root.join(THUMBNAILS_FOLDER);
+        let hf_cache_root = app_data_root.join(HUGGINGFACE_CACHE_FOLDER);
         let ingest = IngestSettings {
             media_root_canon,
             media_root,
@@ -61,6 +63,7 @@ impl From<RawSettings> for AppSettings {
             thumbnails: raw.ingest.thumbnails,
             on_demand_thumbs_cache_root,
             pano_root,
+            hf_cache_root,
             face_clusters_root,
             thumbnails_root,
             cache_root,
@@ -82,7 +85,7 @@ impl From<RawSettings> for AppSettings {
 
         let scaler = ScalerSettings {
             tick_interval_secs: raw.scaler.tick_interval_secs,
-            cooldown_period_secs: raw.scaler.cooldown_period_secs,
+            quick_tick_interval_secs: raw.scaler.quick_tick_interval_secs,
             system_memory_buffer_percentage: raw.scaler.system_memory_buffer_percentage,
             system_memory_buffer_maximum_mb: raw.scaler.system_memory_buffer_maximum_mb,
             profiles: scaler_profiles,
@@ -222,7 +225,7 @@ impl IngestSettings {
 #[derive(Debug, Clone, Deserialize)]
 pub struct ScalerSettings {
     pub tick_interval_secs: u64,
-    pub cooldown_period_secs: u64,
+    pub quick_tick_interval_secs: u64,
     pub system_memory_buffer_percentage: f64,
     pub system_memory_buffer_maximum_mb: u64,
     pub profiles: Vec<ProfileSettings>, // sorted by priority, descending

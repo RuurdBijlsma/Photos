@@ -27,11 +27,13 @@ pub async fn serve(pool: PgPool, settings: AppSettings, run_task_scheduler: bool
     }
     info!("Loading CLIP text embedder...");
     let text_embedder = TextEmbedder::from_hf(&settings.ingest.analyzer.search.embedder_model_id)
+        .cache_dir(&settings.ingest.hf_cache_root)
         .build()
         .await?;
     info!("Loading CLIP vision embedder...");
     let vision_embedder =
         VisionEmbedder::from_hf(&settings.ingest.analyzer.search.embedder_model_id)
+            .cache_dir(&settings.ingest.hf_cache_root)
             .build()
             .await?;
     // --- Server Startup ---

@@ -26,33 +26,43 @@ pub async fn claim_next_job(context: &WorkerContext) -> Result<Option<Job>> {
     let job = sqlx::query_as!(
         Job,
         r#"
-        WITH candidate AS (
-            SELECT j.id FROM jobs j
+        WITH active_jobs AS (
+            SELECT relative_path, scope, phase
+            FROM jobs
+            WHERE status = 'running' OR (status = 'queued' AND scheduled_at <= now())
+        ),
+        phase_limits AS (
+            SELECT
+                MIN(phase) AS min_all_phase,
+                MIN(phase) FILTER (WHERE scope = 'global') AS min_global_phase
+            FROM active_jobs
+        ),
+        path_limits AS (
+            SELECT relative_path, MIN(phase) AS min_path_phase
+            FROM active_jobs
+            WHERE relative_path IS NOT NULL
+            GROUP BY relative_path
+        ),
+        candidate AS (
+            SELECT j.id
+            FROM jobs j
+            CROSS JOIN phase_limits pl
+            LEFT JOIN path_limits pl_path ON j.relative_path = pl_path.relative_path
             WHERE
                 ((j.status = 'queued' AND j.scheduled_at <= now())
                 OR (j.status = 'running' AND j.last_heartbeat < now() - interval '1 second' * $2))
               AND j.job_type::text != ALL($3::text[])
 
-              -- Path-scoped phase check
-              AND (
-                  j.relative_path IS NULL
-                  OR NOT EXISTS (
-                      SELECT 1 FROM jobs dep
-                      WHERE dep.relative_path = j.relative_path
-                        AND dep.phase < j.phase
-                        AND ((dep.status = 'queued' AND dep.scheduled_at <= now()) OR dep.status = 'running')
-                  )
-              )
+              -- Global phase check
+              AND (j.scope != 'global' OR j.phase <= pl.min_all_phase)
 
-              -- Global-scoped: ANY lower-phase job blocks global jobs, or lower-phase global jobs block path jobs
-              AND NOT EXISTS (
-                  SELECT 1 FROM jobs dep
-                  WHERE dep.phase < j.phase
-                    AND ((dep.status = 'queued' AND dep.scheduled_at <= now()) OR dep.status = 'running')
-                    AND (dep.scope = 'global' OR j.scope = 'global')
-              )
-            ORDER BY j.priority, j.relative_path DESC, j.scheduled_at, j.created_at
-            FOR UPDATE SKIP LOCKED
+              -- Path phase check
+              AND (j.scope != 'path' OR (
+                  (pl.min_global_phase IS NULL OR j.phase <= pl.min_global_phase)
+                  AND (j.relative_path IS NULL OR j.phase <= pl_path.min_path_phase)
+              ))
+            ORDER BY j.priority ASC, j.relative_path DESC, j.scheduled_at ASC, j.created_at ASC
+            FOR UPDATE OF j SKIP LOCKED
             LIMIT 1
         )
         UPDATE jobs

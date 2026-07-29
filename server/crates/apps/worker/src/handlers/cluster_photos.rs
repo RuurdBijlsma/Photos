@@ -1,6 +1,8 @@
 use crate::context::WorkerContext;
 use crate::handlers::JobResult;
+use crate::handlers::common::cache::tag_vocab_cache::{load_tag_vocab_cache, save_tag_vocab_cache};
 use crate::handlers::common::clustering::{self, ClusterEntity};
+use app_state::constants::TAG_VOCAB_FOLDER;
 use color_eyre::Result;
 use color_eyre::eyre::eyre;
 use common_services::api::album::service::get_representative_thumbnail;
@@ -33,7 +35,7 @@ impl ClusterEntity for ExistingPhotoCluster {
 
 async fn load_vocab_labels() -> Result<Vec<String>> {
     let mut labels = Vec::new();
-    let dir = Path::new("assets/tag-vocab");
+    let dir = Path::new(TAG_VOCAB_FOLDER);
     if dir.exists() && dir.is_dir() {
         let mut entries = fs::read_dir(dir).await?;
         while let Some(entry) = entries.next_entry().await? {
@@ -85,51 +87,79 @@ async fn load_all_tags(pool: &PgPool) -> Result<HashSet<String>> {
     Ok(deduplicated_tags)
 }
 
-async fn load_tag_embeddings(pool: &PgPool, text_embedder: &TextEmbedder) -> Result<()> {
+async fn load_tag_embeddings(
+    pool: &PgPool,
+    text_embedder: &TextEmbedder,
+    model_id: &str,
+) -> Result<()> {
     let tags = load_all_tags(pool).await?;
 
-    // Retrieve all currently cached tags to compare against
     let existing_tags: Vec<String> = sqlx::query_scalar!("SELECT tag FROM cluster_tags")
         .fetch_all(pool)
         .await?;
 
     let existing_tags_set: HashSet<String> = existing_tags.iter().cloned().collect();
 
-    // Tags in the database that are no longer in the active tags list should be deleted
     let tags_to_delete: Vec<String> = existing_tags
         .into_iter()
         .filter(|t| !tags.contains(t))
         .collect();
 
-    // Tags in the active list that are not yet in the database need to be embedded and added
     let tags_to_process: Vec<String> = tags
         .iter()
         .filter(|t| !existing_tags_set.contains(*t))
         .cloned()
         .collect();
 
-    // Generate embeddings for new tags
-    let mut new_embeddings = Vec::new();
-    if !tags_to_process.is_empty() {
-        let batch_size = 64;
-        for chunk in tags_to_process.chunks(batch_size) {
-            let chunk_vec: Vec<String> = chunk.to_vec();
-            let embeddings_array = text_embedder
-                .embed_texts(&chunk_vec)
-                .map_err(|e| eyre!("CLIP embedding generation failed: {:?}", e))?;
+    if tags_to_delete.is_empty() && tags_to_process.is_empty() {
+        return Ok(());
+    }
 
-            for (i, tag) in chunk.iter().enumerate() {
-                let row: Vec<f32> = embeddings_array.row(i).iter().copied().collect();
-                new_embeddings.push((tag.clone(), Vector::from(row)));
+    let mut new_embeddings = Vec::new();
+
+    if !tags_to_process.is_empty() {
+        let mut static_cache = load_tag_vocab_cache(model_id).await?;
+        let mut cache_updated = false;
+        let mut uncached_tags = Vec::new();
+
+        for tag in tags_to_process {
+            if let Some(embedding) = static_cache.get(&tag) {
+                new_embeddings.push((tag, Vector::from(embedding.clone())));
+            } else {
+                uncached_tags.push(tag);
             }
+        }
+
+        if !uncached_tags.is_empty() {
+            info!(
+                "Embedding {} uncached tags with model {}",
+                uncached_tags.len(),
+                model_id
+            );
+            let batch_size = 64;
+            for chunk in uncached_tags.chunks(batch_size) {
+                let chunk_vec: Vec<String> = chunk.to_vec();
+                let embeddings_array = text_embedder
+                    .embed_texts(&chunk_vec)
+                    .map_err(|e| eyre!("CLIP embedding generation failed: {:?}", e))?;
+
+                for (i, tag) in chunk.iter().enumerate() {
+                    let row: Vec<f32> = embeddings_array.row(i).iter().copied().collect();
+                    static_cache.insert(tag.clone(), row.clone());
+                    new_embeddings.push((tag.clone(), Vector::from(row)));
+                }
+            }
+            cache_updated = true;
+        }
+
+        if cache_updated {
+            save_tag_vocab_cache(model_id, &static_cache).await?;
         }
     }
 
-    // Apply database updates if there are changes to make
     if !tags_to_delete.is_empty() || !new_embeddings.is_empty() {
         let mut tx = pool.begin().await?;
 
-        // Delete obsolete tags
         if !tags_to_delete.is_empty() {
             sqlx::query!(
                 "DELETE FROM cluster_tags WHERE tag = ANY($1::varchar[])",
@@ -139,7 +169,6 @@ async fn load_tag_embeddings(pool: &PgPool, text_embedder: &TextEmbedder) -> Res
             .await?;
         }
 
-        // Insert new tags
         if !new_embeddings.is_empty() {
             for chunk in new_embeddings.chunks(1000) {
                 let mut query_builder: QueryBuilder<sqlx::Postgres> =
@@ -328,7 +357,12 @@ pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
         .text_embedder
         .clone()
         .ok_or_else(|| eyre!("No visual_analyzer on worker that picked up ingest_llm job"))?;
-    load_tag_embeddings(&context.pool, &text_embedder).await?;
+    load_tag_embeddings(
+        &context.pool,
+        &text_embedder,
+        &context.settings.ingest.analyzer.search.embedder_model_id,
+    )
+    .await?;
     info!("load_tag_embeddings took {:?}", now.elapsed());
 
     for user_id in user_ids {

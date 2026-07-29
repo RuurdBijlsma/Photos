@@ -11,6 +11,7 @@
 )]
 
 pub mod api;
+pub mod binary_setup;
 pub mod caching;
 pub mod database;
 pub mod job_queue;

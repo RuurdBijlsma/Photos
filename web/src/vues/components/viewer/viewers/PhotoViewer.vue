@@ -6,7 +6,7 @@ import { useViewPhotoStore } from '@/scripts/stores/timeline/viewPhotoStore.ts'
 import mediaItemService from '@/scripts/services/mediaItemService.ts'
 import axios from 'axios'
 import { useEventListener, useRafFn, useTimeoutFn } from '@vueuse/core'
-import apiClient from '@/scripts/services/api.ts'
+import { SERVER_BASE_URL } from '@/scripts/services/api.ts'
 import type { PannellumConfig } from '@/scripts/types/api/pannellumConfig.ts'
 
 const PanoramaViewer = defineAsyncComponent(
@@ -40,7 +40,7 @@ const translateX = ref(0)
 const translateY = ref(0)
 const containerRef = ref<HTMLElement | null>(null)
 const thumbRef = ref<HTMLImageElement | null>(null)
-const baseUrl = apiClient.defaults.baseURL
+const baseUrl = SERVER_BASE_URL
 
 const activePointers = new Map<number, PointerEvent>()
 let initialPinchDistance = 0

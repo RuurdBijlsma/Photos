@@ -1,0 +1,30 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        WITH active_jobs AS (\n            SELECT relative_path, job_type, scope, phase, status, last_heartbeat\n            FROM jobs\n            WHERE status = 'running' OR (status = 'queued' AND scheduled_at <= now())\n        ),\n        phase_limits AS (\n            SELECT\n                MIN(phase) AS min_all_phase,\n                MIN(phase) FILTER (WHERE scope = 'global') AS min_global_phase\n            FROM active_jobs\n        ),\n        path_limits AS (\n            SELECT relative_path, MIN(phase) AS min_path_phase\n            FROM active_jobs\n            WHERE relative_path IS NOT NULL\n            GROUP BY relative_path\n        )\n        SELECT\n            j.job_type::text AS \"job_type!: JobType\",\n            COUNT(*)::bigint AS \"count!\"\n        FROM active_jobs j\n        CROSS JOIN phase_limits pl\n        LEFT JOIN path_limits pl_path ON j.relative_path = pl_path.relative_path\n        WHERE\n            -- Claimable check: queued OR stale running\n            (j.status = 'queued' OR j.last_heartbeat < now() - interval '1 second' * $1)\n\n            -- Global phase check: no active job can have lower phase than a global job\n            AND (j.scope != 'global' OR j.phase <= pl.min_all_phase)\n\n            -- Path phase check: path job cannot be blocked by global or same-path lower phase jobs\n            AND (j.scope != 'path' OR (\n                (pl.min_global_phase IS NULL OR j.phase <= pl.min_global_phase)\n                AND (j.relative_path IS NULL OR j.phase <= pl_path.min_path_phase)\n            ))\n        GROUP BY j.job_type\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "job_type!: JobType",
+        "type_info": "Text",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 1,
+        "name": "count!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Float8"
+      ]
+    },
+    "nullable": [
+      null,
+      null
+    ]
+  },
+  "hash": "acbcb95c8b12587ff1fddc6adf8b251e3cbb60c1009946ea259a4d33731a78f2"
+}

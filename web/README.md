@@ -47,7 +47,7 @@ cp example.env .env
 Edit `.env` to point to your API URL (usually localhost if running locally):
 
 ```properties
-VITE_API_BASE_URL=http://localhost:9475
+VITE_API_BASE_URL=http://localhost:5272
 ```
 
 ---

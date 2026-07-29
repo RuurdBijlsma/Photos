@@ -71,13 +71,13 @@ logging:
 
 api:
   host: "127.0.0.1"
-  port: 9475
+  port: 5272
   allowed_origins:
     - "http://localhost:5173"
     - "http://localhost:3000"
     - "http://127.0.0.1:3000"
     - "https://ruurdbijlsma.github.io"
-  public_url: "http://localhost:9475"
+  public_url: "http://localhost:5272"
   cookie_secure: false
   rate_limiting:
     req_per_second: 30
@@ -116,7 +116,6 @@ daily_cards:
 
 scaler:
   tick_interval_secs: 1
-  cooldown_period_secs: 1
   system_memory_buffer_percentage: 10.0
   system_memory_buffer_maximum_mb: 2000
   profiles:

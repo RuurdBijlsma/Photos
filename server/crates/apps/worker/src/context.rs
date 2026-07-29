@@ -8,6 +8,7 @@ use open_clip_inference::TextEmbedder;
 use reqwest::Client;
 use sqlx::PgPool;
 use std::sync::Arc;
+use tracing::info;
 
 pub struct WorkerContext {
     pub worker_id: String,
@@ -34,7 +35,9 @@ impl WorkerContext {
         let visual_analyzer = if !excluded_job_types.contains(&JobType::IngestLlm)
             || !excluded_job_types.contains(&JobType::IngestAnalysis)
         {
-            Some(Arc::new(VisualAnalyzer::new(embedder_model_id).await?))
+            Some(Arc::new(
+                VisualAnalyzer::new(embedder_model_id, &settings.ingest.hf_cache_root).await?,
+            ))
         } else {
             None
         };
@@ -43,7 +46,11 @@ impl WorkerContext {
         let text_embedder = if excluded_job_types.contains(&JobType::ClusterPhotos) {
             None
         } else {
-            let embedder = TextEmbedder::from_hf(embedder_model_id).build().await?;
+            info!("Loading CLIP text embedder...");
+            let embedder = TextEmbedder::from_hf(embedder_model_id)
+                .cache_dir(&settings.ingest.hf_cache_root)
+                .build()
+                .await?;
             Some(Arc::new(embedder))
         };
 

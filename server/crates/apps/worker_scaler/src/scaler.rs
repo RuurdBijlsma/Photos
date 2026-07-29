@@ -47,33 +47,39 @@ impl Scaler {
 
     async fn run_inner(&mut self, shutdown_rx: &mut watch::Receiver<bool>) -> Result<()> {
         info!("⚖️ Starting scaler...");
-        let tick_duration = Duration::from_secs(self.settings.scaler.tick_interval_secs);
+
+        let normal_delay = Duration::from_secs(self.settings.scaler.tick_interval_secs);
+        let busy_delay = Duration::from_secs(self.settings.scaler.quick_tick_interval_secs);
 
         loop {
             if *shutdown_rx.borrow() {
-                self.shutdown_all_workers().await;
                 break;
             }
 
-            if let Err(e) = self.tick().await {
-                error!("🚨 Error during scaler tick: {e}");
-            }
+            let tick_delay = match self.tick().await {
+                Ok(true) => normal_delay,
+                Ok(false) => busy_delay,
+                Err(e) => {
+                    error!("🚨 Error during scaler tick: {e}");
+                    normal_delay
+                }
+            };
 
             tokio::select! {
-                () = tokio::time::sleep(tick_duration) => {}
-                _ = shutdown_rx.changed() => {
-                    self.shutdown_all_workers().await;
-                    break;
-                }
+                () = tokio::time::sleep(tick_delay) => {}
+                _ = shutdown_rx.changed() => break,
             }
         }
+
+        self.shutdown_all_workers().await;
 
         Ok(())
     }
 
-    async fn tick(&mut self) -> Result<()> {
+    /// Performs a tick and returns `true` if the system is completely idle.
+    async fn tick(&mut self) -> Result<bool> {
         self.clean_up_sleeping_workers();
-        let demand = get_demand(&self.pool, &self.settings).await?;
+        let demand = get_demand(&self.pool).await?;
         let telemetry = Telemetry::fetch();
 
         let headroom_mb = telemetry.memory_headroom_mb(&self.settings.scaler);
@@ -84,37 +90,50 @@ impl Scaler {
                 telemetry.available_memory_mb, buffer_mb
             );
             self.scale_down();
-            return Ok(());
+            return Ok(false);
         }
 
-        // stop if last worker spawn was too recent
-        let cooldown = Duration::from_secs(self.settings.scaler.cooldown_period_secs);
-        if let Some(last_spawn) = self.last_spawn_time
-            && last_spawn.elapsed() < cooldown
-        {
-            return Ok(());
+        let has_demand = !demand.is_empty() && demand.values().any(|&c| c > 0);
+        let is_idle = !has_demand && self.active_workers.is_empty();
+
+        if !has_demand {
+            return Ok(is_idle);
         }
 
-        for profile in self.settings.scaler.profiles.clone() {
-            let active_count = self.count_active(&profile.name);
-            let max_count = profile.max_workers;
-            let profile_demand = demand.get(&profile.name).copied().unwrap_or(0);
-
-            if profile_demand > active_count {
-                if headroom_mb < profile.estimated_ram_mb {
-                    warn!(
-                        "Demand for '{}' ({}) exists, but headroom ({} MB) is below estimated RAM ({} MB).",
-                        profile.name, profile_demand, headroom_mb, profile.estimated_ram_mb
-                    );
-                } else if active_count < max_count {
-                    self.spawn_worker(&profile);
-                    self.last_spawn_time = Some(Instant::now());
-                    return Ok(());
+        // Find the most capable candidate profile that:
+        // 1. Is allowed by max_workers limits
+        // 2. Fits within available memory headroom
+        // 3. Can pick up at least one job type currently in demand
+        let best_profile = self
+            .settings
+            .scaler
+            .profiles
+            .iter()
+            .filter(|profile| {
+                let active_count = self.count_active(&profile.name);
+                if profile.max_workers == 0 || active_count >= profile.max_workers {
+                    return false;
                 }
-            }
-        }
 
-        Ok(())
+                if headroom_mb < profile.estimated_ram_mb {
+                    return false;
+                }
+
+                // Check if profile can handle at least one job type currently in demand
+                demand.iter().any(|(&job_type, &count)| {
+                    count > 0
+                        && !profile.excluded_jobs.iter().any(|excluded| {
+                            JobType::parse_from_str(excluded).ok() == Some(job_type)
+                        })
+                })
+            })
+            .max_by_key(|profile| profile.priority);
+
+        if let Some(profile) = best_profile.cloned() {
+            self.spawn_worker(&profile);
+            self.last_spawn_time = Some(Instant::now());
+        }
+        Ok(is_idle)
     }
 
     fn clean_up_sleeping_workers(&mut self) {

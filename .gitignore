@@ -5,3 +5,5 @@ server/crates/test_integration/app_data
 
 web/node_modules
 web/dist
+.env
+app_data

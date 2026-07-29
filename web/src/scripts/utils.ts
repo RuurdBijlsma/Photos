@@ -220,3 +220,50 @@ export function arrayToMap<T extends { id: string }>(items: readonly T[]): Map<s
 
   return map
 }
+
+export function formatEta(seconds: number): string {
+  if (!isFinite(seconds) || seconds <= 0) return ''
+  const hrs = Math.floor(seconds / 3600)
+  const mins = Math.floor((seconds % 3600) / 60)
+  const secs = Math.floor(seconds % 60)
+
+  if (hrs > 0) return `${hrs}h ${mins}m`
+  if (mins > 0) return `${mins}m ${secs}s`
+  return `${secs}s`
+}
+
+export class ProcessingRateTracker {
+  private history: { timestamp: number; completed: number }[] = []
+  private windowMs: number
+
+  constructor(windowMs = 20000) {
+    this.windowMs = windowMs
+  }
+
+  update(completed: number): number {
+    const now = Date.now()
+
+    if (this.history.length > 0 && completed < this.history[this.history.length - 1].completed) {
+      this.history = []
+    }
+
+    this.history.push({ timestamp: now, completed })
+
+    const cutoff = now - this.windowMs
+    this.history = this.history.filter((h) => h.timestamp >= cutoff)
+
+    if (this.history.length < 2) return 0
+
+    const oldest = this.history[0]
+    const newest = this.history[this.history.length - 1]
+    const deltaCompleted = newest.completed - oldest.completed
+    const deltaSec = (newest.timestamp - oldest.timestamp) / 1000
+
+    if (deltaSec <= 0 || deltaCompleted <= 0) return 0
+    return deltaCompleted / deltaSec
+  }
+
+  reset(): void {
+    this.history = []
+  }
+}
