@@ -9,6 +9,12 @@ use media_analyzer::MediaMetadata;
 use serde::{Deserialize, Serialize};
 use sqlx::types::Json;
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct MediaItemIdAndHash{
+    pub media_item_id: String,
+    pub hash: String,
+}
+
 /// The root struct representing a '`media_item`' and all its available, nested information.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct CreateFullMediaItem {

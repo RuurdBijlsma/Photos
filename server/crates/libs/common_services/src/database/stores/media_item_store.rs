@@ -3,7 +3,7 @@ use crate::database::media_item::gps::Gps;
 use crate::database::media_item::location::Location;
 use crate::database::media_item::media_features::ReadMediaFeatures;
 use crate::database::media_item::media_item::{
-    CreateFullMediaItem, FullMediaItem, FullMediaItemRow,
+    CreateFullMediaItem, FullMediaItem, FullMediaItemRow, MediaItemIdAndHash,
 };
 use crate::database::media_item::time_details::TimeDetails;
 use crate::database::media_item::weather::Weather;
@@ -43,6 +43,23 @@ impl MediaItemStore {
         Ok(sqlx::query_scalar!(
             r#"
             SELECT id
+            FROM media_item
+            WHERE relative_path = $1
+            "#,
+            relative_path
+        )
+        .fetch_optional(executor)
+        .await?)
+    }
+
+    pub async fn find_id_and_hash_by_relative_path(
+        executor: impl Executor<'_, Database = Postgres>,
+        relative_path: &str,
+    ) -> Result<Option<MediaItemIdAndHash>, DbError> {
+        Ok(sqlx::query_as!(
+            MediaItemIdAndHash,
+            r#"
+            SELECT id as "media_item_id", hash
             FROM media_item
             WHERE relative_path = $1
             "#,

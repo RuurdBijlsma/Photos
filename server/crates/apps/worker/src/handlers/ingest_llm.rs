@@ -4,8 +4,8 @@ use crate::handlers::common::cache::llm_cache::{get_llm_cache, write_llm_cache};
 use crate::handlers::common::utils::get_images_to_analyze;
 use crate::jobs::management::is_job_cancelled;
 use color_eyre::eyre::{Result, eyre};
-use common_services::caching::hash_file;
 use common_services::database::jobs::Job;
+use common_services::database::media_item::media_item::MediaItemIdAndHash;
 use common_services::database::media_item_store::MediaItemStore;
 use common_services::database::visual_analysis_store::VisualAnalysisStore;
 use common_types::ml_analysis::MLChatAnalysis;
@@ -39,7 +39,10 @@ pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
         );
         return Ok(JobResult::DependencyReschedule);
     }
-    let media_item_id = MediaItemStore::find_id_by_relative_path(&context.pool, relative_path)
+    let MediaItemIdAndHash {
+        media_item_id,
+        hash,
+    } = MediaItemStore::find_id_and_hash_by_relative_path(&context.pool, relative_path)
         .await?
         .ok_or_else(|| eyre!("Could not find media item by relative_path."))?;
     let (percentages, v_ids): (Vec<_>, Vec<_>) = sqlx::query!(
@@ -56,7 +59,7 @@ pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
     let percentages = percentages.iter().map(|p| *p as u64).collect::<Vec<_>>();
 
     let llm_analyses =
-        get_cached_llm_data(context, &file_path, &media_item_id, &percentages).await?;
+        get_cached_llm_data(context, &file_path, &media_item_id, &percentages, &hash).await?;
 
     let result: Vec<(i64, MLChatAnalysis)> = v_ids.into_iter().zip(llm_analyses).collect();
 
@@ -68,11 +71,11 @@ async fn get_cached_llm_data(
     file_path: &Path,
     media_item_id: &str,
     percentages: &[u64],
+    file_hash: &str,
 ) -> Result<Vec<MLChatAnalysis>> {
-    let file_hash = hash_file(file_path)?;
     if context.settings.ingest.enable_cache
         && let Some(cached_analysis) =
-            get_llm_cache(&context.settings.ingest.cache_root, &file_hash).await?
+            get_llm_cache(&context.settings.ingest.cache_root, file_hash).await?
     {
         debug!(
             "Using analysis cache for {}",

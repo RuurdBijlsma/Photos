@@ -4,13 +4,13 @@ use crate::handlers::common::cache::analysis_cache::{get_analysis_cache, write_a
 use crate::handlers::common::utils::get_images_to_analyze;
 use crate::jobs::management::is_job_cancelled;
 use color_eyre::eyre::{Result, eyre};
-use common_services::caching::hash_file;
 use common_services::database::jobs::Job;
 use common_services::database::media_item_store::MediaItemStore;
 use common_services::database::visual_analysis_store::VisualAnalysisStore;
 use common_types::ml_analysis::MLFastAnalysis;
 use std::path::Path;
 use tracing::{debug, info};
+use common_services::database::media_item::media_item::MediaItemIdAndHash;
 
 /// Handles the analysis of a given job.
 ///
@@ -39,10 +39,10 @@ pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
         );
         return Ok(JobResult::DependencyReschedule);
     }
-    let media_item_id = MediaItemStore::find_id_by_relative_path(&context.pool, relative_path)
+    let MediaItemIdAndHash{ media_item_id, hash} = MediaItemStore::find_id_and_hash_by_relative_path(&context.pool, relative_path)
         .await?
         .ok_or_else(|| eyre!("Could not find media item by relative_path."))?;
-    let analyses = get_llm_data(context, &file_path, &media_item_id).await?;
+    let analyses = get_analysis_data(context, &file_path, &media_item_id, &hash).await?;
     let user_id = if let Some(uid) = job.user_id {
         uid
     } else {
@@ -61,12 +61,12 @@ pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
     .await
 }
 
-async fn get_llm_data(
+async fn get_analysis_data(
     context: &WorkerContext,
     file_path: &Path,
     media_item_id: &str,
+    file_hash: &str,
 ) -> Result<Vec<MLFastAnalysis>> {
-    let file_hash = hash_file(file_path)?;
     if context.settings.ingest.enable_cache
         && let Some(cached_analysis) =
             get_analysis_cache(&context.settings.ingest.cache_root, &file_hash).await?
