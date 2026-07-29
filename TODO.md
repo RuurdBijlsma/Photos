@@ -35,3 +35,5 @@
 * duplicate photo remover tool
 * rotate image by changing thumbnail orientation?
 * arm docker build in release process
+* watcher errors when there's no users
+* make setup to host only backend, frontend could be gh pages or something?
