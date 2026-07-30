@@ -83,7 +83,6 @@ pub async fn serve(pool: PgPool, settings: AppSettings, run_task_scheduler: bool
 
     info!("📚 Docs available at http://{listen_address}/docs");
     info!("✅ Server listening on http://{listen_address}");
-    info!("TZ {:?}", constants().fallback_timezone);
 
     axum::serve(
         listener,
