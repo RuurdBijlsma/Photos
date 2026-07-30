@@ -10,10 +10,93 @@ env:
   WEB_IMAGE_NAME: ${{ github.repository_owner }}/photos-web
 
 jobs:
-  publish-docker-images:
+  # ========================================================
+  # Job 1: Build Docker images natively on AMD64 and ARM64
+  # ========================================================
+  build:
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+            platform: linux/amd64
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+            platform: linux/arm64
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Build Server Image natively for this architecture and push by digest
+      - name: Build and Push Server Image (Digest)
+        id: build-server
+        uses: docker/build-push-action@v6
+        with:
+          context: ./server
+          file: ./server/Dockerfile
+          platforms: ${{ matrix.platform }}
+          outputs: type=image,name=${{ env.REGISTRY }}/${{ env.SERVER_IMAGE_NAME }},push-by-digest=true,name-canonical=true,push=true
+          cache-from: type=gha,scope=server-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=server-${{ matrix.arch }}
+
+      # Build Web Image natively for this architecture and push by digest
+      - name: Build and Push Web Image (Digest)
+        id: build-web
+        uses: docker/build-push-action@v6
+        with:
+          context: ./web
+          file: ./web/Dockerfile
+          platforms: ${{ matrix.platform }}
+          outputs: type=image,name=${{ env.REGISTRY }}/${{ env.WEB_IMAGE_NAME }},push-by-digest=true,name-canonical=true,push=true
+          cache-from: type=gha,scope=web-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=web-${{ matrix.arch }}
+
+      # Export image digests so the merge job can create the unified multi-arch manifest
+      - name: Export digests
+        run: |
+          mkdir -p /tmp/digests/server
+          mkdir -p /tmp/digests/web
+          digest_server="${{ steps.build-server.outputs.digest }}"
+          digest_web="${{ steps.build-web.outputs.digest }}"
+          touch "/tmp/digests/server/${digest_server#sha256:}"
+          touch "/tmp/digests/web/${digest_web#sha256:}"
+
+      - name: Upload Server digests
+        uses: actions/upload-artifact@v4
+        with:
+          name: digests-server-${{ matrix.arch }}
+          path: /tmp/digests/server/*
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Upload Web digests
+        uses: actions/upload-artifact@v4
+        with:
+          name: digests-web-${{ matrix.arch }}
+          path: /tmp/digests/web/*
+          if-no-files-found: error
+          retention-days: 1
+
+  # ========================================================
+  # Job 2: Merge AMD64 & ARM64 digests into unified tags
+  # ========================================================
+  merge:
     runs-on: ubuntu-latest
+    needs: build
     permissions:
-      contents: write # Needed to attach files to the release
+      contents: write # Needed to attach compose files to release
       packages: write  # Needed to publish images to GHCR
 
     steps:
@@ -30,7 +113,22 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # Extract release tag (e.g. v1.0.0 -> tags: v1.0.0, 1.0.0, latest)
+      # Download architecture digests from Job 1
+      - name: Download Server digests
+        uses: actions/download-artifact@v4
+        with:
+          path: /tmp/digests/server
+          pattern: digests-server-*
+          merge-multiple: true
+
+      - name: Download Web digests
+        uses: actions/download-artifact@v4
+        with:
+          path: /tmp/digests/web
+          pattern: digests-web-*
+          merge-multiple: true
+
+      # Extract version metadata for Server
       - name: Extract Metadata for Server Image
         id: meta-server
         uses: docker/metadata-action@v5
@@ -41,6 +139,7 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
             type=raw,value=latest
 
+      # Extract version metadata for Web
       - name: Extract Metadata for Web Image
         id: meta-web
         uses: docker/metadata-action@v5
@@ -51,29 +150,23 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
             type=raw,value=latest
 
-      - name: Build and Push Server Image
-        uses: docker/build-push-action@v6
-        with:
-          context: ./server
-          file: ./server/Dockerfile
-          push: true
-          tags: ${{ steps.meta-server.outputs.tags }}
-          labels: ${{ steps.meta-server.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+      # Combine AMD64 and ARM64 digests into multi-arch manifest list for Server
+      - name: Create and Push Server Multi-Arch Manifest
+        working-directory: /tmp/digests/server
+        run: |
+          TAGS=$(echo "${{ steps.meta-server.outputs.tags }}" | xargs -n1 echo -t)
+          DIGESTS=$(ls * | awk -v repo="${{ env.REGISTRY }}/${{ env.SERVER_IMAGE_NAME }}" '{print repo "@sha256:" $1}')
+          docker buildx imagetools create $TAGS $DIGESTS
 
-      - name: Build and Push Web Image
-        uses: docker/build-push-action@v6
-        with:
-          context: ./web
-          file: ./web/Dockerfile
-          push: true
-          tags: ${{ steps.meta-web.outputs.tags }}
-          labels: ${{ steps.meta-web.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+      # Combine AMD64 and ARM64 digests into multi-arch manifest list for Web
+      - name: Create and Push Web Multi-Arch Manifest
+        working-directory: /tmp/digests/web
+        run: |
+          TAGS=$(echo "${{ steps.meta-web.outputs.tags }}" | xargs -n1 echo -t)
+          DIGESTS=$(ls * | awk -v repo="${{ env.REGISTRY }}/${{ env.WEB_IMAGE_NAME }}" '{print repo "@sha256:" $1}')
+          docker buildx imagetools create $TAGS $DIGESTS
 
-      # Attach compose.yml and example.env directly to the GitHub Release page
+      # Attach compose.yml and example.env directly to the GitHub Release
       - name: Upload Compose files to GitHub Release
         uses: softprops/action-gh-release@v2
         with:

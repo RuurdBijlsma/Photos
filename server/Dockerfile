@@ -34,7 +34,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Compile libheif from source (we need newer version than in apt)
 RUN curl -L https://github.com/strukturag/libheif/releases/download/v1.23.1/libheif-1.23.1.tar.gz | tar xz \
     && cd libheif-1.23.1 && mkdir build && cd build \
-    && cmake .. -DCMAKE_BUILD_TYPE=Release -DWITH_EXAMPLES=OFF -DWITH_RAV1E=OFF -DWITH_SVT_AV1=OFF \
+    && cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_LIBDIR=lib -DWITH_EXAMPLES=OFF -DWITH_RAV1E=OFF -DWITH_SVT_AV1=OFF \
     && make -j$(nproc) && make install && ldconfig \
     && cd ../.. && rm -rf libheif-1.23.1
 
@@ -54,7 +54,7 @@ ENV SQLX_OFFLINE=true
 RUN cargo build --profile release-docker --bin api --bin worker_scaler --bin watcher
 
 # ==========================================
-# 3. Minimal Runtime Stage
+# 3. Runtime Stage
 # ==========================================
 FROM debian:trixie-slim AS runtime
 WORKDIR /app
@@ -63,6 +63,7 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     ffmpeg \
+    curl \
     exiftool \
     libfontconfig1 \
     libde265-0 \

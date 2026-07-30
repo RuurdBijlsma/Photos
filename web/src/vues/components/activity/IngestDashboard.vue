@@ -398,41 +398,7 @@ onUnmounted(() => {
     <div class="dashboard-grid">
       <!-- Left Column: Scan, Dropzone, Upload Progress -->
       <div class="grid-column">
-        <!-- Scan Card -->
-        <v-card class="action-card" flat>
-          <div class="action-content">
-            <div class="action-text">
-              <div>
-                <h2 class="section-title">Index Library Folder</h2>
-                <p class="section-subtitle">
-                  Folder: Start a search of your media folder to discover new photos and videos.
-                </p>
-              </div>
-              <show-selected-folder
-                class="selected-folder-display"
-                bg-color="surface-variant"
-                text-color="on-surface-variant"
-                exclude-check-icon
-                v-if="authStore.user?.mediaFolder"
-                :folder="authStore.user.mediaFolder.split('/')"
-                pill
-              />
-            </div>
-            <v-btn
-              color="secondary"
-              variant="tonal"
-              rounded="xl"
-              prepend-icon="mdi-folder-search-outline"
-              :loading="isScanning"
-              @click="handleScan"
-              class="scan-button"
-            >
-              Scan Folder
-            </v-btn>
-          </div>
-        </v-card>
-
-        <!-- Simplified File Dropzone -->
+        <!-- File Dropzone -->
         <v-card class="action-card" flat>
           <div class="card-body">
             <h2 class="card-title">Upload Media</h2>
@@ -492,6 +458,40 @@ onUnmounted(() => {
                 Clear Completed
               </v-btn>
             </div>
+          </div>
+        </v-card>
+
+        <!-- Scan Card -->
+        <v-card class="action-card" flat>
+          <div class="action-content">
+            <div class="action-text">
+              <div>
+                <h2 class="section-title">Index Library Folder</h2>
+                <p class="section-subtitle">
+                  Folder: Start a search of your media folder to discover new photos and videos.
+                </p>
+              </div>
+              <show-selected-folder
+                class="selected-folder-display"
+                bg-color="surface-variant"
+                text-color="on-surface-variant"
+                exclude-check-icon
+                v-if="authStore.user?.mediaFolder"
+                :folder="authStore.user.mediaFolder.split('/')"
+                pill
+              />
+            </div>
+            <v-btn
+              color="secondary"
+              variant="tonal"
+              rounded="xl"
+              prepend-icon="mdi-folder-search-outline"
+              :loading="isScanning"
+              @click="handleScan"
+              class="scan-button"
+            >
+              Scan Folder
+            </v-btn>
           </div>
         </v-card>
 

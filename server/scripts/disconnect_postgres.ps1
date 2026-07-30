@@ -1,3 +1,5 @@
+$env:DATABASE_URL = "postgresql://photos_user:dev-password@localhost:5432/photos"
+
 # Configuration
 $containerName = "photos-db-dev"
 $dbName = "photos"

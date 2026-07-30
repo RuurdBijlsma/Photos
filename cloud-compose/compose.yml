@@ -1,5 +1,18 @@
 name: photos
 
+x-backend-common: &backend-common
+  image: ghcr.io/ruurdbijlsma/photos-server:latest
+  restart: always
+  environment: &backend-env
+    DATABASE_URL: postgresql://${DB_USER:-photos_user}:${DB_PASSWORD:-dev-password}@database:5432/${DB_NAME:-photos}
+    APP__SECRETS__JWT: ${JWT_SECRET:-change_me_in_production}
+    APP__INGEST__MEDIA_FOLDER: /media
+    APP__INGEST__APP_DATA_FOLDER: /app_data
+    APP__CONSTANTS__FALLBACK_TIMEZONE: ${TZ:-Europe/Amsterdam}
+  volumes:
+    - ${MEDIA_LOCATION}:/media
+    - ${APP_DATA_LOCATION:-app_data}:/app_data
+
 services:
   database:
     image: pgvector/pgvector:pg18
@@ -12,67 +25,44 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-photos_user} -d ${DB_NAME:-photos}"]
+      test: [ "CMD-SHELL", "pg_isready -U ${DB_USER:-photos_user} -d ${DB_NAME:-photos}" ]
       interval: 5s
       timeout: 5s
       retries: 5
 
   api:
-    image: ghcr.io/ruurdbijlsma/photos-server:latest
+    <<: *backend-common
     container_name: photos_api
-    restart: always
-    command: ["photos-api"]
+    command: [ "photos-api" ]
     depends_on:
       database:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgresql://${DB_USER:-photos_user}:${DB_PASSWORD:-dev-password}@database:5432/${DB_NAME:-photos}
-      APP__SECRETS__JWT: ${JWT_SECRET:-change_me_in_production}
-      APP__INGEST__MEDIA_FOLDER: /media
-      APP__INGEST__APP_DATA_FOLDER: /app_data
+      <<: *backend-env
       APP__API__HOST: "0.0.0.0"
       APP__API__PORT: "5272"
-    volumes:
-      - ${MEDIA_LOCATION}:/media
-      - ${APP_DATA_LOCATION:-app_data}:/app_data
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -f http://localhost:5272/api/health || exit 1" ]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
 
   scaler:
-    image: ghcr.io/ruurdbijlsma/photos-server:latest
+    <<: *backend-common
     container_name: photos_scaler
-    restart: always
-    command: ["photos-scaler"]
+    command: [ "photos-scaler" ]
     depends_on:
       database:
         condition: service_healthy
-      api:
-        condition: service_started
-    environment:
-      DATABASE_URL: postgresql://${DB_USER:-photos_user}:${DB_PASSWORD:-dev-password}@database:5432/${DB_NAME:-photos}
-      APP__SECRETS__JWT: ${JWT_SECRET:-change_me_in_production}
-      APP__INGEST__MEDIA_FOLDER: /media
-      APP__INGEST__APP_DATA_FOLDER: /app_data
-    volumes:
-      - ${MEDIA_LOCATION}:/media
-      - ${APP_DATA_LOCATION:-app_data}:/app_data
 
   watcher:
-    image: ghcr.io/ruurdbijlsma/photos-server:latest
+    <<: *backend-common
     container_name: photos_watcher
-    restart: always
-    command: ["photos-watcher"]
+    command: [ "photos-watcher" ]
     depends_on:
       database:
         condition: service_healthy
-      api:
-        condition: service_started
-    environment:
-      DATABASE_URL: postgresql://${DB_USER:-photos_user}:${DB_PASSWORD:-dev-password}@database:5432/${DB_NAME:-photos}
-      APP__SECRETS__JWT: ${JWT_SECRET:-change_me_in_production}
-      APP__INGEST__MEDIA_FOLDER: /media
-      APP__INGEST__APP_DATA_FOLDER: /app_data
-    volumes:
-      - ${MEDIA_LOCATION}:/media
-      - ${APP_DATA_LOCATION:-app_data}:/app_data
 
   web:
     image: ghcr.io/ruurdbijlsma/photos-web:latest
@@ -81,7 +71,8 @@ services:
     ports:
       - "${WEB_PORT:-9475}:80"
     depends_on:
-      - api
+      api:
+        condition: service_healthy
 
 volumes:
   pgdata:

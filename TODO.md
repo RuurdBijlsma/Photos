@@ -2,7 +2,6 @@
 
 * on login redirect to where you were
 * improve messaging when you load the website and the server is off
-* ✅ make func to refresh frontpage, call it after onboarding is done after 10s, then every 5s;
 * view-option (like gmail), split view: if you single click a photo it opens in a right half of the window pane. Only
   works with enough screen width (desktop).
 * don't allow user to go to /onboarding if onboarding is done already.
@@ -19,11 +18,15 @@
 * [investigate] krijg je ratio/monthItem desync als je de map eerst laad, terwijl de backend foto metadata ingest, en
   dan naar de timeline gaat? Want de map date filter heeft dan al de ratios opgevraagd in de timelineStore.
 * settings page heeft geen visible scrollbar
+
+## NEW:
+
 * update <title> on navigation
 * i dont see Source quality in podman hosted video
 * With 1 drive the nav bar storage overview is kinda ugly
 * GH pages release should be triggered by GH release, not push to main
 * improve loading indicator for albums & cameras (perhaps also people)
+* update readme screenshot to exclude the vue dev tools overlay
 
 # SERVER
 
@@ -39,8 +42,8 @@
 * import albums from google photos
 * duplicate photo remover tool
 * rotate image by changing thumbnail orientation?
+
+## NEW:
+
 * arm docker build in release process
-* watcher errors when there's no users
 * make setup to host only backend, frontend could be gh pages or something?
-* add TZ env var to example.env and make sure it's used
-* uploads dont work on podman
