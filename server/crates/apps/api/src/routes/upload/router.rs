@@ -27,6 +27,7 @@ fn get_tus_handler(context: &ApiContext) -> TusHandler<FileStore, FileLocker> {
     // Subscribe to pre_create hook to handle auth
     let create_context = context.clone();
     let config = Config {
+        base_path: "/api/files".to_string(),
         extensions,
         hooks: HookConfig {
             channel_capacity: 2048,

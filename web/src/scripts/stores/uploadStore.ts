@@ -116,7 +116,7 @@ export const useUploadStore = defineStore('upload', () => {
     }
 
     // todo: maybe broken with new /api/ prefix in backend
-    const endpoint = `${SERVER_BASE_URL}/files`
+    const endpoint = `${SERVER_BASE_URL}/api/files`
 
     const uploadInstance = new tus.Upload(file, {
       endpoint,
