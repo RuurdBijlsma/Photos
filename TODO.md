@@ -46,3 +46,4 @@
 * add TZ env var to example.env and make sure it's used
 * uploads dont work (needs testing on podman, done on normal)
 * ✅ minder repeated config in compose.yml: https://medium.com/@FKosa/docker-compose-yaml-anchors-aliases-the-dry-principle-for-your-config-files-31c543ef023b
+* health check in compose.yml for api and worker scaler if possible

@@ -8,6 +8,7 @@ x-backend-common: &backend-common
     APP__SECRETS__JWT: ${JWT_SECRET:-change_me_in_production}
     APP__INGEST__MEDIA_FOLDER: /media
     APP__INGEST__APP_DATA_FOLDER: /app_data
+    APP__CONSTANTS__FALLBACK_TIMEZONE: ${TZ:-Europe/Amsterdam}
   volumes:
     - ${MEDIA_LOCATION}:/media
     - ${APP_DATA_LOCATION:-app_data}:/app_data

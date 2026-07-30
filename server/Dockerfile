@@ -54,7 +54,7 @@ ENV SQLX_OFFLINE=true
 RUN cargo build --profile release-docker --bin api --bin worker_scaler --bin watcher
 
 # ==========================================
-# 3. Minimal Runtime Stage
+# 3. Runtime Stage
 # ==========================================
 FROM debian:trixie-slim AS runtime
 WORKDIR /app
@@ -63,6 +63,7 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     ffmpeg \
+    curl \
     exiftool \
     libfontconfig1 \
     libde265-0 \
