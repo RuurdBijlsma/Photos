@@ -2,7 +2,6 @@
 
 * on login redirect to where you were
 * improve messaging when you load the website and the server is off
-* ✅ make func to refresh frontpage, call it after onboarding is done after 10s, then every 5s;
 * view-option (like gmail), split view: if you single click a photo it opens in a right half of the window pane. Only
   works with enough screen width (desktop).
 * don't allow user to go to /onboarding if onboarding is done already.
@@ -47,9 +46,4 @@
 ## NEW:
 
 * arm docker build in release process
-* watcher errors when there's no users
 * make setup to host only backend, frontend could be gh pages or something?
-* ✅ add TZ env var to example.env and make sure it's used
-* uploads dont work (needs testing on podman, done on normal)
-* ✅ minder repeated config in compose.yml: https://medium.com/@FKosa/docker-compose-yaml-anchors-aliases-the-dry-principle-for-your-config-files-31c543ef023b
-* ✅ health check in compose.yml for api and worker scaler if possible
