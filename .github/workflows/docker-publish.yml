@@ -154,7 +154,7 @@ jobs:
       - name: Create and Push Server Multi-Arch Manifest
         working-directory: /tmp/digests/server
         run: |
-          TAGS=$(echo "${{ steps.meta-server.outputs.tags }}" | tr '\n' ' ' | sed 's/[^ ]*/-t &/g')
+          TAGS=$(echo "${{ steps.meta-server.outputs.tags }}" | xargs -n1 echo -t)
           DIGESTS=$(ls * | awk -v repo="${{ env.REGISTRY }}/${{ env.SERVER_IMAGE_NAME }}" '{print repo "@sha256:" $1}')
           docker buildx imagetools create $TAGS $DIGESTS
 
@@ -162,7 +162,7 @@ jobs:
       - name: Create and Push Web Multi-Arch Manifest
         working-directory: /tmp/digests/web
         run: |
-          TAGS=$(echo "${{ steps.meta-web.outputs.tags }}" | tr '\n' ' ' | sed 's/[^ ]*/-t &/g')
+          TAGS=$(echo "${{ steps.meta-web.outputs.tags }}" | xargs -n1 echo -t)
           DIGESTS=$(ls * | awk -v repo="${{ env.REGISTRY }}/${{ env.WEB_IMAGE_NAME }}" '{print repo "@sha256:" $1}')
           docker buildx imagetools create $TAGS $DIGESTS
 
