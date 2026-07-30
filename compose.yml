@@ -44,6 +44,12 @@ services:
       <<: *backend-env
       APP__API__HOST: "0.0.0.0"
       APP__API__PORT: "5272"
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -f http://localhost:5272/api/health || exit 1" ]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
 
   scaler:
     <<: *backend-common
@@ -52,8 +58,6 @@ services:
     depends_on:
       database:
         condition: service_healthy
-      api:
-        condition: service_started
 
   watcher:
     <<: *backend-common
@@ -62,8 +66,6 @@ services:
     depends_on:
       database:
         condition: service_healthy
-      api:
-        condition: service_started
 
   web:
     build:
@@ -75,7 +77,8 @@ services:
     ports:
       - "${WEB_PORT:-9475}:80"
     depends_on:
-      - api
+      api:
+        condition: service_healthy
 
 volumes:
   pgdata:

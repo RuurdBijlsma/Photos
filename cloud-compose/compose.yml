@@ -25,7 +25,7 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-photos_user} -d ${DB_NAME:-photos}"]
+      test: [ "CMD-SHELL", "pg_isready -U ${DB_USER:-photos_user} -d ${DB_NAME:-photos}" ]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -33,7 +33,7 @@ services:
   api:
     <<: *backend-common
     container_name: photos_api
-    command: ["photos-api"]
+    command: [ "photos-api" ]
     depends_on:
       database:
         condition: service_healthy
@@ -41,26 +41,28 @@ services:
       <<: *backend-env
       APP__API__HOST: "0.0.0.0"
       APP__API__PORT: "5272"
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -f http://localhost:5272/api/health || exit 1" ]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
 
   scaler:
     <<: *backend-common
     container_name: photos_scaler
-    command: ["photos-scaler"]
+    command: [ "photos-scaler" ]
     depends_on:
       database:
         condition: service_healthy
-      api:
-        condition: service_started
 
   watcher:
     <<: *backend-common
     container_name: photos_watcher
-    command: ["photos-watcher"]
+    command: [ "photos-watcher" ]
     depends_on:
       database:
         condition: service_healthy
-      api:
-        condition: service_started
 
   web:
     image: ghcr.io/ruurdbijlsma/photos-web:latest
@@ -69,7 +71,8 @@ services:
     ports:
       - "${WEB_PORT:-9475}:80"
     depends_on:
-      - api
+      api:
+        condition: service_healthy
 
 volumes:
   pgdata:
