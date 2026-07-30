@@ -45,3 +45,4 @@
 * make setup to host only backend, frontend could be gh pages or something?
 * add TZ env var to example.env and make sure it's used
 * uploads dont work on podman
+* minder repeated config in compose.yml: https://medium.com/@FKosa/docker-compose-yaml-anchors-aliases-the-dry-principle-for-your-config-files-31c543ef023b
