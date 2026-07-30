@@ -1,7 +1,7 @@
 use crate::handlers::{handle_create, handle_remove};
 use app_state::IngestSettings;
 use app_state::constants::ALBUM_IMPORT_FOLDER;
-use color_eyre::eyre::{Result, eyre};
+use color_eyre::eyre::{Result};
 use common_services::alert;
 use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use sqlx::PgPool;
@@ -81,14 +81,13 @@ async fn process_event(pool: &PgPool, settings: &IngestSettings, event: Event) -
         return Ok(());
     }
 
-    let result = match event.kind {
+    if let Err(e) = match event.kind {
         EventKind::Create(_) => handle_create(pool, settings, path).await,
         EventKind::Remove(_) => handle_remove(pool, settings, path).await,
-        _ => Err(eyre!("Unknown event type")),
-    };
-
-    if let Err(e) = result {
+        _ => Ok(()),
+    } {
         warn!("Error handling file event for {:?}: {:?}", path, e);
     }
+
     Ok(())
 }

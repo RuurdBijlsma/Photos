@@ -26,6 +26,7 @@ fn get_tus_handler(context: &ApiContext) -> TusHandler<FileStore, FileLocker> {
 
     // Subscribe to pre_create hook to handle auth
     let create_context = context.clone();
+    // todo: base path has to somehow get the right port as well? right now in podman it tries to send request to localhost/api/files/{uuid}. non-podman works fine
     let config = Config {
         base_path: "/api/files".to_string(),
         extensions,

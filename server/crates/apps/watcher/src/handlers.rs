@@ -1,9 +1,10 @@
 use app_state::{IngestSettings, MakeRelativePath};
+use color_eyre::eyre::eyre;
 use common_services::database::user_store::UserStore;
 use common_services::job_queue::enqueue_full_ingest;
 use sqlx::PgPool;
 use std::path::Path;
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 use walkdir::WalkDir;
 
 enum WatcherJobType {
@@ -57,13 +58,14 @@ async fn enqueue_file_job(
     job_type: WatcherJobType,
 ) -> color_eyre::Result<()> {
     let relative_path = &path.make_relative(&settings.media_root)?;
-    let Some(user) = UserStore::find_user_by_relative_path(pool, relative_path).await? else {
-        warn!(
-            "Could not find user for path: {}. Cannot enqueue job.",
-            relative_path
-        );
-        return Ok(());
-    };
+    let user = UserStore::find_user_by_relative_path(pool, relative_path)
+        .await?
+        .ok_or_else(|| {
+            eyre!(
+                "Could not find user for path: {}, cannot enqueue job.",
+                relative_path
+            )
+        })?;
 
     match job_type {
         WatcherJobType::Ingest => {

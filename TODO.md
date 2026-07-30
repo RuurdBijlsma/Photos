@@ -19,6 +19,9 @@
 * [investigate] krijg je ratio/monthItem desync als je de map eerst laad, terwijl de backend foto metadata ingest, en
   dan naar de timeline gaat? Want de map date filter heeft dan al de ratios opgevraagd in de timelineStore.
 * settings page heeft geen visible scrollbar
+
+## NEW:
+
 * update <title> on navigation
 * i dont see Source quality in podman hosted video
 * With 1 drive the nav bar storage overview is kinda ugly
@@ -40,10 +43,13 @@
 * import albums from google photos
 * duplicate photo remover tool
 * rotate image by changing thumbnail orientation?
+
+## NEW:
+
 * arm docker build in release process
 * watcher errors when there's no users
 * make setup to host only backend, frontend could be gh pages or something?
-* add TZ env var to example.env and make sure it's used
+* ✅ add TZ env var to example.env and make sure it's used
 * uploads dont work (needs testing on podman, done on normal)
 * ✅ minder repeated config in compose.yml: https://medium.com/@FKosa/docker-compose-yaml-anchors-aliases-the-dry-principle-for-your-config-files-31c543ef023b
-* health check in compose.yml for api and worker scaler if possible
+* ✅ health check in compose.yml for api and worker scaler if possible
