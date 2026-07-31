@@ -2,7 +2,7 @@ use crate::api_state::ApiContext;
 use crate::cors::get_cors;
 use crate::create_router;
 use app_state::constants::HOSTED_FOLDER;
-use app_state::{AppSettings, constants};
+use app_state::{AppSettings};
 use axum::routing::get_service;
 use color_eyre::Result;
 use common_services::s2s_client::S2SClient;
