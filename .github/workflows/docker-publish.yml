@@ -2,12 +2,10 @@ name: Publish Release & Docker Images
 
 on:
   release:
-    types: [published]
+    types: [ published ]
 
 env:
   REGISTRY: ghcr.io
-  SERVER_IMAGE_NAME: ${{ github.repository_owner }}/photos-server
-  WEB_IMAGE_NAME: ${{ github.repository_owner }}/photos-web
 
 jobs:
   # ========================================================
@@ -28,6 +26,11 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Set lowercase image names
+        run: |
+          echo "SERVER_IMAGE_NAME=$(echo '${{ github.repository_owner }}/photos-server' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+          echo "WEB_IMAGE_NAME=$(echo '${{ github.repository_owner }}/photos-web' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -102,6 +105,11 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Set lowercase image names
+        run: |
+          echo "SERVER_IMAGE_NAME=$(echo '${{ github.repository_owner }}/photos-server' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+          echo "WEB_IMAGE_NAME=$(echo '${{ github.repository_owner }}/photos-web' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
