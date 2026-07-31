@@ -75,7 +75,7 @@ services:
     container_name: photos_web
     restart: always
     ports:
-      - "${WEB_PORT:-9475}:80"
+      - "${WEB_PORT:-9475}:9475"
     depends_on:
       api:
         condition: service_healthy
