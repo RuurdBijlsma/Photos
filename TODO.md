@@ -18,12 +18,9 @@
 * [investigate] krijg je ratio/monthItem desync als je de map eerst laad, terwijl de backend foto metadata ingest, en
   dan naar de timeline gaat? Want de map date filter heeft dan al de ratios opgevraagd in de timelineStore.
 * settings page heeft geen visible scrollbar
-* location estimatr map top right border radius is broken
 
 ## NEW:
 
-* update <title> on navigation
-* With 1 drive the nav bar storage overview is kinda ugly
 * improve loading indicator for albums & cameras (perhaps also people)
 
 # SERVER
@@ -43,6 +40,5 @@
 
 ## NEW:
 
-* arm docker build in release process
 * make setup to host only backend, frontend could be gh pages or something?
 * update available checker
