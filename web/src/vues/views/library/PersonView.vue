@@ -65,7 +65,7 @@ watch(personResponse, () => {
 })
 
 useRefreshFunction(() => {
-  if (personId.value) peopleStore.fetchPersonMedia(personId.value)
+  if (personId.value) peopleStore.fetchPersonMedia(personId.value, false)
 })
 </script>
 

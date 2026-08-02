@@ -49,7 +49,7 @@ const appDataUsedPct = computed(() => {
       <v-progress-linear
         :model-value="mediaUsedPct"
         color="primary"
-        height="5"
+        height="3"
         rounded
         class="storage-progress"
       />
@@ -80,7 +80,7 @@ const appDataUsedPct = computed(() => {
         <v-progress-linear
           :model-value="appDataUsedPct"
           color="primary"
-          height="4"
+          height="3"
           rounded
           class="storage-progress"
         />
@@ -134,15 +134,15 @@ const appDataUsedPct = computed(() => {
 .drive-icon {
   flex-shrink: 0;
   color: rgb(var(--v-theme-on-background));
-  opacity: 0.6;
+  opacity: 0.5;
 }
 
 .drive-title {
   font-size: 0.9rem;
-  font-weight: 600;
+  font-weight: 400;
   line-height: 1.2;
   color: rgb(var(--v-theme-on-background));
-  opacity: 0.8;
+  opacity: 0.7;
 }
 
 .pct-badge {
@@ -154,19 +154,9 @@ const appDataUsedPct = computed(() => {
   color: rgba(var(--v-theme-on-surface), .6);
 }
 
-.pct-badge--warning {
-  background-color: rgba(var(--v-theme-warning), 0.2);
-  color: rgb(var(--v-theme-warning));
-}
-
-.pct-badge--error {
-  background-color: rgba(var(--v-theme-error), 0.2);
-  color: rgb(var(--v-theme-error));
-}
-
 .storage-progress {
   margin: 2px 0;
-  opacity: 0.9;
+  opacity: 0.7;
 }
 
 .drive-footer {
