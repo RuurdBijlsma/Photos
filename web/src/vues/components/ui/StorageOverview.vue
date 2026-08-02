@@ -21,12 +21,6 @@ const appDataUsedPct = computed(() => {
   if (!total) return 0
   return Math.min(100, Math.max(0, (diskStats.value.appDataDrive.diskUsed / total) * 100))
 })
-
-function getProgressColor(pct: number) {
-  if (pct >= 90) return 'error'
-  if (pct >= 80) return 'warning'
-  return 'primary'
-}
 </script>
 
 <template>
@@ -47,22 +41,14 @@ function getProgressColor(pct: number) {
           >
             mdi-cloud-outline
           </v-icon>
-          <span class="drive-title">{{ diskStats.areSameDrive ? 'Storage' : 'Media Drive' }}</span>
+          <span class="drive-title">{{ diskStats.areSameDrive ? 'Storage' : 'Media' }}</span>
         </div>
-        <span
-          class="pct-badge"
-          :class="{
-            'pct-badge--warning': mediaUsedPct >= 80 && mediaUsedPct < 90,
-            'pct-badge--error': mediaUsedPct >= 90,
-          }"
-        >
-          {{ mediaUsedPct.toFixed(0) }}%
-        </span>
+        <span class="pct-badge"> {{ mediaUsedPct.toFixed(0) }}% </span>
       </div>
 
       <v-progress-linear
         :model-value="mediaUsedPct"
-        :color="getProgressColor(mediaUsedPct)"
+        color="primary"
         height="5"
         rounded
         class="storage-progress"
@@ -88,20 +74,12 @@ function getProgressColor(pct: number) {
             </v-icon>
             <span class="drive-title text-caption font-weight-medium">App Data</span>
           </div>
-          <span
-            class="pct-badge"
-            :class="{
-              'pct-badge--warning': appDataUsedPct >= 80 && appDataUsedPct < 90,
-              'pct-badge--error': appDataUsedPct >= 90,
-            }"
-          >
-            {{ appDataUsedPct.toFixed(0) }}%
-          </span>
+          <span class="pct-badge"> {{ appDataUsedPct.toFixed(0) }}% </span>
         </div>
 
         <v-progress-linear
           :model-value="appDataUsedPct"
-          :color="getProgressColor(appDataUsedPct)"
+          color="primary"
           height="4"
           rounded
           class="storage-progress"
@@ -124,9 +102,7 @@ function getProgressColor(pct: number) {
   display: block;
   text-decoration: none;
   color: inherit;
-  padding: 20px;
-  border-radius: 32px;
-  background-color: rgba(var(--v-theme-background), 0.2);
+  padding: 12px;
   margin-top: auto;
   margin-bottom: 8px;
   transition:
@@ -134,6 +110,7 @@ function getProgressColor(pct: number) {
     border-color 0.2s ease,
     transform 0.15s ease;
   user-select: none;
+  border-radius: 20px;
 }
 
 .drive-section {
@@ -157,7 +134,7 @@ function getProgressColor(pct: number) {
 .drive-icon {
   flex-shrink: 0;
   color: rgb(var(--v-theme-on-background));
-  opacity: 0.8;
+  opacity: 0.6;
 }
 
 .drive-title {
@@ -170,12 +147,11 @@ function getProgressColor(pct: number) {
 
 .pct-badge {
   font-size: 0.725rem;
-  font-weight: 700;
+  font-weight: 600;
   padding: 2px 7px;
   border-radius: 8px;
   background-color: rgba(var(--v-theme-on-surface), 0.08);
-  color: rgb(var(--v-theme-on-surface));
-  color: rgb(var(--v-theme-on-surface-variant));
+  color: rgba(var(--v-theme-on-surface), .6);
 }
 
 .pct-badge--warning {

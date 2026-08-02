@@ -33,7 +33,8 @@ export const useSystemStore = defineStore('system', () => {
   async function fetchStats() {
     try {
       const { data } = await systemService.getStats()
-      data.disk.areSameDrive = true
+      // data.disk.areSameDrive = true
+      // data.disk.mediaDrive.diskUsed=3.6 *1000*1000*1000*1000
       stats.value = data
     } catch (e) {
       snackbarStore.error('Could not fetch system stats', e)
