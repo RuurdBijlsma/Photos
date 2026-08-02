@@ -8,6 +8,7 @@ import SimpleTimeline from '@/vues/components/timeline/simple-timeline/SimpleTim
 import peopleService from '@/scripts/services/peopleService.ts'
 import PersonNameDialog from '@/vues/components/rename-people/PersonNameDialog.vue'
 import { useRefreshFunction } from '@/scripts/composables/useRefreshFunction.ts'
+import { usePageTitle } from '@/scripts/composables/usePageTitle.ts'
 
 const theme = useTheme()
 const route = useRoute()
@@ -33,6 +34,8 @@ const personResponse = computed(() => {
 })
 const person = computed(() => personResponse.value?.person ?? null)
 const items = computed(() => personResponse.value?.items ?? [])
+
+const personTitle = computed(() => person.value?.name)
 
 function photoCountText(count: number) {
   return `${count.toLocaleString()} photo${count === 1 ? '' : 's'}`
@@ -67,6 +70,7 @@ watch(personResponse, () => {
 useRefreshFunction(() => {
   if (personId.value) peopleStore.fetchPersonMedia(personId.value, false)
 })
+usePageTitle(personTitle, { fallback: 'Person' })
 </script>
 
 <template>

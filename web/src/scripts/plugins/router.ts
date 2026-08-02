@@ -4,9 +4,10 @@ import TimelineView from '@/vues/views/main/TimelineView.vue'
 import { useSnackbarsStore } from '@/scripts/stores/snackbarStore.ts'
 import { useAuthStore } from '@/scripts/stores/authStore.ts'
 import { useTimelineStore } from '@/scripts/stores/timeline/timelineStore.ts'
+import { useTitleStore } from '@/scripts/stores/titleStore.ts'
 
 const ViewPhoto = () => import('@/vues/views/main/ViewPhoto.vue')
-// todo: set <title> based on which page you're viewing
+
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
@@ -20,6 +21,7 @@ const router = createRouter({
           path: '',
           name: 'timeline',
           component: TimelineView,
+          meta: { title: 'Photos' },
           children: [
             {
               path: 'view/:mediaId',
@@ -31,12 +33,13 @@ const router = createRouter({
         {
           path: 'share/:viewerType/:mediaId',
           name: 'share',
-          meta: { requiresAuth: false },
+          meta: { requiresAuth: false, title: 'Shared Media' },
           component: () => import('@/vues/views/main/ShareView.vue'),
         },
         {
           path: 'daily/:cardId',
           name: 'daily-card-viewer',
+          meta: { title: 'Daily' },
           component: () => import('@/vues/components/timeline/daily-cards/DailyViewer.vue'),
           children: [
             {
@@ -49,11 +52,13 @@ const router = createRouter({
         {
           path: 'people',
           name: 'people',
+          meta: { title: 'People' },
           component: () => import('@/vues/views/library/PeopleLibrary.vue'),
         },
         {
           path: 'person/:personId',
           name: 'person-view',
+          meta: { fallbackTitle: 'Person' },
           component: () => import('@/vues/views/library/PersonView.vue'),
           children: [
             {
@@ -66,11 +71,13 @@ const router = createRouter({
         {
           path: 'cameras',
           name: 'cameras',
+          meta: { title: 'Cameras' },
           component: () => import('@/vues/views/library/CamerasLibrary.vue'),
         },
         {
           path: 'camera/:cameraMake/:cameraModel',
           name: 'camera-view',
+          meta: { fallbackTitle: 'Camera' },
           component: () => import('@/vues/views/library/CameraView.vue'),
           children: [
             {
@@ -83,6 +90,7 @@ const router = createRouter({
         {
           path: 'explore',
           name: 'explore',
+          meta: { title: 'Explore' },
           component: () => import('@/vues/views/main/ExploreView.vue'),
           children: [
             {
@@ -95,6 +103,7 @@ const router = createRouter({
         {
           path: 'explore/location/:locationId',
           name: 'explore-location-view',
+          meta: { fallbackTitle: 'Place' },
           component: () => import('@/vues/views/main/LocationView.vue'),
           children: [
             {
@@ -107,6 +116,7 @@ const router = createRouter({
         {
           path: 'bin',
           name: 'bin',
+          meta: { title: 'Bin' },
           component: () => import('@/vues/views/main/BinView.vue'),
           children: [
             {
@@ -119,6 +129,7 @@ const router = createRouter({
         {
           path: 'storage',
           name: 'storage',
+          meta: { title: 'Storage' },
           component: () => import('@/vues/views/main/StorageView.vue'),
           children: [
             {
@@ -131,6 +142,7 @@ const router = createRouter({
         {
           path: 'storage/review',
           name: 'storage-review',
+          meta: { title: 'Storage Review' },
           component: () => import('@/vues/views/main/StorageReviewView.vue'),
           children: [
             {
@@ -143,6 +155,7 @@ const router = createRouter({
         {
           path: 'storage/blurry',
           name: 'storage-blurry',
+          meta: { title: 'Blurry Photos' },
           component: () => import('@/vues/views/main/StorageReviewView.vue'),
           children: [
             {
@@ -155,6 +168,7 @@ const router = createRouter({
         {
           path: 'map',
           name: 'map',
+          meta: { title: 'Map' },
           component: () => import('@/vues/views/main/MapView.vue'),
           children: [
             {
@@ -167,33 +181,37 @@ const router = createRouter({
         {
           path: 'albums',
           name: 'albums',
+          meta: { title: 'Albums' },
           component: () => import('@/vues/views/library/AlbumsLibrary.vue'),
         },
         {
           path: 'settings',
           name: 'settings',
+          meta: { title: 'Settings' },
           component: () => import('@/vues/views/main/SettingsView.vue'),
         },
         {
           path: 'activity',
           name: 'activity',
+          meta: { title: 'Activity' },
           component: () => import('@/vues/views/main/ActivityView.vue'),
         },
         {
           path: 'admin',
           name: 'admin',
-          meta: { requiresAdmin: true },
+          meta: { requiresAdmin: true, title: 'Admin' },
           component: () => import('@/vues/views/main/AdminView.vue'),
         },
         {
           path: 'user/:userId/:name',
           name: 'profile',
+          meta: { fallbackTitle: 'Profile' },
           component: () => import('@/vues/views/main/ProfileView.vue'),
         },
         {
           path: 'album/:albumId',
           name: 'album-view',
-          meta: { requiresAuth: false },
+          meta: { requiresAuth: false, fallbackTitle: 'Album' },
           component: () => import('@/vues/views/library/AlbumView.vue'),
           children: [
             {
@@ -206,6 +224,7 @@ const router = createRouter({
         {
           path: 'search',
           name: 'search',
+          meta: { fallbackTitle: 'Search' },
           component: () => import('@/vues/views/main/SearchView.vue'),
           children: [
             {
@@ -218,7 +237,7 @@ const router = createRouter({
         {
           path: '/import-album/:token',
           name: 'import-album',
-          meta: { requiresAuth: true },
+          meta: { requiresAuth: true, title: 'Import Album' },
           component: () => import('@/vues/views/main/ImportAlbumView.vue'),
         },
       ],
@@ -226,30 +245,55 @@ const router = createRouter({
     {
       path: '/login',
       name: 'login',
-      meta: { guest: true },
+      meta: { guest: true, title: 'Login' },
       component: () => import('@/vues/views/auth/LoginView.vue'),
     },
     {
       path: '/register',
       name: 'register',
-      meta: { guest: true },
+      meta: { guest: true, title: 'Register' },
       component: () => import('@/vues/views/auth/RegisterView.vue'),
     },
     {
       path: '/onboarding',
       name: 'onboarding',
-      meta: { requiresAuth: true, requiresAdmin: true },
+      meta: { requiresAuth: true, requiresAdmin: true, title: 'Setup' },
       component: () => import('@/vues/views/onboarding/OnboardingView.vue'),
     },
     {
       path: '/:pathMatch(.*)*',
       name: 'not-found',
+      meta: { title: 'Not found' },
       component: () => import('@/vues/views/NotFoundView.vue'),
     },
   ],
 })
 
-let sessionChecked = false // Tracks if cold-start authentication has been resolved
+router.afterEach((to) => {
+  const titleStore = useTitleStore()
+
+  const isViewMediaRoute = to.name?.toString().startsWith('view-photo-')
+
+  if (!isViewMediaRoute) {
+    titleStore.setDetailTitle(null)
+  }
+
+  const matchedRoute =
+    isViewMediaRoute && to.matched.length > 1
+      ? to.matched[to.matched.length - 2]
+      : to.matched[to.matched.length - 1]
+
+  const titleMeta = matchedRoute?.meta.title as string | undefined
+  const fallbackMeta = matchedRoute?.meta.fallbackTitle as string | undefined
+
+  if (titleMeta) {
+    titleStore.setPageTitle(titleMeta)
+  } else if (!fallbackMeta) {
+    titleStore.setPageTitle(null)
+  }
+})
+
+let sessionChecked = false
 let onAuthHandled = false
 
 export function registerNavigationGuard() {
@@ -258,20 +302,16 @@ export function registerNavigationGuard() {
   router.beforeEach(async (to) => {
     const authStore = useAuthStore()
 
-    // --- Authentication Initialization ---
-    // Cold-start check: determine active session on page reload via standard cookie authorization
     if (!sessionChecked) {
       sessionChecked = true
       try {
         await authStore.fetchCurrentUser()
       } catch (error) {
         console.warn('Session restore failed or no active session:', error)
-        // Ensure client state is completely cleared on failed load
         await authStore.logout(false)
       }
     }
 
-    // --- Get Fresh Auth State ---
     const isAuthenticated = authStore.isAuthenticated
     const isAdmin = authStore.isAdmin
 
@@ -282,18 +322,15 @@ export function registerNavigationGuard() {
       onAuthHandled = false
     }
 
-    // --- "Onboarding Needed" Redirect Logic ---
     const needsOnboarding =
       isAdmin && (authStore.user?.mediaFolder === null || authStore.user?.mediaFolder === undefined)
     if (needsOnboarding && to.name !== 'onboarding') {
       return { name: 'onboarding' }
     }
-    // If onboarding is needed, and we are already going to the onboarding page, allow it.
     if (needsOnboarding && to.name === 'onboarding') {
       return true
     }
 
-    // --- Admin Route Logic ---
     if (to.meta.requiresAdmin) {
       if (isAuthenticated && isAdmin) {
         return true
@@ -302,23 +339,19 @@ export function registerNavigationGuard() {
         if (isAuthenticated) {
           return { name: 'timeline' }
         } else {
-          console.warn('[router -> 2] redirect to /login')
           return { name: 'login' }
         }
       }
     }
 
-    // --- Authenticated Route Logic ---
     if (to.meta.requiresAuth) {
       if (isAuthenticated) {
         return true
       } else {
-        console.warn('[router meta requires auth] redirect to /login')
         return { name: 'login' }
       }
     }
 
-    // --- Guest Route Logic (for pages like Login and Register) ---
     if (to.meta.guest) {
       if (isAuthenticated) {
         return { name: 'timeline' }
@@ -327,13 +360,11 @@ export function registerNavigationGuard() {
       }
     }
 
-    // Slightly faster load time for timeline
     if (to.name === 'timeline') {
       const timelineStore = useTimelineStore()
       if (!timelineStore.isInitialized) timelineStore.initialize().then()
     }
 
-    // --- Fallback for public routes ---
     return true
   })
 }

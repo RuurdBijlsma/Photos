@@ -11,6 +11,7 @@ import { useSearchStore } from '@/scripts/stores/searchStore.ts'
 import { useRefreshFunction } from '@/scripts/composables/useRefreshFunction.ts'
 import ThumbnailImg from '@/vues/components/ui/ThumbnailImg.vue'
 import { getThumbnailHeight } from '@/scripts/utils.ts'
+import { usePageTitle } from '@/scripts/composables/usePageTitle.ts'
 
 const snackStore = useSnackbarsStore()
 const searchStore = useSearchStore()
@@ -218,6 +219,7 @@ watch([() => route.query, () => searchStore.searchImage], () => executeSearch(fa
 })
 
 useRefreshFunction(() => executeSearch(false, false))
+usePageTitle(query, { fallback: 'Search' })
 </script>
 
 <template>
