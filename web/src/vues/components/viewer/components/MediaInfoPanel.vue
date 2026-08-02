@@ -526,6 +526,7 @@ const showCameraSection = computed(() => {
   font-weight: 500;
   opacity: 0.7;
   display: flex;
+  user-select: text;
   align-items: center;
 }
 

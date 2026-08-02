@@ -2,68 +2,203 @@
 import { useSystemStore } from '@/scripts/stores/systemStore.ts'
 import { prettyBytes } from '@/scripts/utils.ts'
 import { computed } from 'vue'
+import { useRoute } from 'vue-router'
 
 const systemStore = useSystemStore()
+const route = useRoute()
+
 const diskStats = computed(() => systemStore.stats.disk)
-const usedPercentage = computed(
-  () => (diskStats.value.mediaDrive.diskUsed / diskStats.value.mediaDrive.diskTotal) * 100,
-)
-const thumbsUsedPercentage = computed(
-  () => (diskStats.value.appDataDrive.diskUsed / diskStats.value.appDataDrive.diskTotal) * 100,
-)
+const isStorageActive = computed(() => route.path.startsWith('/storage'))
+
+const mediaUsedPct = computed(() => {
+  const total = diskStats.value?.mediaDrive?.diskTotal || 0
+  if (!total) return 0
+  return Math.min(100, Math.max(0, (diskStats.value.mediaDrive.diskUsed / total) * 100))
+})
+
+const appDataUsedPct = computed(() => {
+  const total = diskStats.value?.appDataDrive?.diskTotal || 0
+  if (!total) return 0
+  return Math.min(100, Math.max(0, (diskStats.value.appDataDrive.diskUsed / total) * 100))
+})
+
+function getProgressColor(pct: number) {
+  if (pct >= 90) return 'error'
+  if (pct >= 80) return 'warning'
+  return 'primary'
+}
 </script>
 
 <template>
-  <div class="storage-container">
-    <div class="storage-info">
-      <p v-if="!diskStats.areSameDrive" class="drive-descriptor">Media drive</p>
+  <router-link
+    to="/storage"
+    class="storage-card"
+    v-ripple
+    :class="{ 'storage-card--active': isStorageActive }"
+  >
+    <!-- Media / Main Storage Drive -->
+    <div class="drive-section">
+      <div class="drive-header">
+        <div class="drive-title-wrap">
+          <v-icon
+            size="20"
+            class="drive-icon"
+            :color="isStorageActive ? 'primary' : 'on-surface-variant'"
+          >
+            mdi-cloud-outline
+          </v-icon>
+          <span class="drive-title">{{ diskStats.areSameDrive ? 'Storage' : 'Media Drive' }}</span>
+        </div>
+        <span
+          class="pct-badge"
+          :class="{
+            'pct-badge--warning': mediaUsedPct >= 80 && mediaUsedPct < 90,
+            'pct-badge--error': mediaUsedPct >= 90,
+          }"
+        >
+          {{ mediaUsedPct.toFixed(0) }}%
+        </span>
+      </div>
+
       <v-progress-linear
-        class="progress-linear"
-        :model-value="usedPercentage"
-        color="primary"
-        rounded-bar
+        :model-value="mediaUsedPct"
+        :color="getProgressColor(mediaUsedPct)"
+        height="5"
+        rounded
+        class="storage-progress"
       />
-      <p class="usage-text">
-        {{ prettyBytes(diskStats.mediaDrive.diskUsed, 1) }} of
-        {{ prettyBytes(diskStats.mediaDrive.diskTotal, 1) }} used
-      </p>
+
+      <div class="drive-footer">
+        <span>
+          {{ prettyBytes(diskStats.mediaDrive.diskUsed, 1) }} of
+          {{ prettyBytes(diskStats.mediaDrive.diskTotal, 1) }}
+        </span>
+        <span>{{ prettyBytes(diskStats.mediaDrive.diskAvailable, 1) }} free</span>
+      </div>
     </div>
-    <div class="storage-info" v-if="!diskStats.areSameDrive">
-      <p class="drive-descriptor">App data drive</p>
-      <v-progress-linear
-        class="progress-linear"
-        :model-value="thumbsUsedPercentage"
-        color="primary"
-        rounded-bar
-      />
-      <p class="usage-text">
-        {{ prettyBytes(diskStats.appDataDrive.diskUsed, 1) }} of
-        {{ prettyBytes(diskStats.appDataDrive.diskTotal, 1) }} used
-      </p>
-    </div>
-  </div>
+
+    <!-- App Data Drive (when separate) -->
+    <template v-if="!diskStats.areSameDrive">
+      <v-divider class="my-3 opacity-20" />
+      <div class="drive-section">
+        <div class="drive-header">
+          <div class="drive-title-wrap">
+            <v-icon size="18" color="on-surface-variant" class="drive-icon">
+              mdi-folder-outline
+            </v-icon>
+            <span class="drive-title text-caption font-weight-medium">App Data</span>
+          </div>
+          <span
+            class="pct-badge"
+            :class="{
+              'pct-badge--warning': appDataUsedPct >= 80 && appDataUsedPct < 90,
+              'pct-badge--error': appDataUsedPct >= 90,
+            }"
+          >
+            {{ appDataUsedPct.toFixed(0) }}%
+          </span>
+        </div>
+
+        <v-progress-linear
+          :model-value="appDataUsedPct"
+          :color="getProgressColor(appDataUsedPct)"
+          height="4"
+          rounded
+          class="storage-progress"
+        />
+
+        <div class="drive-footer">
+          <span>
+            {{ prettyBytes(diskStats.appDataDrive.diskUsed, 1) }} of
+            {{ prettyBytes(diskStats.appDataDrive.diskTotal, 1) }}
+          </span>
+          <span>{{ prettyBytes(diskStats.appDataDrive.diskAvailable, 1) }} free</span>
+        </div>
+      </div>
+    </template>
+  </router-link>
 </template>
 
 <style scoped>
-.storage-info {
-  padding: 15px;
-  padding-bottom: 10px;
-  padding-top: 0;
+.storage-card {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  padding: 20px;
+  border-radius: 32px;
+  background-color: rgba(var(--v-theme-background), 0.2);
+  margin-top: auto;
+  margin-bottom: 8px;
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    transform 0.15s ease;
+  user-select: none;
 }
 
-.progress-linear {
-  opacity: 0.7;
+.drive-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
-.drive-descriptor {
-  font-size: 12px;
+.drive-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.drive-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.drive-icon {
+  flex-shrink: 0;
+  color: rgb(var(--v-theme-on-background));
+  opacity: 0.8;
+}
+
+.drive-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1.2;
+  color: rgb(var(--v-theme-on-background));
+  opacity: 0.8;
+}
+
+.pct-badge {
+  font-size: 0.725rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 8px;
+  background-color: rgba(var(--v-theme-on-surface), 0.08);
+  color: rgb(var(--v-theme-on-surface));
+  color: rgb(var(--v-theme-on-surface-variant));
+}
+
+.pct-badge--warning {
+  background-color: rgba(var(--v-theme-warning), 0.2);
+  color: rgb(var(--v-theme-warning));
+}
+
+.pct-badge--error {
+  background-color: rgba(var(--v-theme-error), 0.2);
+  color: rgb(var(--v-theme-error));
+}
+
+.storage-progress {
+  margin: 2px 0;
+  opacity: 0.9;
+}
+
+.drive-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.725rem;
+  color: rgb(var(--v-theme-on-surface-variant));
   font-weight: 500;
-}
-
-.usage-text {
-  margin-top: 6px;
-  font-size: 12px;
-  color: rgba(var(--v-theme-on-background), 0.8);
-  font-weight: 400;
 }
 </style>

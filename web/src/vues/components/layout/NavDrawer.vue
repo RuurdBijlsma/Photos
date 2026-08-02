@@ -174,7 +174,8 @@ useEventListener(document, 'mousemove', (e) => {
 
       <v-list-item rounded prepend-icon="mdi-trash-can-outline" title="Bin" to="/bin" />
 
-      <v-list-item title="Storage" prepend-icon="mdi-cloud-outline" class="mb-3" to="/storage" />
+      <v-spacer />
+
       <storage-overview />
     </v-list>
     <div v-else class="collapsed-list">
@@ -268,6 +269,7 @@ useEventListener(document, 'mousemove', (e) => {
   gap: 5px;
   display: flex;
   flex-direction: column;
+  height: 100%;
 }
 
 .nav-list:deep(.v-list-item) {
