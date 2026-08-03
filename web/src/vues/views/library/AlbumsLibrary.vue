@@ -223,20 +223,12 @@ useRefreshFunction(() => albumStore.fetchUserAlbums())
         </div>
       </header>
 
-      <!-- Grid Layout -->
-      <div v-if="showLoading" class="album-grid">
-        <div v-for="i in 9" :key="i" class="album-card-skeleton">
-          <v-skeleton-loader
-            type="card"
-            elevation="1"
-            color="surface-container-low"
-            height="265"
-            width="200"
-            class="rounded-xl"
-          />
-        </div>
+      <!-- Loading State -->
+      <div v-if="showLoading" class="loading-state">
+        <v-progress-circular indeterminate color="primary" size="48" />
       </div>
 
+      <!-- Grid Layout -->
       <div v-else class="album-grid">
         <router-link
           v-for="album in sortedAlbums"
@@ -359,6 +351,13 @@ useRefreshFunction(() => albumStore.fetchUserAlbums())
   font-size: 0.9rem;
   font-weight: 400;
   color: rgb(var(--v-theme-on-surface-variant));
+}
+
+.loading-state {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 100px 0;
 }
 
 .album-grid {

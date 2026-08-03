@@ -21,7 +21,6 @@ export const useAlbumStore = defineStore('album', () => {
   const albumMediaPromises = new Map<string, Promise<FullAlbumMediaResponse>>()
 
   async function fetchUserAlbums() {
-    console.warn("fetchUserAlbums")
     userAlbumsLoading.value = true
     try {
       const { data } = await albumService.getUserAlbums()
