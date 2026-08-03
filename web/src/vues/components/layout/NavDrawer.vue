@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { useRoute } from 'vue-router'
-import { computed } from 'vue'
+import { computed, useTemplateRef } from 'vue'
 import { useAlbumStore } from '@/scripts/stores/albumStore.ts'
 import ThumbnailImg from '@/vues/components/ui/ThumbnailImg.vue'
 import { useSystemStore } from '@/scripts/stores/systemStore.ts'
-import { useEventListener, useStorage } from '@vueuse/core'
+import { useEventListener, useScroll, useStorage } from '@vueuse/core'
 import { useTimelineStore } from '@/scripts/stores/timeline/timelineStore.ts'
 import { usePeopleStore } from '@/scripts/stores/peopleStore.ts'
 import { useTheme } from 'vuetify/framework'
@@ -60,6 +60,9 @@ useEventListener(document, 'mousemove', (e) => {
   if (!isResizing) return
   collapseDrawer.value = e.clientX < COLLAPSE_THRESHOLD
 })
+
+const navList = useTemplateRef('navList')
+const { isScrolling } = useScroll(() => navList.value?.$el as HTMLElement | null, { idle: 1000 })
 </script>
 
 <template>
@@ -70,7 +73,13 @@ useEventListener(document, 'mousemove', (e) => {
     class="drawer-container"
     :width="collapseDrawer ? 60 : 256"
   >
-    <v-list color="primary-darken-1" v-if="!collapseDrawer" class="nav-list">
+    <v-list
+      ref="navList"
+      color="primary-darken-1"
+      v-if="!collapseDrawer"
+      class="nav-list"
+      :class="{ 'is-scrolling': isScrolling }"
+    >
       <v-list-item
         class="mt-3"
         rounded
@@ -270,33 +279,36 @@ useEventListener(document, 'mousemove', (e) => {
   display: flex;
   flex-direction: column;
   height: 100%;
+  overflow-y: auto;
+}
+
+.nav-list::-webkit-scrollbar {
+  width: 3px;
+  height: 3px;
+}
+
+.nav-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.nav-list::-webkit-scrollbar-thumb {
+  background-color: transparent;
+  border-radius: 10px;
+  transition: background-color 0.3s ease;
+}
+
+.nav-list.is-scrolling::-webkit-scrollbar-thumb,
+.nav-list:hover::-webkit-scrollbar-thumb {
+  background-color: rgba(var(--v-theme-primary), 0.4);
 }
 
 .nav-list:deep(.v-list-item) {
   border-radius: 40px;
 }
 
-.albums-nav {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
-
-.albums-nav-item {
-  flex-grow: 1;
-}
-
 .album-sub-item {
   padding-top: 4px;
   padding-bottom: 4px;
-}
-
-.albums-nav-btn {
-  transition: transform 0.3s ease-in-out;
-}
-
-.point-down {
-  transform: rotate(180deg);
 }
 
 .collapsed-list {
@@ -305,5 +317,12 @@ useEventListener(document, 'mousemove', (e) => {
   display: flex;
   flex-direction: column;
   gap: 5px;
+  height: 100%;
+  overflow-y: auto;
+}
+
+.collapsed-list::-webkit-scrollbar {
+  width: 3px;
+  height: 3px;
 }
 </style>
