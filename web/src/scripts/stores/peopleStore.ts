@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { shallowRef, triggerRef } from 'vue'
+import { ref, shallowRef, triggerRef } from 'vue'
 import type { FullPersonMediaResponse, PersonInfo } from '@/scripts/types/generated/timeline.ts'
 import { useSnackbarsStore } from '@/scripts/stores/snackbarStore.ts'
 import peopleService from '@/scripts/services/peopleService.ts'
@@ -14,18 +14,22 @@ export const usePeopleStore = defineStore('people', () => {
   const snackbarStore = useSnackbarsStore()
   const dialogs = useDialogStore()
   const router = useRouter()
+  const peopleLoading = ref(false)
 
   const people = useObjStorage<PersonInfo[]>('userPeople', [])
   const personMedia = shallowRef(new Map<string, FullPersonMediaResponse>())
   const personMediaPromises = new Map<string, Promise<FullPersonMediaResponse>>()
 
   async function fetchPeople() {
+    peopleLoading.value = true
     try {
       const response = await peopleService.list()
       console.log('People list', response.people)
       people.value = response.people
     } catch (e) {
       snackbarStore.error("Can't fetch people", e)
+    } finally {
+      peopleLoading.value = false
     }
   }
 
@@ -118,6 +122,7 @@ export const usePeopleStore = defineStore('people', () => {
   return {
     people,
     personMedia,
+    peopleLoading,
 
     fetchPeople,
     fetchPersonMedia,
