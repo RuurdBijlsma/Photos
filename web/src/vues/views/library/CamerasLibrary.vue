@@ -1,19 +1,14 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref, computed } from 'vue'
+import { onMounted, computed } from 'vue'
 import MainLayoutContainer from '@/vues/components/MainLayoutContainer.vue'
-import { useSnackbarsStore } from '@/scripts/stores/snackbarStore.ts'
 import GlowThumbnail from '@/vues/components/ui/GlowThumbnail.vue'
 import { useCameraStore } from '@/scripts/stores/cameraStore.ts'
 import { useStorage } from '@vueuse/core'
 import type { CameraInfo } from '@/scripts/types/generated/timeline.ts'
 import { useRefreshFunction } from '@/scripts/composables/useRefreshFunction.ts'
+import { useDelayedBoolean } from '@/scripts/composables/useDelayedBoolean.ts'
 
-const snackbarStore = useSnackbarsStore()
 const cameraStore = useCameraStore()
-
-const loading = ref(false)
-const showSkeleton = ref(false)
-let skeletonTimeout: ReturnType<typeof setTimeout> | null = null
 
 // Sorting State
 const currentSortField = useStorage<'make' | 'model' | 'photoCount'>(
@@ -72,27 +67,8 @@ const sortedCameras = computed(() => {
   })
 })
 
-async function loadCameras() {
-  loading.value = true
-  showSkeleton.value = false
-
-  if (skeletonTimeout) clearTimeout(skeletonTimeout)
-
-  // Set skeleton to appear only after 150ms to prevent brief flashes
-  skeletonTimeout = setTimeout(() => {
-    showSkeleton.value = true
-  }, 150)
-
-  try {
-    await cameraStore.fetchCameras()
-  } catch (e) {
-    snackbarStore.error('Could not fetch cameras', e)
-  } finally {
-    loading.value = false
-    showSkeleton.value = false
-    if (skeletonTimeout) clearTimeout(skeletonTimeout)
-  }
-}
+const flickerLoad = useDelayedBoolean(() => cameraStore.camerasLoading, 150)
+const showLoading = computed(() => flickerLoad.value && sortedCameras.value.length === 0)
 
 function handleFieldChange(field: 'make' | 'model' | 'photoCount') {
   currentSortField.value = field
@@ -113,14 +89,10 @@ function getCameraThumbnailId(camera: CameraInfo) {
 }
 
 onMounted(() => {
-  loadCameras()
+  cameraStore.fetchCameras()
 })
 
-onUnmounted(() => {
-  if (skeletonTimeout) clearTimeout(skeletonTimeout)
-})
-
-useRefreshFunction(() => loadCameras())
+useRefreshFunction(() => cameraStore.fetchCameras())
 </script>
 
 <template>
@@ -174,21 +146,22 @@ useRefreshFunction(() => loadCameras())
         </div>
       </header>
 
-      <!-- Grid Layout (Skeleton Loaders) -->
-      <div v-if="showSkeleton" class="album-grid">
-        <div v-for="i in 9" :key="i" class="album-card-skeleton">
-          <v-skeleton-loader
-            type="card"
-            elevation="1"
-            color="surface-container-low"
-            height="265"
-            width="200"
-            class="rounded-xl"
-          />
-        </div>
+      <!-- Loading State -->
+      <div v-if="showLoading" class="loading-state">
+        <v-progress-circular indeterminate color="primary" size="48" />
       </div>
 
-      <!-- Grid Layout (Actual Content) -->
+      <!-- Empty State -->
+      <div
+        v-else-if="!cameraStore.camerasLoading && sortedCameras.length === 0"
+        class="empty-state"
+      >
+        <v-icon icon="mdi-camera" size="100" class="mb-4 opacity-20" />
+        <h2>No cameras found</h2>
+        <p>Once you import media with camera metadata, they will appear here.</p>
+      </div>
+
+      <!-- Grid Layout -->
       <div v-else class="album-grid">
         <router-link
           v-for="camera in sortedCameras"
@@ -236,13 +209,6 @@ useRefreshFunction(() => loadCameras())
           </div>
         </router-link>
       </div>
-
-      <!-- Empty State -->
-      <div v-if="!loading && sortedCameras.length === 0" class="empty-state">
-        <v-icon icon="mdi-camera" size="100" class="mb-4 opacity-20" />
-        <h2>No cameras found</h2>
-        <p>Once you import media with camera metadata, they will appear here.</p>
-      </div>
     </div>
   </main-layout-container>
 </template>
@@ -271,6 +237,13 @@ useRefreshFunction(() => loadCameras())
   font-size: 0.9rem;
   font-weight: 400;
   color: rgb(var(--v-theme-on-surface-variant));
+}
+
+.loading-state {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 100px 0;
 }
 
 .album-grid {
