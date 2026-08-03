@@ -14,7 +14,7 @@ pub mod api;
 pub mod binary_setup;
 pub mod caching;
 pub mod database;
+pub mod graceful_exit;
 pub mod job_queue;
 pub mod s2s_client;
 pub mod utils;
-pub mod graceful_exit;
