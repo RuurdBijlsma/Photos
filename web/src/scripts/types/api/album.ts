@@ -10,7 +10,7 @@ import type { PannellumConfig } from '@/scripts/types/api/pannellumConfig.ts'
 // Enums
 export type AlbumRole = 'Owner' | 'Contributor' | 'Viewer'
 export type SortDirection = 'asc' | 'desc'
-export type AlbumSortField = 'updatedAt' | 'latestPhoto' | 'name'
+export type AlbumSortField = 'updatedAt' | 'latestMediaItemTimestamp' | 'name'
 export type AlbumSort = 'DateAsc' | 'DateDesc' | 'AddedAsc' | 'AddedDesc' | 'None'
 
 // Entities
