@@ -202,10 +202,12 @@ export function formatNaiveDate(date: Date): string {
 export function useObjStorage<T>(
   key: string,
   initialValue: T,
+  shallow: boolean = false,
   storage: Storage = localStorage,
 ): RemovableRef<T> {
   return useStorage<T>(key, initialValue, storage, {
     serializer: StorageSerializers.object,
+    shallow,
   })
 }
 

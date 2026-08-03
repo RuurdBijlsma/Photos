@@ -24,6 +24,7 @@ export const useBinStore = defineStore('bin', () => {
     isLoading.value = true
     try {
       const response = await binService.getBinTimeline()
+      await new Promise((resolve) => setTimeout(resolve, 1000))
       binItems.value = response.items
     } catch (e) {
       snackbarStore.error("Can't fetch bin items", e)
