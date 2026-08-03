@@ -58,7 +58,7 @@ export const useSnackbarsStore = defineStore('snackbars', () => {
    * Adds a snackbar to the queue and returns its ID.
    */
   function enqueue(options: SnackOptions): string {
-    const id = crypto.randomUUID()
+    const id = Math.round(Math.random() * 1e16).toString()
     const defaultTimeout = 10000
 
     const snack: Snack = {

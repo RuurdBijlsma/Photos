@@ -1,6 +1,6 @@
 use color_eyre::Result;
 use common_services::binary_setup::setup_binary;
-use worker::graceful_exit::get_kill_signal;
+use common_services::graceful_exit::get_kill_signal;
 use worker_scaler::start_scaler;
 
 #[tokio::main]

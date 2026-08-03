@@ -92,7 +92,7 @@ useRefreshFunction(() => {
     exploreStore.fetchLocationData(locationId.value)
   }
 })
-usePageTitle(primaryName, {fallback:'Place'})
+usePageTitle(primaryName, { fallback: 'Place' })
 </script>
 
 <template>

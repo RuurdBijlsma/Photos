@@ -79,11 +79,11 @@ function percentage(used: number, total: number) {
           <h2>{{ diskStats.areSameDrive ? 'Storage usage' : 'Media drive' }}</h2>
           <div class="usage-used-available">
             <span>
-              {{ prettyBytes(diskStats.mediaDrive.diskUsed, 1) }} of
-              {{ prettyBytes(diskStats.mediaDrive.diskTotal, 1) }} used
+              {{ prettyBytes(diskStats.mediaDrive.diskUsed) }} of
+              {{ prettyBytes(diskStats.mediaDrive.diskTotal) }} used
             </span>
             <span>•</span>
-            <span> {{ prettyBytes(diskStats.mediaDrive.diskAvailable, 1) }} available </span>
+            <span> {{ prettyBytes(diskStats.mediaDrive.diskAvailable) }} available </span>
           </div>
         </div>
         <strong class="usage-percentage">{{ Math.round(mediaUsedPercentage) }}%</strong>
@@ -116,17 +116,17 @@ function percentage(used: number, total: number) {
         <div class="legend-item" v-if="mediaDriveUsage.mediaBytes > 0">
           <span class="legend-dot media-dot"></span>
           <span class="legend-label">Media:</span>
-          <strong class="legend-value">{{ prettyBytes(mediaDriveUsage.mediaBytes, 1) }}</strong>
+          <strong class="legend-value">{{ prettyBytes(mediaDriveUsage.mediaBytes) }}</strong>
         </div>
         <div class="legend-item" v-if="mediaDriveUsage.appDataBytes > 0">
           <span class="legend-dot thumbnail-dot"></span>
           <span class="legend-label">App data:</span>
-          <strong class="legend-value">{{ prettyBytes(mediaDriveUsage.appDataBytes, 1) }}</strong>
+          <strong class="legend-value">{{ prettyBytes(mediaDriveUsage.appDataBytes) }}</strong>
         </div>
         <div class="legend-item" v-if="mediaDriveUsage.otherBytes > 0">
           <span class="legend-dot other-dot"></span>
           <span class="legend-label">Other files:</span>
-          <strong class="legend-value">{{ prettyBytes(mediaDriveUsage.otherBytes, 1) }}</strong>
+          <strong class="legend-value">{{ prettyBytes(mediaDriveUsage.otherBytes) }}</strong>
         </div>
       </div>
     </div>
@@ -138,11 +138,11 @@ function percentage(used: number, total: number) {
           <h2>App data drive</h2>
           <div class="usage-used-available">
             <span>
-              {{ prettyBytes(diskStats.appDataDrive.diskUsed, 1) }} of
-              {{ prettyBytes(diskStats.appDataDrive.diskTotal, 1) }} used
+              {{ prettyBytes(diskStats.appDataDrive.diskUsed) }} of
+              {{ prettyBytes(diskStats.appDataDrive.diskTotal) }} used
             </span>
             <span>•</span>
-            <span> {{ prettyBytes(diskStats.appDataDrive.diskAvailable, 1) }} available </span>
+            <span> {{ prettyBytes(diskStats.appDataDrive.diskAvailable) }} available </span>
           </div>
         </div>
         <strong class="usage-percentage">{{ Math.round(appDataUsedPercentage) }}%</strong>
@@ -169,12 +169,12 @@ function percentage(used: number, total: number) {
         <div class="legend-item" v-if="appDataDriveUsage.appDataBytes > 0">
           <span class="legend-dot thumbnail-dot"></span>
           <span class="legend-label">App data:</span>
-          <strong class="legend-value">{{ prettyBytes(appDataDriveUsage.appDataBytes, 1) }}</strong>
+          <strong class="legend-value">{{ prettyBytes(appDataDriveUsage.appDataBytes) }}</strong>
         </div>
         <div class="legend-item" v-if="appDataDriveUsage.otherBytes > 0">
           <span class="legend-dot other-dot"></span>
           <span class="legend-label">Other files:</span>
-          <strong class="legend-value">{{ prettyBytes(appDataDriveUsage.otherBytes, 1) }}</strong>
+          <strong class="legend-value">{{ prettyBytes(appDataDriveUsage.otherBytes) }}</strong>
         </div>
       </div>
     </div>

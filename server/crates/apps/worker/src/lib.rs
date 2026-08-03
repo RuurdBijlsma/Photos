@@ -10,7 +10,6 @@
 )]
 
 pub mod context;
-pub mod graceful_exit;
 pub mod handlers;
 pub mod jobs;
 pub mod macros;

@@ -56,10 +56,10 @@ const appDataUsedPct = computed(() => {
 
       <div class="drive-footer">
         <span>
-          {{ prettyBytes(diskStats.mediaDrive.diskUsed, 1) }} of
-          {{ prettyBytes(diskStats.mediaDrive.diskTotal, 1) }}
+          {{ prettyBytes(diskStats.mediaDrive.diskUsed) }} of
+          {{ prettyBytes(diskStats.mediaDrive.diskTotal) }}
         </span>
-        <span>{{ prettyBytes(diskStats.mediaDrive.diskAvailable, 1) }} free</span>
+        <span>{{ prettyBytes(diskStats.mediaDrive.diskAvailable) }} free</span>
       </div>
     </div>
 
@@ -87,10 +87,10 @@ const appDataUsedPct = computed(() => {
 
         <div class="drive-footer">
           <span>
-            {{ prettyBytes(diskStats.appDataDrive.diskUsed, 1) }} of
-            {{ prettyBytes(diskStats.appDataDrive.diskTotal, 1) }}
+            {{ prettyBytes(diskStats.appDataDrive.diskUsed) }} of
+            {{ prettyBytes(diskStats.appDataDrive.diskTotal) }}
           </span>
-          <span>{{ prettyBytes(diskStats.appDataDrive.diskAvailable, 1) }} free</span>
+          <span>{{ prettyBytes(diskStats.appDataDrive.diskAvailable) }} free</span>
         </div>
       </div>
     </template>
@@ -151,7 +151,7 @@ const appDataUsedPct = computed(() => {
   padding: 2px 7px;
   border-radius: 8px;
   background-color: rgba(var(--v-theme-on-surface), 0.08);
-  color: rgba(var(--v-theme-on-surface), .6);
+  color: rgba(var(--v-theme-on-surface), 0.6);
 }
 
 .storage-progress {
