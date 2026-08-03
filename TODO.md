@@ -1,13 +1,7 @@
 # WEB
 
-* on login redirect to where you were
-* improve messaging when you load the website and the server is off
 * view-option (like gmail), split view: if you single click a photo it opens in a right half of the window pane. Only
   works with enough screen width (desktop).
-* don't allow user to go to /onboarding if onboarding is done already.
-* setting: usebackdropblur doesnt apply everywhere.
-* preload 1440p thumbnail on grid item hover
-* re-establish ws connection if auth failed and it's refreshed automatically afterwards
 * add sort order to timeline controller and remove it as passed down prop, and use it in api requests through that prop
 * idea to fix desync timeline bug:
     * bug: timeline ids/ratios/by month might by out of sync because theyre separate requests
@@ -18,27 +12,29 @@
 * [investigate] krijg je ratio/monthItem desync als je de map eerst laad, terwijl de backend foto metadata ingest, en
   dan naar de timeline gaat? Want de map date filter heeft dan al de ratios opgevraagd in de timelineStore.
 * settings page heeft geen visible scrollbar
-
-## NEW:
-
-* improve loading indicator for albums & cameras (perhaps also people)
+* --- MEDIUM PRIO ---
+* improve messaging when you load the website and the server is off
+* on login redirect to where you were
+* don't allow user to go to /onboarding if onboarding is done already.
+* --- HIGH PRIO ---
+* preload 1440p thumbnail on grid item hover
+* When no user exists and user visits login page -> redirect to register?admin=true and show messaging to create admin
+  account
 
 # SERVER
 
-* nginx thumbnail hosting (optional maak setting voor Rust thumb hosting).
-* check of readme uitleg klopt met verse windows installatie & linux
-* better error if exiftool isnt there (worker wont work then)
-* improve speed of album/{id} endpoint
-* make single executable kind of that runs api, watcher, and worker, but have it sort of auto-scale based off number of
-  jobs. So api, watcher, autoscaler, and if theres jobs, then N amount of workers.
 * email password reset?
-* restart server? [for later]
 * backup (met export jsons / import?)
 * import albums from google photos
 * duplicate photo remover tool
+* better error if exiftool isnt there (worker wont work then)
+* --- HIGH PRIO ---
 * rotate image by changing thumbnail orientation?
 
-## NEW:
+# INFRASTRUCTURE:
 
 * make setup to host only backend, frontend could be gh pages or something?
+  * I think this would be faster than hosting web on laptop
 * update available checker
+* nginx thumbnail hosting (optional maak setting voor Rust thumb hosting).
+* restart server button?
