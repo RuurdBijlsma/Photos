@@ -1,47 +1,48 @@
-import { ref, watch, onUnmounted, toValue, type Ref, type MaybeRefOrGetter } from 'vue'
+import { ref, watch, toValue, type Ref, type MaybeRefOrGetter } from 'vue'
+import { useTimeoutFn } from '@vueuse/core'
 
-/**
- * Returns a Ref<boolean> that tracks a boolean source.
- * When the source becomes `true`, the returned ref delays changing to `true` by `delayMs`.
- * When the source becomes `false`, the returned ref changes to `false` immediately.
- *
- * @param source A ref, computed, or getter function returning a boolean
- * @param delayMs Delay in milliseconds before setting output to true (default: 150ms)
- */
-export function useDelayedBoolean(source: MaybeRefOrGetter<boolean>, delayMs = 150): Ref<boolean> {
+export interface DelayOptions {
+  /** Delay before turning true (ms). Default: 150 */
+  delayOn?: number
+  /** Delay before turning false (ms). Default: 0 */
+  delayOff?: number
+}
+
+export function useDelayedBoolean(
+  source: MaybeRefOrGetter<boolean>,
+  options: number | DelayOptions = 150,
+): Ref<boolean> {
+  const delayOn = typeof options === 'number' ? options : (options.delayOn ?? 150)
+  const delayOff = typeof options === 'number' ? 0 : (options.delayOff ?? 0)
+
   const delayedRef = ref(false)
-  let timer: ReturnType<typeof setTimeout> | null = null
 
-  const clearTimer = () => {
-    if (timer !== null) {
-      clearTimeout(timer)
-      timer = null
-    }
-  }
+  const { start: startOn, stop: stopOn } = useTimeoutFn(() => (delayedRef.value = true), delayOn, {
+    immediate: false,
+  })
+
+  const { start: startOff, stop: stopOff } = useTimeoutFn(
+    () => (delayedRef.value = false),
+    delayOff,
+    { immediate: false },
+  )
 
   watch(
     () => toValue(source),
     (isTrue) => {
-      clearTimer()
+      stopOn()
+      stopOff()
 
       if (isTrue) {
-        // Switched to true: start timer before showing loading state
-        timer = setTimeout(() => {
-          delayedRef.value = true
-          timer = null
-        }, delayMs)
+        startOn()
+      } else if (delayOff > 0) {
+        startOff()
       } else {
-        // Switched to false: instantly hide loading state
         delayedRef.value = false
       }
     },
     { immediate: true },
   )
-
-  // Clean up timer if component unmounts while request is pending
-  onUnmounted(() => {
-    clearTimer()
-  })
 
   return delayedRef
 }
