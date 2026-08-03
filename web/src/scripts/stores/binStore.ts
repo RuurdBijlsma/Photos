@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref, shallowRef } from 'vue'
+import { ref } from 'vue'
 import type { SimpleTimelineItem } from '@/scripts/types/generated/timeline.ts'
 import binService from '@/scripts/services/binService.ts'
 import { useSnackbarsStore } from '@/scripts/stores/snackbarStore.ts'
@@ -8,6 +8,7 @@ import { useSelectionStore } from '@/scripts/stores/timeline/selectionStore.ts'
 import { useAlbumStore } from '@/scripts/stores/albumStore.ts'
 import { useRefreshStore } from '@/scripts/stores/refreshStore.ts'
 import { usePeopleStore } from '@/scripts/stores/peopleStore.ts'
+import { useObjStorage } from '@/scripts/utils.ts'
 
 export const useBinStore = defineStore('bin', () => {
   const snackbarStore = useSnackbarsStore()
@@ -17,19 +18,18 @@ export const useBinStore = defineStore('bin', () => {
   const peopleStore = usePeopleStore()
   const refreshStore = useRefreshStore()
 
-  const binItems = shallowRef<SimpleTimelineItem[]>([])
-  const isLoading = ref(false)
+  const binItems = useObjStorage<SimpleTimelineItem[]>('userBinItems', [])
+  const binLoading = ref(false)
 
   async function fetchBin() {
-    isLoading.value = true
+    binLoading.value = true
     try {
       const response = await binService.getBinTimeline()
-      await new Promise((resolve) => setTimeout(resolve, 1000))
       binItems.value = response.items
     } catch (e) {
       snackbarStore.error("Can't fetch bin items", e)
     } finally {
-      isLoading.value = false
+      binLoading.value = false
     }
   }
 
@@ -118,7 +118,7 @@ export const useBinStore = defineStore('bin', () => {
 
   return {
     binItems,
-    isLoading,
+    binLoading,
     fetchBin,
     softDeleteItems,
     restoreItems,

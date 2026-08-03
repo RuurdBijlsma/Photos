@@ -1,11 +1,16 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useBinStore } from '@/scripts/stores/binStore.ts'
 import SimpleTimeline from '@/vues/components/timeline/simple-timeline/SimpleTimeline.vue'
 import { useSystemStore } from '@/scripts/stores/systemStore.ts'
-import { useRefreshFunction } from '@/scripts/composables/useRefreshFunction'
+import { useRefreshFunction } from '@/scripts/composables/useRefreshFunction.ts'
+import { useDelayedBoolean } from '@/scripts/composables/useDelayedBoolean.ts'
 
 const binStore = useBinStore()
 const systemStore = useSystemStore()
+
+const flickerLoad = useDelayedBoolean(() => binStore.binLoading, 150)
+const showLoading = computed(() => flickerLoad.value && binStore.binItems.length === 0)
 
 async function emptyBin() {
   const ids = binStore.binItems.map((item) => item.id)
@@ -48,18 +53,15 @@ useRefreshFunction(() => binStore.fetchBin(), { immediate: true })
       </header>
 
       <!-- Loading State -->
-      <div v-if="binStore.isLoading && binStore.binItems.length === 0" class="loading-state">
-        <v-progress-circular indeterminate color="primary" size="50" />
+      <div v-if="showLoading" class="loading-state">
+        <v-progress-circular indeterminate color="primary" size="48" />
       </div>
 
       <!-- Empty State -->
-      <div v-else-if="!binStore.isLoading && binStore.binItems.length === 0" class="empty-state">
+      <div v-else-if="!binStore.binLoading && binStore.binItems.length === 0" class="empty-state">
         <v-icon icon="mdi-delete-outline" size="100" class="mb-4 opacity-20" />
         <h2>Bin is empty</h2>
-        <p>
-          Once you delete photos or videos, they will appear where you have the choice to
-          permanently delete them.
-        </p>
+        <p>Once you delete photos or videos, they will appear here.</p>
       </div>
     </simple-timeline>
   </div>
@@ -98,7 +100,7 @@ useRefreshFunction(() => binStore.fetchBin(), { immediate: true })
   display: flex;
   justify-content: center;
   align-items: center;
-  height: 300px;
+  padding: 100px 0;
 }
 
 .empty-state {
