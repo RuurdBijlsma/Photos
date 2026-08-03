@@ -16,8 +16,6 @@ export const useCameraStore = defineStore('cameras', () => {
   async function fetchCameras() {
     camerasLoading.value = true
     try {
-      await new Promise((resolve) => setTimeout(resolve, 50))
-      console.warn("fetchCameras")
       const response = await cameraService.list()
       console.log('Cameras list', response.cameras)
       cameras.value = response.cameras
