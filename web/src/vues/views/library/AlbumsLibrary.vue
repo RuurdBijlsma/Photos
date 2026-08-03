@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, watch } from 'vue'
+import { computed, onMounted } from 'vue'
 import MainLayoutContainer from '@/vues/components/MainLayoutContainer.vue'
 import type { Album, AlbumSortField, SortDirection } from '@/scripts/types/api/album'
 import { useRouter } from 'vue-router'
@@ -23,6 +23,7 @@ const currentSortField = useStorage<AlbumSortField>(
   'latestMediaItemTimestamp',
 )
 const currentSortDirection = useStorage<SortDirection>('albumLibrarySortDirection', 'desc')
+
 const sortedAlbums = computed(() => {
   const albums = [...albumStore.userAlbums]
   const field = currentSortField.value
@@ -52,6 +53,7 @@ const sortedAlbums = computed(() => {
     return isAsc ? comparison : -comparison
   })
 })
+
 const flickerLoad = useDelayedBoolean(() => albumStore.userAlbumsLoading, 150)
 const showLoading = computed(() => flickerLoad.value && sortedAlbums.value.length === 0)
 
@@ -82,6 +84,7 @@ const sortDirectionIcon = computed(() => {
     ? 'mdi-sort-calendar-ascending'
     : 'mdi-sort-calendar-descending'
 })
+
 const sortDirectionTooltip = computed(() => {
   if (currentSortField.value === 'name') {
     return currentSortDirection.value === 'asc' ? 'A-Z' : 'Z-A'
@@ -92,13 +95,11 @@ const sortDirectionTooltip = computed(() => {
 function handleFieldChange(field: AlbumSortField) {
   if (currentSortField.value !== field) {
     currentSortField.value = field
-    albumStore.fetchUserAlbums()
   }
 }
 
 function toggleDirection() {
   currentSortDirection.value = currentSortDirection.value === 'asc' ? 'desc' : 'asc'
-  albumStore.fetchUserAlbums()
 }
 
 async function makeNewAlbum() {
@@ -228,6 +229,19 @@ useRefreshFunction(() => albumStore.fetchUserAlbums())
         <v-progress-circular indeterminate color="primary" size="48" />
       </div>
 
+      <!-- Empty State -->
+      <div
+        v-else-if="!albumStore.userAlbumsLoading && sortedAlbums.length === 0"
+        class="empty-state"
+      >
+        <v-icon icon="mdi-image-album" size="100" class="mb-4 opacity-20" />
+        <h2>No albums yet</h2>
+        <p>Create your first album to start organizing your memories.</p>
+        <v-btn color="primary" variant="tonal" rounded class="mt-6" @click="makeNewAlbum">
+          Create Album
+        </v-btn>
+      </div>
+
       <!-- Grid Layout -->
       <div v-else class="album-grid">
         <router-link
@@ -279,8 +293,9 @@ useRefreshFunction(() => albumStore.fetchUserAlbums())
                   @click.stop.prevent
                   class="album-shared-avatar"
                   color="primary"
-                  ><v-icon icon="mdi-share" size="23"></v-icon
-                ></v-avatar>
+                >
+                  <v-icon icon="mdi-share" size="23" />
+                </v-avatar>
               </template>
               <v-list density="compact">
                 <v-list-item @click="leaveAlbum(album.id)">
@@ -302,26 +317,16 @@ useRefreshFunction(() => albumStore.fetchUserAlbums())
               {{ album.name || 'Untitled Album' }}
             </h3>
             <p class="album-meta">
-              <span
-                >{{ album.mediaCount.toLocaleString() ?? 0 }} item{{
+              <span>
+                {{ album.mediaCount.toLocaleString() ?? 0 }} item{{
                   album.mediaCount === 1 ? '' : 's'
-                }}</span
-              >
+                }}
+              </span>
               •
               <span>{{ getAlbumTimeSpan(album) }}</span>
             </p>
           </div>
         </router-link>
-      </div>
-
-      <!-- Empty State -->
-      <div v-if="!showLoading && sortedAlbums.length === 0" class="empty-state">
-        <v-icon icon="mdi-image-album" size="100" class="mb-4 opacity-20" />
-        <h2>No albums yet</h2>
-        <p>Create your first album to start organizing your memories.</p>
-        <v-btn color="primary" variant="tonal" rounded class="mt-6" @click="makeNewAlbum">
-          Create Album
-        </v-btn>
       </div>
     </div>
   </main-layout-container>
@@ -446,7 +451,6 @@ useRefreshFunction(() => albumStore.fetchUserAlbums())
   opacity: 0.6;
 }
 
-/* Custom shadow/glow effect on hover similar to GlowImage's logic */
 .album-card:hover :deep(.glow-image-container) {
   box-shadow: 0 10px 30px -10px rgba(var(--v-theme-primary), 0.3);
 }
