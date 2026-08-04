@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { shallowRef, triggerRef } from 'vue'
+import { ref, shallowRef, triggerRef } from 'vue'
 import type { Album, AlbumSort, UpdateAlbumRequest } from '@/scripts/types/api/album.ts'
 import albumService from '@/scripts/services/albumService.ts'
 import type { FullAlbumMediaResponse } from '@/scripts/types/generated/timeline.ts'
@@ -14,17 +14,21 @@ export const useAlbumStore = defineStore('album', () => {
   const selectionStore = useSelectionStore()
   const dialogs = useDialogStore()
   const router = useRouter()
+  const userAlbumsLoading = ref(false)
 
   const userAlbums = useObjStorage<Album[]>('userAlbums', [])
   const albumMedia = shallowRef(new Map<string, FullAlbumMediaResponse>())
   const albumMediaPromises = new Map<string, Promise<FullAlbumMediaResponse>>()
 
   async function fetchUserAlbums() {
+    userAlbumsLoading.value = true
     try {
       const { data } = await albumService.getUserAlbums()
       userAlbums.value = data
     } catch (e) {
       snackbarStore.error("Can't fetch user albums", e)
+    } finally {
+      userAlbumsLoading.value = false
     }
   }
 
@@ -141,6 +145,7 @@ export const useAlbumStore = defineStore('album', () => {
   return {
     userAlbums,
     albumMedia,
+    userAlbumsLoading,
 
     fetchUserAlbums,
     fetchAlbumMedia,

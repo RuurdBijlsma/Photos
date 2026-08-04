@@ -1,9 +1,7 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref, computed } from 'vue'
+import { computed, onMounted } from 'vue'
 import MainLayoutContainer from '@/vues/components/MainLayoutContainer.vue'
 import type { Album, AlbumSortField, SortDirection } from '@/scripts/types/api/album'
-import albumService from '@/scripts/services/albumService.ts'
-import { useSnackbarsStore } from '@/scripts/stores/snackbarStore.ts'
 import { useRouter } from 'vue-router'
 import { MONTHS } from '@/scripts/constants.ts'
 import GlowThumbnail from '@/vues/components/ui/GlowThumbnail.vue'
@@ -12,26 +10,57 @@ import { useAlbumStore } from '@/scripts/stores/albumStore.ts'
 import { useAuthStore } from '@/scripts/stores/authStore.ts'
 import { useStorage } from '@vueuse/core'
 import { useRefreshFunction } from '@/scripts/composables/useRefreshFunction.ts'
+import { useDelayedBoolean } from '@/scripts/composables/useDelayedBoolean.ts'
 
-const snackbarStore = useSnackbarsStore()
 const authStore = useAuthStore()
 const dialogs = useDialogStore()
 const router = useRouter()
 const albumStore = useAlbumStore()
 
-const loading = ref(false)
-const showSkeleton = ref(false)
-let skeletonTimeout: ReturnType<typeof setTimeout> | null = null
-
 // Sorting State
-const currentSortField = useStorage<AlbumSortField>('albumLibrarySortField', 'latestPhoto')
+const currentSortField = useStorage<AlbumSortField>(
+  'albumLibrarySortField',
+  'latestMediaItemTimestamp',
+)
 const currentSortDirection = useStorage<SortDirection>('albumLibrarySortDirection', 'desc')
-const userAlbums = ref<Album[]>([])
+
+const sortedAlbums = computed(() => {
+  const albums = [...albumStore.userAlbums]
+  const field = currentSortField.value
+  const isAsc = currentSortDirection.value === 'asc'
+
+  return albums.sort((a, b) => {
+    const valA = a[field]
+    const valB = b[field]
+    // Keep albums with missing values at the end regardless of sort direction
+    if (valA == null && valB == null) return 0
+    if (valA == null) return 1
+    if (valB == null) return -1
+
+    let comparison: number
+    if (field === 'name') {
+      // case-insensitive string comparison
+      comparison = String(valA).localeCompare(String(valB), undefined, {
+        numeric: true,
+        sensitivity: 'base',
+      })
+    } else {
+      // Date fields
+      const timeA = new Date(valA as string).getTime()
+      const timeB = new Date(valB as string).getTime()
+      comparison = timeA - timeB
+    }
+    return isAsc ? comparison : -comparison
+  })
+})
+
+const flickerLoad = useDelayedBoolean(() => albumStore.userAlbumsLoading, 150)
+const showLoading = computed(() => flickerLoad.value && sortedAlbums.value.length === 0)
 
 // Separated Field Options
 const sortFields = [
   { title: 'Name', field: 'name' },
-  { title: 'Content date', field: 'latestPhoto' },
+  { title: 'Content date', field: 'latestMediaItemTimestamp' },
   { title: 'Updated date', field: 'updatedAt' },
 ]
 
@@ -55,6 +84,7 @@ const sortDirectionIcon = computed(() => {
     ? 'mdi-sort-calendar-ascending'
     : 'mdi-sort-calendar-descending'
 })
+
 const sortDirectionTooltip = computed(() => {
   if (currentSortField.value === 'name') {
     return currentSortDirection.value === 'asc' ? 'A-Z' : 'Z-A'
@@ -62,44 +92,14 @@ const sortDirectionTooltip = computed(() => {
   return currentSortDirection.value === 'asc' ? 'Old to new' : 'New to old'
 })
 
-async function loadAlbums() {
-  loading.value = true
-  showSkeleton.value = false
-
-  // Clear any existing timeout to avoid race conditions
-  if (skeletonTimeout) clearTimeout(skeletonTimeout)
-
-  // Set skeleton to appear only after 150ms
-  skeletonTimeout = setTimeout(() => {
-    showSkeleton.value = true
-  }, 150)
-
-  try {
-    const { data } = await albumService.getUserAlbums(
-      currentSortField.value,
-      currentSortDirection.value,
-    )
-    console.log(data)
-    userAlbums.value = data
-  } catch (e) {
-    snackbarStore.error('Could not fetch albums', e)
-  } finally {
-    loading.value = false
-    showSkeleton.value = false
-    if (skeletonTimeout) clearTimeout(skeletonTimeout)
-  }
-}
-
 function handleFieldChange(field: AlbumSortField) {
   if (currentSortField.value !== field) {
     currentSortField.value = field
-    loadAlbums()
   }
 }
 
 function toggleDirection() {
   currentSortDirection.value = currentSortDirection.value === 'asc' ? 'desc' : 'asc'
-  loadAlbums()
 }
 
 async function makeNewAlbum() {
@@ -138,12 +138,12 @@ function getAlbumTimeSpan(album: Album) {
 
 async function renameAlbum(album: Album) {
   await albumStore.renameAlbum(album.id, album.name)
-  requestIdleCallback(() => loadAlbums())
+  requestIdleCallback(() => albumStore.fetchUserAlbums())
 }
 
 async function deleteAlbum(albumId: string) {
   await albumStore.deleteAlbum(albumId)
-  requestIdleCallback(() => loadAlbums())
+  requestIdleCallback(() => albumStore.fetchUserAlbums())
 }
 
 async function leaveAlbum(albumId: string) {
@@ -155,18 +155,13 @@ async function leaveAlbum(albumId: string) {
   const currentUserCollaborator = collaborators.find((c) => c.userId === authStore.user?.id)
   if (!currentUserCollaborator) return
   await albumStore.removeCollaborator(albumId, currentUserCollaborator.id, true)
-  requestIdleCallback(() => loadAlbums())
+  requestIdleCallback(() => albumStore.fetchUserAlbums())
 }
 
 onMounted(() => {
-  loadAlbums()
+  albumStore.fetchUserAlbums()
 })
-useRefreshFunction(() => loadAlbums())
-
-onUnmounted(() => {
-  // Prevent memory leaks / UI state issues if the component mounts/unmounts quickly
-  if (skeletonTimeout) clearTimeout(skeletonTimeout)
-})
+useRefreshFunction(() => albumStore.fetchUserAlbums())
 </script>
 
 <template>
@@ -175,7 +170,7 @@ onUnmounted(() => {
       <header class="library-header">
         <div class="header-left">
           <h1>Albums</h1>
-          <span class="album-count">{{ userAlbums.length }} albums</span>
+          <span class="album-count">{{ sortedAlbums.length }} albums</span>
         </div>
 
         <div class="header-actions d-flex align-center">
@@ -229,23 +224,28 @@ onUnmounted(() => {
         </div>
       </header>
 
-      <!-- Grid Layout -->
-      <div v-if="showSkeleton" class="album-grid">
-        <div v-for="i in 9" :key="i" class="album-card-skeleton">
-          <v-skeleton-loader
-            type="card"
-            elevation="1"
-            color="surface-container-low"
-            height="265"
-            width="200"
-            class="rounded-xl"
-          />
-        </div>
+      <!-- Loading State -->
+      <div v-if="showLoading" class="loading-state">
+        <v-progress-circular indeterminate color="primary" size="48" />
       </div>
 
+      <!-- Empty State -->
+      <div
+        v-else-if="!albumStore.userAlbumsLoading && sortedAlbums.length === 0"
+        class="empty-state"
+      >
+        <v-icon icon="mdi-image-album" size="100" class="mb-4 opacity-20" />
+        <h2>No albums yet</h2>
+        <p>Create your first album to start organizing your memories.</p>
+        <v-btn color="primary" variant="tonal" rounded class="mt-6" @click="makeNewAlbum">
+          Create Album
+        </v-btn>
+      </div>
+
+      <!-- Grid Layout -->
       <div v-else class="album-grid">
         <router-link
-          v-for="album in userAlbums"
+          v-for="album in sortedAlbums"
           :key="album.id"
           :to="`/album/${album.id}`"
           class="album-card"
@@ -293,8 +293,9 @@ onUnmounted(() => {
                   @click.stop.prevent
                   class="album-shared-avatar"
                   color="primary"
-                  ><v-icon icon="mdi-share" size="23"></v-icon
-                ></v-avatar>
+                >
+                  <v-icon icon="mdi-share" size="23" />
+                </v-avatar>
               </template>
               <v-list density="compact">
                 <v-list-item @click="leaveAlbum(album.id)">
@@ -316,26 +317,16 @@ onUnmounted(() => {
               {{ album.name || 'Untitled Album' }}
             </h3>
             <p class="album-meta">
-              <span
-                >{{ album.mediaCount.toLocaleString() ?? 0 }} item{{
+              <span>
+                {{ album.mediaCount.toLocaleString() ?? 0 }} item{{
                   album.mediaCount === 1 ? '' : 's'
-                }}</span
-              >
+                }}
+              </span>
               •
               <span>{{ getAlbumTimeSpan(album) }}</span>
             </p>
           </div>
         </router-link>
-      </div>
-
-      <!-- Empty State -->
-      <div v-if="!loading && userAlbums.length === 0" class="empty-state">
-        <v-icon icon="mdi-image-album" size="100" class="mb-4 opacity-20" />
-        <h2>No albums yet</h2>
-        <p>Create your first album to start organizing your memories.</p>
-        <v-btn color="primary" variant="tonal" rounded class="mt-6" @click="makeNewAlbum">
-          Create Album
-        </v-btn>
       </div>
     </div>
   </main-layout-container>
@@ -365,6 +356,13 @@ onUnmounted(() => {
   font-size: 0.9rem;
   font-weight: 400;
   color: rgb(var(--v-theme-on-surface-variant));
+}
+
+.loading-state {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 100px 0;
 }
 
 .album-grid {
@@ -453,7 +451,6 @@ onUnmounted(() => {
   opacity: 0.6;
 }
 
-/* Custom shadow/glow effect on hover similar to GlowImage's logic */
 .album-card:hover :deep(.glow-image-container) {
   box-shadow: 0 10px 30px -10px rgba(var(--v-theme-primary), 0.3);
 }

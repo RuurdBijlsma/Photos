@@ -982,7 +982,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 24px; /* very rounded corners */
+  border-radius: 24px;
   overflow: hidden;
   box-shadow: 0 12px 36px rgba(0, 0, 0, 0.15);
   background-color: rgb(var(--v-theme-surface-container-low));
@@ -1001,8 +1001,9 @@ onUnmounted(() => {
   bottom: 24px;
   left: 24px;
   z-index: 10;
-  border-radius: 24px; /* very rounded corners */
+  border-radius: 24px;
   overflow: hidden;
+  clip-path: inset(0 round 24px); /* firefox `overflow: hidden` broken with gpu items in the el */
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
   background-color: rgb(var(--v-theme-surface-container-high));
   border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
@@ -1077,7 +1078,7 @@ onUnmounted(() => {
   background-color: rgba(var(--v-theme-surface-container-high), 0.85);
   backdrop-filter: saturate(150%) blur(12px);
   border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
-  border-radius: 24px; /* very rounded corners */
+  border-radius: 24px;
   padding: 16px;
   z-index: 10;
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
@@ -1158,7 +1159,7 @@ onUnmounted(() => {
   background-color: rgba(var(--v-theme-surface-container-high), 0.85) !important;
   backdrop-filter: saturate(150%) blur(12px);
   border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity)) !important;
-  border-radius: 24px !important; /* very rounded corners */
+  border-radius: 24px !important;
   display: flex;
   flex-direction: column;
   overflow-y: auto;

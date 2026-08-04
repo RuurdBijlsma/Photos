@@ -53,7 +53,12 @@ export const useDialogStore = defineStore('dialog', () => {
   function alert(options: DialogOptions | string): Promise<void> {
     const opts = typeof options === 'string' ? { title: 'Alert', description: options } : options
     return new Promise((resolve) => {
-      queue.value.push({ id: crypto.randomUUID(), type: 'alert', options: opts, resolve })
+      queue.value.push({
+        id: Math.round(Math.random() * 1e16).toString(),
+        type: 'alert',
+        options: opts,
+        resolve,
+      })
       processQueue()
     })
   }
@@ -61,7 +66,12 @@ export const useDialogStore = defineStore('dialog', () => {
   function confirm(options: DialogOptions | string): Promise<boolean> {
     const opts = typeof options === 'string' ? { title: options } : options
     return new Promise((resolve) => {
-      queue.value.push({ id: crypto.randomUUID(), type: 'confirm', options: opts, resolve })
+      queue.value.push({
+        id: Math.round(Math.random() * 1e16).toString(),
+        type: 'confirm',
+        options: opts,
+        resolve,
+      })
       processQueue()
     })
   }
@@ -69,7 +79,12 @@ export const useDialogStore = defineStore('dialog', () => {
   function prompt(options: DialogOptions | string): Promise<string | null> {
     const opts = typeof options === 'string' ? { title: options } : options
     return new Promise((resolve) => {
-      queue.value.push({ id: crypto.randomUUID(), type: 'prompt', options: opts, resolve })
+      queue.value.push({
+        id: Math.round(Math.random() * 1e16).toString(),
+        type: 'prompt',
+        options: opts,
+        resolve,
+      })
       processQueue()
     })
   }

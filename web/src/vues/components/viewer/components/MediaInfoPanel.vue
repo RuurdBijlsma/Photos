@@ -529,6 +529,10 @@ const showCameraSection = computed(() => {
   align-items: center;
 }
 
+.filename > * {
+  user-select: text !important;
+}
+
 .albums-section {
   padding: 4px 22px 8px;
 }

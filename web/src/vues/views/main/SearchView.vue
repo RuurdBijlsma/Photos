@@ -11,6 +11,7 @@ import { useSearchStore } from '@/scripts/stores/searchStore.ts'
 import { useRefreshFunction } from '@/scripts/composables/useRefreshFunction.ts'
 import ThumbnailImg from '@/vues/components/ui/ThumbnailImg.vue'
 import { getThumbnailHeight } from '@/scripts/utils.ts'
+import { usePageTitle } from '@/scripts/composables/usePageTitle.ts'
 
 const snackStore = useSnackbarsStore()
 const searchStore = useSearchStore()
@@ -109,7 +110,7 @@ function getSearchParams(isLoadMore: boolean) {
   }
 }
 
-async function executeSearch(isLoadMore = false) {
+async function executeSearch(isLoadMore = false, useCache = true) {
   // Verify that we actually have a text query, active filters, an image, or a similar items query.
   if (!searchStore.searchImage && !query.value && !hasFilters.value && !isSimilarSearch.value) {
     results.value = []
@@ -161,7 +162,7 @@ async function executeSearch(isLoadMore = false) {
     } else {
       // Execute Text/Filter Search with Cache Check
       const key = JSON.stringify(searchParams)
-      if (searchCache.has(key)) {
+      if (useCache && searchCache.has(key)) {
         items = searchCache.get(key)!
       } else {
         const response = await searchService.search(searchParams, signal)
@@ -217,7 +218,8 @@ watch([() => route.query, () => searchStore.searchImage], () => executeSearch(fa
   immediate: true,
 })
 
-useRefreshFunction(() => executeSearch(false))
+useRefreshFunction(() => executeSearch(false, false))
+usePageTitle(query, { fallback: 'Search' })
 </script>
 
 <template>

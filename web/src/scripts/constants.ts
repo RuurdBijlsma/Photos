@@ -1,4 +1,5 @@
 export const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+export const APP_NAME = 'Ruurd Photos'
 
 export const MONTHS = [
   'January',

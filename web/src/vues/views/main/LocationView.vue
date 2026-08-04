@@ -7,6 +7,7 @@ import ThumbnailImg from '@/vues/components/ui/ThumbnailImg.vue'
 import LocationMediaMap from '@/vues/components/map/LocationMediaMap.vue'
 import { useRefreshFunction } from '@/scripts/composables/useRefreshFunction.ts'
 import { getThumbnailHeight } from '@/scripts/utils.ts'
+import { usePageTitle } from '@/scripts/composables/usePageTitle.ts'
 
 const route = useRoute()
 const exploreStore = useExploreStore()
@@ -91,6 +92,7 @@ useRefreshFunction(() => {
     exploreStore.fetchLocationData(locationId.value)
   }
 })
+usePageTitle(primaryName, { fallback: 'Place' })
 </script>
 
 <template>

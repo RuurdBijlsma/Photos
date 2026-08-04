@@ -9,6 +9,7 @@ import { useDialogStore } from '@/scripts/stores/dialogStore.ts'
 import PersonNameDialog from '@/vues/components/rename-people/PersonNameDialog.vue'
 import MergePersonDialog from '@/vues/components/rename-people/MergePersonDialog.vue'
 import { useRefreshFunction } from '@/scripts/composables/useRefreshFunction.ts'
+import { useDelayedBoolean } from '@/scripts/composables/useDelayedBoolean.ts'
 
 const theme = useTheme()
 const peopleStore = usePeopleStore()
@@ -44,6 +45,9 @@ const sections = computed(() =>
 )
 
 const totalPeopleCount = computed(() => peopleStore.people.length)
+
+const flickerLoad = useDelayedBoolean(() => peopleStore.peopleLoading, 150)
+const showLoading = computed(() => flickerLoad.value && totalPeopleCount.value === 0)
 
 function setName(e: PointerEvent, person: PersonInfo) {
   e.preventDefault()
@@ -155,7 +159,19 @@ useRefreshFunction(() => peopleStore.fetchPeople(), { immediate: true })
         </div>
       </header>
 
-      <template v-if="totalPeopleCount > 0">
+      <!-- Loading State -->
+      <div v-if="showLoading" class="loading-state">
+        <v-progress-circular indeterminate color="primary" size="48" />
+      </div>
+
+      <!-- Empty State -->
+      <div v-else-if="!peopleStore.peopleLoading && totalPeopleCount === 0" class="empty-people">
+        <v-icon color="on-surface-variant" size="140" icon="mdi-account-search-outline" />
+        <h2>No people found</h2>
+      </div>
+
+      <!-- Grid Layout -->
+      <template v-else>
         <section v-for="section in sections" :key="section.title" class="people-section">
           <div class="section-header">
             <h2>{{ section.title }}</h2>
@@ -206,11 +222,6 @@ useRefreshFunction(() => peopleStore.fetchPeople(), { immediate: true })
           </div>
         </section>
       </template>
-
-      <div class="empty-people" v-else>
-        <v-icon color="on-surface-variant" size="140" icon="mdi-account-search-outline" />
-        <h2>No people found</h2>
-      </div>
     </div>
   </main-layout-container>
 </template>
@@ -239,6 +250,13 @@ useRefreshFunction(() => peopleStore.fetchPeople(), { immediate: true })
   font-size: 0.9rem;
   font-weight: 400;
   color: rgb(var(--v-theme-on-surface-variant));
+}
+
+.loading-state {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 100px 0;
 }
 
 .people-section {

@@ -28,7 +28,8 @@ import AddToAlbumCard from '@/vues/components/timeline/timeline-components/AddTo
 import { useUiHider } from '@/scripts/composables/useUiHider.ts'
 import { navigatorShare } from '@/scripts/sharing.ts'
 import PhotoGallery from '@/vues/components/viewer/components/PhotoGallery.vue'
-import { useStorage, useEventListener } from '@vueuse/core'
+import { useEventListener, useStorage } from '@vueuse/core'
+import { useDetailTitle } from '@/scripts/composables/usePageTitle.ts'
 
 const props = withDefaults(
   defineProps<{
@@ -185,6 +186,7 @@ const currentItemRatio = computed(() => {
   if (fullImage.value) return fullImage.value.width / fullImage.value.height
   return 1
 })
+const mediaDetailTitle = computed(() => fullImage.value?.user_caption ?? fullImage.value?.filename)
 
 function forwardWheel(e: WheelEvent) {
   // Find the interactive pan container inside the photo viewer
@@ -320,6 +322,8 @@ watch(isVideo, () => {
   isZoomed.value = false
   isPanoActive.value = false
 })
+
+useDetailTitle(mediaDetailTitle, { fallback: 'Photo' })
 </script>
 
 <template>

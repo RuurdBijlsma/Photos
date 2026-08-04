@@ -25,14 +25,18 @@ export function downloadBlob(blob: Blob, filename?: string) {
   }, 60000)
 }
 
-export function prettyBytes(bytes: number, decimals = 2): string {
+export function prettyBytes(bytes: number): string {
   if (bytes === 0) return '0 B'
 
   const k = 1024
   const sizes = ['B', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB']
   const i = Math.floor(Math.log(bytes) / Math.log(k))
 
-  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(decimals))} ${sizes[i]}`
+  const value = bytes / Math.pow(k, i)
+  const integerDigits = Math.floor(value).toString().length
+  const decimals = integerDigits >= 3 ? 0 : 1
+
+  return `${parseFloat(value.toFixed(decimals))} ${sizes[i]}`
 }
 
 export function requestIdleCallbackAsync(
@@ -198,10 +202,12 @@ export function formatNaiveDate(date: Date): string {
 export function useObjStorage<T>(
   key: string,
   initialValue: T,
+  shallow: boolean = false,
   storage: Storage = localStorage,
 ): RemovableRef<T> {
   return useStorage<T>(key, initialValue, storage, {
     serializer: StorageSerializers.object,
+    shallow,
   })
 }
 

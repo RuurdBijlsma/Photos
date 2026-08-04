@@ -14,6 +14,7 @@ use tempfile::TempDir;
 use tokio::task::JoinHandle;
 use tokio::time::sleep;
 use tracing::{error, info, warn};
+use watcher::watcher::create_watcher;
 
 pub fn init_test_constants(constants: AppConstants) {
     if CONSTANTS.set(constants).is_err() {
@@ -119,8 +120,8 @@ impl TestContext {
         let watcher_pool = pool.clone();
         let watcher_settings = settings.ingest.clone();
         let watcher_handle = tokio::spawn(async move {
-            if let Err(e) = watcher::watcher::start_watching(&watcher_pool, &watcher_settings).await
-            {
+            let (_shutdown_tx, shutdown_rx) = tokio::sync::watch::channel(false);
+            if let Err(e) = create_watcher(&watcher_pool, &watcher_settings, shutdown_rx).await {
                 error!("Watcher failed: {}", e);
             }
         });

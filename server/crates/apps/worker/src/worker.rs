@@ -1,36 +1,15 @@
 use crate::context::WorkerContext;
-use crate::graceful_exit::get_kill_signal;
 use crate::handlers::handle_job;
 use crate::jobs::management::{claim_next_job, update_job_on_completion, update_job_on_failure};
 use app_state::AppSettings;
 use color_eyre::Result;
 use common_services::database::jobs::JobType;
-use common_services::utils::nice_id;
 use sqlx::PgPool;
 use std::time::Duration;
 use tracing::{Instrument, info, info_span};
 
 #[allow(clippy::large_futures)]
 pub async fn create_worker(
-    pool: PgPool,
-    settings: AppSettings,
-    excluded_job_types: Vec<JobType>,
-    stop_on_sleep: bool,
-) -> Result<()> {
-    let shutdown_rx = get_kill_signal();
-    create_worker_with_shutdown(
-        pool,
-        settings,
-        nice_id(8),
-        excluded_job_types,
-        stop_on_sleep,
-        shutdown_rx,
-    )
-    .await
-}
-
-#[allow(clippy::large_futures)]
-pub async fn create_worker_with_shutdown(
     pool: PgPool,
     settings: AppSettings,
     worker_id: String,

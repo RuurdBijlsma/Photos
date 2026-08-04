@@ -11,6 +11,7 @@ import { useDate } from 'vuetify'
 import { usePeopleStore } from '@/scripts/stores/peopleStore.ts'
 import peopleService from '@/scripts/services/peopleService.ts'
 import { useRefreshFunction } from '@/scripts/composables/useRefreshFunction.ts'
+import { usePageTitle } from '@/scripts/composables/usePageTitle.ts'
 
 const authStore = useAuthStore()
 const snackbars = useSnackbarsStore()
@@ -136,6 +137,11 @@ const statCards = computed(() => [
   },
 ])
 
+const nameTitle = computed(() => {
+  if (!profile.value) return ''
+  return `${profile.value.name}'s Profile`
+})
+usePageTitle(nameTitle, { fallback: 'Profile' })
 useRefreshFunction(() => loadProfile())
 </script>
 

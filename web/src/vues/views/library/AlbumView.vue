@@ -1,13 +1,12 @@
 <script setup lang="ts">
-import { useRoute, useRouter, onBeforeRouteLeave, onBeforeRouteUpdate } from 'vue-router'
-import { computed, nextTick, ref, useTemplateRef, watch } from 'vue'
+import { onBeforeRouteLeave, onBeforeRouteUpdate, useRoute, useRouter } from 'vue-router'
+import { computed, nextTick, onBeforeUnmount, ref, useTemplateRef, watch } from 'vue'
 import { useAlbumStore } from '@/scripts/stores/albumStore.ts'
 import type { AlbumSort } from '@/scripts/types/api/album.ts'
 import type { SimpleTimelineItem } from '@/scripts/types/generated/timeline.ts'
 import { useSnackbarsStore } from '@/scripts/stores/snackbarStore.ts'
 import { useDialogStore } from '@/scripts/stores/dialogStore.ts'
 import { useDebounceFn, useTextareaAutosize } from '@vueuse/core'
-import { onBeforeUnmount } from 'vue'
 import EditableTitle from '@/vues/components/ui/EditableTitle.vue'
 import { CURRENT_YEAR, MONTHS } from '@/scripts/constants.ts'
 import albumService from '@/scripts/services/albumService.ts'
@@ -20,6 +19,7 @@ import type { SmallUser } from '@/scripts/types/api/user.ts'
 import { useAuthStore } from '@/scripts/stores/authStore.ts'
 import { copyToClipboard } from '@/scripts/utils.ts'
 import { useRefreshFunction } from '@/scripts/composables/useRefreshFunction.ts'
+import { usePageTitle } from '@/scripts/composables/usePageTitle.ts'
 
 const route = useRoute()
 const router = useRouter()
@@ -419,6 +419,7 @@ watch(collabMenuOpen, () => {
   fetchUserList()
 })
 
+usePageTitle(albumTitle, { fallback: 'Album' })
 useRefreshFunction(() => {
   if (id.value) albumStore.fetchAlbumMedia(id.value, false)
 })

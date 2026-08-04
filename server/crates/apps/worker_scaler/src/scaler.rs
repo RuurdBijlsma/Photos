@@ -8,7 +8,7 @@ use std::time::{Duration, Instant};
 use tokio::sync::watch;
 use tokio::task::JoinHandle;
 use tracing::{Instrument, error, info, info_span, warn};
-use worker::worker::create_worker_with_shutdown;
+use worker::worker::create_worker;
 
 pub struct ActiveWorker {
     pub id: String,
@@ -184,7 +184,7 @@ impl Scaler {
 
         let worker_id_clone = worker_id.clone();
         let handle = tokio::spawn(async move {
-            create_worker_with_shutdown(
+            create_worker(
                 pool,
                 settings,
                 worker_id_clone,

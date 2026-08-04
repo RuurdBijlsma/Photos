@@ -2,28 +2,23 @@ use crate::handlers::{handle_create, handle_remove};
 use app_state::IngestSettings;
 use app_state::constants::ALBUM_IMPORT_FOLDER;
 use color_eyre::eyre::Result;
-use common_services::alert;
 use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use sqlx::PgPool;
 use std::path::Component;
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, watch};
 use tracing::{error, info, warn};
 
 const EXCLUDED_WATCH_FOLDER: [&str; 1] = [ALBUM_IMPORT_FOLDER];
-
-pub async fn start_watching(pool: &PgPool, settings: &IngestSettings) -> Result<()> {
-    if let Err(e) = run(pool, settings).await {
-        alert!("Watcher failed with an error: {}", e);
-    }
-
-    Ok(())
-}
 
 /// Runs the file system watcher.
 ///
 /// This function sets up a channel to receive file system events and processes them
 /// in a loop. Each event is handled in a separate asynchronous task.
-async fn run(pool: &PgPool, settings: &IngestSettings) -> notify::Result<()> {
+pub async fn create_watcher(
+    pool: &PgPool,
+    settings: &IngestSettings,
+    mut shutdown_rx: watch::Receiver<bool>,
+) -> notify::Result<()> {
     let (tx, mut rx) = mpsc::channel(100);
 
     let mut watcher = RecommendedWatcher::new(
@@ -38,21 +33,35 @@ async fn run(pool: &PgPool, settings: &IngestSettings) -> notify::Result<()> {
     watcher.watch(&settings.media_root, RecursiveMode::Recursive)?;
     info!("👁️ Watcher started on: {:?}", &settings.media_root);
 
-    while let Some(result) = rx.recv().await {
-        let pool = pool.clone();
-        let settings = settings.clone();
-        tokio::spawn(async move {
-            let event = match result {
-                Ok(evt) => evt,
-                Err(err) => {
-                    error!("Watch error: {:?}", err);
-                    return;
-                }
-            };
-            if let Err(e) = process_event(&pool, &settings, event).await {
-                warn!("Error while processing file watcher event {e}");
+    loop {
+        if *shutdown_rx.borrow() {
+            info!("Shutdown requested. Exiting watcher loop.");
+            break;
+        }
+
+        tokio::select! {
+            maybe_result = rx.recv() => {
+                let Some(result) = maybe_result else { break; };
+                let pool = pool.clone();
+                let settings = settings.clone();
+                tokio::spawn(async move {
+                    let event = match result {
+                        Ok(evt) => evt,
+                        Err(err) => {
+                            error!("Watch error: {:?}", err);
+                            return;
+                        }
+                    };
+                    if let Err(e) = process_event(&pool, &settings, event).await {
+                        warn!("Error while processing file watcher event {e}");
+                    }
+                });
             }
-        });
+            _ = shutdown_rx.changed() => {
+                info!("Shutdown signal received. Exiting watcher loop.");
+                break;
+            }
+        }
     }
 
     Ok(())
