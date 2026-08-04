@@ -51,10 +51,14 @@ export const useMediaItemStore = defineStore('mediaItem', () => {
     const result = await promise
     mediaItemPromises.delete(id)
 
-    mediaItems.value.set(id, result.data.media_item)
-    mediaItemAlbums.value.set(id, result.data.albums)
-    triggerRef(mediaItems)
-    triggerRef(mediaItemAlbums)
+    // Re-assign a new Map instance so Vue's computed properties detect the reference change
+    const updatedMediaItems = new Map(mediaItems.value)
+    updatedMediaItems.set(id, result.data.media_item)
+    mediaItems.value = updatedMediaItems
+
+    const updatedAlbums = new Map(mediaItemAlbums.value)
+    updatedAlbums.set(id, result.data.albums)
+    mediaItemAlbums.value = updatedAlbums
   }
 
   async function fetchSharedMediaItem(
@@ -73,8 +77,10 @@ export const useMediaItemStore = defineStore('mediaItem', () => {
     const result = await promise
     sharedMediaItemPromises.delete(mediaItemId)
 
-    sharedMediaItems.value.set(mediaItemId, result.data)
-    triggerRef(sharedMediaItems)
+    // Re-assign a new Map instance
+    const updatedShared = new Map(sharedMediaItems.value)
+    updatedShared.set(mediaItemId, result.data)
+    sharedMediaItems.value = updatedShared
   }
 
   function getAlbumsForMediaItem(id: string): MediaItemAlbumRef[] | undefined {

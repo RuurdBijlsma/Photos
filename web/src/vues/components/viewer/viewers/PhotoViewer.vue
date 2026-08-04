@@ -7,6 +7,7 @@ import mediaItemService from '@/scripts/services/mediaItemService.ts'
 import axios from 'axios'
 import { useEventListener, useRafFn, useTimeoutFn } from '@vueuse/core'
 import { SERVER_BASE_URL } from '@/scripts/services/api.ts'
+import type { FullMediaItem } from '@/scripts/types/api/fullPhoto.ts'
 import type { PannellumConfig } from '@/scripts/types/api/pannellumConfig.ts'
 
 const PanoramaViewer = defineAsyncComponent(
@@ -65,7 +66,7 @@ const is3DMode = ref(false)
 const imageUrl = computed(() => {
   return mediaItemService.getPhotoThumbnail(
     props.mediaItemId,
-    1440, // 1440p thumbnail for high resolution details
+    1440,
     !generatedThumbsAvailable.value,
   )
 })
@@ -113,18 +114,8 @@ function cleanup() {
   isLoadingFull.value = false
 }
 
-// Start abortable download of the full-resolution media file
-async function startFullResLoad() {
-  cleanup()
-
-  const item = fullImage.value
-  if (!item) return
-
-  // Bypasses the download if format is RAW, unsupported HEIC, etc.
-  if (!isMimeTypeSupported(item.media_features?.mime_type)) {
-    return
-  }
-
+// Download the original full-resolution media file blob
+async function loadFullResBlob(item: FullMediaItem) {
   const controller = new AbortController()
   currentAbortController = controller
   isLoadingFull.value = true
@@ -132,7 +123,6 @@ async function startFullResLoad() {
   try {
     const res = await mediaItemService.downloadMediaFileById(item.id, controller.signal)
 
-    // Check if we switched items or aborted in the meantime
     if (controller.signal.aborted || props.mediaItemId !== item.id) {
       return
     }
@@ -170,9 +160,7 @@ async function onFullResLoad(e: Event) {
 // Motion Photo Settings & Logic
 const showingMotionVideo = ref(false)
 const videoPlayerRef = ref<HTMLVideoElement | null>(null)
-const motionVideoUrl = computed(() => {
-  return mediaItemService.getMotionVideo(props.mediaItemId)
-})
+const motionVideoUrl = computed(() => mediaItemService.getMotionVideo(props.mediaItemId))
 
 const { pause: stopMonitoring, resume: startMonitoring } = useRafFn(
   () => {
@@ -219,7 +207,40 @@ function onVideoEnded() {
   stopMonitoring()
 }
 
-// Watchers
+// Reset UI viewport state whenever media item ID changes
+watch(
+  () => props.mediaItemId,
+  () => {
+    scale.value = 1
+    translateX.value = 0
+    translateY.value = 0
+    is3DMode.value = false
+    showingMotionVideo.value = false
+    stopMonitoring()
+  },
+  { immediate: true },
+)
+
+// 2. Drive Media Content Loading Lifecycle whenever fullImage changes
+watch(
+  fullImage,
+  (item) => {
+    // Always clean up previous blob URLs or active network requests first
+    cleanup()
+
+    if (!item) return
+
+    if (settings.playMotionPhotos && item.media_features?.is_motion_photo) {
+      playMotionPhoto()
+    }
+
+    if (isMimeTypeSupported(item.media_features?.mime_type)) {
+      loadFullResBlob(item)
+    }
+  },
+  { immediate: true },
+)
+
 watch(
   is3DMode,
   (isActive) => {
@@ -227,43 +248,6 @@ watch(
   },
   { immediate: true },
 )
-
-watch(
-  () => props.mediaItemId,
-  () => {
-    // Reset zoom & pan when switching img
-    scale.value = 1
-    translateX.value = 0
-    translateY.value = 0
-
-    // Reset panorama mode
-    is3DMode.value = false
-
-    // Start motion photo autoplay if configured
-    showingMotionVideo.value = false
-    stopMonitoring()
-    if (settings.playMotionPhotos && fullImage.value?.media_features?.is_motion_photo) {
-      playMotionPhoto()
-    }
-
-    startFullResLoad()
-  },
-  { immediate: true },
-)
-
-watch(fullImage, (newVal) => {
-  if (newVal && !fullResUrl.value && !isLoadingFull.value) {
-    startFullResLoad()
-  }
-  if (
-    newVal &&
-    settings.playMotionPhotos &&
-    newVal.media_features?.is_motion_photo &&
-    !showingMotionVideo.value
-  ) {
-    playMotionPhoto()
-  }
-})
 
 // Emit zoom state to parents
 watch(
