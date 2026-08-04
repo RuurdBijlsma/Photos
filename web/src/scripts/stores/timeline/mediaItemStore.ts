@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { computed, shallowRef, triggerRef } from 'vue'
+import { computed, shallowRef } from 'vue'
 import type {
   FullMediaItem,
   MediaItemAlbumRef,

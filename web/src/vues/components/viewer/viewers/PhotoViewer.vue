@@ -9,6 +9,7 @@ import { useEventListener, useRafFn, useTimeoutFn } from '@vueuse/core'
 import { SERVER_BASE_URL } from '@/scripts/services/api.ts'
 import type { FullMediaItem } from '@/scripts/types/api/fullPhoto.ts'
 import type { PannellumConfig } from '@/scripts/types/api/pannellumConfig.ts'
+import { useAuthStore } from '@/scripts/stores/authStore.ts'
 
 const PanoramaViewer = defineAsyncComponent(
   () => import('@/vues/components/viewer/components/PanoramaViewer.vue'),
@@ -34,6 +35,7 @@ const emit = defineEmits<{
 const mediaItemStore = useMediaItemStore()
 const settings = useSettingStore()
 const viewPhotoStore = useViewPhotoStore()
+const authStore = useAuthStore()
 
 // Zoom and Pan state
 const scale = ref(1)
@@ -62,7 +64,7 @@ const isPanorama = computed(
 const panoramaConfig = computed(() => props.forcePano ?? fullImage.value?.panorama_config)
 const is3DMode = ref(false)
 
-// Phase 1: Immediate Thumbnail URL (1440p)
+// Immediate Thumbnail URL (1440p)
 const imageUrl = computed(() => {
   return mediaItemService.getPhotoThumbnail(
     props.mediaItemId,
@@ -71,7 +73,7 @@ const imageUrl = computed(() => {
   )
 })
 
-// Phase 2: Full Resolution Background Load
+// Full Resolution Background Load
 const fullResUrl = ref<string | null>(null)
 const fullResLoaded = ref(false)
 const isLoadingFull = ref(false)
@@ -145,7 +147,7 @@ async function loadFullResBlob(item: FullMediaItem) {
   }
 }
 
-// Native async decoding to prevent main thread "image decode" frame drops during zoom
+// Async decoding to prevent main thread "image decode" frame drops during zoom
 async function onFullResLoad(e: Event) {
   const img = e.target as HTMLImageElement
   try {
@@ -221,7 +223,7 @@ watch(
   { immediate: true },
 )
 
-// 2. Drive Media Content Loading Lifecycle whenever fullImage changes
+// Drive Media Content Loading Lifecycle whenever fullImage changes
 watch(
   fullImage,
   (item) => {
@@ -234,8 +236,8 @@ watch(
       playMotionPhoto()
     }
 
-    if (isMimeTypeSupported(item.media_features?.mime_type)) {
-      loadFullResBlob(item)
+    if (isMimeTypeSupported(item.media_features?.mime_type) && authStore.isAuthenticated) {
+      loadFullResBlob(item as FullMediaItem)
     }
   },
   { immediate: true },
@@ -364,7 +366,7 @@ function clampTranslations() {
 
   const paddingPx = scale.value < 1.4 ? 0 : scale.value * 40
 
-  // 1. Horizontal clamping
+  // Horizontal clamping
   if (scale.value <= 1) {
     translateX.value = 0
   } else if (drawnWidth * scale.value <= w) {
@@ -380,7 +382,7 @@ function clampTranslations() {
     translateX.value = Math.max(minX, Math.min(maxX, translateX.value))
   }
 
-  // 2. Vertical clamping
+  // Vertical clamping
   if (scale.value <= 1) {
     translateY.value = 0
   } else if (drawnHeight * scale.value <= h) {
