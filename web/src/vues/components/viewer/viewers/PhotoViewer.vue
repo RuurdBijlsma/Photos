@@ -274,11 +274,19 @@ onUnmounted(() => {
   cleanup()
 })
 
+const transientAngle = computed(() => viewPhotoStore.getTransientRotation(props.mediaItemId))
+const isRotated90or270 = computed(() => (transientAngle.value / 90) % 2 !== 0)
+const naturalWidth = computed(() => (thumbRef.value && thumbRef.value.naturalWidth > 0) ? thumbRef.value.naturalWidth : (fullImage.value?.width ?? 1))
+const naturalHeight = computed(() => (thumbRef.value && thumbRef.value.naturalHeight > 0) ? thumbRef.value.naturalHeight : (fullImage.value?.height ?? 1))
+const effectiveWidth = computed(() => isRotated90or270.value ? naturalHeight.value : naturalWidth.value)
+const effectiveHeight = computed(() => isRotated90or270.value ? naturalWidth.value : naturalHeight.value)
+const effectiveAspectRatio = computed(() => effectiveWidth.value / effectiveHeight.value)
+
 const transformStyle = computed(() => {
   return {
     // translate3d forces GPU rendering continuously, without requiring blurry "will-change: transform" caching.
-    transform: `translate3d(${translateX.value}px, ${translateY.value}px, 0) scale(${scale.value})`,
-    transformOrigin: '0 0',
+    transform: `translate3d(${translateX.value}px, ${translateY.value}px, 0) scale(${scale.value}) rotate(${transientAngle.value}deg)`,
+    transformOrigin: '50% 50%',
   }
 })
 
@@ -336,10 +344,7 @@ function zoomToPoint(clientX: number, clientY: number, newScale: number) {
 }
 
 function getImageAspectRatio(): number | null {
-  if (thumbRef.value && thumbRef.value.naturalWidth > 0 && thumbRef.value.naturalHeight > 0) {
-    return thumbRef.value.naturalWidth / thumbRef.value.naturalHeight
-  }
-  return null
+  return effectiveAspectRatio.value > 0 ? effectiveAspectRatio.value : null
 }
 
 function clampTranslations() {

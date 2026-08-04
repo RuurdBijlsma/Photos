@@ -1195,6 +1195,7 @@ dependencies = [
  "color-eyre",
  "common_types",
  "criterion",
+ "exiftool",
  "face_id",
  "fast_image_resize",
  "fastrand",

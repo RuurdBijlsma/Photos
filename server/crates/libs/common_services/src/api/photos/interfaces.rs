@@ -32,4 +32,13 @@ pub struct UpdateMediaItemRequest {
     pub use_panorama_viewer: Option<bool>,
     #[serde(default)]
     pub timezone_offset_seconds: UpdateField<i32>,
+    #[serde(default)]
+    pub orientation: Option<i32>,
 }
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateMediaItemResponse {
+    pub media_item_id: String,
+}
+

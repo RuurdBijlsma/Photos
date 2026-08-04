@@ -497,7 +497,7 @@ impl MediaItemStore {
     }
 
     /// Retrieves an existing location's ID or creates a new one if it doesn't exist.
-    async fn get_or_create_location(
+    pub async fn get_or_create_location(
         tx: &mut PgTransaction<'_>,
         location_data: &Location,
     ) -> Result<i32, DbError> {
@@ -600,4 +600,87 @@ impl MediaItemStore {
 
         Ok(())
     }
+
+    pub async fn change_media_item_id(
+        tx: &mut PgTransaction<'_>,
+        old_id: &str,
+        new_id: &str,
+    ) -> Result<(), DbError> {
+        // 1. Duplicate media_item row under the new_id
+        sqlx::query!(
+            r#"
+            INSERT INTO media_item (
+                id, user_id, remote_user_id, filename, relative_path,
+                hash, deleted, is_video, has_thumbnails, width, height, duration_ms,
+                taken_at_local, taken_at_utc, og_taken_at_local, sort_timestamp,
+                orientation, user_caption, search_vector
+            )
+            SELECT
+                $2, user_id, remote_user_id, filename, relative_path,
+                hash, deleted, is_video, has_thumbnails, width, height, duration_ms,
+                taken_at_local, taken_at_utc, og_taken_at_local, sort_timestamp,
+                orientation, user_caption, search_vector
+            FROM media_item
+            WHERE id = $1
+            "#,
+            old_id,
+            new_id
+        )
+        .execute(&mut **tx)
+        .await?;
+
+        // 2. Re-point direct foreign keys
+        sqlx::query!("UPDATE gps SET media_item_id = $2 WHERE media_item_id = $1", old_id, new_id)
+            .execute(&mut **tx)
+            .await?;
+        sqlx::query!("UPDATE panorama_config SET media_item_id = $2 WHERE media_item_id = $1", old_id, new_id)
+            .execute(&mut **tx)
+            .await?;
+        sqlx::query!("UPDATE time SET media_item_id = $2 WHERE media_item_id = $1", old_id, new_id)
+            .execute(&mut **tx)
+            .await?;
+        sqlx::query!("UPDATE weather SET media_item_id = $2 WHERE media_item_id = $1", old_id, new_id)
+            .execute(&mut **tx)
+            .await?;
+        sqlx::query!("UPDATE media_features SET media_item_id = $2 WHERE media_item_id = $1", old_id, new_id)
+            .execute(&mut **tx)
+            .await?;
+        sqlx::query!("UPDATE camera_settings SET media_item_id = $2 WHERE media_item_id = $1", old_id, new_id)
+            .execute(&mut **tx)
+            .await?;
+        sqlx::query!("UPDATE visual_analysis SET media_item_id = $2 WHERE media_item_id = $1", old_id, new_id)
+            .execute(&mut **tx)
+            .await?;
+        sqlx::query!("UPDATE album_media_item SET media_item_id = $2 WHERE media_item_id = $1", old_id, new_id)
+            .execute(&mut **tx)
+            .await?;
+        sqlx::query!("UPDATE media_item_photo_cluster SET media_item_id = $2 WHERE media_item_id = $1", old_id, new_id)
+            .execute(&mut **tx)
+            .await?;
+
+        // 3. Re-point circular and optional references
+        sqlx::query!("UPDATE face_cluster SET thumb_media_item_id = $2 WHERE thumb_media_item_id = $1", old_id, new_id)
+            .execute(&mut **tx)
+            .await?;
+        sqlx::query!("UPDATE photo_cluster SET thumbnail_media_item_id = $2 WHERE thumbnail_media_item_id = $1", old_id, new_id)
+            .execute(&mut **tx)
+            .await?;
+        sqlx::query!("UPDATE album SET thumbnail_id = $2 WHERE thumbnail_id = $1", old_id, new_id)
+            .execute(&mut **tx)
+            .await?;
+        sqlx::query!("UPDATE app_user SET avatar_id = $2 WHERE avatar_id = $1", old_id, new_id)
+            .execute(&mut **tx)
+            .await?;
+        sqlx::query!("UPDATE daily_card SET thumbnail_media_item_id = $2 WHERE thumbnail_media_item_id = $1", old_id, new_id)
+            .execute(&mut **tx)
+            .await?;
+
+        // 4. Remove original media_item row
+        sqlx::query!("DELETE FROM media_item WHERE id = $1", old_id)
+            .execute(&mut **tx)
+            .await?;
+
+        Ok(())
+    }
 }
+

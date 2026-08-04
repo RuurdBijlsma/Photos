@@ -447,6 +447,19 @@ useDetailTitle(mediaDetailTitle, { fallback: 'Photo' })
             width: 140,
           }"
         />
+        <v-btn
+          v-if="!isVideo && !isPanoActive && id"
+          rounded="xl"
+          icon="mdi-rotate-right"
+          variant="plain"
+          @click="viewPhotoStore.rotatePhoto(id, fullImage?.orientation, route.query)"
+          v-tooltip="{
+            text: 'Rotate clockwise',
+            location: 'bottom',
+            attach: true,
+            width: 140,
+          }"
+        />
 
         <v-menu
           v-if="!isBin"
