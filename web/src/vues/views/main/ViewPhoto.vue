@@ -452,7 +452,7 @@ useDetailTitle(mediaDetailTitle, { fallback: 'Photo' })
           rounded="xl"
           icon="mdi-rotate-right"
           variant="plain"
-          @click="viewPhotoStore.rotatePhoto(id, fullImage?.orientation, route.query)"
+          @click="console.log(id, fullImage?.orientation, route.query)"
           v-tooltip="{
             text: 'Rotate clockwise',
             location: 'bottom',
