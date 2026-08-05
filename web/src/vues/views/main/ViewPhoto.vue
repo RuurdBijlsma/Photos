@@ -182,8 +182,16 @@ const isVideo = computed<boolean>(
   () => fullImage.value?.is_video ?? timelineItem.value?.isVideo ?? false,
 )
 
+const rotation = computed(() => (id.value ? (viewPhotoStore.rotatedPhotos.get(id.value) ?? 0) : 0))
+
 const currentItemRatio = computed(() => {
-  if (fullImage.value) return fullImage.value.width / fullImage.value.height
+  if (fullImage.value) {
+    const rawRatio = fullImage.value.width / fullImage.value.height
+    if (rotation.value % 180 !== 0) {
+      return 1 / rawRatio
+    }
+    return rawRatio
+  }
   return 1
 })
 const mediaDetailTitle = computed(() => fullImage.value?.user_caption ?? fullImage.value?.filename)

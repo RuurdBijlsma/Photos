@@ -5,7 +5,7 @@ import { useMediaItemStore } from '@/scripts/stores/timeline/mediaItemStore.ts'
 import { useViewPhotoStore } from '@/scripts/stores/timeline/viewPhotoStore.ts'
 import mediaItemService from '@/scripts/services/mediaItemService.ts'
 import axios from 'axios'
-import { useEventListener, useRafFn, useTimeoutFn } from '@vueuse/core'
+import { useElementSize, useEventListener, useRafFn, useTimeoutFn } from '@vueuse/core'
 import { SERVER_BASE_URL } from '@/scripts/services/api.ts'
 import type { FullMediaItem } from '@/scripts/types/api/fullPhoto.ts'
 import type { PannellumConfig } from '@/scripts/types/api/pannellumConfig.ts'
@@ -41,7 +41,9 @@ const authStore = useAuthStore()
 const scale = ref(1)
 const translateX = ref(0)
 const translateY = ref(0)
+const thumbErrored = ref(false)
 const containerRef = ref<HTMLElement | null>(null)
+const { width: containerWidth, height: containerHeight } = useElementSize(containerRef)
 const thumbRef = ref<HTMLImageElement | null>(null)
 const baseUrl = SERVER_BASE_URL
 
@@ -217,6 +219,7 @@ watch(
     translateX.value = 0
     translateY.value = 0
     is3DMode.value = false
+    thumbErrored.value = false
     showingMotionVideo.value = false
     stopMonitoring()
   },
@@ -251,11 +254,30 @@ watch(
   { immediate: true },
 )
 
+const rotation = computed(() => viewPhotoStore.rotatedPhotos.get(props.mediaItemId) ?? 0)
+const isRotated90or270 = computed(() => {
+  const norm = ((rotation.value % 360) + 360) % 360
+  return norm === 90 || norm === 270
+})
+
+// Reset zoom when client rotation is active
+watch(
+  rotation,
+  (newRot) => {
+    if (newRot % 360 !== 0) {
+      scale.value = 1
+      translateX.value = 0
+      translateY.value = 0
+    }
+  },
+  { immediate: true },
+)
+
 // Emit zoom state to parents
 watch(
-  [scale, is3DMode],
-  ([newScale, is3D]) => {
-    emit('zoom-change', !is3D && newScale > 1)
+  [scale, is3DMode, rotation],
+  ([newScale, is3D, rot]) => {
+    emit('zoom-change', !is3D && rot % 360 === 0 && newScale > 1)
   },
   { immediate: true },
 )
@@ -274,10 +296,41 @@ onUnmounted(() => {
   cleanup()
 })
 
-const rotation = computed(() => viewPhotoStore.rotatedPhotos.get(props.mediaItemId) ?? 0)
-const transformStyle = computed(() => {
+const wrapperStyle = computed(() => {
+  const normRot = ((rotation.value % 360) + 360) % 360
+
+  if (isRotated90or270.value) {
+    const w = containerHeight.value || containerRef.value?.clientHeight || 0
+    const h = containerWidth.value || containerRef.value?.clientWidth || 0
+    return {
+      width: w > 0 ? `${w}px` : '100vh',
+      height: h > 0 ? `${h}px` : '100vw',
+      position: 'absolute' as const,
+      top: '50%',
+      left: '50%',
+      transform: `translate(-50%, -50%) rotate(${normRot}deg)`,
+      transformOrigin: 'center center',
+    }
+  }
+
+  if (normRot === 180) {
+    return {
+      width: '100%',
+      height: '100%',
+      position: 'absolute' as const,
+      top: '0px',
+      left: '0px',
+      transform: 'rotate(180deg)',
+      transformOrigin: 'center center',
+    }
+  }
+
   return {
-    // translate3d forces GPU rendering continuously, without requiring blurry "will-change: transform" caching.
+    width: '100%',
+    height: '100%',
+    position: 'absolute' as const,
+    top: '0px',
+    left: '0px',
     transform: `translate3d(${translateX.value}px, ${translateY.value}px, 0) scale(${scale.value})`,
     transformOrigin: '0 0',
   }
@@ -300,7 +353,7 @@ function setTransforming(value: boolean) {
 }
 
 function zoomToPoint(clientX: number, clientY: number, newScale: number) {
-  if (!containerRef.value) return
+  if (!containerRef.value || rotation.value % 360 !== 0) return
 
   const rect = containerRef.value.getBoundingClientRect()
   const xScreen = clientX - rect.left
@@ -344,7 +397,7 @@ function getImageAspectRatio(): number | null {
 }
 
 function clampTranslations() {
-  if (!containerRef.value) return
+  if (!containerRef.value || rotation.value % 360 !== 0) return
 
   const w = containerRef.value.clientWidth
   const h = containerRef.value.clientHeight
@@ -402,8 +455,7 @@ function clampTranslations() {
 
 // Pointer events panning & pinch-to-zoom
 function handlePointerDown(e: PointerEvent) {
-  if (props.disableEventCapture) return
-  // Only allow drag/pan with left mouse button, touch, or pen. Right-clicks bypass.
+  if (props.disableEventCapture || rotation.value % 360 !== 0) return
   if (e.pointerType === 'mouse' && e.button !== 0) {
     return
   }
@@ -433,7 +485,7 @@ function handlePointerDown(e: PointerEvent) {
 }
 
 function handlePointerMove(e: PointerEvent) {
-  if (props.disableEventCapture) return
+  if (props.disableEventCapture || rotation.value % 360 !== 0) return
   if (!activePointers.has(e.pointerId)) return
   activePointers.set(e.pointerId, e)
 
@@ -464,7 +516,7 @@ function handlePointerMove(e: PointerEvent) {
 }
 
 function handlePointerUp(e: PointerEvent) {
-  if (props.disableEventCapture) return
+  if (props.disableEventCapture || rotation.value % 360 !== 0) return
   activePointers.delete(e.pointerId)
   try {
     const target = e.currentTarget as HTMLElement
@@ -492,12 +544,12 @@ function handlePointerUp(e: PointerEvent) {
 }
 
 function handlePointerCancel(e: PointerEvent) {
-  if (props.disableEventCapture) return
+  if (props.disableEventCapture || rotation.value % 360 !== 0) return
   handlePointerUp(e)
 }
 
 function handleWheel(e: WheelEvent) {
-  if (props.disableEventCapture) return
+  if (props.disableEventCapture || rotation.value % 360 !== 0) return
   const target = e.target as HTMLElement
   // Only zoom if the event isn't targeted inside overlays, info panels or menus
   if (
@@ -534,6 +586,7 @@ useEventListener(containerRef, 'wheel', handleWheel, { passive: false })
       class="blurry-bg"
       :style="{
         backgroundImage: `url(${imageUrl})`,
+        transform: rotation ? `rotate(${rotation}deg)` : undefined,
       }"
     ></div>
 
@@ -550,21 +603,19 @@ useEventListener(containerRef, 'wheel', handleWheel, { passive: false })
       ref="containerRef"
       class="zoom-pan-container"
       :class="{ 'zoomed-in': scale > 1 }"
-      :style="{
-        transform: `rotate(${rotation}deg)`
-      }"
       @pointerdown="handlePointerDown"
       @pointermove="handlePointerMove"
       @pointerup="handlePointerUp"
       @pointercancel="handlePointerCancel"
     >
-      <div class="image-wrapper" :style="transformStyle">
+      <div class="image-wrapper" :style="wrapperStyle">
         <!-- Thumbnail layer at bottom -->
         <img
           ref="thumbRef"
           class="image-tag thumbnail-img"
           :src="imageUrl"
-          alt="Thumbnail image"
+          v-if="!thumbErrored || !fullResLoaded"
+          @error="thumbErrored = true"
           @load="clampTranslations"
           @dragstart.prevent
         />
@@ -654,12 +705,7 @@ useEventListener(containerRef, 'wheel', handleWheel, { passive: false })
 
 .image-wrapper {
   position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  will-change: auto;
-  transform: translateZ(0);
+  will-change: transform;
 }
 
 .image-tag {
