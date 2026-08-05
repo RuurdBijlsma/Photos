@@ -503,7 +503,6 @@ pub async fn reprocess_media_item(
         .map_err(|e| AppError::Internal(eyre!("Failed to analyze media {:?}: {}", file_path, e)))?;
 
     let create_item: CreateFullMediaItem = media_info.into();
-    let sort_timestamp = with_fallback_timezone(create_item.taken_at_utc, &create_item.taken_at_local);
 
     let mut tx = pool.begin().await?;
 
@@ -515,187 +514,8 @@ pub async fn reprocess_media_item(
     .execute(&mut *tx)
     .await?;
 
-    // Clear child metadata tables for clean re-insertion
-    sqlx::query!("DELETE FROM gps WHERE media_item_id = $1", media_item_id)
-        .execute(&mut *tx)
-        .await?;
-    sqlx::query!("DELETE FROM panorama_config WHERE media_item_id = $1", media_item_id)
-        .execute(&mut *tx)
-        .await?;
-    sqlx::query!("DELETE FROM time WHERE media_item_id = $1", media_item_id)
-        .execute(&mut *tx)
-        .await?;
-    sqlx::query!("DELETE FROM weather WHERE media_item_id = $1", media_item_id)
-        .execute(&mut *tx)
-        .await?;
-    sqlx::query!("DELETE FROM media_features WHERE media_item_id = $1", media_item_id)
-        .execute(&mut *tx)
-        .await?;
-    sqlx::query!("DELETE FROM camera_settings WHERE media_item_id = $1", media_item_id)
-        .execute(&mut *tx)
-        .await?;
-
-    // Update main media_item table
-    sqlx::query!(
-        r#"
-        UPDATE media_item
-        SET has_thumbnails = false,
-            hash = $2,
-            width = $3,
-            height = $4,
-            is_video = $5,
-            duration_ms = $6,
-            taken_at_local = $7,
-            taken_at_utc = $8,
-            og_taken_at_local = $9,
-            sort_timestamp = $10,
-            orientation = $11,
-            use_panorama_viewer = $12,
-            timezone_name = $13,
-            timezone_offset_seconds = $14,
-            og_timezone_offset_seconds = $15
-        WHERE id = $1
-        "#,
-        media_item_id,
-        &create_item.hash,
-        create_item.width,
-        create_item.height,
-        create_item.is_video,
-        create_item.duration_ms,
-        create_item.taken_at_local,
-        create_item.taken_at_utc,
-        create_item.og_taken_at_local,
-        sort_timestamp,
-        create_item.orientation,
-        create_item.use_panorama_viewer,
-        create_item.timezone_name,
-        create_item.timezone_offset_seconds,
-        create_item.og_timezone_offset_seconds,
-    )
-    .execute(&mut *tx)
-    .await?;
-
-    // Re-insert child tables if metadata is present
-    if let Some(gps_info) = &create_item.gps {
-        let location_id = MediaItemStore::get_or_create_location(&mut tx, &gps_info.location).await?;
-        sqlx::query!(
-            r#"
-            INSERT INTO gps (media_item_id, location_id, latitude, longitude, altitude, compass_direction)
-            VALUES ($1, $2, $3, $4, $5, $6)
-            "#,
-            media_item_id,
-            location_id,
-            gps_info.latitude,
-            gps_info.longitude,
-            gps_info.altitude,
-            gps_info.compass_direction,
-        )
-        .execute(&mut *tx)
-        .await?;
-    }
-
-    let time_det = &create_item.time;
-    sqlx::query!(
-        r#"
-        INSERT INTO time (media_item_id, timezone_source, source_details, source_confidence)
-        VALUES ($1, $2, $3, $4)
-        "#,
-        media_item_id,
-        time_det.timezone_source,
-        time_det.source_details,
-        time_det.source_confidence,
-    )
-    .execute(&mut *tx)
-    .await?;
-
-    if let Some(w) = &create_item.weather {
-        sqlx::query!(
-            r#"
-            INSERT INTO weather (
-                media_item_id, temperature, dew_point, relative_humidity, precipitation,
-                snow, wind_direction, wind_speed, peak_wind_gust, pressure,
-                sunshine_minutes, condition, sunrise, sunset, dawn, dusk, is_daytime
-            )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
-            "#,
-            media_item_id,
-            w.temperature,
-            w.dew_point,
-            w.relative_humidity,
-            w.precipitation,
-            w.snow,
-            w.wind_direction,
-            w.wind_speed,
-            w.peak_wind_gust,
-            w.pressure,
-            w.sunshine_minutes,
-            w.condition,
-            w.sunrise,
-            w.sunset,
-            w.dawn,
-            w.dusk,
-            w.is_daytime,
-        )
-        .execute(&mut *tx)
-        .await?;
-    }
-
-    let mf = &create_item.media_features;
-    sqlx::query!(
-        r#"
-        INSERT INTO media_features (
-            media_item_id, mime_type, size_bytes, is_motion_photo, motion_photo_presentation_timestamp,
-            is_hdr, is_burst, burst_id, capture_fps, video_fps, is_nightsight, is_timelapse, exif,
-            audio_format, audio_channels, audio_sample_rate, compressor_id
-        )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
-        "#,
-        media_item_id,
-        mf.mime_type,
-        mf.size_bytes,
-        mf.is_motion_photo,
-        mf.motion_photo_presentation_timestamp,
-        mf.is_hdr,
-        mf.is_burst,
-        mf.burst_id,
-        mf.capture_fps,
-        mf.video_fps,
-        mf.is_nightsight,
-        mf.is_timelapse,
-        sqlx::types::Json(&mf.exif) as _,
-        mf.audio_format,
-        mf.audio_channels.map(|v| v as i32),
-        mf.audio_sample_rate.map(|v| v as i32),
-        mf.compressor_id,
-    )
-    .execute(&mut *tx)
-    .await?;
-
-    let cs = &create_item.camera_settings;
-    sqlx::query!(
-        r#"
-        INSERT INTO camera_settings (
-            media_item_id, iso, exposure_time, aperture, focal_length,
-            focal_length_in_35mm, camera_make, camera_model, flash_fired,
-            flash_mode, lens_make, lens_model
-        )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-        "#,
-        media_item_id,
-        cs.iso,
-        cs.exposure_time,
-        cs.aperture,
-        cs.focal_length,
-        cs.focal_length_in_35mm,
-        cs.camera_make,
-        cs.camera_model,
-        cs.flash_fired,
-        cs.flash_mode,
-        cs.lens_make,
-        cs.lens_model,
-    )
-    .execute(&mut *tx)
-    .await?;
+    // Update main item and metadata child tables
+    MediaItemStore::update_full(&mut tx, media_item_id, false, &create_item).await?;
 
     tx.commit().await?;
 
@@ -764,7 +584,15 @@ pub async fn update_media_item(
 
         write_exif_orientation(&file_path, *new_orientation)?;
 
-        reprocess_media_item(pool, settings, media_item_id, user_id, &relative_path, &file_path).await?;
+        reprocess_media_item(
+            pool,
+            settings,
+            media_item_id,
+            user_id,
+            &relative_path,
+            &file_path,
+        )
+        .await?;
 
         let new_id = nice_id(app_state::constants().database.media_item_id_length);
         let mut tx = pool.begin().await?;
@@ -810,4 +638,3 @@ pub async fn update_media_item(
         media_item_id: current_id,
     })
 }
-
