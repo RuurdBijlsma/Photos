@@ -8,7 +8,7 @@ use crate::database::media_item_store::MediaItemStore;
 use crate::database::{UpdateField, UpdateMediaItemPayload, with_fallback_timezone};
 use crate::job_queue::enqueue_job;
 use crate::utils::{nice_id, write_exif_orientation};
-use app_state::{IngestSettings, MakeRelativePath};
+use app_state::{IngestSettings, MakeRelativePath, constants};
 use axum::body::Body;
 use axum_extra::headers::Range;
 use chrono::{DateTime, FixedOffset, NaiveDateTime, TimeZone, Utc};
@@ -594,7 +594,7 @@ pub async fn update_media_item(
         )
         .await?;
 
-        let new_id = nice_id(app_state::constants().database.media_item_id_length);
+        let new_id = nice_id(constants().database.media_item_id_length);
         let mut tx = pool.begin().await?;
         MediaItemStore::change_media_item_id(&mut tx, media_item_id, &new_id).await?;
         tx.commit().await?;
@@ -603,36 +603,43 @@ pub async fn update_media_item(
     }
 
     // 2. Process caption / timestamp / panorama updates if provided
-    let mut tx = pool.begin().await?;
+    let has_metadata_updates = taken_at_local.is_some()
+        || !matches!(user_caption, UpdateField::Ignore)
+        || use_panorama_viewer.is_some()
+        || !matches!(timezone_offset_seconds, UpdateField::Ignore);
 
-    let taken_at_local_input = taken_at_local
-        .as_ref()
-        .map(|m| NaiveDateTime::parse_from_str(m, "%Y-%m-%dT%H:%M:%S"))
-        .transpose()?;
+    if has_metadata_updates {
+        let mut tx = pool.begin().await?;
 
-    let (taken_at_utc, sort_timestamp) = compute_updated_timestamps(
-        &mut *tx,
-        &current_id,
-        taken_at_local_input,
-        timezone_offset_seconds,
-    )
-    .await?;
+        let taken_at_local_input = taken_at_local
+            .as_ref()
+            .map(|m| NaiveDateTime::parse_from_str(m, "%Y-%m-%dT%H:%M:%S"))
+            .transpose()?;
 
-    MediaItemStore::update(
-        &mut *tx,
-        &current_id,
-        UpdateMediaItemPayload {
-            user_caption: user_caption.clone(),
-            taken_at_local: taken_at_local_input,
-            taken_at_utc,
-            sort_timestamp,
-            timezone_offset_seconds: timezone_offset_seconds.clone(),
-            use_panorama_viewer: *use_panorama_viewer,
-        },
-    )
-    .await?;
+        let (taken_at_utc, sort_timestamp) = compute_updated_timestamps(
+            &mut *tx,
+            &current_id,
+            taken_at_local_input,
+            timezone_offset_seconds,
+        )
+        .await?;
 
-    tx.commit().await?;
+        MediaItemStore::update(
+            &mut *tx,
+            &current_id,
+            UpdateMediaItemPayload {
+                user_caption: user_caption.clone(),
+                taken_at_local: taken_at_local_input,
+                taken_at_utc,
+                sort_timestamp,
+                timezone_offset_seconds: timezone_offset_seconds.clone(),
+                use_panorama_viewer: *use_panorama_viewer,
+            },
+        )
+        .await?;
+
+        tx.commit().await?;
+    }
 
     Ok(UpdateMediaItemResponse {
         media_item_id: current_id,
