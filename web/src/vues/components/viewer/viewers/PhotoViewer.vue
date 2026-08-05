@@ -10,6 +10,7 @@ import { SERVER_BASE_URL } from '@/scripts/services/api.ts'
 import type { FullMediaItem } from '@/scripts/types/api/fullPhoto.ts'
 import type { PannellumConfig } from '@/scripts/types/api/pannellumConfig.ts'
 import { useAuthStore } from '@/scripts/stores/authStore.ts'
+import { isMimeTypeSupported } from '@/scripts/utils.ts'
 
 const PanoramaViewer = defineAsyncComponent(
   () => import('@/vues/components/viewer/components/PanoramaViewer.vue'),
@@ -82,28 +83,6 @@ const isLoadingFull = ref(false)
 
 let currentAbortController: AbortController | null = null
 
-// Native format support check
-function isMimeTypeSupported(mimeType?: string): boolean {
-  if (!mimeType) return false
-  const lower = mimeType.toLowerCase()
-  // Standard formats supported by all modern browsers
-  if (
-    lower === 'image/jpeg' ||
-    lower === 'image/jpg' ||
-    lower === 'image/png' ||
-    lower === 'image/webp' ||
-    lower === 'image/gif' ||
-    lower === 'image/avif'
-  ) {
-    return true
-  }
-  // HEIC support check (natively supported on Apple devices/Safari)
-  if (lower === 'image/heic' || lower === 'image/heif') {
-    return /^((?!chrome|android).)*safari/i.test(navigator.userAgent)
-  }
-  return false
-}
-
 // Cleanup full resolution load resources
 function cleanup() {
   if (currentAbortController) {
@@ -116,6 +95,24 @@ function cleanup() {
   }
   fullResLoaded.value = false
   isLoadingFull.value = false
+}
+
+async function loadFromStore(item: FullMediaItem) {
+  const preloadedUrl = viewPhotoStore.preloadedBlobs.get(item.id)!
+  viewPhotoStore.preloadedBlobs.delete(item.id)
+
+  if (currentAbortController) {
+    currentAbortController.abort()
+    currentAbortController = null
+  }
+  if (fullResUrl.value && fullResUrl.value !== preloadedUrl) {
+    URL.revokeObjectURL(fullResUrl.value)
+  }
+
+  fullResUrl.value = preloadedUrl
+  fullResLoaded.value = true
+  isLoadingFull.value = false
+  return
 }
 
 // Download the original full-resolution media file blob
@@ -230,17 +227,24 @@ watch(
 watch(
   fullImage,
   (item) => {
-    // Always clean up previous blob URLs or active network requests first
-    cleanup()
-
-    if (!item) return
+    if (!item) {
+      cleanup()
+      return
+    }
 
     if (settings.playMotionPhotos && item.media_features?.is_motion_photo) {
       playMotionPhoto()
     }
+    // clean up previous blob URLs or active network requests
+    cleanup()
 
-    if (isMimeTypeSupported(item.media_features?.mime_type) && authStore.isAuthenticated) {
-      loadFullResBlob(item as FullMediaItem)
+    if (authStore.isAuthenticated && isMimeTypeSupported(item.media_features?.mime_type)) {
+      // Check if a preloaded blob is available
+      if (viewPhotoStore.preloadedBlobs.has(item.id)) {
+        loadFromStore(item as FullMediaItem)
+      } else {
+        loadFullResBlob(item as FullMediaItem)
+      }
     }
   },
   { immediate: true },
@@ -614,7 +618,7 @@ useEventListener(containerRef, 'wheel', handleWheel, { passive: false })
           ref="thumbRef"
           class="image-tag thumbnail-img"
           :src="imageUrl"
-          v-if="!thumbErrored || !fullResLoaded"
+          v-if="(!thumbErrored || !fullResLoaded) && !viewPhotoStore.hideRotatedThumb.has(mediaItemId)"
           @error="thumbErrored = true"
           @load="clampTranslations"
           @dragstart.prevent

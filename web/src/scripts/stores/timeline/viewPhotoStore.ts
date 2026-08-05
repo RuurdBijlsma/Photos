@@ -9,6 +9,8 @@ import { type LocationQuery, useRouter } from 'vue-router'
 import { useSnackbarsStore } from '@/scripts/stores/snackbarStore.ts'
 import mediaItemService from '@/scripts/services/mediaItemService.ts'
 import { useRefreshStore } from '@/scripts/stores/refreshStore.ts'
+import { useMediaItemStore } from '@/scripts/stores/timeline/mediaItemStore.ts'
+import { isMimeTypeSupported } from '@/scripts/utils.ts'
 
 const rotations: Record<number, [number, number, number, number]> = {
   1: [1, 6, 3, 8],
@@ -28,6 +30,7 @@ function rotatedOrientationByDegrees(orientation: number, degrees: 0 | 90 | 180 
 export const useViewPhotoStore = defineStore('viewPhoto', () => {
   const snackbarStore = useSnackbarsStore()
   const refreshStore = useRefreshStore()
+  const mediaItemStore = useMediaItemStore()
   const router = useRouter()
 
   const viewLink = ref<string>('')
@@ -39,6 +42,8 @@ export const useViewPhotoStore = defineStore('viewPhoto', () => {
   const rotatedPhotos = ref(new Map<string, number>())
   const rotationLoading = ref(false)
   const rotateDebounceTimers = new Map<string, ReturnType<typeof setTimeout>>()
+  const preloadedBlobs = ref(new Map<string, string>())
+  const hideRotatedThumb = ref(new Set<string>())
 
   function triggerPlayMotion() {
     playMotionTrigger.value++
@@ -75,9 +80,33 @@ export const useViewPhotoStore = defineStore('viewPhoto', () => {
   ) {
     if (currentOrientation === newOrientation) return
     rotationLoading.value = true
+    let preloadedUrl: string | null = null
+    let newId: string | null = null
+
     try {
       const { data } = await mediaItemService.update(mediaItemId, { orientation: newOrientation })
-      const newId = data.mediaItemId
+      newId = data.mediaItemId
+
+      // Fetch updated media item metadata
+      await mediaItemStore.fetchMediaItem(newId, false)
+      const newItem = mediaItemStore.mediaItems.get(newId)!
+
+      // Pre-download and decode the rotated full-res image blob
+      if (isMimeTypeSupported(newItem.media_features.mime_type))
+        try {
+          const res = await mediaItemService.downloadMediaFileById(newId)
+          preloadedUrl = URL.createObjectURL(res.data)
+          const img = new Image()
+          img.src = preloadedUrl
+          await img.decode().catch(() => {})
+          preloadedBlobs.value.set(newId, preloadedUrl)
+        } catch (err) {
+          console.warn('Failed to preload rotated full res blob:', err)
+        }
+
+      hideRotatedThumb.value.add(newId)
+      hideRotatedThumb.value.add(mediaItemId)
+      // Update route if viewing the rotated item
       if (router.currentRoute.value.params.mediaId === mediaItemId) {
         await router.replace({
           path: `${viewLink.value}${newId}`,
@@ -86,10 +115,15 @@ export const useViewPhotoStore = defineStore('viewPhoto', () => {
       }
       refreshStore.counter++
     } catch (e) {
+      if (preloadedUrl) URL.revokeObjectURL(preloadedUrl)
       snackbarStore.error('Could not rotate photo', e)
     } finally {
       rotationLoading.value = false
-      rotatedPhotos.value.delete(mediaItemId)
+      setTimeout(() => {
+        rotatedPhotos.value.delete(mediaItemId)
+        hideRotatedThumb.value.delete(mediaItemId)
+        if (newId) hideRotatedThumb.value.delete(newId)
+      }, 250)
     }
   }
 
@@ -100,6 +134,8 @@ export const useViewPhotoStore = defineStore('viewPhoto', () => {
     playMotionTrigger,
     rotatedPhotos,
     rotationLoading,
+    preloadedBlobs,
+    hideRotatedThumb,
     triggerPlayMotion,
     rotatePhoto,
   }

@@ -17,6 +17,7 @@ import {
   isMobileDevice,
   makeDateTimeString,
   makeLocationString,
+  mimeSupportsRotation,
 } from '@/scripts/utils.ts'
 import { useDialogStore } from '@/scripts/stores/dialogStore.ts'
 import { useAuthStore } from '@/scripts/stores/authStore.ts'
@@ -456,7 +457,14 @@ useDetailTitle(mediaDetailTitle, { fallback: 'Photo' })
           }"
         />
         <v-btn
-          v-if="!isVideo && !isPanoActive && id && fullImage"
+          v-if="
+            !isVideo &&
+            !isPanoActive &&
+            id &&
+            fullImage &&
+            authStore.isAuthenticated &&
+            mimeSupportsRotation(fullImage.media_features.mime_type)
+          "
           rounded="xl"
           icon="mdi-rotate-right"
           variant="plain"
