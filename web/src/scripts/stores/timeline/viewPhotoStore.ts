@@ -8,7 +8,6 @@ import type {
 import { type LocationQuery, useRouter } from 'vue-router'
 import { useSnackbarsStore } from '@/scripts/stores/snackbarStore.ts'
 import mediaItemService from '@/scripts/services/mediaItemService.ts'
-import { useDebounceFn } from '@vueuse/core'
 import { useRefreshStore } from '@/scripts/stores/refreshStore.ts'
 
 const rotations: Record<number, [number, number, number, number]> = {
@@ -39,6 +38,7 @@ export const useViewPhotoStore = defineStore('viewPhoto', () => {
   const playMotionTrigger = ref(0)
   const rotatedPhotos = ref(new Map<string, number>())
   const rotationLoading = ref(false)
+  const rotateDebounceTimers = new Map<string, ReturnType<typeof setTimeout>>()
 
   function triggerPlayMotion() {
     playMotionTrigger.value++
@@ -46,23 +46,26 @@ export const useViewPhotoStore = defineStore('viewPhoto', () => {
 
   async function rotatePhoto(
     mediaItemId: string,
-    currentOrientation: number,
-    currentRouteQuery: LocationQuery,
+    currentOrientation: number | undefined,
+    currentRouteQuery: LocationQuery = {},
   ) {
     if (rotationLoading.value) return
-    const currentRotation = rotatedPhotos.value.get(mediaItemId) ?? 0
-    const newRotation = ((currentRotation + 90) % 360) as 90 | 180 | 270
-    rotatedPhotos.value.set(mediaItemId, newRotation)
-    const newOrientation = rotatedOrientationByDegrees(currentOrientation, newRotation)
-    debouncedRotatePhotoServerSide(
-      mediaItemId,
-      currentOrientation,
-      newOrientation,
-      currentRouteQuery,
-    )
-  }
+    currentOrientation = currentOrientation ?? 1
 
-  const debouncedRotatePhotoServerSide = useDebounceFn(rotatePhotoServerSide, 2500)
+    const currentRotation = rotatedPhotos.value.get(mediaItemId) ?? 0
+    const newRotation = ((currentRotation + 90) % 360) as 0 | 90 | 180 | 270
+    rotatedPhotos.value.set(mediaItemId, newRotation)
+
+    // Debounced rotate update on server
+    const newOrientation = rotatedOrientationByDegrees(currentOrientation, newRotation)
+    if (rotateDebounceTimers.has(mediaItemId)) clearTimeout(rotateDebounceTimers.get(mediaItemId))
+    const timer = setTimeout(() => {
+      rotateDebounceTimers.delete(mediaItemId)
+      rotatePhotoServerSide(mediaItemId, currentOrientation, newOrientation, currentRouteQuery)
+    }, 2500)
+
+    rotateDebounceTimers.set(mediaItemId, timer)
+  }
 
   async function rotatePhotoServerSide(
     mediaItemId: string,
@@ -87,7 +90,6 @@ export const useViewPhotoStore = defineStore('viewPhoto', () => {
     } finally {
       rotationLoading.value = false
       rotatedPhotos.value.delete(mediaItemId)
-      console.log('NICE')
     }
   }
 
