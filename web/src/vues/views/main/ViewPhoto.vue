@@ -448,11 +448,11 @@ useDetailTitle(mediaDetailTitle, { fallback: 'Photo' })
           }"
         />
         <v-btn
-          v-if="!isVideo && !isPanoActive && id"
+          v-if="!isVideo && !isPanoActive && id && fullImage"
           rounded="xl"
           icon="mdi-rotate-right"
           variant="plain"
-          @click="console.log(id, fullImage?.orientation, route.query)"
+          @click="viewPhotoStore.rotatePhoto(id, fullImage?.orientation, route.query)"
           v-tooltip="{
             text: 'Rotate clockwise',
             location: 'bottom',

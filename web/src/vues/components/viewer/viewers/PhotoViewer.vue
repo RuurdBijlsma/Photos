@@ -274,6 +274,7 @@ onUnmounted(() => {
   cleanup()
 })
 
+const rotation = computed(() => viewPhotoStore.rotatedPhotos.get(props.mediaItemId) ?? 0)
 const transformStyle = computed(() => {
   return {
     // translate3d forces GPU rendering continuously, without requiring blurry "will-change: transform" caching.
@@ -549,6 +550,9 @@ useEventListener(containerRef, 'wheel', handleWheel, { passive: false })
       ref="containerRef"
       class="zoom-pan-container"
       :class="{ 'zoomed-in': scale > 1 }"
+      :style="{
+        transform: `rotate(${rotation}deg)`
+      }"
       @pointerdown="handlePointerDown"
       @pointermove="handlePointerMove"
       @pointerup="handlePointerUp"
