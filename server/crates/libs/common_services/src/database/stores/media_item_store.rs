@@ -153,6 +153,7 @@ impl MediaItemStore {
             mi.updated_at,
             mi.width,
             mi.height,
+            mi.orientation,
             mi.is_video,
             mi.duration_ms,
             mi.taken_at_local,
@@ -606,23 +607,39 @@ impl MediaItemStore {
         old_id: &str,
         new_id: &str,
     ) -> Result<(), DbError> {
-        // 1. Duplicate media_item row under the new_id
+        // 0. Temporarily rename old relative_path to avoid UNIQUE constraint violation when copying
         sqlx::query!(
             r#"
-            INSERT INTO media_item (
-                id, user_id, remote_user_id, filename, relative_path,
-                hash, deleted, is_video, has_thumbnails, width, height, duration_ms,
-                taken_at_local, taken_at_utc, og_taken_at_local, sort_timestamp,
-                orientation, user_caption, search_vector
-            )
-            SELECT
-                $2, user_id, remote_user_id, filename, relative_path,
-                hash, deleted, is_video, has_thumbnails, width, height, duration_ms,
-                taken_at_local, taken_at_utc, og_taken_at_local, sort_timestamp,
-                orientation, user_caption, search_vector
-            FROM media_item
-            WHERE id = $1
-            "#,
+        UPDATE media_item
+        SET relative_path = relative_path || '__temp_' || $1
+        WHERE id = $1
+        "#,
+            old_id
+        )
+        .execute(&mut **tx)
+        .await?;
+
+        // 1. Duplicate media_item row under the new_id with ALL required columns
+        sqlx::query!(
+            r#"
+        INSERT INTO media_item (
+            id, user_id, remote_user_id, filename, relative_path,
+            hash, deleted, is_video, has_thumbnails, width, height, duration_ms,
+            taken_at_local, taken_at_utc, og_taken_at_local, sort_timestamp,
+            timezone_name, timezone_offset_seconds, og_timezone_offset_seconds,
+            use_panorama_viewer, orientation, user_caption, search_vector,
+            created_at, updated_at
+        )
+        SELECT
+            $2, user_id, remote_user_id, filename, REPLACE(relative_path, '__temp_' || $1, ''),
+            hash, deleted, is_video, has_thumbnails, width, height, duration_ms,
+            taken_at_local, taken_at_utc, og_taken_at_local, sort_timestamp,
+            timezone_name, timezone_offset_seconds, og_timezone_offset_seconds,
+            use_panorama_viewer, orientation, user_caption, search_vector,
+            created_at, updated_at
+        FROM media_item
+        WHERE id = $1
+        "#,
             old_id,
             new_id
         )
@@ -630,50 +647,102 @@ impl MediaItemStore {
         .await?;
 
         // 2. Re-point direct foreign keys
-        sqlx::query!("UPDATE gps SET media_item_id = $2 WHERE media_item_id = $1", old_id, new_id)
-            .execute(&mut **tx)
-            .await?;
-        sqlx::query!("UPDATE panorama_config SET media_item_id = $2 WHERE media_item_id = $1", old_id, new_id)
-            .execute(&mut **tx)
-            .await?;
-        sqlx::query!("UPDATE time SET media_item_id = $2 WHERE media_item_id = $1", old_id, new_id)
-            .execute(&mut **tx)
-            .await?;
-        sqlx::query!("UPDATE weather SET media_item_id = $2 WHERE media_item_id = $1", old_id, new_id)
-            .execute(&mut **tx)
-            .await?;
-        sqlx::query!("UPDATE media_features SET media_item_id = $2 WHERE media_item_id = $1", old_id, new_id)
-            .execute(&mut **tx)
-            .await?;
-        sqlx::query!("UPDATE camera_settings SET media_item_id = $2 WHERE media_item_id = $1", old_id, new_id)
-            .execute(&mut **tx)
-            .await?;
-        sqlx::query!("UPDATE visual_analysis SET media_item_id = $2 WHERE media_item_id = $1", old_id, new_id)
-            .execute(&mut **tx)
-            .await?;
-        sqlx::query!("UPDATE album_media_item SET media_item_id = $2 WHERE media_item_id = $1", old_id, new_id)
-            .execute(&mut **tx)
-            .await?;
-        sqlx::query!("UPDATE media_item_photo_cluster SET media_item_id = $2 WHERE media_item_id = $1", old_id, new_id)
-            .execute(&mut **tx)
-            .await?;
+        sqlx::query!(
+            "UPDATE gps SET media_item_id = $2 WHERE media_item_id = $1",
+            old_id,
+            new_id
+        )
+        .execute(&mut **tx)
+        .await?;
+        sqlx::query!(
+            "UPDATE panorama_config SET media_item_id = $2 WHERE media_item_id = $1",
+            old_id,
+            new_id
+        )
+        .execute(&mut **tx)
+        .await?;
+        sqlx::query!(
+            "UPDATE time SET media_item_id = $2 WHERE media_item_id = $1",
+            old_id,
+            new_id
+        )
+        .execute(&mut **tx)
+        .await?;
+        sqlx::query!(
+            "UPDATE weather SET media_item_id = $2 WHERE media_item_id = $1",
+            old_id,
+            new_id
+        )
+        .execute(&mut **tx)
+        .await?;
+        sqlx::query!(
+            "UPDATE media_features SET media_item_id = $2 WHERE media_item_id = $1",
+            old_id,
+            new_id
+        )
+        .execute(&mut **tx)
+        .await?;
+        sqlx::query!(
+            "UPDATE camera_settings SET media_item_id = $2 WHERE media_item_id = $1",
+            old_id,
+            new_id
+        )
+        .execute(&mut **tx)
+        .await?;
+        sqlx::query!(
+            "UPDATE visual_analysis SET media_item_id = $2 WHERE media_item_id = $1",
+            old_id,
+            new_id
+        )
+        .execute(&mut **tx)
+        .await?;
+        sqlx::query!(
+            "UPDATE album_media_item SET media_item_id = $2 WHERE media_item_id = $1",
+            old_id,
+            new_id
+        )
+        .execute(&mut **tx)
+        .await?;
+        sqlx::query!(
+            "UPDATE media_item_photo_cluster SET media_item_id = $2 WHERE media_item_id = $1",
+            old_id,
+            new_id
+        )
+        .execute(&mut **tx)
+        .await?;
 
         // 3. Re-point circular and optional references
-        sqlx::query!("UPDATE face_cluster SET thumb_media_item_id = $2 WHERE thumb_media_item_id = $1", old_id, new_id)
-            .execute(&mut **tx)
-            .await?;
+        sqlx::query!(
+            "UPDATE face_cluster SET thumb_media_item_id = $2 WHERE thumb_media_item_id = $1",
+            old_id,
+            new_id
+        )
+        .execute(&mut **tx)
+        .await?;
         sqlx::query!("UPDATE photo_cluster SET thumbnail_media_item_id = $2 WHERE thumbnail_media_item_id = $1", old_id, new_id)
             .execute(&mut **tx)
             .await?;
-        sqlx::query!("UPDATE album SET thumbnail_id = $2 WHERE thumbnail_id = $1", old_id, new_id)
-            .execute(&mut **tx)
-            .await?;
-        sqlx::query!("UPDATE app_user SET avatar_id = $2 WHERE avatar_id = $1", old_id, new_id)
-            .execute(&mut **tx)
-            .await?;
-        sqlx::query!("UPDATE daily_card SET thumbnail_media_item_id = $2 WHERE thumbnail_media_item_id = $1", old_id, new_id)
-            .execute(&mut **tx)
-            .await?;
+        sqlx::query!(
+            "UPDATE album SET thumbnail_id = $2 WHERE thumbnail_id = $1",
+            old_id,
+            new_id
+        )
+        .execute(&mut **tx)
+        .await?;
+        sqlx::query!(
+            "UPDATE app_user SET avatar_id = $2 WHERE avatar_id = $1",
+            old_id,
+            new_id
+        )
+        .execute(&mut **tx)
+        .await?;
+        sqlx::query!(
+            "UPDATE daily_card SET thumbnail_media_item_id = $2 WHERE thumbnail_media_item_id = $1",
+            old_id,
+            new_id
+        )
+        .execute(&mut **tx)
+        .await?;
 
         // 4. Remove original media_item row
         sqlx::query!("DELETE FROM media_item WHERE id = $1", old_id)
@@ -683,4 +752,3 @@ impl MediaItemStore {
         Ok(())
     }
 }
-
