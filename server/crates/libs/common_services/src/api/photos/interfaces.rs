@@ -41,4 +41,3 @@ pub struct UpdateMediaItemRequest {
 pub struct UpdateMediaItemResponse {
     pub media_item_id: String,
 }
-

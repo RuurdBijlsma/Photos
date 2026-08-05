@@ -202,13 +202,6 @@ impl MediaItemStore {
     }
 
     /// Inserts a full media item and all its associated metadata into the database.
-    /// This function will first delete any existing media item with the same `relative_path`
-    /// to ensure a clean insert.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if any of the database deletion or insertion queries fail.
-    #[allow(clippy::too_many_lines)]
     pub async fn create(
         tx: &mut PgTransaction<'_>,
         id: &str,
@@ -223,7 +216,6 @@ impl MediaItemStore {
             || relative_path.to_string(),
             |f| f.to_string_lossy().to_string(),
         );
-        // It's getting stuck here somtimes? Why??
 
         // Insert into the main media_item table
         sqlx::query!(
@@ -259,143 +251,10 @@ impl MediaItemStore {
             .execute(&mut **tx)
             .await?;
 
-        // Insert into related tables
-        if let Some(gps_info) = &media_item.gps {
-            let location_id = Self::get_or_create_location(tx, &gps_info.location).await?;
-
-            sqlx::query!(
-                r#"
-                INSERT INTO gps (media_item_id, location_id, latitude, longitude, altitude, compass_direction)
-                VALUES ($1, $2, $3, $4, $5, $6)
-                "#,
-                id,
-                location_id,
-                gps_info.latitude,
-                gps_info.longitude,
-                gps_info.altitude,
-                gps_info.compass_direction,
-            )
-                .execute(&mut **tx)
-                .await?;
-        }
-
-        if let Some(weather_info) = &media_item.weather {
-            sqlx::query!(
-                r#"
-                INSERT INTO weather (
-                    media_item_id, temperature, dew_point, relative_humidity, precipitation, snow,
-                    wind_direction, wind_speed, peak_wind_gust, pressure, sunshine_minutes,
-                    condition, sunrise, sunset, dawn, dusk, is_daytime
-                )
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
-                "#,
-                id,
-                weather_info.temperature,
-                weather_info.dew_point,
-                weather_info.relative_humidity,
-                weather_info.precipitation,
-                weather_info.snow,
-                weather_info.wind_direction,
-                weather_info.wind_speed,
-                weather_info.peak_wind_gust,
-                weather_info.pressure,
-                weather_info.sunshine_minutes,
-                weather_info.condition,
-                weather_info.sunrise,
-                weather_info.sunset,
-                weather_info.dawn,
-                weather_info.dusk,
-                weather_info.is_daytime,
-            )
-            .execute(&mut **tx)
-            .await?;
-        }
-
-        sqlx::query!(
-            r#"
-                INSERT INTO time (
-                    media_item_id, timezone_source, source_details, source_confidence
-                )
-                VALUES ($1, $2, $3, $4)
-                "#,
-            id,
-            media_item.time.timezone_source,
-            &media_item.time.source_details,
-            &media_item.time.source_confidence,
-        )
-        .execute(&mut **tx)
-        .await?;
-
-        sqlx::query!(
-            r#"
-                INSERT INTO media_features (
-                    media_item_id, mime_type, size_bytes, is_motion_photo,
-                    motion_photo_presentation_timestamp, is_hdr, is_burst, burst_id,
-                    capture_fps, video_fps, is_nightsight, is_timelapse, exif, audio_format,
-                    audio_channels, audio_sample_rate, compressor_id
-                )
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
-                "#,
-            id,
-            media_item.media_features.mime_type,
-            media_item.media_features.size_bytes,
-            media_item.media_features.is_motion_photo,
-            media_item
-                .media_features
-                .motion_photo_presentation_timestamp,
-            media_item.media_features.is_hdr,
-            media_item.media_features.is_burst,
-            media_item.media_features.burst_id,
-            media_item.media_features.capture_fps,
-            media_item.media_features.video_fps,
-            media_item.media_features.is_nightsight,
-            media_item.media_features.is_timelapse,
-            media_item.media_features.exif,
-            media_item.media_features.audio_format,
-            media_item.media_features.audio_channels.map(|i| i as i32),
-            media_item
-                .media_features
-                .audio_sample_rate
-                .map(|i| i as i32),
-            media_item.media_features.compressor_id,
-        )
-        .execute(&mut **tx)
-        .await?;
-
-        sqlx::query!(
-            r#"
-                INSERT INTO camera_settings (
-                    media_item_id, iso, exposure_time, aperture, focal_length, camera_make,
-                    camera_model, flash_fired, flash_mode, lens_make, lens_model,
-                    digital_zoom_ratio, subject_distance, focal_length_in_35mm,
-                    exposure_compensation
-                )
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
-                "#,
-            id,
-            media_item.camera_settings.iso,
-            media_item.camera_settings.exposure_time,
-            media_item.camera_settings.aperture,
-            media_item.camera_settings.focal_length,
-            media_item.camera_settings.camera_make,
-            media_item.camera_settings.camera_model,
-            media_item.camera_settings.flash_fired,
-            media_item.camera_settings.flash_mode,
-            media_item.camera_settings.lens_make,
-            media_item.camera_settings.lens_model,
-            media_item.camera_settings.digital_zoom_ratio,
-            media_item.camera_settings.subject_distance,
-            media_item.camera_settings.focal_length_in_35mm,
-            media_item.camera_settings.exposure_compensation,
-        )
-        .execute(&mut **tx)
-        .await?;
-
-        Ok(())
+        Self::insert_child_metadata(tx, id, media_item).await
     }
 
-    /// Updates a media item's main attributes.
-    #[allow(clippy::too_many_lines)]
+    /// Updates a media item's main attributes and refreshes its child metadata tables.
     pub async fn update_full(
         tx: &mut PgTransaction<'_>,
         id: &str,
@@ -466,9 +325,18 @@ impl MediaItemStore {
         .execute(&mut **tx)
         .await?;
 
-        // Re-insert child tables if metadata is present
+        Self::insert_child_metadata(tx, id, media_item).await
+    }
+
+    /// Helper method to insert associated child metadata records for a media item.
+    async fn insert_child_metadata(
+        tx: &mut PgTransaction<'_>,
+        id: &str,
+        media_item: &CreateFullMediaItem,
+    ) -> Result<(), DbError> {
         if let Some(gps_info) = &media_item.gps {
             let location_id = Self::get_or_create_location(tx, &gps_info.location).await?;
+
             sqlx::query!(
                 r#"
                 INSERT INTO gps (media_item_id, location_id, latitude, longitude, altitude, compass_direction)
@@ -485,105 +353,114 @@ impl MediaItemStore {
                 .await?;
         }
 
-        let time_det = &media_item.time;
-        sqlx::query!(
-            r#"
-            INSERT INTO time (media_item_id, timezone_source, source_details, source_confidence)
-            VALUES ($1, $2, $3, $4)
-            "#,
-            id,
-            time_det.timezone_source,
-            time_det.source_details,
-            time_det.source_confidence,
-        )
-        .execute(&mut **tx)
-        .await?;
-
-        if let Some(w) = &media_item.weather {
+        if let Some(weather_info) = &media_item.weather {
             sqlx::query!(
                 r#"
                 INSERT INTO weather (
-                    media_item_id, temperature, dew_point, relative_humidity, precipitation,
-                    snow, wind_direction, wind_speed, peak_wind_gust, pressure,
-                    sunshine_minutes, condition, sunrise, sunset, dawn, dusk, is_daytime
+                    media_item_id, temperature, dew_point, relative_humidity, precipitation, snow,
+                    wind_direction, wind_speed, peak_wind_gust, pressure, sunshine_minutes,
+                    condition, sunrise, sunset, dawn, dusk, is_daytime
                 )
                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
                 "#,
                 id,
-                w.temperature,
-                w.dew_point,
-                w.relative_humidity,
-                w.precipitation,
-                w.snow,
-                w.wind_direction,
-                w.wind_speed,
-                w.peak_wind_gust,
-                w.pressure,
-                w.sunshine_minutes,
-                w.condition,
-                w.sunrise,
-                w.sunset,
-                w.dawn,
-                w.dusk,
-                w.is_daytime,
+                weather_info.temperature,
+                weather_info.dew_point,
+                weather_info.relative_humidity,
+                weather_info.precipitation,
+                weather_info.snow,
+                weather_info.wind_direction,
+                weather_info.wind_speed,
+                weather_info.peak_wind_gust,
+                weather_info.pressure,
+                weather_info.sunshine_minutes,
+                weather_info.condition,
+                weather_info.sunrise,
+                weather_info.sunset,
+                weather_info.dawn,
+                weather_info.dusk,
+                weather_info.is_daytime,
             )
             .execute(&mut **tx)
             .await?;
         }
 
-        let mf = &media_item.media_features;
+        sqlx::query!(
+            r#"
+            INSERT INTO time (
+                media_item_id, timezone_source, source_details, source_confidence
+            )
+            VALUES ($1, $2, $3, $4)
+            "#,
+            id,
+            media_item.time.timezone_source,
+            &media_item.time.source_details,
+            &media_item.time.source_confidence,
+        )
+        .execute(&mut **tx)
+        .await?;
+
         sqlx::query!(
             r#"
             INSERT INTO media_features (
-                media_item_id, mime_type, size_bytes, is_motion_photo, motion_photo_presentation_timestamp,
-                is_hdr, is_burst, burst_id, capture_fps, video_fps, is_nightsight, is_timelapse, exif,
-                audio_format, audio_channels, audio_sample_rate, compressor_id
+                media_item_id, mime_type, size_bytes, is_motion_photo,
+                motion_photo_presentation_timestamp, is_hdr, is_burst, burst_id,
+                capture_fps, video_fps, is_nightsight, is_timelapse, exif, audio_format,
+                audio_channels, audio_sample_rate, compressor_id
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
             "#,
             id,
-            mf.mime_type,
-            mf.size_bytes,
-            mf.is_motion_photo,
-            mf.motion_photo_presentation_timestamp,
-            mf.is_hdr,
-            mf.is_burst,
-            mf.burst_id,
-            mf.capture_fps,
-            mf.video_fps,
-            mf.is_nightsight,
-            mf.is_timelapse,
-            mf.exif,
-            mf.audio_format,
-            mf.audio_channels.map(|v| v as i32),
-            mf.audio_sample_rate.map(|v| v as i32),
-            mf.compressor_id,
+            media_item.media_features.mime_type,
+            media_item.media_features.size_bytes,
+            media_item.media_features.is_motion_photo,
+            media_item
+                .media_features
+                .motion_photo_presentation_timestamp,
+            media_item.media_features.is_hdr,
+            media_item.media_features.is_burst,
+            media_item.media_features.burst_id,
+            media_item.media_features.capture_fps,
+            media_item.media_features.video_fps,
+            media_item.media_features.is_nightsight,
+            media_item.media_features.is_timelapse,
+            media_item.media_features.exif,
+            media_item.media_features.audio_format,
+            media_item.media_features.audio_channels.map(|i| i as i32),
+            media_item
+                .media_features
+                .audio_sample_rate
+                .map(|i| i as i32),
+            media_item.media_features.compressor_id,
         )
-            .execute(&mut **tx)
-            .await?;
+        .execute(&mut **tx)
+        .await?;
 
-        let cs = &media_item.camera_settings;
         sqlx::query!(
             r#"
             INSERT INTO camera_settings (
-                media_item_id, iso, exposure_time, aperture, focal_length,
-                focal_length_in_35mm, camera_make, camera_model, flash_fired,
-                flash_mode, lens_make, lens_model
+                media_item_id, iso, exposure_time, aperture, focal_length, camera_make,
+                camera_model, flash_fired, flash_mode, lens_make, lens_model,
+                digital_zoom_ratio, subject_distance, focal_length_in_35mm,
+                exposure_compensation
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
             "#,
             id,
-            cs.iso,
-            cs.exposure_time,
-            cs.aperture,
-            cs.focal_length,
-            cs.focal_length_in_35mm,
-            cs.camera_make,
-            cs.camera_model,
-            cs.flash_fired,
-            cs.flash_mode,
-            cs.lens_make,
-            cs.lens_model,
+            media_item.camera_settings.iso,
+            media_item.camera_settings.exposure_time,
+            media_item.camera_settings.aperture,
+            media_item.camera_settings.focal_length,
+            media_item.camera_settings.camera_make,
+            media_item.camera_settings.camera_model,
+            media_item.camera_settings.flash_fired,
+            media_item.camera_settings.flash_mode,
+            media_item.camera_settings.lens_make,
+            media_item.camera_settings.lens_model,
+            media_item.camera_settings.digital_zoom_ratio,
+            media_item.camera_settings.subject_distance,
+            media_item.camera_settings.focal_length_in_35mm,
+            media_item.camera_settings.exposure_compensation,
         )
         .execute(&mut **tx)
         .await?;
