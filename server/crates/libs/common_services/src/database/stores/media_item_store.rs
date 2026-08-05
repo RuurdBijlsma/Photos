@@ -324,6 +324,7 @@ impl MediaItemStore {
     }
 
     /// Helper method to insert associated child metadata records for a media item.
+    #[allow(clippy::too_many_lines)]
     async fn insert_child_metadata(
         tx: &mut PgTransaction<'_>,
         id: &str,
