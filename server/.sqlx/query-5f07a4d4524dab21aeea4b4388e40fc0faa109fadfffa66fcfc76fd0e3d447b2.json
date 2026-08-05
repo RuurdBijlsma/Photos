@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            WITH d1 AS (DELETE FROM gps WHERE media_item_id = $1),\n                 d2 AS (DELETE FROM panorama_config WHERE media_item_id = $1),\n                 d3 AS (DELETE FROM time WHERE media_item_id = $1),\n                 d4 AS (DELETE FROM weather WHERE media_item_id = $1),\n                 d5 AS (DELETE FROM media_features WHERE media_item_id = $1)\n            DELETE FROM camera_settings WHERE media_item_id = $1\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "5f07a4d4524dab21aeea4b4388e40fc0faa109fadfffa66fcfc76fd0e3d447b2"
+}

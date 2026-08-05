@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            WITH inserted_mi AS (\n                INSERT INTO media_item (\n                    id, user_id, remote_user_id, filename, relative_path,\n                    hash, deleted, is_video, has_thumbnails, width, height, duration_ms,\n                    taken_at_local, taken_at_utc, og_taken_at_local, sort_timestamp,\n                    timezone_name, timezone_offset_seconds, og_timezone_offset_seconds,\n                    use_panorama_viewer, orientation, user_caption, search_vector,\n                    created_at, updated_at\n                )\n                SELECT\n                    $2, user_id, remote_user_id, filename, REPLACE(relative_path, '__temp_' || $1, ''),\n                    hash, deleted, is_video, has_thumbnails, width, height, duration_ms,\n                    taken_at_local, taken_at_utc, og_taken_at_local, sort_timestamp,\n                    timezone_name, timezone_offset_seconds, og_timezone_offset_seconds,\n                    use_panorama_viewer, orientation, user_caption, search_vector,\n                    created_at, updated_at\n                FROM media_item\n                WHERE id = $1\n            ),\n            u_gps AS (UPDATE gps SET media_item_id = $2 WHERE media_item_id = $1),\n            u_pc AS (UPDATE panorama_config SET media_item_id = $2 WHERE media_item_id = $1),\n            u_time AS (UPDATE time SET media_item_id = $2 WHERE media_item_id = $1),\n            u_weather AS (UPDATE weather SET media_item_id = $2 WHERE media_item_id = $1),\n            u_mf AS (UPDATE media_features SET media_item_id = $2 WHERE media_item_id = $1),\n            u_cs AS (UPDATE camera_settings SET media_item_id = $2 WHERE media_item_id = $1),\n            u_va AS (UPDATE visual_analysis SET media_item_id = $2 WHERE media_item_id = $1),\n            u_ami AS (UPDATE album_media_item SET media_item_id = $2 WHERE media_item_id = $1),\n            u_mipc AS (UPDATE media_item_photo_cluster SET media_item_id = $2 WHERE media_item_id = $1),\n            u_fc AS (UPDATE face_cluster SET thumb_media_item_id = $2 WHERE thumb_media_item_id = $1),\n            u_photoc AS (UPDATE photo_cluster SET thumbnail_media_item_id = $2 WHERE thumbnail_media_item_id = $1),\n            u_album AS (UPDATE album SET thumbnail_id = $2 WHERE thumbnail_id = $1),\n            u_user AS (UPDATE app_user SET avatar_id = $2 WHERE avatar_id = $1),\n            u_dc AS (UPDATE daily_card SET thumbnail_media_item_id = $2 WHERE thumbnail_media_item_id = $1)\n            DELETE FROM media_item WHERE id = $1\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Varchar"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "1289f163f434b29b94962c90167371bbe8035d17e42aded4b9784ec8fad6d78e"
+}
