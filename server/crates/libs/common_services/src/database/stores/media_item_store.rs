@@ -498,7 +498,7 @@ impl MediaItemStore {
     }
 
     /// Retrieves an existing location's ID or creates a new one if it doesn't exist.
-    pub async fn get_or_create_location(
+    async fn get_or_create_location(
         tx: &mut PgTransaction<'_>,
         location_data: &Location,
     ) -> Result<i32, DbError> {

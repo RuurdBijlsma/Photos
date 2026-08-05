@@ -23,7 +23,6 @@ macro_rules! alert {
 /// Write/update the EXIF Orientation tag on a media file on disk.
 pub fn write_exif_orientation(file_path: &Path, orientation: i32) -> color_eyre::Result<()> {
     let et = exiftool::ExifTool::new()?;
-    dbg!(file_path, orientation);
     et.write_tag(
         file_path,
         "Orientation",
