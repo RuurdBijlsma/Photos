@@ -299,10 +299,11 @@ export function isMimeTypeSupported(mimeType?: string): boolean {
 export function mimeSupportsRotation(mimeType?: string): boolean {
   if (!mimeType) return false
   const lower = mimeType.toLowerCase()
-  return lower === 'image/jpeg' ||
+  return (
+    lower === 'image/jpeg' ||
     lower === 'image/jpg' ||
     lower === 'image/tiff' ||
     lower === 'image/png' ||
-    lower === 'image/webp';
-
+    lower === 'image/webp'
+  )
 }

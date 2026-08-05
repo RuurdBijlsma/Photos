@@ -618,7 +618,9 @@ useEventListener(containerRef, 'wheel', handleWheel, { passive: false })
           ref="thumbRef"
           class="image-tag thumbnail-img"
           :src="imageUrl"
-          v-if="(!thumbErrored || !fullResLoaded) && !viewPhotoStore.hideRotatedThumb.has(mediaItemId)"
+          v-if="
+            (!thumbErrored || !fullResLoaded) && !viewPhotoStore.hideRotatedThumb.has(mediaItemId)
+          "
           @error="thumbErrored = true"
           @load="clampTranslations"
           @dragstart.prevent
