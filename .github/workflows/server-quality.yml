@@ -44,7 +44,7 @@ jobs:
       - name: Check formatting
         run: cargo fmt --all -- --check
 
-      - name: Run Clippy
+      - name: Run Clippies
         run: cargo clippy --no-deps -- -D clippy::all -D clippy::pedantic -D clippy::nursery
 
       - name: Build
