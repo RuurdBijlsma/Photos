@@ -5,9 +5,12 @@ import { useMediaItemStore } from '@/scripts/stores/timeline/mediaItemStore.ts'
 import { useViewPhotoStore } from '@/scripts/stores/timeline/viewPhotoStore.ts'
 import mediaItemService from '@/scripts/services/mediaItemService.ts'
 import axios from 'axios'
-import { useEventListener, useRafFn, useTimeoutFn } from '@vueuse/core'
+import { useElementSize, useEventListener, useRafFn, useTimeoutFn } from '@vueuse/core'
 import { SERVER_BASE_URL } from '@/scripts/services/api.ts'
+import type { FullMediaItem } from '@/scripts/types/api/fullPhoto.ts'
 import type { PannellumConfig } from '@/scripts/types/api/pannellumConfig.ts'
+import { useAuthStore } from '@/scripts/stores/authStore.ts'
+import { isMimeTypeSupported } from '@/scripts/utils.ts'
 
 const PanoramaViewer = defineAsyncComponent(
   () => import('@/vues/components/viewer/components/PanoramaViewer.vue'),
@@ -33,12 +36,15 @@ const emit = defineEmits<{
 const mediaItemStore = useMediaItemStore()
 const settings = useSettingStore()
 const viewPhotoStore = useViewPhotoStore()
+const authStore = useAuthStore()
 
 // Zoom and Pan state
 const scale = ref(1)
 const translateX = ref(0)
 const translateY = ref(0)
+const thumbErrored = ref(false)
 const containerRef = ref<HTMLElement | null>(null)
+const { width: containerWidth, height: containerHeight } = useElementSize(containerRef)
 const thumbRef = ref<HTMLImageElement | null>(null)
 const baseUrl = SERVER_BASE_URL
 
@@ -61,43 +67,21 @@ const isPanorama = computed(
 const panoramaConfig = computed(() => props.forcePano ?? fullImage.value?.panorama_config)
 const is3DMode = ref(false)
 
-// Phase 1: Immediate Thumbnail URL (1440p)
+// Immediate Thumbnail URL (1440p)
 const imageUrl = computed(() => {
   return mediaItemService.getPhotoThumbnail(
     props.mediaItemId,
-    1440, // 1440p thumbnail for high resolution details
+    1440,
     !generatedThumbsAvailable.value,
   )
 })
 
-// Phase 2: Full Resolution Background Load
+// Full Resolution Background Load
 const fullResUrl = ref<string | null>(null)
 const fullResLoaded = ref(false)
 const isLoadingFull = ref(false)
 
 let currentAbortController: AbortController | null = null
-
-// Native format support check
-function isMimeTypeSupported(mimeType?: string): boolean {
-  if (!mimeType) return false
-  const lower = mimeType.toLowerCase()
-  // Standard formats supported by all modern browsers
-  if (
-    lower === 'image/jpeg' ||
-    lower === 'image/jpg' ||
-    lower === 'image/png' ||
-    lower === 'image/webp' ||
-    lower === 'image/gif' ||
-    lower === 'image/avif'
-  ) {
-    return true
-  }
-  // HEIC support check (natively supported on Apple devices/Safari)
-  if (lower === 'image/heic' || lower === 'image/heif') {
-    return /^((?!chrome|android).)*safari/i.test(navigator.userAgent)
-  }
-  return false
-}
 
 // Cleanup full resolution load resources
 function cleanup() {
@@ -113,18 +97,26 @@ function cleanup() {
   isLoadingFull.value = false
 }
 
-// Start abortable download of the full-resolution media file
-async function startFullResLoad() {
-  cleanup()
+async function loadFromStore(item: FullMediaItem) {
+  const preloadedUrl = viewPhotoStore.preloadedBlobs.get(item.id)!
+  viewPhotoStore.preloadedBlobs.delete(item.id)
 
-  const item = fullImage.value
-  if (!item) return
-
-  // Bypasses the download if format is RAW, unsupported HEIC, etc.
-  if (!isMimeTypeSupported(item.media_features?.mime_type)) {
-    return
+  if (currentAbortController) {
+    currentAbortController.abort()
+    currentAbortController = null
+  }
+  if (fullResUrl.value && fullResUrl.value !== preloadedUrl) {
+    URL.revokeObjectURL(fullResUrl.value)
   }
 
+  fullResUrl.value = preloadedUrl
+  fullResLoaded.value = true
+  isLoadingFull.value = false
+  return
+}
+
+// Download the original full-resolution media file blob
+async function loadFullResBlob(item: FullMediaItem) {
   const controller = new AbortController()
   currentAbortController = controller
   isLoadingFull.value = true
@@ -132,7 +124,6 @@ async function startFullResLoad() {
   try {
     const res = await mediaItemService.downloadMediaFileById(item.id, controller.signal)
 
-    // Check if we switched items or aborted in the meantime
     if (controller.signal.aborted || props.mediaItemId !== item.id) {
       return
     }
@@ -155,7 +146,7 @@ async function startFullResLoad() {
   }
 }
 
-// Native async decoding to prevent main thread "image decode" frame drops during zoom
+// Async decoding to prevent main thread "image decode" frame drops during zoom
 async function onFullResLoad(e: Event) {
   const img = e.target as HTMLImageElement
   try {
@@ -170,9 +161,7 @@ async function onFullResLoad(e: Event) {
 // Motion Photo Settings & Logic
 const showingMotionVideo = ref(false)
 const videoPlayerRef = ref<HTMLVideoElement | null>(null)
-const motionVideoUrl = computed(() => {
-  return mediaItemService.getMotionVideo(props.mediaItemId)
-})
+const motionVideoUrl = computed(() => mediaItemService.getMotionVideo(props.mediaItemId))
 
 const { pause: stopMonitoring, resume: startMonitoring } = useRafFn(
   () => {
@@ -219,7 +208,48 @@ function onVideoEnded() {
   stopMonitoring()
 }
 
-// Watchers
+// Reset UI viewport state whenever media item ID changes
+watch(
+  () => props.mediaItemId,
+  () => {
+    scale.value = 1
+    translateX.value = 0
+    translateY.value = 0
+    is3DMode.value = false
+    thumbErrored.value = false
+    showingMotionVideo.value = false
+    stopMonitoring()
+  },
+  { immediate: true },
+)
+
+// Drive Media Content Loading Lifecycle whenever fullImage changes
+watch(
+  fullImage,
+  (item) => {
+    if (!item) {
+      cleanup()
+      return
+    }
+
+    if (settings.playMotionPhotos && item.media_features?.is_motion_photo) {
+      playMotionPhoto()
+    }
+    // clean up previous blob URLs or active network requests
+    cleanup()
+
+    if (authStore.isAuthenticated && isMimeTypeSupported(item.media_features?.mime_type)) {
+      // Check if a preloaded blob is available
+      if (viewPhotoStore.preloadedBlobs.has(item.id)) {
+        loadFromStore(item as FullMediaItem)
+      } else {
+        loadFullResBlob(item as FullMediaItem)
+      }
+    }
+  },
+  { immediate: true },
+)
+
 watch(
   is3DMode,
   (isActive) => {
@@ -228,48 +258,30 @@ watch(
   { immediate: true },
 )
 
+const rotation = computed(() => viewPhotoStore.rotatedPhotos.get(props.mediaItemId) ?? 0)
+const isRotated90or270 = computed(() => {
+  const norm = ((rotation.value % 360) + 360) % 360
+  return norm === 90 || norm === 270
+})
+
+// Reset zoom when client rotation is active
 watch(
-  () => props.mediaItemId,
-  () => {
-    // Reset zoom & pan when switching img
-    scale.value = 1
-    translateX.value = 0
-    translateY.value = 0
-
-    // Reset panorama mode
-    is3DMode.value = false
-
-    // Start motion photo autoplay if configured
-    showingMotionVideo.value = false
-    stopMonitoring()
-    if (settings.playMotionPhotos && fullImage.value?.media_features?.is_motion_photo) {
-      playMotionPhoto()
+  rotation,
+  (newRot) => {
+    if (newRot % 360 !== 0) {
+      scale.value = 1
+      translateX.value = 0
+      translateY.value = 0
     }
-
-    startFullResLoad()
   },
   { immediate: true },
 )
 
-watch(fullImage, (newVal) => {
-  if (newVal && !fullResUrl.value && !isLoadingFull.value) {
-    startFullResLoad()
-  }
-  if (
-    newVal &&
-    settings.playMotionPhotos &&
-    newVal.media_features?.is_motion_photo &&
-    !showingMotionVideo.value
-  ) {
-    playMotionPhoto()
-  }
-})
-
 // Emit zoom state to parents
 watch(
-  [scale, is3DMode],
-  ([newScale, is3D]) => {
-    emit('zoom-change', !is3D && newScale > 1)
+  [scale, is3DMode, rotation],
+  ([newScale, is3D, rot]) => {
+    emit('zoom-change', !is3D && rot % 360 === 0 && newScale > 1)
   },
   { immediate: true },
 )
@@ -288,9 +300,41 @@ onUnmounted(() => {
   cleanup()
 })
 
-const transformStyle = computed(() => {
+const wrapperStyle = computed(() => {
+  const normRot = ((rotation.value % 360) + 360) % 360
+
+  if (isRotated90or270.value) {
+    const w = containerHeight.value || containerRef.value?.clientHeight || 0
+    const h = containerWidth.value || containerRef.value?.clientWidth || 0
+    return {
+      width: w > 0 ? `${w}px` : '100vh',
+      height: h > 0 ? `${h}px` : '100vw',
+      position: 'absolute' as const,
+      top: '50%',
+      left: '50%',
+      transform: `translate(-50%, -50%) rotate(${normRot}deg)`,
+      transformOrigin: 'center center',
+    }
+  }
+
+  if (normRot === 180) {
+    return {
+      width: '100%',
+      height: '100%',
+      position: 'absolute' as const,
+      top: '0px',
+      left: '0px',
+      transform: 'rotate(180deg)',
+      transformOrigin: 'center center',
+    }
+  }
+
   return {
-    // translate3d forces GPU rendering continuously, without requiring blurry "will-change: transform" caching.
+    width: '100%',
+    height: '100%',
+    position: 'absolute' as const,
+    top: '0px',
+    left: '0px',
     transform: `translate3d(${translateX.value}px, ${translateY.value}px, 0) scale(${scale.value})`,
     transformOrigin: '0 0',
   }
@@ -313,7 +357,7 @@ function setTransforming(value: boolean) {
 }
 
 function zoomToPoint(clientX: number, clientY: number, newScale: number) {
-  if (!containerRef.value) return
+  if (!containerRef.value || rotation.value % 360 !== 0) return
 
   const rect = containerRef.value.getBoundingClientRect()
   const xScreen = clientX - rect.left
@@ -357,7 +401,7 @@ function getImageAspectRatio(): number | null {
 }
 
 function clampTranslations() {
-  if (!containerRef.value) return
+  if (!containerRef.value || rotation.value % 360 !== 0) return
 
   const w = containerRef.value.clientWidth
   const h = containerRef.value.clientHeight
@@ -380,7 +424,7 @@ function clampTranslations() {
 
   const paddingPx = scale.value < 1.4 ? 0 : scale.value * 40
 
-  // 1. Horizontal clamping
+  // Horizontal clamping
   if (scale.value <= 1) {
     translateX.value = 0
   } else if (drawnWidth * scale.value <= w) {
@@ -396,7 +440,7 @@ function clampTranslations() {
     translateX.value = Math.max(minX, Math.min(maxX, translateX.value))
   }
 
-  // 2. Vertical clamping
+  // Vertical clamping
   if (scale.value <= 1) {
     translateY.value = 0
   } else if (drawnHeight * scale.value <= h) {
@@ -415,8 +459,7 @@ function clampTranslations() {
 
 // Pointer events panning & pinch-to-zoom
 function handlePointerDown(e: PointerEvent) {
-  if (props.disableEventCapture) return
-  // Only allow drag/pan with left mouse button, touch, or pen. Right-clicks bypass.
+  if (props.disableEventCapture || rotation.value % 360 !== 0) return
   if (e.pointerType === 'mouse' && e.button !== 0) {
     return
   }
@@ -446,7 +489,7 @@ function handlePointerDown(e: PointerEvent) {
 }
 
 function handlePointerMove(e: PointerEvent) {
-  if (props.disableEventCapture) return
+  if (props.disableEventCapture || rotation.value % 360 !== 0) return
   if (!activePointers.has(e.pointerId)) return
   activePointers.set(e.pointerId, e)
 
@@ -477,7 +520,7 @@ function handlePointerMove(e: PointerEvent) {
 }
 
 function handlePointerUp(e: PointerEvent) {
-  if (props.disableEventCapture) return
+  if (props.disableEventCapture || rotation.value % 360 !== 0) return
   activePointers.delete(e.pointerId)
   try {
     const target = e.currentTarget as HTMLElement
@@ -505,12 +548,12 @@ function handlePointerUp(e: PointerEvent) {
 }
 
 function handlePointerCancel(e: PointerEvent) {
-  if (props.disableEventCapture) return
+  if (props.disableEventCapture || rotation.value % 360 !== 0) return
   handlePointerUp(e)
 }
 
 function handleWheel(e: WheelEvent) {
-  if (props.disableEventCapture) return
+  if (props.disableEventCapture || rotation.value % 360 !== 0) return
   const target = e.target as HTMLElement
   // Only zoom if the event isn't targeted inside overlays, info panels or menus
   if (
@@ -547,6 +590,7 @@ useEventListener(containerRef, 'wheel', handleWheel, { passive: false })
       class="blurry-bg"
       :style="{
         backgroundImage: `url(${imageUrl})`,
+        transform: rotation ? `rotate(${rotation}deg)` : undefined,
       }"
     ></div>
 
@@ -568,13 +612,16 @@ useEventListener(containerRef, 'wheel', handleWheel, { passive: false })
       @pointerup="handlePointerUp"
       @pointercancel="handlePointerCancel"
     >
-      <div class="image-wrapper" :style="transformStyle">
+      <div class="image-wrapper" :style="wrapperStyle">
         <!-- Thumbnail layer at bottom -->
         <img
           ref="thumbRef"
           class="image-tag thumbnail-img"
           :src="imageUrl"
-          alt="Thumbnail image"
+          v-if="
+            (!thumbErrored || !fullResLoaded) && !viewPhotoStore.hideRotatedThumb.has(mediaItemId)
+          "
+          @error="thumbErrored = true"
           @load="clampTranslations"
           @dragstart.prevent
         />
@@ -664,12 +711,7 @@ useEventListener(containerRef, 'wheel', handleWheel, { passive: false })
 
 .image-wrapper {
   position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  will-change: auto;
-  transform: translateZ(0);
+  will-change: transform;
 }
 
 .image-tag {

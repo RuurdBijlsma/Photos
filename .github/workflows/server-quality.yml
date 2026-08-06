@@ -8,9 +8,6 @@ on:
       - '.github/workflows/server-quality.yml'
   pull_request:
     branches: [ main ]
-    paths:
-      - 'server/**'
-      - '.github/workflows/server-quality.yml'
 
 env:
   CARGO_TERM_COLOR: always
@@ -44,7 +41,7 @@ jobs:
       - name: Check formatting
         run: cargo fmt --all -- --check
 
-      - name: Run Clippy
+      - name: Run Clippies
         run: cargo clippy --no-deps -- -D clippy::all -D clippy::pedantic -D clippy::nursery
 
       - name: Build

@@ -153,6 +153,7 @@ impl MediaItemStore {
             mi.updated_at,
             mi.width,
             mi.height,
+            mi.orientation,
             mi.is_video,
             mi.duration_ms,
             mi.taken_at_local,
@@ -201,13 +202,6 @@ impl MediaItemStore {
     }
 
     /// Inserts a full media item and all its associated metadata into the database.
-    /// This function will first delete any existing media item with the same `relative_path`
-    /// to ensure a clean insert.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if any of the database deletion or insertion queries fail.
-    #[allow(clippy::too_many_lines)]
     pub async fn create(
         tx: &mut PgTransaction<'_>,
         id: &str,
@@ -222,7 +216,6 @@ impl MediaItemStore {
             || relative_path.to_string(),
             |f| f.to_string_lossy().to_string(),
         );
-        // It's getting stuck here somtimes? Why??
 
         // Insert into the main media_item table
         sqlx::query!(
@@ -258,7 +251,85 @@ impl MediaItemStore {
             .execute(&mut **tx)
             .await?;
 
-        // Insert into related tables
+        Self::insert_child_metadata(tx, id, media_item).await
+    }
+
+    /// Updates a media item's main attributes and refreshes its child metadata tables.
+    pub async fn update_full(
+        tx: &mut PgTransaction<'_>,
+        id: &str,
+        has_thumbnails: bool,
+        media_item: &CreateFullMediaItem,
+    ) -> Result<(), DbError> {
+        let sort_timestamp =
+            with_fallback_timezone(media_item.taken_at_utc, &media_item.taken_at_local);
+
+        // Clear child metadata tables for clean re-insertion
+        sqlx::query!(
+            r#"
+            WITH d1 AS (DELETE FROM gps WHERE media_item_id = $1),
+                 d2 AS (DELETE FROM panorama_config WHERE media_item_id = $1),
+                 d3 AS (DELETE FROM time WHERE media_item_id = $1),
+                 d4 AS (DELETE FROM weather WHERE media_item_id = $1),
+                 d5 AS (DELETE FROM media_features WHERE media_item_id = $1)
+            DELETE FROM camera_settings WHERE media_item_id = $1
+            "#,
+            id
+        )
+        .execute(&mut **tx)
+        .await?;
+
+        // Update main media_item table
+        sqlx::query!(
+            r#"
+            UPDATE media_item
+            SET has_thumbnails = $16,
+                hash = $2,
+                width = $3,
+                height = $4,
+                is_video = $5,
+                duration_ms = $6,
+                taken_at_local = $7,
+                taken_at_utc = $8,
+                og_taken_at_local = $9,
+                sort_timestamp = $10,
+                orientation = $11,
+                use_panorama_viewer = $12,
+                timezone_name = $13,
+                timezone_offset_seconds = $14,
+                og_timezone_offset_seconds = $15
+            WHERE id = $1
+            "#,
+            id,
+            &media_item.hash,
+            media_item.width,
+            media_item.height,
+            media_item.is_video,
+            media_item.duration_ms,
+            media_item.taken_at_local,
+            media_item.taken_at_utc,
+            media_item.og_taken_at_local,
+            sort_timestamp,
+            media_item.orientation,
+            media_item.use_panorama_viewer,
+            media_item.timezone_name,
+            media_item.timezone_offset_seconds,
+            media_item.og_timezone_offset_seconds,
+            has_thumbnails,
+        )
+        .execute(&mut **tx)
+        .await?;
+
+        Self::insert_child_metadata(tx, id, media_item).await
+    }
+
+    /// Helper method to insert associated child metadata records for a media item.
+    #[allow(clippy::too_many_lines)]
+    async fn insert_child_metadata(
+        tx: &mut PgTransaction<'_>,
+        id: &str,
+        media_item: &CreateFullMediaItem,
+    ) -> Result<(), DbError> {
         if let Some(gps_info) = &media_item.gps {
             let location_id = Self::get_or_create_location(tx, &gps_info.location).await?;
 
@@ -312,11 +383,11 @@ impl MediaItemStore {
 
         sqlx::query!(
             r#"
-                INSERT INTO time (
-                    media_item_id, timezone_source, source_details, source_confidence
-                )
-                VALUES ($1, $2, $3, $4)
-                "#,
+            INSERT INTO time (
+                media_item_id, timezone_source, source_details, source_confidence
+            )
+            VALUES ($1, $2, $3, $4)
+            "#,
             id,
             media_item.time.timezone_source,
             &media_item.time.source_details,
@@ -327,14 +398,14 @@ impl MediaItemStore {
 
         sqlx::query!(
             r#"
-                INSERT INTO media_features (
-                    media_item_id, mime_type, size_bytes, is_motion_photo,
-                    motion_photo_presentation_timestamp, is_hdr, is_burst, burst_id,
-                    capture_fps, video_fps, is_nightsight, is_timelapse, exif, audio_format,
-                    audio_channels, audio_sample_rate, compressor_id
-                )
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
-                "#,
+            INSERT INTO media_features (
+                media_item_id, mime_type, size_bytes, is_motion_photo,
+                motion_photo_presentation_timestamp, is_hdr, is_burst, burst_id,
+                capture_fps, video_fps, is_nightsight, is_timelapse, exif, audio_format,
+                audio_channels, audio_sample_rate, compressor_id
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+            "#,
             id,
             media_item.media_features.mime_type,
             media_item.media_features.size_bytes,
@@ -363,14 +434,14 @@ impl MediaItemStore {
 
         sqlx::query!(
             r#"
-                INSERT INTO camera_settings (
-                    media_item_id, iso, exposure_time, aperture, focal_length, camera_make,
-                    camera_model, flash_fired, flash_mode, lens_make, lens_model,
-                    digital_zoom_ratio, subject_distance, focal_length_in_35mm,
-                    exposure_compensation
-                )
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
-                "#,
+            INSERT INTO camera_settings (
+                media_item_id, iso, exposure_time, aperture, focal_length, camera_make,
+                camera_model, flash_fired, flash_mode, lens_make, lens_model,
+                digital_zoom_ratio, subject_distance, focal_length_in_35mm,
+                exposure_compensation
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+            "#,
             id,
             media_item.camera_settings.iso,
             media_item.camera_settings.exposure_time,
@@ -501,35 +572,33 @@ impl MediaItemStore {
         tx: &mut PgTransaction<'_>,
         location_data: &Location,
     ) -> Result<i32, DbError> {
-        //todo: can this be done in 1 query? is better?
-        let existing_id: Option<i32> = sqlx::query_scalar!(
-            "SELECT id FROM location WHERE name = $1 AND admin1 = $2 AND country_code = $3",
+        let id: i32 = sqlx::query_scalar!(
+            r#"
+            WITH existing AS (
+                SELECT id FROM location
+                WHERE name = $1 AND admin1 = $2 AND country_code = $3
+                LIMIT 1
+            ),
+            inserted AS (
+                INSERT INTO location (name, admin1, admin2, country_code, country_name)
+                SELECT $1, $2, $4, $3, $5
+                WHERE NOT EXISTS (SELECT 1 FROM existing)
+                RETURNING id
+            )
+            SELECT id AS "id!" FROM inserted
+            UNION ALL
+            SELECT id AS "id!" FROM existing
+            "#,
             &location_data.name,
             &location_data.admin1,
             &location_data.country_code,
+            &location_data.admin2,
+            &location_data.country_name,
         )
-        .fetch_optional(&mut **tx)
+        .fetch_one(&mut **tx)
         .await?;
 
-        if let Some(id) = existing_id {
-            Ok(id)
-        } else {
-            let new_id: i32 = sqlx::query_scalar!(
-                r#"
-                INSERT INTO location (name, admin1, admin2, country_code, country_name)
-                VALUES ($1, $2, $3, $4, $5)
-                RETURNING id
-                "#,
-                &location_data.name,
-                &location_data.admin1,
-                &location_data.admin2,
-                &location_data.country_code,
-                &location_data.country_name,
-            )
-            .fetch_one(&mut **tx)
-            .await?;
-            Ok(new_id)
-        }
+        Ok(id)
     }
 
     pub async fn find_all_geo_by_user_id(
@@ -597,6 +666,70 @@ impl MediaItemStore {
         )
         .execute(executor)
         .await?;
+
+        Ok(())
+    }
+
+    pub async fn change_media_item_id(
+        tx: &mut PgTransaction<'_>,
+        old_id: &str,
+        new_id: &str,
+    ) -> Result<(), DbError> {
+        // 0. Temporarily rename old relative_path to avoid UNIQUE constraint violation when copying
+        sqlx::query!(
+            r#"
+            UPDATE media_item
+            SET relative_path = relative_path || '__temp_' || $1
+            WHERE id = $1
+            "#,
+            old_id
+        )
+        .execute(&mut **tx)
+        .await?;
+
+        // 1. Duplicate media_item under new_id, update all child/referencing tables, and remove original
+        sqlx::query!(
+            r#"
+            WITH inserted_mi AS (
+                INSERT INTO media_item (
+                    id, user_id, remote_user_id, filename, relative_path,
+                    hash, deleted, is_video, has_thumbnails, width, height, duration_ms,
+                    taken_at_local, taken_at_utc, og_taken_at_local, sort_timestamp,
+                    timezone_name, timezone_offset_seconds, og_timezone_offset_seconds,
+                    use_panorama_viewer, orientation, user_caption, search_vector,
+                    created_at, updated_at
+                )
+                SELECT
+                    $2, user_id, remote_user_id, filename, REPLACE(relative_path, '__temp_' || $1, ''),
+                    hash, deleted, is_video, has_thumbnails, width, height, duration_ms,
+                    taken_at_local, taken_at_utc, og_taken_at_local, sort_timestamp,
+                    timezone_name, timezone_offset_seconds, og_timezone_offset_seconds,
+                    use_panorama_viewer, orientation, user_caption, search_vector,
+                    created_at, updated_at
+                FROM media_item
+                WHERE id = $1
+            ),
+            u_gps AS (UPDATE gps SET media_item_id = $2 WHERE media_item_id = $1),
+            u_pc AS (UPDATE panorama_config SET media_item_id = $2 WHERE media_item_id = $1),
+            u_time AS (UPDATE time SET media_item_id = $2 WHERE media_item_id = $1),
+            u_weather AS (UPDATE weather SET media_item_id = $2 WHERE media_item_id = $1),
+            u_mf AS (UPDATE media_features SET media_item_id = $2 WHERE media_item_id = $1),
+            u_cs AS (UPDATE camera_settings SET media_item_id = $2 WHERE media_item_id = $1),
+            u_va AS (UPDATE visual_analysis SET media_item_id = $2 WHERE media_item_id = $1),
+            u_ami AS (UPDATE album_media_item SET media_item_id = $2 WHERE media_item_id = $1),
+            u_mipc AS (UPDATE media_item_photo_cluster SET media_item_id = $2 WHERE media_item_id = $1),
+            u_fc AS (UPDATE face_cluster SET thumb_media_item_id = $2 WHERE thumb_media_item_id = $1),
+            u_photoc AS (UPDATE photo_cluster SET thumbnail_media_item_id = $2 WHERE thumbnail_media_item_id = $1),
+            u_album AS (UPDATE album SET thumbnail_id = $2 WHERE thumbnail_id = $1),
+            u_user AS (UPDATE app_user SET avatar_id = $2 WHERE avatar_id = $1),
+            u_dc AS (UPDATE daily_card SET thumbnail_media_item_id = $2 WHERE thumbnail_media_item_id = $1)
+            DELETE FROM media_item WHERE id = $1
+            "#,
+            old_id,
+            new_id
+        )
+            .execute(&mut **tx)
+            .await?;
 
         Ok(())
     }

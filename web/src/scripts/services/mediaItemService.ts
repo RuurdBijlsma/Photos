@@ -3,15 +3,17 @@ import apiClient, { SERVER_BASE_URL } from './api.ts'
 import type { RandomPhotoResponse } from '@/scripts/types/api/photos.ts'
 import type { MediaItemWithAlbums } from '@/scripts/types/api/fullPhoto.ts'
 import type { Theme } from '@/scripts/types/themeColor.ts'
-import type { Album } from '@/scripts/types/api/album.ts'
-import type { UpdateMediaItemRequest } from '@/scripts/types/api/mediaItem.ts'
+import type {
+  UpdateMediaItemRequest,
+  UpdateMediaItemResponse,
+} from '@/scripts/types/api/mediaItem.ts'
 import { MapPhotosResponse } from '@/scripts/types/generated/timeline.ts'
 import type { ThemeVariant } from '@/scripts/constants.ts'
 import type { PannellumConfig } from '@/scripts/types/api/pannellumConfig.ts'
 
 const mediaItemService = {
   update(id: string, payload: UpdateMediaItemRequest) {
-    return apiClient.put<Album>(`/photos/${id}/item`, payload)
+    return apiClient.put<UpdateMediaItemResponse>(`/photos/${id}/item`, payload)
   },
 
   getPhotoThumbnail(

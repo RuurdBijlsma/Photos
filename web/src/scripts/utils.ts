@@ -273,3 +273,37 @@ export class ProcessingRateTracker {
     this.history = []
   }
 }
+
+// Native format support check
+export function isMimeTypeSupported(mimeType?: string): boolean {
+  if (!mimeType) return false
+  const lower = mimeType.toLowerCase()
+  // Standard formats supported by all modern browsers
+  if (
+    lower === 'image/jpeg' ||
+    lower === 'image/jpg' ||
+    lower === 'image/png' ||
+    lower === 'image/webp' ||
+    lower === 'image/gif' ||
+    lower === 'image/avif'
+  ) {
+    return true
+  }
+  // HEIC support check (natively supported on Apple devices/Safari)
+  if (lower === 'image/heic' || lower === 'image/heif') {
+    return /^((?!chrome|android).)*safari/i.test(navigator.userAgent)
+  }
+  return false
+}
+
+export function mimeSupportsRotation(mimeType?: string): boolean {
+  if (!mimeType) return false
+  const lower = mimeType.toLowerCase()
+  return (
+    lower === 'image/jpeg' ||
+    lower === 'image/jpg' ||
+    lower === 'image/tiff' ||
+    lower === 'image/png' ||
+    lower === 'image/webp'
+  )
+}

@@ -105,6 +105,7 @@ export interface SharedMediaItem {
   filename: string
   width: number
   height: number
+  orientation: number
   is_video: boolean
   duration_ms: number | null
   taken_at_local: string // NaiveDateTime

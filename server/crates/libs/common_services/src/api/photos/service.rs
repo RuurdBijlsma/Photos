@@ -1,10 +1,14 @@
 use crate::api::app_error::AppError;
-use crate::api::photos::interfaces::UpdateMediaItemRequest;
+use crate::api::photos::interfaces::{UpdateMediaItemRequest, UpdateMediaItemResponse};
 use crate::database::app_user::UserRole;
 use crate::database::cached_store::cached_store;
+use crate::database::jobs::JobType;
+use crate::database::media_item::media_item::CreateFullMediaItem;
 use crate::database::media_item_store::MediaItemStore;
 use crate::database::{UpdateField, UpdateMediaItemPayload, with_fallback_timezone};
-use app_state::{IngestSettings, MakeRelativePath};
+use crate::job_queue::enqueue_job;
+use crate::utils::{nice_id, write_exif_orientation};
+use app_state::{IngestSettings, MakeRelativePath, constants};
 use axum::body::Body;
 use axum_extra::headers::Range;
 use chrono::{DateTime, FixedOffset, NaiveDateTime, TimeZone, Utc};
@@ -480,15 +484,71 @@ async fn compute_updated_timestamps(
     Ok((utc_field, sort_timestamp))
 }
 
+pub async fn reprocess_media_item(
+    pool: &PgPool,
+    settings: &IngestSettings,
+    media_item_id: &str,
+    user_id: i32,
+    relative_path: &str,
+    file_path: &Path,
+) -> Result<(), AppError> {
+    let analyzer = media_analyzer::MediaAnalyzer::builder()
+        .build()
+        .await
+        .map_err(|e| AppError::Internal(eyre!("Failed to build MediaAnalyzer: {}", e)))?;
+
+    let media_info = analyzer
+        .analyze_media(file_path)
+        .await
+        .map_err(|e| AppError::Internal(eyre!("Failed to analyze media {:?}: {}", file_path, e)))?;
+
+    let create_item: CreateFullMediaItem = media_info.into();
+
+    let mut tx = pool.begin().await?;
+
+    // Delete visual_analysis records
+    sqlx::query!(
+        "DELETE FROM visual_analysis WHERE media_item_id = $1",
+        media_item_id
+    )
+    .execute(&mut *tx)
+    .await?;
+
+    // Update main item and metadata child tables
+    MediaItemStore::update_full(&mut tx, media_item_id, false, &create_item).await?;
+
+    tx.commit().await?;
+
+    // Enqueue worker reprocessing jobs
+    enqueue_job::<()>(pool, settings, JobType::IngestThumbnails)
+        .relative_path(relative_path)
+        .user_id(user_id)
+        .call()
+        .await?;
+    enqueue_job::<()>(pool, settings, JobType::IngestAnalysis)
+        .relative_path(relative_path)
+        .user_id(user_id)
+        .call()
+        .await?;
+    enqueue_job::<()>(pool, settings, JobType::IngestLlm)
+        .relative_path(relative_path)
+        .user_id(user_id)
+        .call()
+        .await?;
+
+    Ok(())
+}
+
 pub async fn update_media_item(
     pool: &PgPool,
+    settings: &IngestSettings,
     media_item_id: &str,
     user_id: i32,
     payload: &UpdateMediaItemRequest,
-) -> Result<(), AppError> {
-    let mut tx = pool.begin().await?;
+) -> Result<UpdateMediaItemResponse, AppError> {
+    let mut current_id = media_item_id.to_owned();
 
-    let media_user_id = MediaItemStore::find_user_by_id(&mut *tx, media_item_id)
+    let media_user_id = MediaItemStore::find_user_by_id(pool, media_item_id)
         .await?
         .ok_or_else(|| AppError::NotFound(media_item_id.to_owned()))?;
 
@@ -501,9 +561,10 @@ pub async fn update_media_item(
         user_caption,
         use_panorama_viewer,
         timezone_offset_seconds,
+        orientation,
     } = payload;
 
-    // Validate timezone offset
+    // Validate timezone offset if provided
     if let UpdateField::Value(v) = timezone_offset_seconds
         && FixedOffset::east_opt(*v).is_none()
     {
@@ -513,34 +574,74 @@ pub async fn update_media_item(
         )));
     }
 
-    let taken_at_local_input = taken_at_local
-        .as_ref()
-        .map(|m| NaiveDateTime::parse_from_str(m, "%Y-%m-%dT%H:%M:%S"))
-        .transpose()?;
+    // 1. Process EXIF Orientation update if provided
+    if let Some(new_orientation) = orientation {
+        let relative_path = MediaItemStore::find_relative_path_by_id(pool, media_item_id)
+            .await?
+            .ok_or_else(|| AppError::NotFound(media_item_id.to_owned()))?;
 
-    let (taken_at_utc, sort_timestamp) = compute_updated_timestamps(
-        &mut *tx,
-        media_item_id,
-        taken_at_local_input,
-        timezone_offset_seconds,
-    )
-    .await?;
+        let file_path = settings.media_root.join(&relative_path);
 
-    MediaItemStore::update(
-        &mut *tx,
-        media_item_id,
-        UpdateMediaItemPayload {
-            user_caption: user_caption.clone(),
-            taken_at_local: taken_at_local_input,
-            taken_at_utc,
-            sort_timestamp,
-            timezone_offset_seconds: timezone_offset_seconds.clone(),
-            use_panorama_viewer: *use_panorama_viewer,
-        },
-    )
-    .await?;
+        write_exif_orientation(&file_path, *new_orientation)?;
 
-    tx.commit().await?;
+        reprocess_media_item(
+            pool,
+            settings,
+            media_item_id,
+            user_id,
+            &relative_path,
+            &file_path,
+        )
+        .await?;
 
-    Ok(())
+        let new_id = nice_id(constants().database.media_item_id_length);
+        let mut tx = pool.begin().await?;
+        MediaItemStore::change_media_item_id(&mut tx, media_item_id, &new_id).await?;
+        tx.commit().await?;
+
+        current_id = new_id;
+    }
+
+    // 2. Process caption / timestamp / panorama updates if provided
+    let has_metadata_updates = taken_at_local.is_some()
+        || !matches!(user_caption, UpdateField::Ignore)
+        || use_panorama_viewer.is_some()
+        || !matches!(timezone_offset_seconds, UpdateField::Ignore);
+
+    if has_metadata_updates {
+        let mut tx = pool.begin().await?;
+
+        let taken_at_local_input = taken_at_local
+            .as_ref()
+            .map(|m| NaiveDateTime::parse_from_str(m, "%Y-%m-%dT%H:%M:%S"))
+            .transpose()?;
+
+        let (taken_at_utc, sort_timestamp) = compute_updated_timestamps(
+            &mut *tx,
+            &current_id,
+            taken_at_local_input,
+            timezone_offset_seconds,
+        )
+        .await?;
+
+        MediaItemStore::update(
+            &mut *tx,
+            &current_id,
+            UpdateMediaItemPayload {
+                user_caption: user_caption.clone(),
+                taken_at_local: taken_at_local_input,
+                taken_at_utc,
+                sort_timestamp,
+                timezone_offset_seconds: timezone_offset_seconds.clone(),
+                use_panorama_viewer: *use_panorama_viewer,
+            },
+        )
+        .await?;
+
+        tx.commit().await?;
+    }
+
+    Ok(UpdateMediaItemResponse {
+        media_item_id: current_id,
+    })
 }

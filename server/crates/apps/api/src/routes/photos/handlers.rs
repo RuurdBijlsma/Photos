@@ -3,7 +3,7 @@ use axum::{Extension, Json};
 use axum_extra::protobuf::Protobuf;
 use common_services::api::album::interfaces::MediaItemWithAlbums;
 use common_services::api::photos::interfaces::{
-    DownloadMediaParams, GeoPhotosParams, UpdateMediaItemRequest,
+    DownloadMediaParams, GeoPhotosParams, UpdateMediaItemRequest, UpdateMediaItemResponse,
 };
 use common_services::api::photos::service::{
     download_media_file, stream_video_file, thumbnail_on_demand_cached, update_media_item,
@@ -43,16 +43,23 @@ pub async fn get_full_item_handler(
     }
 }
 
-#[instrument(skip(pool, user), err(Debug))]
+#[instrument(skip(context, user), err(Debug))]
 pub async fn update_media_item_handler(
-    State(pool): State<PgPool>,
+    State(context): State<ApiContext>,
     Extension(user): Extension<ApiUser>,
     Path(media_item_id): Path<String>,
     Json(payload): Json<UpdateMediaItemRequest>,
-) -> Result<(), AppError> {
-    update_media_item(&pool, &media_item_id, user.id, &payload).await?;
+) -> Result<Json<UpdateMediaItemResponse>, AppError> {
+    let result = update_media_item(
+        &context.pool,
+        &context.settings.ingest,
+        &media_item_id,
+        user.id,
+        &payload,
+    )
+    .await?;
 
-    Ok(())
+    Ok(Json(result))
 }
 
 pub async fn download_full_file_by_rel_path(

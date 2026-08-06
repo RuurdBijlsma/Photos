@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE media_item\n            SET has_thumbnails = $16,\n                hash = $2,\n                width = $3,\n                height = $4,\n                is_video = $5,\n                duration_ms = $6,\n                taken_at_local = $7,\n                taken_at_utc = $8,\n                og_taken_at_local = $9,\n                sort_timestamp = $10,\n                orientation = $11,\n                use_panorama_viewer = $12,\n                timezone_name = $13,\n                timezone_offset_seconds = $14,\n                og_timezone_offset_seconds = $15\n            WHERE id = $1\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Int4",
+        "Int4",
+        "Bool",
+        "Int8",
+        "Timestamp",
+        "Timestamptz",
+        "Timestamp",
+        "Timestamptz",
+        "Int4",
+        "Bool",
+        "Text",
+        "Int4",
+        "Int4",
+        "Bool"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "abfd739182201563815ddf8c624a0d5299dcaee79ec0aa6d65456b3bd306a458"
+}

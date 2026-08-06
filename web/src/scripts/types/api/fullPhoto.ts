@@ -179,6 +179,7 @@ export interface FullMediaItem {
   updated_at: string
   width: number
   height: number
+  orientation: number
   is_video: boolean
   duration_ms?: number
   taken_at_local: string

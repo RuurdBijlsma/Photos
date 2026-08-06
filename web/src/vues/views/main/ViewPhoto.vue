@@ -17,6 +17,7 @@ import {
   isMobileDevice,
   makeDateTimeString,
   makeLocationString,
+  mimeSupportsRotation,
 } from '@/scripts/utils.ts'
 import { useDialogStore } from '@/scripts/stores/dialogStore.ts'
 import { useAuthStore } from '@/scripts/stores/authStore.ts'
@@ -182,8 +183,16 @@ const isVideo = computed<boolean>(
   () => fullImage.value?.is_video ?? timelineItem.value?.isVideo ?? false,
 )
 
+const rotation = computed(() => (id.value ? (viewPhotoStore.rotatedPhotos.get(id.value) ?? 0) : 0))
+
 const currentItemRatio = computed(() => {
-  if (fullImage.value) return fullImage.value.width / fullImage.value.height
+  if (fullImage.value) {
+    const rawRatio = fullImage.value.width / fullImage.value.height
+    if (rotation.value % 180 !== 0) {
+      return 1 / rawRatio
+    }
+    return rawRatio
+  }
   return 1
 })
 const mediaDetailTitle = computed(() => fullImage.value?.user_caption ?? fullImage.value?.filename)
@@ -442,6 +451,27 @@ useDetailTitle(mediaDetailTitle, { fallback: 'Photo' })
           @click="toggleSelected"
           v-tooltip="{
             text: isSelected ? 'Remove from selection' : 'Add to selection',
+            location: 'bottom',
+            attach: true,
+            width: 140,
+          }"
+        />
+        <v-btn
+          v-if="
+            !isVideo &&
+            !isPanoActive &&
+            id &&
+            fullImage &&
+            authStore.isAuthenticated &&
+            mimeSupportsRotation(fullImage.media_features.mime_type)
+          "
+          rounded="xl"
+          icon="mdi-rotate-right"
+          variant="plain"
+          :loading="viewPhotoStore.rotationLoading"
+          @click="viewPhotoStore.rotatePhoto(id, fullImage?.orientation, route.query)"
+          v-tooltip="{
+            text: 'Rotate clockwise',
             location: 'bottom',
             attach: true,
             width: 140,

@@ -20,6 +20,7 @@
 * preload 1440p thumbnail on grid item hover
 * When no user exists and user visits login page -> redirect to register?admin=true and show messaging to create admin
   account
+* door alle requests kijken op verse page load om te zien of ze allemaal relevant zijn (ik zag thunder icon geladen worden op timeline page load)
 
 # SERVER
 

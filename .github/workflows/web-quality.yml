@@ -1,12 +1,14 @@
 name: Web CI
 
 on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'server/**'
+      - '.github/workflows/server-quality.yml'
   pull_request:
     branches:
       - main
-    paths:
-      - 'web/**'
-      - '.github/workflows/web-quality.yml'
 
 jobs:
   web-lint-build:
