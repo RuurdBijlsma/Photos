@@ -35,6 +35,9 @@ export default defineConfig({
     vueJsx(),
     vueDevTools(),
     vuetify({ autoImport: { labs: true } }),
+    Icons({
+      compiler: 'vue3',
+    }),
     VitePWA({
       registerType: 'prompt', // Prompt users before updating (allows showing a reload notification)
       injectRegister: 'auto',

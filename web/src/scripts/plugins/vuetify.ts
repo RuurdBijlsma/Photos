@@ -1,5 +1,4 @@
 import { createVuetify } from 'vuetify'
-import { aliases, mdi } from 'vuetify/iconsets/mdi-svg'
 import themeJson from '@/assets/themes/etna-theme.json'
 import { transformToVuetifyTheme } from '@/scripts/stores/themeStore.ts'
 import type { Theme } from '@/scripts/types/themeColor.ts'
@@ -8,6 +7,21 @@ import { useStorage } from '@vueuse/core'
 import { resolveThemeMode } from '@/scripts/themeUtils.ts'
 import type { SunCache } from '@/scripts/themeUtils.ts'
 import { useObjStorage } from '@/scripts/utils.ts'
+
+import MdiChevronDown from '~icons/mdi/chevron-down'
+import MdiCheckboxMarked from '~icons/mdi/checkbox-marked'
+import MdiCheckboxBlankOutline from '~icons/mdi/checkbox-blank-outline'
+import MdiClose from '~icons/mdi/close'
+import MdiCloseCircle from '~icons/mdi/close-circle'
+import MdiMinus from '~icons/mdi/minus'
+import MdiInformation from '~icons/mdi/information'
+import MdiChevronLeft from '~icons/mdi/chevron-left'
+import MdiChevronRight from '~icons/mdi/chevron-right'
+import MdiRadioboxBlank from '~icons/mdi/radiobox-blank'
+import MdiRadioboxMarked from '~icons/mdi/radiobox-marked'
+import MdiStar from '~icons/mdi/star'
+import MdiStarHalf from '~icons/mdi/star-half-full'
+import MdiStarOutline from '~icons/mdi/star-outline'
 
 const theme: Theme = themeJson
 const lightDefinition = transformToVuetifyTheme(theme.schemes?.light, false)
@@ -40,10 +54,28 @@ export const vuetify = createVuetify({
     },
   },
   icons: {
-    defaultSet: 'mdi',
-    aliases,
-    sets: {
-      mdi,
+    defaultSet: 'component',
+    aliases: {
+      cancel: MdiCloseCircle,
+      checkboxOff: MdiCheckboxBlankOutline,
+      checkboxOn: MdiCheckboxMarked,
+      checkboxIndeterminate: MdiMinus,
+      clear: MdiClose,
+      close: MdiClose,
+      complete: MdiCheckboxMarked,
+      dropdown: MdiChevronDown,
+      edit: MdiClose,
+      error: MdiCloseCircle,
+      info: MdiInformation,
+      next: MdiChevronRight,
+      prev: MdiChevronLeft,
+      radioOff: MdiRadioboxBlank,
+      radioOn: MdiRadioboxMarked,
+      ratingEmpty: MdiStarOutline,
+      ratingFull: MdiStar,
+      ratingHalf: MdiStarHalf,
+      subgroup: MdiChevronDown,
+      unfold: MdiChevronDown,
     },
   },
 })
