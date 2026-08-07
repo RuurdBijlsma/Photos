@@ -29,8 +29,6 @@
 * import albums from google photos
 * duplicate photo remover tool
 * better error if exiftool isnt there (worker wont work then)
-* --- HIGH PRIO ---
-* rotate image by changing thumbnail orientation?
 
 # INFRASTRUCTURE:
 
