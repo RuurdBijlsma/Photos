@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import { mdiChevronLeft, mdiChevronRight, mdiMapMarkerOutline } from '@mdi/js'
+import MdiChevronLeft from '~icons/mdi/chevron-left'
+import MdiChevronRight from '~icons/mdi/chevron-right'
+import MdiMapMarkerOutline from '~icons/mdi/map-marker-outline'
 import { ref, watch, nextTick, shallowRef } from 'vue'
 import { useResizeObserver } from '@vueuse/core'
 import { useExploreStore } from '@/scripts/stores/exploreStore.ts'
@@ -74,7 +76,7 @@ watch(
       <transition name="fade">
         <v-btn
           v-if="canScrollLeft"
-          :icon="mdiChevronLeft"
+          :icon="MdiChevronLeft"
           class="scroll-btn scroll-btn-left"
           variant="elevated"
           color="surface"
@@ -102,7 +104,7 @@ watch(
               class="location-avatar"
             />
             <div v-else class="location-avatar-placeholder">
-              <v-icon size="40" color="primary" :icon="mdiMapMarkerOutline"></v-icon>
+              <v-icon size="40" color="primary" :icon="MdiMapMarkerOutline"></v-icon>
             </div>
           </div>
           <span class="location-primary" :title="loc.name">{{ loc.name }}</span>
@@ -116,7 +118,7 @@ watch(
       <transition name="fade">
         <v-btn
           v-if="canScrollRight"
-          :icon="mdiChevronRight"
+          :icon="MdiChevronRight"
           class="scroll-btn scroll-btn-right"
           variant="elevated"
           color="surface"

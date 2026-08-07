@@ -10,15 +10,13 @@ import { isLikelyJwt } from '@/scripts/utils.ts'
 import { useAuthStore } from '@/scripts/stores/authStore.ts'
 import peopleService from '@/scripts/services/peopleService.ts'
 import { useSearchStore } from '@/scripts/stores/searchStore.ts'
-import {
-  mdiClose,
-  mdiHistory,
-  mdiImageAlbum,
-  mdiImageSearchOutline,
-  mdiLoading,
-  mdiMagnify,
-  mdiMapMarkerOutline,
-} from '@mdi/js'
+import MdiClose from '~icons/mdi/close'
+import MdiHistory from '~icons/mdi/history'
+import MdiImageAlbum from '~icons/mdi/image-album'
+import MdiImageSearchOutline from '~icons/mdi/image-search-outline'
+import MdiLoading from '~icons/mdi/loading'
+import MdiMagnify from '~icons/mdi/magnify'
+import MdiMapMarkerOutline from '~icons/mdi/map-marker-outline'
 
 const router = useRouter()
 const route = useRoute()
@@ -404,7 +402,7 @@ watch(
             <v-icon
               class="search-icon"
               :icon="
-                loading ? mdiLoading : searchStore.searchImage ? mdiImageSearchOutline : mdiMagnify
+                loading ? MdiLoading : searchStore.searchImage ? MdiImageSearchOutline : MdiMagnify
               "
             ></v-icon>
           </span>
@@ -431,7 +429,7 @@ watch(
           />
           <v-btn
             class="image-clear-button"
-            :icon="mdiClose"
+            :icon="MdiClose"
             v-if="searchStore.searchImage"
             variant="plain"
             @click="clearImage"
@@ -458,19 +456,19 @@ watch(
             >
               <v-icon
                 v-if="suggestion.suggestionType === 'HISTORY'"
-                :icon="mdiHistory"
+                :icon="MdiHistory"
                 size="small"
                 class="suggestion-icon"
               />
               <v-icon
                 v-else-if="suggestion.suggestionType === SuggestionType.ALBUM"
-                :icon="mdiImageAlbum"
+                :icon="MdiImageAlbum"
                 size="small"
                 class="suggestion-icon"
               />
               <v-icon
                 v-else-if="suggestion.suggestionType === SuggestionType.LOCATION"
-                :icon="mdiMapMarkerOutline"
+                :icon="MdiMapMarkerOutline"
                 size="small"
                 class="suggestion-icon"
               />

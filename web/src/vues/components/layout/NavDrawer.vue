@@ -1,23 +1,21 @@
 <script setup lang="ts">
-import {
-  mdiBabyFaceOutline,
-  mdiCamera,
-  mdiCloudOutline,
-  mdiCompassOutline,
-  mdiFaceMan,
-  mdiFaceManOutline,
-  mdiFaceManShimmer,
-  mdiFaceManShimmerOutline,
-  mdiFaceWoman,
-  mdiFaceWomanOutline,
-  mdiFaceWomanShimmer,
-  mdiFaceWomanShimmerOutline,
-  mdiImageAlbum,
-  mdiImageOutline,
-  mdiMapOutline,
-  mdiTrashCan,
-  mdiTrashCanOutline,
-} from '@mdi/js'
+import MdiBabyFaceOutline from '~icons/mdi/baby-face-outline'
+import MdiCamera from '~icons/mdi/camera'
+import MdiCloudOutline from '~icons/mdi/cloud-outline'
+import MdiCompassOutline from '~icons/mdi/compass-outline'
+import MdiFaceMan from '~icons/mdi/face-man'
+import MdiFaceManOutline from '~icons/mdi/face-man-outline'
+import MdiFaceManShimmer from '~icons/mdi/face-man-shimmer'
+import MdiFaceManShimmerOutline from '~icons/mdi/face-man-shimmer-outline'
+import MdiFaceWoman from '~icons/mdi/face-woman'
+import MdiFaceWomanOutline from '~icons/mdi/face-woman-outline'
+import MdiFaceWomanShimmer from '~icons/mdi/face-woman-shimmer'
+import MdiFaceWomanShimmerOutline from '~icons/mdi/face-woman-shimmer-outline'
+import MdiImageAlbum from '~icons/mdi/image-album'
+import MdiImageOutline from '~icons/mdi/image-outline'
+import MdiMapOutline from '~icons/mdi/map-outline'
+import MdiTrashCan from '~icons/mdi/trash-can'
+import MdiTrashCanOutline from '~icons/mdi/trash-can-outline'
 import { useRoute } from 'vue-router'
 import { computed, useTemplateRef } from 'vue'
 import { useAlbumStore } from '@/scripts/stores/albumStore.ts'
@@ -38,15 +36,15 @@ const theme = useTheme()
 const route = useRoute()
 
 const faceIcons = [
-  mdiFaceMan,
-  mdiFaceManOutline,
-  mdiFaceManShimmer,
-  mdiFaceManShimmerOutline,
-  mdiFaceWoman,
-  mdiFaceWomanOutline,
-  mdiFaceWomanShimmer,
-  mdiFaceWomanShimmerOutline,
-  mdiBabyFaceOutline,
+  MdiFaceMan,
+  MdiFaceManOutline,
+  MdiFaceManShimmer,
+  MdiFaceManShimmerOutline,
+  MdiFaceWoman,
+  MdiFaceWomanOutline,
+  MdiFaceWomanShimmer,
+  MdiFaceWomanShimmerOutline,
+  MdiBabyFaceOutline,
 ]
 const faceIcon = faceIcons[Math.floor(Math.random() * faceIcons.length)]
 
@@ -102,14 +100,14 @@ const { isScrolling } = useScroll(() => navList.value?.$el as HTMLElement | null
       <v-list-item
         class="mt-3"
         rounded
-        :prepend-icon="mdiImageOutline"
+        :prepend-icon="MdiImageOutline"
         title="Photos"
         to="/"
         :active="route.path === '/'"
         @click="route.path === '/' ? timelineToTop() : undefined"
       />
-      <v-list-item rounded :prepend-icon="mdiCompassOutline" title="Explore" to="/explore" />
-      <v-list-item rounded :prepend-icon="mdiMapOutline" title="Map" to="/map" />
+      <v-list-item rounded :prepend-icon="MdiCompassOutline" title="Explore" to="/explore" />
+      <v-list-item rounded :prepend-icon="MdiMapOutline" title="Map" to="/map" />
 
       <v-list-subheader class="mt-5">Collections</v-list-subheader>
 
@@ -117,7 +115,7 @@ const { isScrolling } = useScroll(() => navList.value?.$el as HTMLElement | null
         v-model:expanded="albumsExpanded"
         title="Albums"
         to="/albums"
-        :icon="mdiImageAlbum"
+        :icon="MdiImageAlbum"
         :items="albumStore.userAlbums"
       >
         <template #item="{ item: album }">
@@ -196,11 +194,11 @@ const { isScrolling } = useScroll(() => navList.value?.$el as HTMLElement | null
         </template>
       </NavExpandableList>
 
-      <v-list-item rounded :prepend-icon="mdiCamera" title="Cameras" to="/cameras" />
+      <v-list-item rounded :prepend-icon="MdiCamera" title="Cameras" to="/cameras" />
 
       <v-divider class="mx-5 mt-2 mb-2" />
 
-      <v-list-item rounded :prepend-icon="mdiTrashCanOutline" title="Bin" to="/bin" />
+      <v-list-item rounded :prepend-icon="MdiTrashCanOutline" title="Bin" to="/bin" />
 
       <v-spacer />
 
@@ -208,7 +206,7 @@ const { isScrolling } = useScroll(() => navList.value?.$el as HTMLElement | null
     </v-list>
     <div v-else class="collapsed-list">
       <v-btn
-        :icon="mdiImageOutline"
+        :icon="MdiImageOutline"
         @click="route.path === '/' ? timelineToTop() : undefined"
         :variant="route.path === '/' ? 'tonal' : 'plain'"
         :color="route.path === '/' ? 'primary-darken-1' : undefined"
@@ -217,14 +215,14 @@ const { isScrolling } = useScroll(() => navList.value?.$el as HTMLElement | null
         :active="route.path === '/'"
       />
       <v-btn
-        :icon="mdiCompassOutline"
+        :icon="MdiCompassOutline"
         :variant="route.path.startsWith('/explore') ? 'tonal' : 'plain'"
         :color="route.path === '/explore' ? 'primary-darken-1' : undefined"
         to="/explore"
         title="Explore"
       />
       <v-btn
-        :icon="mdiMapOutline"
+        :icon="MdiMapOutline"
         :variant="route.path.startsWith('/map') ? 'tonal' : 'plain'"
         :color="route.path === '/map' ? 'primary-darken-1' : undefined"
         to="/map"
@@ -232,7 +230,7 @@ const { isScrolling } = useScroll(() => navList.value?.$el as HTMLElement | null
       />
       <v-divider class="ma-2" />
       <v-btn
-        :icon="mdiImageAlbum"
+        :icon="MdiImageAlbum"
         :variant="route.path.startsWith('/albums') ? 'tonal' : 'plain'"
         :color="route.path === '/albums' ? 'primary-darken-1' : undefined"
         to="/albums"
@@ -247,7 +245,7 @@ const { isScrolling } = useScroll(() => navList.value?.$el as HTMLElement | null
         title="People"
       />
       <v-btn
-        :icon="mdiCamera"
+        :icon="MdiCamera"
         :variant="route.path.startsWith('/cameras') ? 'tonal' : 'plain'"
         :color="route.path === '/cameras' ? 'primary-darken-1' : undefined"
         to="/cameras"
@@ -255,14 +253,14 @@ const { isScrolling } = useScroll(() => navList.value?.$el as HTMLElement | null
       />
       <v-divider class="ma-2" />
       <v-btn
-        :icon="mdiTrashCan"
+        :icon="MdiTrashCan"
         :variant="route.path.startsWith('/bin') ? 'tonal' : 'plain'"
         :color="route.path === '/bin' ? 'primary-darken-1' : undefined"
         to="/bin"
         title="Bin"
       />
       <v-btn
-        :icon="mdiCloudOutline"
+        :icon="MdiCloudOutline"
         :variant="route.path.startsWith('/storage') ? 'tonal' : 'plain'"
         :color="route.path === '/storage' ? 'primary-darken-1' : undefined"
         to="/storage"

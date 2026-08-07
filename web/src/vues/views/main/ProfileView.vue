@@ -1,17 +1,15 @@
 <script setup lang="ts">
-import {
-  mdiAccount,
-  mdiAccountOff,
-  mdiAutoFix,
-  mdiCalendarRange,
-  mdiChevronRight,
-  mdiClose,
-  mdiImageAlbum,
-  mdiImageMultiple,
-  mdiPencil,
-  mdiShareVariant,
-  mdiVideo,
-} from '@mdi/js'
+import MdiAccount from '~icons/mdi/account'
+import MdiAccountOff from '~icons/mdi/account-off'
+import MdiAutoFix from '~icons/mdi/auto-fix'
+import MdiCalendarRange from '~icons/mdi/calendar-range'
+import MdiChevronRight from '~icons/mdi/chevron-right'
+import MdiClose from '~icons/mdi/close'
+import MdiImageAlbum from '~icons/mdi/image-album'
+import MdiImageMultiple from '~icons/mdi/image-multiple'
+import MdiPencil from '~icons/mdi/pencil'
+import MdiShareVariant from '~icons/mdi/share-variant'
+import MdiVideo from '~icons/mdi/video'
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import MainLayoutContainer from '@/vues/components/MainLayoutContainer.vue'
@@ -127,25 +125,25 @@ const statCards = computed(() => [
   {
     title: 'Photos',
     value: profile.value?.stats.photoCount ?? 0,
-    icon: mdiImageMultiple,
+    icon: MdiImageMultiple,
     color: 'primary',
   },
   {
     title: 'Videos',
     value: profile.value?.stats.videoCount ?? 0,
-    icon: mdiVideo,
+    icon: MdiVideo,
     color: 'secondary',
   },
   {
     title: 'Albums',
     value: profile.value?.stats.albumCount ?? 0,
-    icon: mdiImageAlbum,
+    icon: MdiImageAlbum,
     color: 'tertiary',
   },
   {
     title: 'Shared',
     value: profile.value?.stats.sharedAlbumCount ?? 0,
-    icon: mdiShareVariant,
+    icon: MdiShareVariant,
     color: 'info',
   },
 ])
@@ -179,7 +177,7 @@ useRefreshFunction(() => loadProfile())
               <h1 class="user-name">{{ profile.name }}</h1>
               <v-btn
                 v-if="isCurrentUser"
-                :prepend-icon="mdiPencil"
+                :prepend-icon="MdiPencil"
                 variant="tonal"
                 rounded="xl"
                 class="edit-btn"
@@ -191,7 +189,7 @@ useRefreshFunction(() => loadProfile())
             </div>
             <p v-if="profile.email" class="user-email">{{ profile.email }}</p>
             <div class="user-joined">
-              <v-icon :icon="mdiCalendarRange" size="small" class="joined-icon" />
+              <v-icon :icon="MdiCalendarRange" size="small" class="joined-icon" />
               <span>Joined {{ formatDate(profile.createdAt) }}</span>
             </div>
           </div>
@@ -220,7 +218,7 @@ useRefreshFunction(() => loadProfile())
       </div>
 
       <div v-else class="not-found-state">
-        <v-icon :icon="mdiAccountOff" size="100" class="not-found-icon" />
+        <v-icon :icon="MdiAccountOff" size="100" class="not-found-icon" />
         <h2 class="not-found-title">User not found</h2>
         <v-btn color="primary" variant="tonal" rounded class="home-btn" @click="router.push('/')">
           Go Home
@@ -233,7 +231,7 @@ useRefreshFunction(() => loadProfile())
           <v-card-title class="dialog-header">
             <span>Edit Profile</span>
             <v-btn
-              :icon="mdiClose"
+              :icon="MdiClose"
               variant="text"
               @click="editDialog = false"
               :disabled="saving"
@@ -256,7 +254,7 @@ useRefreshFunction(() => loadProfile())
                 color="transparent"
                 @click="showExplanation = true"
               >
-                <v-icon class="avatar-edit-icon" size="40" color="white" :icon="mdiPencil"></v-icon>
+                <v-icon class="avatar-edit-icon" size="40" color="white" :icon="MdiPencil"></v-icon>
               </v-btn>
             </div>
 
@@ -281,7 +279,7 @@ useRefreshFunction(() => loadProfile())
                     class="px-5"
                     rounded
                     variant="tonal"
-                    :prepend-icon="mdiAutoFix"
+                    :prepend-icon="MdiAutoFix"
                     @click="autoSetProfilePic"
                     >Auto-set</v-btn
                   >
@@ -290,7 +288,7 @@ useRefreshFunction(() => loadProfile())
                     exact
                     rounded
                     variant="tonal"
-                    :prepend-icon="mdiChevronRight"
+                    :prepend-icon="MdiChevronRight"
                     to="/"
                     >Photos</v-btn
                   >
@@ -306,7 +304,7 @@ useRefreshFunction(() => loadProfile())
               autofocus
               class="mt-5"
               rounded
-              :prepend-inner-icon="mdiAccount"
+              :prepend-inner-icon="MdiAccount"
               :disabled="saving"
               hide-details
               @keyup.enter="saveProfile"

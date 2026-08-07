@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { mdiCheck, mdiRefresh } from '@mdi/js'
+import MdiCheck from '~icons/mdi/check'
+import MdiRefresh from '~icons/mdi/refresh'
 import UnsupportedFiles from '@/vues/components/onboarding/UnsupportedFiles.vue'
 import InaccessibleEntries from '@/vues/components/onboarding/InaccessibleEntries.vue'
 import ShowSelectedFolder from '@/vues/components/onboarding/ShowSelectedFolder.vue'
@@ -19,7 +20,7 @@ const pickFolderStore = usePickFolderStore()
     <v-spacer />
     <v-btn
       :loading="pickFolderStore.unsupportedFilesLoading"
-      :prepend-icon="mdiRefresh"
+      :prepend-icon="MdiRefresh"
       rounded
       variant="text"
       @click="pickFolderStore.refreshUnsupportedFiles"
@@ -52,7 +53,7 @@ const pickFolderStore = usePickFolderStore()
     color="surface-container"
     v-else-if="pickFolderStore.unsupportedFiles"
     class="rounded-xl text-md-caption"
-    :icon="mdiCheck"
+    :icon="MdiCheck"
   >
     <p :style="{ color: 'rgb(var(--v-theme-on-surface-container))' }">
       Great news! There are no unsupported files in your selection. Everything looks good!

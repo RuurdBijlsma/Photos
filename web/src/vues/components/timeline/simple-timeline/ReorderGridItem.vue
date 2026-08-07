@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { mdiPlay } from '@mdi/js'
+import MdiPlay from '~icons/mdi/play'
 import type { SimpleTimelineItem } from '@/scripts/types/generated/timeline.ts'
 import { toHms } from '@/scripts/utils.ts'
 import mediaItemService from '@/scripts/services/mediaItemService.ts'
@@ -45,7 +45,7 @@ function onDragStart(e: DragEvent) {
       />
       <div class="video-info" v-if="isVideo">
         <span v-if="durationMs">{{ toHms(durationMs / 1000) }}</span>
-        <v-icon color="white" size="16" :icon="mdiPlay" />
+        <v-icon color="white" size="16" :icon="MdiPlay" />
       </div>
     </div>
   </div>

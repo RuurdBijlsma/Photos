@@ -1,15 +1,13 @@
 <script setup lang="ts">
-import {
-  mdiAccountMultipleOutline,
-  mdiAccountOutline,
-  mdiAccountPlusOutline,
-  mdiAccountSearchOutline,
-  mdiAlert,
-  mdiDeleteOutline,
-  mdiFolderAlert,
-  mdiFolderEditOutline,
-  mdiHarddisk,
-} from '@mdi/js'
+import MdiAccountMultipleOutline from '~icons/mdi/account-multiple-outline'
+import MdiAccountOutline from '~icons/mdi/account-outline'
+import MdiAccountPlusOutline from '~icons/mdi/account-plus-outline'
+import MdiAccountSearchOutline from '~icons/mdi/account-search-outline'
+import MdiAlert from '~icons/mdi/alert'
+import MdiDeleteOutline from '~icons/mdi/delete-outline'
+import MdiFolderAlert from '~icons/mdi/folder-alert'
+import MdiFolderEditOutline from '~icons/mdi/folder-edit-outline'
+import MdiHarddisk from '~icons/mdi/harddisk'
 import { ref, onMounted, computed } from 'vue'
 import { useAdminStore } from '@/scripts/stores/adminStore.ts'
 import { useAuthStore } from '@/scripts/stores/authStore.ts'
@@ -84,7 +82,7 @@ async function confirmChangeFolder(userEmail: string) {
     `,
     confirmText: 'Change media folder',
     cancelText: 'Keep current folder',
-    icon: mdiFolderAlert,
+    icon: MdiFolderAlert,
     persistent: true,
   })
 }
@@ -195,11 +193,11 @@ async function deleteUser(user: AdminUserInfo) {
               color="primary"
               size="large"
               class="ml-2"
-              :icon="mdiAccountMultipleOutline"
+              :icon="MdiAccountMultipleOutline"
             ></v-icon>
           </div>
           <v-btn
-            :prepend-icon="mdiAccountPlusOutline"
+            :prepend-icon="MdiAccountPlusOutline"
             color="primary"
             variant="tonal"
             rounded
@@ -218,7 +216,7 @@ async function deleteUser(user: AdminUserInfo) {
 
           <!-- Empty State -->
           <div v-else-if="adminStore.users.length === 0" class="empty-state">
-            <v-icon size="64" color="on-surface-variant" :icon="mdiAccountSearchOutline"></v-icon>
+            <v-icon size="64" color="on-surface-variant" :icon="MdiAccountSearchOutline"></v-icon>
             <p class="empty-text">No registered users found on this server.</p>
           </div>
 
@@ -240,7 +238,7 @@ async function deleteUser(user: AdminUserInfo) {
                     size="52"
                     class="border-fallback"
                   >
-                    <v-icon color="primary" size="x-large" :icon="mdiAccountOutline"></v-icon>
+                    <v-icon color="primary" size="x-large" :icon="MdiAccountOutline"></v-icon>
                   </v-avatar>
                 </div>
 
@@ -281,7 +279,7 @@ async function deleteUser(user: AdminUserInfo) {
                 <span class="section-subtitle">Storage Usage</span>
 
                 <div class="storage-row">
-                  <v-icon :icon="mdiHarddisk" size="small" class="mr-2" color="primary" />
+                  <v-icon :icon="MdiHarddisk" size="small" class="mr-2" color="primary" />
                   <span class="storage-text font-weight-bold">
                     {{ prettyBytes(user.mainDriveUsed) }}
                   </span>
@@ -304,7 +302,7 @@ async function deleteUser(user: AdminUserInfo) {
               <div class="user-actions-section">
                 <v-btn
                   v-if="!isCurrentUser(user)"
-                  :icon="mdiDeleteOutline"
+                  :icon="MdiDeleteOutline"
                   variant="text"
                   color="error"
                   density="comfortable"
@@ -329,7 +327,7 @@ async function deleteUser(user: AdminUserInfo) {
       >
         <v-card-title class="dialog-header-row">
           <div class="dialog-title">
-            <v-icon :icon="mdiFolderEditOutline" class="mr-2" color="primary" />
+            <v-icon :icon="MdiFolderEditOutline" class="mr-2" color="primary" />
             Update Media Folder for: {{ editingUser?.username }}
           </div>
         </v-card-title>
@@ -362,7 +360,7 @@ async function deleteUser(user: AdminUserInfo) {
       <v-card class="pick-folder-dialog" rounded="xl" color="surface-container-highest">
         <v-card-title class="dialog-header-row">
           <div class="dialog-title">
-            <v-icon :icon="mdiAccountPlusOutline" class="mr-2" color="primary" />
+            <v-icon :icon="MdiAccountPlusOutline" class="mr-2" color="primary" />
             Invite a Friend
           </div>
         </v-card-title>
@@ -370,7 +368,7 @@ async function deleteUser(user: AdminUserInfo) {
           <template v-if="authStore.user?.mediaFolder === ''">
             <div class="alert-warning-box pa-4">
               <div class="d-flex align-start">
-                <v-icon :icon="mdiAlert" color="error" class="mr-3 mt-1" />
+                <v-icon :icon="MdiAlert" color="error" class="mr-3 mt-1" />
                 <div>
                   <div class="text-subtitle-1 font-weight-bold">Cannot Invite Users</div>
                   <p class="text-body-2 mb-0 text-medium-emphasis">

@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import { mdiAlertCircleOutline, mdiFile, mdiFileAlertOutline } from '@mdi/js'
+import MdiAlertCircleOutline from '~icons/mdi/alert-circle-outline'
+import MdiFile from '~icons/mdi/file'
+import MdiFileAlertOutline from '~icons/mdi/file-alert-outline'
 import { computed } from 'vue'
 import type { UnsupportedFilesResponse } from '@/scripts/types/api/admin.js'
 
@@ -19,7 +21,7 @@ const virtualScrollHeight = computed(() => {
 <template>
   <v-card class="mb-6 folder-card" variant="text" rounded color="primary">
     <v-card-title class="d-flex align-center card-title">
-      <v-icon :icon="mdiAlertCircleOutline" class="mr-2"></v-icon>
+      <v-icon :icon="MdiAlertCircleOutline" class="mr-2"></v-icon>
       Unsupported Files ({{ summary.unsupportedCount.toLocaleString() }})
     </v-card-title>
     <v-card-text>
@@ -42,7 +44,7 @@ const virtualScrollHeight = computed(() => {
                   v-tooltip="`.${item}`"
                   class="ma-1"
                   v-bind="activatorProps"
-                  :prepend-icon="mdiFileAlertOutline"
+                  :prepend-icon="MdiFileAlertOutline"
                 >
                   <span class="empty-extension" v-if="item === ''">Empty extension</span>
                   <span v-else>{{ item }}</span>
@@ -59,7 +61,7 @@ const virtualScrollHeight = computed(() => {
                         <template v-slot:default="{ item }">
                           <v-list-item>
                             <template v-slot:prepend>
-                              <v-icon :icon="mdiFile"></v-icon>
+                              <v-icon :icon="MdiFile"></v-icon>
                             </template>
                             <v-list-item-title :title="item">
                               {{ item }}

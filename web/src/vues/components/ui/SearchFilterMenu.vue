@@ -1,11 +1,9 @@
 <script setup lang="ts">
-import {
-  mdiClose,
-  mdiInformationOutline,
-  mdiSortCalendarAscending,
-  mdiSortDescending,
-  mdiTuneVariant,
-} from '@mdi/js'
+import MdiClose from '~icons/mdi/close'
+import MdiInformationOutline from '~icons/mdi/information-outline'
+import MdiSortCalendarAscending from '~icons/mdi/sort-calendar-ascending'
+import MdiSortDescending from '~icons/mdi/sort-descending'
+import MdiTuneVariant from '~icons/mdi/tune-variant'
 import { computed, nextTick, ref, watch, onMounted } from 'vue'
 import HistogramDateRangePicker from '@/vues/components/ui/HistogramDateRangePicker.vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -400,7 +398,7 @@ const activeFilterChips = computed(() => {
       content-class="search-filter-menu"
     >
       <template v-slot:activator="{ props }">
-        <v-btn v-bind="props" variant="text" rounded :prepend-icon="mdiTuneVariant">
+        <v-btn v-bind="props" variant="text" rounded :prepend-icon="MdiTuneVariant">
           Filters
         </v-btn>
       </template>
@@ -529,7 +527,7 @@ const activeFilterChips = computed(() => {
                 Exclude
                 <v-icon
                   size="16"
-                  :icon="mdiInformationOutline"
+                  :icon="MdiInformationOutline"
                   class="ml-2"
                   v-tooltip="{
                     location: 'top',
@@ -556,7 +554,7 @@ const activeFilterChips = computed(() => {
     </v-menu>
 
     <v-btn
-      :icon="mdiClose"
+      :icon="MdiClose"
       variant="plain"
       @click="clearFilters"
       class="clear-filters-button"
@@ -585,7 +583,7 @@ const activeFilterChips = computed(() => {
       }"
     >
       <span>Date</span>
-      <v-icon end :icon="mdiSortCalendarAscending"></v-icon>
+      <v-icon end :icon="MdiSortCalendarAscending"></v-icon>
     </v-btn>
 
     <v-btn-toggle
@@ -604,12 +602,12 @@ const activeFilterChips = computed(() => {
     >
       <v-btn value="date">
         <span>Date</span>
-        <v-icon end :icon="mdiSortCalendarAscending"></v-icon>
+        <v-icon end :icon="MdiSortCalendarAscending"></v-icon>
       </v-btn>
 
       <v-btn value="relevancy">
         <span>Relevancy</span>
-        <v-icon end :icon="mdiSortDescending"></v-icon>
+        <v-icon end :icon="MdiSortDescending"></v-icon>
       </v-btn>
     </v-btn-toggle>
   </div>

@@ -1,12 +1,10 @@
 <script setup lang="ts">
-import {
-  mdiArrowRight,
-  mdiFileImageOutline,
-  mdiImageOutline,
-  mdiRefresh,
-  mdiSearchWeb,
-  mdiSwapVertical,
-} from '@mdi/js'
+import MdiArrowRight from '~icons/mdi/arrow-right'
+import MdiFileImageOutline from '~icons/mdi/file-image-outline'
+import MdiImageOutline from '~icons/mdi/image-outline'
+import MdiRefresh from '~icons/mdi/refresh'
+import MdiSearchWeb from '~icons/mdi/search-web'
+import MdiSwapVertical from '~icons/mdi/swap-vertical'
 import { onMounted, onUnmounted, computed } from 'vue'
 import { useIngestJobsStore } from '@/scripts/stores/ingestJobsStore.ts'
 import IngestPipelineRow from '@/vues/components/activity/IngestPipelineRow.vue'
@@ -27,9 +25,9 @@ onUnmounted(() => {
 })
 
 const categories = [
-  { id: 'metadata', label: 'File import', icon: mdiFileImageOutline },
-  { id: 'thumbnails', label: 'Generate thumbnails', icon: mdiImageOutline },
-  { id: 'analysis', label: 'Index for search', icon: mdiSearchWeb },
+  { id: 'metadata', label: 'File import', icon: MdiFileImageOutline },
+  { id: 'thumbnails', label: 'Generate thumbnails', icon: MdiImageOutline },
+  { id: 'analysis', label: 'Index for search', icon: MdiSearchWeb },
 ] as const
 
 const activeCategories = computed(() => {
@@ -78,7 +76,7 @@ const filteredCategoryProgress = computed(() => {
       <div class="ingest-header">
         <span class="font-weight-bold">Importing photos and videos...</span>
         <v-btn
-          :icon="mdiRefresh"
+          :icon="MdiRefresh"
           variant="text"
           density="comfortable"
           color="primary"
@@ -98,7 +96,7 @@ const filteredCategoryProgress = computed(() => {
 
       <div class="running-jobs-section">
         <div class="section-title">
-          <v-icon :icon="mdiSwapVertical" color="primary" />
+          <v-icon :icon="MdiSwapVertical" color="primary" />
           <span>Currently importing</span>
         </div>
 
@@ -123,7 +121,7 @@ const filteredCategoryProgress = computed(() => {
           block
           variant="tonal"
           rounded="xl"
-          :prepend-icon="mdiArrowRight"
+          :prepend-icon="MdiArrowRight"
           @click="emit('close-menu')"
         >
           View Full Activity

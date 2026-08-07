@@ -1,5 +1,8 @@
 <script setup lang="ts">
-import { mdiCheck, mdiClose, mdiController, mdiImageArea } from '@mdi/js'
+import MdiCheck from '~icons/mdi/check'
+import MdiClose from '~icons/mdi/close'
+import MdiController from '~icons/mdi/controller'
+import MdiImageArea from '~icons/mdi/image-area'
 import ThumbnailImg from '@/vues/components/ui/ThumbnailImg.vue'
 import type { DailyCardResponse } from '@/scripts/types/api/dailyCards.ts'
 import { useDailyCardStore } from '@/scripts/stores/timeline/dailyCardStore.ts'
@@ -36,7 +39,7 @@ function isGame(cardType: string) {
         cover
       />
       <div class="card-thumb fake-thumb" v-else>
-        <v-icon :icon="mdiImageArea" color="primary" size="150"></v-icon>
+        <v-icon :icon="MdiImageArea" color="primary" size="150"></v-icon>
       </div>
       <div class="card-content">
         <div class="card-top">
@@ -46,7 +49,7 @@ function isGame(cardType: string) {
               location: 'top',
             }"
             class="close-button"
-            :icon="mdiClose"
+            :icon="MdiClose"
             variant="plain"
             density="compact"
             @click="closeCard"
@@ -61,7 +64,7 @@ function isGame(cardType: string) {
           <div class="card-icon-container">
             <v-icon
               size="40"
-              :icon="cardStore.completedCards.includes(card.id) ? mdiCheck : mdiController"
+              :icon="cardStore.completedCards.includes(card.id) ? MdiCheck : MdiController"
               color="on-surface-variant"
               v-if="isGame(card.cardType)"
             />

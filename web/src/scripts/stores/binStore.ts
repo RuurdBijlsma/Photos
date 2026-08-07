@@ -1,4 +1,7 @@
-import { mdiAlert, mdiDelete, mdiDeleteForever, mdiRestore } from '@mdi/js'
+import MdiAlert from '~icons/mdi/alert'
+import MdiDelete from '~icons/mdi/delete'
+import MdiDeleteForever from '~icons/mdi/delete-forever'
+import MdiRestore from '~icons/mdi/restore'
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import type { SimpleTimelineItem } from '@/scripts/types/generated/timeline.ts'
@@ -50,7 +53,7 @@ export const useBinStore = defineStore('bin', () => {
       await binService.softDelete(ids)
       snackbarStore.enqueue({
         message: `${ids.length} item${ids.length === 1 ? '' : 's'} moved to bin`,
-        icon: mdiDelete,
+        icon: MdiDelete,
         action: {
           label: 'Undo',
           onClick: () => restoreItems(ids),
@@ -71,7 +74,7 @@ export const useBinStore = defineStore('bin', () => {
       await binService.restore(ids)
       snackbarStore.enqueue({
         message: `${ids.length} item${ids.length === 1 ? '' : 's'} restored`,
-        icon: mdiRestore,
+        icon: MdiRestore,
       })
       callForRefresh()
     } catch (e) {
@@ -86,7 +89,7 @@ export const useBinStore = defineStore('bin', () => {
     let confirmed = await dialogStore.confirm({
       title: 'Delete Permanently?',
       color: 'error',
-      icon: mdiDelete,
+      icon: MdiDelete,
       description: `Are you sure you want to permanently delete ${ids.length} item${ids.length === 1 ? '' : 's'}? This action cannot be undone and will delete the files from your storage.`,
       confirmText: 'Delete Permanently',
     })
@@ -95,7 +98,7 @@ export const useBinStore = defineStore('bin', () => {
     confirmed = await dialogStore.confirm({
       title: 'Are you sure??',
       color: 'error',
-      icon: mdiAlert,
+      icon: MdiAlert,
       description: `Are you super sure you want to permanently delete ${ids.length} item${ids.length === 1 ? '' : 's'}? This action <strong>cannot be undone</strong> and will delete the files from your storage.`,
       confirmText: 'Delete Permanently',
     })
@@ -107,7 +110,7 @@ export const useBinStore = defineStore('bin', () => {
       await binService.deletePermanently(ids)
       snackbarStore.enqueue({
         message: `${ids.length} item${ids.length === 1 ? '' : 's'} permanently deleted`,
-        icon: mdiDeleteForever,
+        icon: MdiDeleteForever,
       })
       callForRefresh()
     } catch (e) {

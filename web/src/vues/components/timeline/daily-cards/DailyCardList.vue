@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { mdiChevronLeft, mdiChevronRight } from '@mdi/js'
+import MdiChevronLeft from '~icons/mdi/chevron-left'
+import MdiChevronRight from '~icons/mdi/chevron-right'
 import { useDailyCardStore } from '@/scripts/stores/timeline/dailyCardStore.ts'
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useResizeObserver } from '@vueuse/core'
@@ -66,7 +67,7 @@ onMounted(() => cardStore.fetchDailyCards())
     <transition name="fade">
       <v-btn
         v-if="canScrollLeft"
-        :icon="mdiChevronLeft"
+        :icon="MdiChevronLeft"
         class="scroll-btn scroll-btn-left"
         variant="elevated"
         color="surface"
@@ -91,7 +92,7 @@ onMounted(() => cardStore.fetchDailyCards())
     <transition name="fade">
       <v-btn
         v-if="canScrollRight"
-        :icon="mdiChevronRight"
+        :icon="MdiChevronRight"
         class="scroll-btn scroll-btn-right"
         variant="flat"
         color="surface"

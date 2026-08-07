@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { mdiCalendarFilter, mdiClose } from '@mdi/js'
+import MdiCalendarFilter from '~icons/mdi/calendar-filter'
+import MdiClose from '~icons/mdi/close'
 import { ref, computed } from 'vue'
 import HistogramDateRangePicker from '@/vues/components/ui/HistogramDateRangePicker.vue'
 
@@ -50,7 +51,7 @@ const closedButtonLabel = computed(() => {
         variant="flat"
         rounded="xl"
         elevation="4"
-        :prepend-icon="mdiCalendarFilter"
+        :prepend-icon="MdiCalendarFilter"
         @click="isOpen = true"
       >
         {{ closedButtonLabel }}
@@ -60,7 +61,7 @@ const closedButtonLabel = computed(() => {
       <v-card v-else class="map-date-filter-panel" elevation="8" rounded="xl">
         <!-- Close Button -->
         <v-btn
-          :icon="mdiClose"
+          :icon="MdiClose"
           variant="text"
           density="comfortable"
           class="panel-close-btn"

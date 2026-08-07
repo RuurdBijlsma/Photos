@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { formatEta } from '@/scripts/utils.ts'
+import type { IconValue } from '@/scripts/types/iconValue.ts'
 
 const props = withDefaults(
   defineProps<{
     label: string
-    icon: string
+    icon: IconValue
     progress: number
     status: string
     isActive?: boolean

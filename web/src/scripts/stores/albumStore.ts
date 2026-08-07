@@ -1,4 +1,4 @@
-import { mdiDelete } from '@mdi/js'
+import MdiDelete from '~icons/mdi/delete'
 import { defineStore } from 'pinia'
 import { ref, shallowRef, triggerRef } from 'vue'
 import type { Album, AlbumSort, UpdateAlbumRequest } from '@/scripts/types/api/album.ts'
@@ -60,7 +60,7 @@ export const useAlbumStore = defineStore('album', () => {
     console.warn('DELETING', { confirmed, albumId })
     try {
       await albumService.deleteAlbum(albumId)
-      snackbarStore.enqueue({ message: 'Album deleted', icon: mdiDelete })
+      snackbarStore.enqueue({ message: 'Album deleted', icon: MdiDelete })
       requestIdleCallback(() => fetchUserAlbums())
     } catch (e) {
       snackbarStore.error('Error deleting album', e)

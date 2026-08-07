@@ -1,24 +1,22 @@
 <script setup lang="ts">
-import {
-  mdiCheck,
-  mdiClose,
-  mdiCloudUpload,
-  mdiDelete,
-  mdiDotsHorizontal,
-  mdiEarth,
-  mdiImageAlbum,
-  mdiLock,
-  mdiMinus,
-  mdiPencil,
-  mdiPencilOutline,
-  mdiPlus,
-  mdiShare,
-  mdiSort,
-  mdiSortCalendarAscending,
-  mdiSortCalendarDescending,
-  mdiSortClockAscendingOutline,
-  mdiSortClockDescendingOutline,
-} from '@mdi/js'
+import MdiCheck from '~icons/mdi/check'
+import MdiClose from '~icons/mdi/close'
+import MdiCloudUpload from '~icons/mdi/cloud-upload'
+import MdiDelete from '~icons/mdi/delete'
+import MdiDotsHorizontal from '~icons/mdi/dots-horizontal'
+import MdiEarth from '~icons/mdi/earth'
+import MdiImageAlbum from '~icons/mdi/image-album'
+import MdiLock from '~icons/mdi/lock'
+import MdiMinus from '~icons/mdi/minus'
+import MdiPencil from '~icons/mdi/pencil'
+import MdiPencilOutline from '~icons/mdi/pencil-outline'
+import MdiPlus from '~icons/mdi/plus'
+import MdiShare from '~icons/mdi/share'
+import MdiSort from '~icons/mdi/sort'
+import MdiSortCalendarAscending from '~icons/mdi/sort-calendar-ascending'
+import MdiSortCalendarDescending from '~icons/mdi/sort-calendar-descending'
+import MdiSortClockAscendingOutline from '~icons/mdi/sort-clock-ascending-outline'
+import MdiSortClockDescendingOutline from '~icons/mdi/sort-clock-descending-outline'
 import { onBeforeRouteLeave, onBeforeRouteUpdate, useRoute, useRouter } from 'vue-router'
 import { computed, nextTick, onBeforeUnmount, ref, useTemplateRef, watch } from 'vue'
 import { useAlbumStore } from '@/scripts/stores/albumStore.ts'
@@ -92,13 +90,13 @@ const sortModeIcon = computed(() => {
   if (!album.value) return null
   const sortMode = album.value.sortMode as AlbumSort
   if (sortMode === 'AddedDesc') {
-    return mdiSortClockDescendingOutline
+    return MdiSortClockDescendingOutline
   } else if (sortMode === 'AddedAsc') {
-    return mdiSortClockAscendingOutline
+    return MdiSortClockAscendingOutline
   } else if (sortMode === 'DateAsc') {
-    return mdiSortCalendarAscending
+    return MdiSortCalendarAscending
   } else if (sortMode === 'DateDesc') {
-    return mdiSortCalendarDescending
+    return MdiSortCalendarDescending
   }
   return null
 })
@@ -198,7 +196,7 @@ function manualOrderMode() {
   pendingSortMode.value = (album.value?.sortMode ?? 'None') as AlbumSort
   snackbars.enqueue({
     message: 'Drag photos to reorder the album',
-    icon: mdiPencilOutline,
+    icon: MdiPencilOutline,
     timeout: 5000,
   })
 }
@@ -311,7 +309,7 @@ async function publicize() {
     description:
       'Anyone with the link will be able to view this album, including all photos and videos it contains.',
     confirmText: 'Make public',
-    icon: mdiEarth,
+    icon: MdiEarth,
   })
   if (!confirmed || !album.value) return
   await albumStore.updateAlbumDetails(album.value.id, { isPublic: true })
@@ -323,7 +321,7 @@ async function privatize() {
     title: 'Make album private?',
     description: 'It will no longer be publicly accessible via the URL.',
     confirmText: 'Make private',
-    icon: mdiLock,
+    icon: MdiLock,
   })
   if (!confirmed || !album.value) return
   await albumStore.updateAlbumDetails(album.value.id, { isPublic: false })
@@ -449,7 +447,7 @@ useRefreshFunction(() => {
   <div class="album-container">
     <div class="album-reorder-header" v-if="isManualOrderMode">
       <div class="reorder-header-title">
-        <v-icon :icon="mdiPencil" class="mr-5" size="25" />
+        <v-icon :icon="MdiPencil" class="mr-5" size="25" />
         <p>Edit album order</p>
       </div>
       <div>
@@ -461,7 +459,7 @@ useRefreshFunction(() => {
               variant="text"
               rounded
               color="primary"
-              :prepend-icon="mdiSort"
+              :prepend-icon="MdiSort"
             >
               Sort photos
             </v-btn>
@@ -471,7 +469,7 @@ useRefreshFunction(() => {
               v-if="album"
               :active="album.sortMode == 'DateDesc'"
               @click="fetchSortedPreview('DateDesc')"
-              :prepend-icon="mdiSortCalendarDescending"
+              :prepend-icon="MdiSortCalendarDescending"
             >
               <v-list-item-title>Newest first</v-list-item-title>
             </v-list-item>
@@ -479,20 +477,20 @@ useRefreshFunction(() => {
               v-if="album"
               :active="album.sortMode == 'DateAsc'"
               @click="fetchSortedPreview('DateAsc')"
-              :prepend-icon="mdiSortCalendarAscending"
+              :prepend-icon="MdiSortCalendarAscending"
             >
               <v-list-item-title>Oldest first</v-list-item-title>
             </v-list-item>
             <v-divider />
             <v-list-item
               @click="fetchSortedPreview('AddedDesc')"
-              :prepend-icon="mdiSortClockDescendingOutline"
+              :prepend-icon="MdiSortClockDescendingOutline"
             >
               <v-list-item-title>Recently added</v-list-item-title>
             </v-list-item>
             <v-list-item
               @click="fetchSortedPreview('AddedAsc')"
-              :prepend-icon="mdiSortClockAscendingOutline"
+              :prepend-icon="MdiSortClockAscendingOutline"
             >
               <v-list-item-title>Oldest added</v-list-item-title>
             </v-list-item>
@@ -504,7 +502,7 @@ useRefreshFunction(() => {
           color="primary"
           rounded
           @click="saveReorder"
-          :prepend-icon="mdiCheck"
+          :prepend-icon="MdiCheck"
         >
           Save
         </v-btn>
@@ -552,7 +550,7 @@ useRefreshFunction(() => {
                 <v-btn
                   v-bind="props"
                   class="album-options-btn"
-                  :icon="mdiDotsHorizontal"
+                  :icon="MdiDotsHorizontal"
                   variant="tonal"
                   density="comfortable"
                   color="primary"
@@ -560,10 +558,10 @@ useRefreshFunction(() => {
                 />
               </template>
               <v-list density="compact" bg-color="surface-container-high">
-                <v-list-item @click="deleteAlbum" :prepend-icon="mdiDelete">
+                <v-list-item @click="deleteAlbum" :prepend-icon="MdiDelete">
                   <v-list-item-title>Delete album</v-list-item-title>
                 </v-list-item>
-                <v-list-item @click="manualOrderMode" :prepend-icon="mdiPencilOutline">
+                <v-list-item @click="manualOrderMode" :prepend-icon="MdiPencilOutline">
                   <v-list-item-title>Edit order</v-list-item-title>
                 </v-list-item>
               </v-list>
@@ -607,7 +605,7 @@ useRefreshFunction(() => {
                   text: album?.isPublic ? 'Publicly available' : 'Private',
                 }"
               >
-                <v-icon size="20" :icon="album?.isPublic ? mdiEarth : mdiLock" />
+                <v-icon size="20" :icon="album?.isPublic ? MdiEarth : MdiLock" />
               </v-btn>
               <span>•</span>
             </template>
@@ -619,7 +617,7 @@ useRefreshFunction(() => {
             <v-btn
               v-if="albumDescription === null && isOwner"
               class="description-add-button"
-              :prepend-icon="mdiPlus"
+              :prepend-icon="MdiPlus"
               density="compact"
               variant="plain"
               rounded
@@ -648,7 +646,7 @@ useRefreshFunction(() => {
                 v-if="isOwner"
                 @click="removeDescription"
                 v-tooltip:top="'Remove description'"
-                :icon="mdiClose"
+                :icon="MdiClose"
                 density="compact"
                 variant="plain"
                 :style="{
@@ -683,7 +681,7 @@ useRefreshFunction(() => {
                 <v-btn
                   v-bind="props"
                   v-tooltip:top="'Add collaborator'"
-                  :icon="mdiShare"
+                  :icon="MdiShare"
                   variant="tonal"
                   color="primary"
                   size="40"
@@ -705,7 +703,7 @@ useRefreshFunction(() => {
                   <v-divider class="mt-2 mb-1" />
                 </template>
                 <v-list-item
-                  :prepend-icon="mdiLock"
+                  :prepend-icon="MdiLock"
                   @click="privatize"
                   v-if="album.isPublic"
                   v-tooltip="{
@@ -716,7 +714,7 @@ useRefreshFunction(() => {
                   <v-list-item-title>Make private</v-list-item-title>
                 </v-list-item>
                 <v-list-item
-                  :prepend-icon="mdiEarth"
+                  :prepend-icon="MdiEarth"
                   @click="publicize"
                   v-else
                   v-tooltip="{
@@ -727,7 +725,7 @@ useRefreshFunction(() => {
                   <v-list-item-title>Make public</v-list-item-title>
                 </v-list-item>
                 <v-list-item
-                  :prepend-icon="mdiCloudUpload"
+                  :prepend-icon="MdiCloudUpload"
                   @click="crossServerInvite"
                   v-tooltip="{
                     location: 'top',
@@ -743,7 +741,7 @@ useRefreshFunction(() => {
                 <v-btn
                   v-bind="props"
                   v-tooltip:top="'Leave album'"
-                  :icon="mdiMinus"
+                  :icon="MdiMinus"
                   variant="tonal"
                   color="primary"
                   size="40"
@@ -762,7 +760,7 @@ useRefreshFunction(() => {
         </div>
       </div>
       <div class="empty-album" v-if="displayedItems.length === 0 && !isInitialLoad">
-        <v-icon color="on-surface-variant" size="200" :icon="mdiImageAlbum"></v-icon>
+        <v-icon color="on-surface-variant" size="200" :icon="MdiImageAlbum"></v-icon>
         <h2>This album is empty</h2>
         <template v-if="route.query.importing === 'true'">
           <p>Importing media from remote server...</p>

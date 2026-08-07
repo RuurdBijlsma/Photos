@@ -1,4 +1,4 @@
-import { mdiAccountMultipleRemove } from '@mdi/js'
+import MdiAccountMultipleRemove from '~icons/mdi/account-multiple-remove'
 import { defineStore } from 'pinia'
 import { ref, shallowRef, triggerRef } from 'vue'
 import type { FullPersonMediaResponse, PersonInfo } from '@/scripts/types/generated/timeline.ts'
@@ -92,7 +92,7 @@ export const usePeopleStore = defineStore('people', () => {
       title: 'Separate merged people?',
       description: 'This will split this person into separate groups.',
       confirmText: 'Separate',
-      icon: mdiAccountMultipleRemove,
+      icon: MdiAccountMultipleRemove,
       color: 'warning',
     })
     if (!confirmed) return false

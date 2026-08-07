@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { mdiClose, mdiInformationOutline } from '@mdi/js'
+import MdiClose from '~icons/mdi/close'
+import MdiInformationOutline from '~icons/mdi/information-outline'
 import { ref } from 'vue'
 import { isAxiosError } from 'axios'
 import { type Snack, useSnackbarsStore } from '@/scripts/stores/snackbarStore'
@@ -61,7 +62,7 @@ const onMouseLeave = (id: string) => store.resumeTimeout(id)
             <!-- Detailed Error Button -->
             <v-btn
               v-if="snack.error || snack.errorData"
-              :icon="mdiInformationOutline"
+              :icon="MdiInformationOutline"
               variant="text"
               density="comfortable"
               size="small"
@@ -79,7 +80,7 @@ const onMouseLeave = (id: string) => store.resumeTimeout(id)
             <!-- Dismiss Button (hidden if dismissable is false) -->
             <v-btn
               v-if="snack.dismissable !== false"
-              :icon="mdiClose"
+              :icon="MdiClose"
               variant="text"
               density="comfortable"
               size="small"
@@ -100,7 +101,7 @@ const onMouseLeave = (id: string) => store.resumeTimeout(id)
           {{ selectedSnack.error.message || 'Error Details' }}
         </v-toolbar-title>
         <v-spacer />
-        <v-btn :icon="mdiClose" @click="dialog = false" />
+        <v-btn :icon="MdiClose" @click="dialog = false" />
       </v-toolbar>
 
       <v-card-text class="pt-4">

@@ -1,15 +1,13 @@
 <script setup lang="ts">
-import {
-  mdiChevronRight,
-  mdiCogOutline,
-  mdiFullscreen,
-  mdiFullscreenExit,
-  mdiPause,
-  mdiPlay,
-  mdiVolumeHigh,
-  mdiVolumeMedium,
-  mdiVolumeMute,
-} from '@mdi/js'
+import MdiChevronRight from '~icons/mdi/chevron-right'
+import MdiCogOutline from '~icons/mdi/cog-outline'
+import MdiFullscreen from '~icons/mdi/fullscreen'
+import MdiFullscreenExit from '~icons/mdi/fullscreen-exit'
+import MdiPause from '~icons/mdi/pause'
+import MdiPlay from '~icons/mdi/play'
+import MdiVolumeHigh from '~icons/mdi/volume-high'
+import MdiVolumeMedium from '~icons/mdi/volume-medium'
+import MdiVolumeMute from '~icons/mdi/volume-mute'
 import { computed, nextTick, onMounted, onUnmounted, ref, useTemplateRef, watch } from 'vue'
 import { useEventListener, useStorage } from '@vueuse/core'
 import { useMediaItemStore } from '@/scripts/stores/timeline/mediaItemStore.ts'
@@ -436,9 +434,9 @@ function handleKeyDown(e: KeyboardEvent) {
 }
 
 const volumeIcon = computed(() => {
-  if (isMuted.value || savedVolume.value === 0) return mdiVolumeMute
-  if (savedVolume.value < 0.5) return mdiVolumeMedium
-  return mdiVolumeHigh
+  if (isMuted.value || savedVolume.value === 0) return MdiVolumeMute
+  if (savedVolume.value < 0.5) return MdiVolumeMedium
+  return MdiVolumeHigh
 })
 
 onMounted(() => {
@@ -485,7 +483,7 @@ useEventListener(window, 'keydown', handleKeyDown)
     <!-- Play/Pause Overlay Indication -->
     <div v-if="overlayAction" :key="overlayTrigger" class="play-pause-overlay">
       <div class="overlay-circle">
-        <v-icon :icon="overlayAction === 'play' ? mdiPlay : mdiPause" size="40" />
+        <v-icon :icon="overlayAction === 'play' ? MdiPlay : MdiPause" size="40" />
       </div>
     </div>
 
@@ -508,7 +506,7 @@ useEventListener(window, 'keydown', handleKeyDown)
           <!-- Clicking bottom-left control capsule buttons will play/pause silently without screen overlay feedback -->
           <v-btn
             variant="plain"
-            :icon="isPlaying ? mdiPause : mdiPlay"
+            :icon="isPlaying ? MdiPause : MdiPlay"
             rounded="xl"
             @click="togglePlay()"
           />
@@ -546,7 +544,7 @@ useEventListener(window, 'keydown', handleKeyDown)
             :close-on-content-click="false"
           >
             <template v-slot:activator="{ props }">
-              <v-btn variant="plain" :icon="mdiCogOutline" rounded="xl" v-bind="props" />
+              <v-btn variant="plain" :icon="MdiCogOutline" rounded="xl" v-bind="props" />
             </template>
             <v-list class="settings-menu-list">
               <!-- Submenu 1: Playback Speed -->
@@ -561,7 +559,7 @@ useEventListener(window, 'keydown', handleKeyDown)
                     <v-list-item-title class="menu-text">Playback speed</v-list-item-title>
                     <template v-slot:append>
                       <span class="current-setting-label">{{ currentPlaybackRate }}x</span>
-                      <v-icon :icon="mdiChevronRight" size="small" class="ml-1" />
+                      <v-icon :icon="MdiChevronRight" size="small" class="ml-1" />
                     </template>
                   </v-list-item>
                 </template>
@@ -594,7 +592,7 @@ useEventListener(window, 'keydown', handleKeyDown)
                           currentQuality === 'source' ? `${sourceHeight}p` : `${currentQuality}p`
                         }}
                       </span>
-                      <v-icon :icon="mdiChevronRight" size="small" class="ml-1" />
+                      <v-icon :icon="MdiChevronRight" size="small" class="ml-1" />
                     </template>
                   </v-list-item>
                 </template>
@@ -625,12 +623,12 @@ useEventListener(window, 'keydown', handleKeyDown)
               </v-menu>
             </v-list>
           </v-menu>
-          <v-btn v-else variant="plain" :icon="mdiCogOutline" rounded="xl" disabled />
+          <v-btn v-else variant="plain" :icon="MdiCogOutline" rounded="xl" disabled />
 
           <!-- Fullscreen Button -->
           <v-btn
             variant="plain"
-            :icon="isFullscreen ? mdiFullscreenExit : mdiFullscreen"
+            :icon="isFullscreen ? MdiFullscreenExit : MdiFullscreen"
             rounded="xl"
             @click="toggleFullscreen"
           />

@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { mdiCheckCircleOutline, mdiChevronRight } from '@mdi/js'
+import MdiCheckCircleOutline from '~icons/mdi/check-circle-outline'
+import MdiChevronRight from '~icons/mdi/chevron-right'
 import { computed } from 'vue'
 
 const props = defineProps<{
@@ -29,7 +30,7 @@ const color = computed(() => {
     <v-icon
       v-if="!excludeCheckIcon"
       :color="iconColor ?? 'primary'"
-      :icon="mdiCheckCircleOutline"
+      :icon="MdiCheckCircleOutline"
     />
     <span class="primary-color" v-if="includeSelectedText">Selected folder:</span>
     <div
@@ -42,7 +43,7 @@ const color = computed(() => {
     >
       <span class="opa">Root</span>
       <template v-for="(component, index) in folder" :key="index">
-        <v-icon color="on-secondary-container" :icon="mdiChevronRight" />
+        <v-icon color="on-secondary-container" :icon="MdiChevronRight" />
         <span>{{ component }}</span>
       </template>
     </div>

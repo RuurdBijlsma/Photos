@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { mdiClose } from '@mdi/js'
+import MdiClose from '~icons/mdi/close'
 import { type DialogAction, useDialogStore } from '@/scripts/stores/dialogStore'
 const store = useDialogStore()
 
@@ -25,7 +25,7 @@ const handleAction = async (actionItem: DialogAction) => {
         <span>{{ store.current.options.title }}</span>
         <v-spacer />
         <v-btn
-          :icon="mdiClose"
+          :icon="MdiClose"
           variant="text"
           density="comfortable"
           @click="store.handleCancel()"

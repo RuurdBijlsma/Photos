@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import type { IconValue } from '@/scripts/types/iconValue.ts'
 
 const props = withDefaults(
   defineProps<{
     label: string
-    icon: string
+    icon: IconValue
     total: number
     percentage: number
     toGo: number

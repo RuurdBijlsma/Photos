@@ -8,12 +8,10 @@ import type { StorageSummaryResponse } from '@/scripts/types/generated/timeline.
 import { useSnackbarsStore } from '@/scripts/stores/snackbarStore.ts'
 import BigStorageOverview from '@/vues/components/ui/BigStorageOverview.vue'
 import { useRefreshFunction } from '@/scripts/composables/useRefreshFunction.ts'
-import {
-  mdiChevronRight,
-  mdiImageBrokenVariant,
-  mdiImageMultipleOutline,
-  mdiRefresh,
-} from '@mdi/js'
+import MdiChevronRight from '~icons/mdi/chevron-right'
+import MdiImageBrokenVariant from '~icons/mdi/image-broken-variant'
+import MdiImageMultipleOutline from '~icons/mdi/image-multiple-outline'
+import MdiRefresh from '~icons/mdi/refresh'
 
 const systemStore = useSystemStore()
 const snackbarStore = useSnackbarsStore()
@@ -33,14 +31,14 @@ const reviewCards = computed(() => [
     title: 'Large photos & videos',
     description: `${summary.value.largeItemCount}${summary.value.largeItemCount >= 250 ? '+' : ''} item${summary.value.largeItemCount === 1 ? '' : 's'} over 10 MB`,
     savings: summary.value.largePotentialSavings,
-    icon: mdiImageMultipleOutline,
+    icon: MdiImageMultipleOutline,
     to: '/storage/review',
   },
   {
     title: 'Blurry photos',
     description: `${summary.value.blurryItemCount} low-quality item${summary.value.blurryItemCount === 1 ? '' : 's'} detected`,
     savings: summary.value.blurryPotentialSavings,
-    icon: mdiImageBrokenVariant,
+    icon: MdiImageBrokenVariant,
     to: '/storage/blurry',
   },
 ])
@@ -76,7 +74,7 @@ useRefreshFunction(() => loadSummary())
         <v-btn
           variant="text"
           color="primary"
-          :icon="mdiRefresh"
+          :icon="MdiRefresh"
           :loading="loading"
           v-tooltip:top="'Refresh'"
           @click="loadSummary"
@@ -102,7 +100,7 @@ useRefreshFunction(() => loadSummary())
               <span>Can save</span>
               <strong>{{ prettyBytes(card.savings) }}</strong>
             </div>
-            <v-icon :icon="mdiChevronRight" size="28" class="chevron" />
+            <v-icon :icon="MdiChevronRight" size="28" class="chevron" />
           </router-link>
         </div>
       </section>

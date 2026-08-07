@@ -1,18 +1,16 @@
 <script setup lang="ts">
-import {
-  mdiAccountOutline,
-  mdiAlertCircle,
-  mdiAlertCircleOutline,
-  mdiCached,
-  mdiCheck,
-  mdiClockFast,
-  mdiClose,
-  mdiCogOutline,
-  mdiInformation,
-  mdiInformationOutline,
-  mdiRefresh,
-  mdiStopCircleOutline,
-} from '@mdi/js'
+import MdiAccountOutline from '~icons/mdi/account-outline'
+import MdiAlertCircle from '~icons/mdi/alert-circle'
+import MdiAlertCircleOutline from '~icons/mdi/alert-circle-outline'
+import MdiCached from '~icons/mdi/cached'
+import MdiCheck from '~icons/mdi/check'
+import MdiClockFast from '~icons/mdi/clock-fast'
+import MdiClose from '~icons/mdi/close'
+import MdiCogOutline from '~icons/mdi/cog-outline'
+import MdiInformation from '~icons/mdi/information'
+import MdiInformationOutline from '~icons/mdi/information-outline'
+import MdiRefresh from '~icons/mdi/refresh'
+import MdiStopCircleOutline from '~icons/mdi/stop-circle-outline'
 import { ref, onMounted, computed, watch } from 'vue'
 import { useAdminStore } from '@/scripts/stores/adminStore.ts'
 import type { AdminUserInfo, JobInfo, JobStatus, JobType } from '@/scripts/types/api/admin.ts'
@@ -216,12 +214,12 @@ watch(
         <div class="card-header">
           <div class="card-title-group">
             <span class="card-title">Background Job Queue</span>
-            <v-icon color="primary" size="large" class="ml-2" :icon="mdiClockFast"></v-icon>
+            <v-icon color="primary" size="large" class="ml-2" :icon="MdiClockFast"></v-icon>
           </div>
           <v-spacer />
           <v-btn
             v-if="!autoRefresh"
-            :prepend-icon="mdiRefresh"
+            :prepend-icon="MdiRefresh"
             variant="tonal"
             color="primary"
             rounded
@@ -236,8 +234,8 @@ watch(
             color="primary"
             label="Auto refresh"
             size="small"
-            :true-icon="mdiCheck"
-            :false-icon="mdiClose"
+            :true-icon="MdiCheck"
+            :false-icon="MdiClose"
             inset="material"
           ></v-switch>
         </div>
@@ -345,7 +343,7 @@ watch(
                     :media-item-id="userMap.get(item.userId)!.avatarId!"
                     cover
                   />
-                  <v-icon v-else size="small" color="primary" :icon="mdiAccountOutline"></v-icon>
+                  <v-icon v-else size="small" color="primary" :icon="MdiAccountOutline"></v-icon>
                 </v-avatar>
                 <span class="text-caption font-weight-medium">
                   {{ userMap.get(item.userId)?.username || `ID: ${item.userId}` }}
@@ -353,7 +351,7 @@ watch(
               </div>
               <div v-else class="d-flex align-center text-medium-emphasis">
                 <v-avatar size="26" class="mr-2" color="surface-container-highest">
-                  <v-icon size="small" :icon="mdiCogOutline"></v-icon>
+                  <v-icon size="small" :icon="MdiCogOutline"></v-icon>
                 </v-avatar>
                 <span class="text-caption italic">System</span>
               </div>
@@ -396,7 +394,7 @@ watch(
             <template #[`item.actions`]="{ item }">
               <v-btn
                 v-if="item.lastError"
-                :icon="mdiAlertCircleOutline"
+                :icon="MdiAlertCircleOutline"
                 variant="text"
                 color="error"
                 density="comfortable"
@@ -405,7 +403,7 @@ watch(
               />
               <v-btn
                 v-else
-                :icon="mdiInformationOutline"
+                :icon="MdiInformationOutline"
                 variant="text"
                 color="primary"
                 density="comfortable"
@@ -424,13 +422,13 @@ watch(
         <v-card-title class="dialog-header d-flex align-center justify-space-between py-4 px-6">
           <div class="d-flex align-center font-weight-bold">
             <v-icon
-              :icon="detailedJob?.lastError ? mdiAlertCircle : mdiInformation"
+              :icon="detailedJob?.lastError ? MdiAlertCircle : MdiInformation"
               :color="detailedJob?.lastError ? 'error' : 'primary'"
               class="mr-2"
             />
             Job #{{ detailedJob?.id }} ({{ detailedJob?.jobType }})
           </div>
-          <v-btn :icon="mdiClose" variant="text" density="comfortable" @click="closeErrorDetail" />
+          <v-btn :icon="MdiClose" variant="text" density="comfortable" @click="closeErrorDetail" />
         </v-card-title>
 
         <v-card-text class="py-4 px-6 overflow-y-auto" style="max-height: 60vh">
@@ -478,7 +476,7 @@ watch(
               detailedJob && (detailedJob.status === 'queued' || detailedJob.status === 'running')
             "
             variant="tonal"
-            :prepend-icon="mdiStopCircleOutline"
+            :prepend-icon="MdiStopCircleOutline"
             rounded
             :loading="isActionLoading"
             @click="handleCancelJob(detailedJob.id)"
@@ -496,7 +494,7 @@ watch(
                 detailedJob.status === 'cancelled')
             "
             variant="tonal"
-            :prepend-icon="mdiCached"
+            :prepend-icon="MdiCached"
             rounded
             :loading="isActionLoading"
             @click="handleRetryJob(detailedJob.id)"

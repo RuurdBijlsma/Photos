@@ -1,5 +1,9 @@
 <script setup lang="ts">
-import { mdiChevronDown, mdiClose, mdiImageMultipleOutline, mdiPause, mdiPlay } from '@mdi/js'
+import MdiChevronDown from '~icons/mdi/chevron-down'
+import MdiClose from '~icons/mdi/close'
+import MdiImageMultipleOutline from '~icons/mdi/image-multiple-outline'
+import MdiPause from '~icons/mdi/pause'
+import MdiPlay from '~icons/mdi/play'
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useWindowSize } from '@vueuse/core'
@@ -235,7 +239,7 @@ onUnmounted(() => {
 <template>
   <div class="collection-container" @scroll="onScroll">
     <div class="empty-collection" v-if="mediaItems.length === 0">
-      <v-icon size="100" :icon="mdiImageMultipleOutline" color="grey" />
+      <v-icon size="100" :icon="MdiImageMultipleOutline" color="grey" />
       <p>This collection has no media items.</p>
       <v-btn @click="goBack" color="primary">Go Back</v-btn>
     </div>
@@ -249,7 +253,7 @@ onUnmounted(() => {
             <!-- Left Column: Close Button on top left -->
             <div class="control-left">
               <v-btn
-                :icon="mdiClose"
+                :icon="MdiClose"
                 variant="text"
                 color="white"
                 size="small"
@@ -269,7 +273,7 @@ onUnmounted(() => {
             <div class="control-center">
               <div class="story-progress-wrapper">
                 <v-btn
-                  :icon="isPaused ? mdiPlay : mdiPause"
+                  :icon="isPaused ? MdiPlay : MdiPause"
                   variant="text"
                   color="white"
                   size="small"
@@ -347,7 +351,7 @@ onUnmounted(() => {
 
         <!-- Scroll down indicator -->
         <div class="scroll-down-hint" @click="scrollToGrid">
-          <v-icon :icon="mdiChevronDown" size="28" />
+          <v-icon :icon="MdiChevronDown" size="28" />
           <span>Scroll down for all photos</span>
         </div>
       </div>

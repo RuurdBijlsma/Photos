@@ -1,13 +1,11 @@
 <script setup lang="ts">
-import {
-  mdiCheckboxMultipleMarkedCircleOutline,
-  mdiChevronRight,
-  mdiClose,
-  mdiDelete,
-  mdiDownloadOutline,
-  mdiHarddisk,
-  mdiImageBrokenVariant,
-} from '@mdi/js'
+import MdiCheckboxMultipleMarkedCircleOutline from '~icons/mdi/checkbox-multiple-marked-circle-outline'
+import MdiChevronRight from '~icons/mdi/chevron-right'
+import MdiClose from '~icons/mdi/close'
+import MdiDelete from '~icons/mdi/delete'
+import MdiDownloadOutline from '~icons/mdi/download-outline'
+import MdiHarddisk from '~icons/mdi/harddisk'
+import MdiImageBrokenVariant from '~icons/mdi/image-broken-variant'
 import { computed, onMounted, ref, useTemplateRef, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useResizeObserver } from '@vueuse/core'
@@ -46,7 +44,7 @@ const mode = computed<'review' | 'blurry'>(() =>
   route.path.includes('/blurry') ? 'blurry' : 'review',
 )
 const title = computed(() => (mode.value === 'blurry' ? 'Blurry photos' : 'Large photos & videos'))
-const emptyIcon = computed(() => (mode.value === 'blurry' ? mdiImageBrokenVariant : mdiHarddisk))
+const emptyIcon = computed(() => (mode.value === 'blurry' ? MdiImageBrokenVariant : MdiHarddisk))
 const basePath = computed(() => (mode.value === 'blurry' ? '/storage/blurry' : '/storage/review'))
 const totalSize = computed(() => items.value.reduce((sum, item) => sum + item.sizeBytes, 0))
 const selectedSize = computed(() => {
@@ -127,7 +125,7 @@ async function deleteItems(ids: string[]) {
   const confirmed = await dialogStore.confirm({
     title: 'Move items to bin?',
     color: 'error',
-    icon: mdiDelete,
+    icon: MdiDelete,
     description: `Are you sure you want to delete ${ids.length} item${ids.length === 1 ? '' : 's'}? They will end up in your Bin where you can delete them permanently.`,
     confirmText: 'Move to bin',
   })
@@ -171,7 +169,7 @@ useRefreshFunction(() => loadItems())
           <div>
             <div class="breadcrumbs">
               <router-link class="crumb-link" to="/storage">Manage storage</router-link>
-              <v-icon :icon="mdiChevronRight" size="18" />
+              <v-icon :icon="MdiChevronRight" size="18" />
               <span>{{ title }}</span>
             </div>
             <h1>{{ title }}</h1>
@@ -186,7 +184,7 @@ useRefreshFunction(() => loadItems())
               variant="tonal"
               v-if="selected.size !== 0"
               color="error"
-              :prepend-icon="mdiDelete"
+              :prepend-icon="MdiDelete"
               rounded="xl"
               class="text-none delete-btn"
               :loading="actionLoading"
@@ -199,7 +197,7 @@ useRefreshFunction(() => loadItems())
               variant="tonal"
               v-if="selected.size !== 0"
               color="primary"
-              :prepend-icon="mdiDownloadOutline"
+              :prepend-icon="MdiDownloadOutline"
               rounded="xl"
               class="text-none stable-btn"
               :loading="downloadStore.anyDownloading"
@@ -212,7 +210,7 @@ useRefreshFunction(() => loadItems())
               variant="tonal"
               color="primary"
               rounded="xl"
-              :prepend-icon="allSelected ? mdiClose : mdiCheckboxMultipleMarkedCircleOutline"
+              :prepend-icon="allSelected ? MdiClose : MdiCheckboxMultipleMarkedCircleOutline"
               class="text-none stable-btn"
               :disabled="items.length === 0"
               @click="toggleAll"

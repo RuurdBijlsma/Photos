@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { mdiArrowTopRight } from '@mdi/js'
+import MdiArrowTopRight from '~icons/mdi/arrow-top-right'
 import { computed, onUnmounted, shallowRef, watch } from 'vue'
 import type { FullMediaItem } from '@/scripts/types/api/fullPhoto.ts'
 import type { SharedMediaItem } from '@/scripts/types/api/album.ts'
@@ -101,7 +101,7 @@ onUnmounted(() => {
           <span v-if="mediaItem.gps.location">{{
             makeLocationString(mediaItem.gps.location, 3)
           }}</span>
-          <v-icon size="15" class="ml-2 map-button-icon" :icon="mdiArrowTopRight" />
+          <v-icon size="15" class="ml-2 map-button-icon" :icon="MdiArrowTopRight" />
         </a>
       </v-sheet>
     </v-theme-provider>

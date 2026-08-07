@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { mdiCogOutline } from '@mdi/js'
+import MdiCogOutline from '~icons/mdi/cog-outline'
 import { UPLOAD_CONCURRENCY_LIMIT, useSettingStore } from '@/scripts/stores/settingsStore.ts'
 import SettingsSlider from '@/vues/components/settings/components/SettingsSlider.vue'
 
@@ -14,7 +14,7 @@ const settings = useSettingStore()
         <!-- Card Header -->
         <div class="card-header">
           <span class="card-title">Upload Config</span>
-          <v-icon color="primary" size="large" :icon="mdiCogOutline"></v-icon>
+          <v-icon color="primary" size="large" :icon="MdiCogOutline"></v-icon>
         </div>
 
         <div class="card-body">

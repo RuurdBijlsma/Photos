@@ -1,4 +1,4 @@
-import { mdiZipBoxOutline } from '@mdi/js'
+import MdiZipBoxOutline from '~icons/mdi/zip-box-outline'
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import mediaItemService from '@/scripts/services/mediaItemService.ts'
@@ -37,7 +37,7 @@ export const useDownloadStore = defineStore('download', () => {
     zipDownloading.value = true
     const snackId = snackbarStore.enqueue({
       message: `Preparing ZIP download for ${ids.length} items...`,
-      icon: mdiZipBoxOutline,
+      icon: MdiZipBoxOutline,
       dismissable: false,
       loading: true,
       timeout: 0,

@@ -1,11 +1,9 @@
 <script setup lang="ts">
-import {
-  mdiArrowUp,
-  mdiChevronRight,
-  mdiFolderOutline,
-  mdiFolderPlusOutline,
-  mdiRefresh,
-} from '@mdi/js'
+import MdiArrowUp from '~icons/mdi/arrow-up'
+import MdiChevronRight from '~icons/mdi/chevron-right'
+import MdiFolderOutline from '~icons/mdi/folder-outline'
+import MdiFolderPlusOutline from '~icons/mdi/folder-plus-outline'
+import MdiRefresh from '~icons/mdi/refresh'
 import { onMounted, watch } from 'vue'
 import { usePickFolderStore } from '@/scripts/stores/pickFolderStore.ts'
 import { useDialogStore } from '@/scripts/stores/dialogStore.ts'
@@ -30,7 +28,7 @@ async function promptCreateFolder() {
   const folder = await dialogs.prompt({
     title: 'Create folder',
     description: 'Create folder',
-    icon: mdiFolderPlusOutline,
+    icon: MdiFolderPlusOutline,
     confirmText: 'Create',
   })
   if (!folder) return
@@ -56,7 +54,7 @@ onMounted(init)
             :disabled="pickFolderStore.viewedFolder.length === 0"
             @click="pickFolderStore.truncateViewed(pickFolderStore.viewedFolder.length - 1)"
             density="compact"
-            :icon="mdiArrowUp"
+            :icon="MdiArrowUp"
           />
           <v-btn
             color="primary"
@@ -64,7 +62,7 @@ onMounted(init)
             variant="text"
             title="Create folder"
             density="compact"
-            :icon="mdiFolderPlusOutline"
+            :icon="MdiFolderPlusOutline"
             @click="promptCreateFolder"
           />
         </div>
@@ -77,7 +75,7 @@ onMounted(init)
             Media Root
           </div>
           <template v-for="(component, index) in pickFolderStore.viewedFolder" :key="index">
-            <v-icon :icon="mdiChevronRight" />
+            <v-icon :icon="MdiChevronRight" />
             <div
               class="route-component"
               v-ripple
@@ -93,7 +91,7 @@ onMounted(init)
             class="ml-2"
             variant="text"
             density="compact"
-            :icon="mdiRefresh"
+            :icon="MdiRefresh"
             @click="pickFolderStore.refreshFolders"
             :loading="pickFolderStore.listFolderLoading"
           />
@@ -111,7 +109,7 @@ onMounted(init)
           :key="folder"
           class="rounded-xl"
           @click="pickFolderStore.openFolder(folder)"
-          :prepend-icon="mdiFolderOutline"
+          :prepend-icon="MdiFolderOutline"
           :title="folder"
         ></v-list-item>
       </div>

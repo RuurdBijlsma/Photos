@@ -1,4 +1,4 @@
-import { mdiBackupRestore } from '@mdi/js'
+import MdiBackupRestore from '~icons/mdi/backup-restore'
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import type { BackupInfo } from '@/scripts/types/api/album.ts'
@@ -33,7 +33,7 @@ export const useAlbumBackupStore = defineStore('albumBackup', () => {
 
     try {
       await albumService.restoreBackup(backupFilename)
-      snackbarStore.enqueue({ message: 'Backup restored successfully', icon: mdiBackupRestore })
+      snackbarStore.enqueue({ message: 'Backup restored successfully', icon: MdiBackupRestore })
       requestIdleCallback(() => albumStore.fetchUserAlbums())
       return true
     } catch (e) {

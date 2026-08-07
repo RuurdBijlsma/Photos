@@ -1,5 +1,9 @@
 <script setup lang="ts">
-import { mdiCheckCircleOutline, mdiClose, mdiEarth, mdiMap, mdiResizeBottomRight } from '@mdi/js'
+import MdiCheckCircleOutline from '~icons/mdi/check-circle-outline'
+import MdiClose from '~icons/mdi/close'
+import MdiEarth from '~icons/mdi/earth'
+import MdiMap from '~icons/mdi/map'
+import MdiResizeBottomRight from '~icons/mdi/resize-bottom-right'
 import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useEventListener } from '@vueuse/core'
@@ -652,7 +656,7 @@ onUnmounted(() => {
     <!-- Top HUD Bar -->
     <div class="estimatr-header">
       <div class="header-left">
-        <v-btn :icon="mdiClose" variant="text" color="on-surface" size="small" @click="goBack" />
+        <v-btn :icon="MdiClose" variant="text" color="on-surface" size="small" @click="goBack" />
         <div class="header-titles">
           <h3>{{ card.title }}</h3>
           <p class="subtitle" v-if="card.subtitle">{{ card.subtitle }}</p>
@@ -714,7 +718,7 @@ onUnmounted(() => {
             @touchstart="startResizeTouch"
             title="Drag to resize map"
           >
-            <v-icon size="14" color="on-surface" :icon="mdiResizeBottomRight"></v-icon>
+            <v-icon size="14" color="on-surface" :icon="MdiResizeBottomRight"></v-icon>
           </div>
 
           <!-- Floating Map Style controls -->
@@ -723,7 +727,7 @@ onUnmounted(() => {
               color="primary"
               density="compact"
               elevation="3"
-              :icon="mapStyle === 'SATELLITE' ? mdiMap : mdiEarth"
+              :icon="mapStyle === 'SATELLITE' ? MdiMap : MdiEarth"
               @click="toggleMapStyle"
             />
           </div>
@@ -796,7 +800,7 @@ onUnmounted(() => {
             size="x-small"
             color="surface"
             elevation="3"
-            :icon="mapStyle === 'SATELLITE' ? mdiMap : mdiEarth"
+            :icon="mapStyle === 'SATELLITE' ? MdiMap : MdiEarth"
             @click="toggleMapStyle"
           />
         </div>
@@ -810,7 +814,7 @@ onUnmounted(() => {
               size="48"
               color="success"
               class="success-icon"
-              :icon="mdiCheckCircleOutline"
+              :icon="MdiCheckCircleOutline"
             ></v-icon>
             <h2>Challenge Completed!</h2>
             <p class="summary-desc">Come back tomorrow for another game.</p>

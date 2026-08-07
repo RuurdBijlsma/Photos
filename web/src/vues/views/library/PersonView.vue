@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import { mdiAccountMultipleRemove, mdiImageSearchOutline, mdiPencil } from '@mdi/js'
+import MdiAccountMultipleRemove from '~icons/mdi/account-multiple-remove'
+import MdiImageSearchOutline from '~icons/mdi/image-search-outline'
+import MdiPencil from '~icons/mdi/pencil'
 import { computed, ref, useTemplateRef, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useTheme } from 'vuetify/framework'
@@ -102,7 +104,7 @@ usePageTitle(personTitle, { fallback: 'Person' })
               {{ person?.name || 'Unnamed' }}
             </h1>
             <v-btn
-              :icon="mdiPencil"
+              :icon="MdiPencil"
               variant="tonal"
               color="primary"
               density="comfortable"
@@ -138,7 +140,7 @@ usePageTitle(personTitle, { fallback: 'Person' })
             <v-btn
               size="42"
               v-if="person && person.faceClusterIds.length > 1"
-              :icon="mdiAccountMultipleRemove"
+              :icon="MdiAccountMultipleRemove"
               variant="tonal"
               color="tertiary"
               density="comfortable"
@@ -158,7 +160,7 @@ usePageTitle(personTitle, { fallback: 'Person' })
       </div>
 
       <div class="empty-person" v-if="items.length === 0 && !isInitialLoad">
-        <v-icon color="on-surface-variant" size="170" :icon="mdiImageSearchOutline" />
+        <v-icon color="on-surface-variant" size="170" :icon="MdiImageSearchOutline" />
         <h2>No photos found</h2>
       </div>
     </simple-timeline>

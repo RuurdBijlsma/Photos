@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import { mdiCamera, mdiImageMultiple, mdiRefresh } from '@mdi/js'
+import MdiCamera from '~icons/mdi/camera'
+import MdiImageMultiple from '~icons/mdi/image-multiple'
+import MdiRefresh from '~icons/mdi/refresh'
 import FullFolderStatus from '@/vues/components/onboarding/FullFolderStatus.vue'
 import { ref } from 'vue'
 import { useAdminStore } from '@/scripts/stores/adminStore.ts'
@@ -29,7 +31,7 @@ refreshFolderSummary().then()
       density="compact"
       @click="refreshFolderSummary"
       :loading="refreshLoading"
-      :prepend-icon="mdiRefresh"
+      :prepend-icon="MdiRefresh"
       >Refresh
     </v-btn>
   </div>
@@ -38,14 +40,14 @@ refreshFolderSummary().then()
     <full-folder-status
       :folder="adminStore.disks.mediaFolder"
       env-var="MEDIA_DIR"
-      :title-icon="mdiCamera"
+      :title-icon="MdiCamera"
     />
 
     <!-- Thumbnails Folder -->
     <full-folder-status
       :folder="adminStore.disks.appDataFolder"
       env-var="THUMBNAILS_DIR"
-      :title-icon="mdiImageMultiple"
+      :title-icon="MdiImageMultiple"
     />
   </section>
 
