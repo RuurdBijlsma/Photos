@@ -8,10 +8,11 @@ import { useObjStorage } from '@/scripts/utils.ts'
 import mediaItemService from '@/scripts/services/mediaItemService.ts'
 import type { StyleName } from '@/vues/components/map/BaseMap.vue'
 import BaseMap from '@/vues/components/map/BaseMap.vue'
-import maplibregl from 'maplibre-gl'
+import { type GeoJSONSource, LngLatBounds, Map as LibreMap, Marker } from 'maplibre-gl'
 import { useDailyCardStore } from '@/scripts/stores/timeline/dailyCardStore.ts'
 import MediaViewer from '@/vues/components/viewer/MediaViewer.vue'
 import { useMediaItemStore } from '@/scripts/stores/timeline/mediaItemStore.ts'
+import type * as GeoJSON from 'geojson'
 
 const props = defineProps<{
   card: DailyCardResponse
@@ -73,11 +74,11 @@ if (!gameState.value || gameState.value.cardId !== props.card.id) {
 const tempGuess = ref<{ lat: number; lng: number } | null>(null)
 
 // Map parameters and reactive drag-resize coordinates
-const mapInstance = ref<maplibregl.Map | null>(null)
+const mapInstance = ref<LibreMap | null>(null)
 const mapStyle = ref<StyleName>('LIBERTY')
 
-function requireMap(): maplibregl.Map {
-  return mapInstance.value as unknown as maplibregl.Map
+function requireMap(): LibreMap {
+  return mapInstance.value as unknown as LibreMap
 }
 
 const mapWidth = ref(440) // Generous starting map size
@@ -118,9 +119,9 @@ const stableMapOptions = {
 }
 
 // Marker handles
-let guessMarker: maplibregl.Marker | null = null
-let actualMarker: maplibregl.Marker | null = null
-const summaryMarkers: maplibregl.Marker[] = []
+let guessMarker: Marker | null = null
+let actualMarker: Marker | null = null
+const summaryMarkers: Marker[] = []
 const summaryLineLayers: string[] = []
 
 const currentRound = computed<EstimatrRound | null>(() => {
@@ -272,7 +273,7 @@ function formatDistance(distKm: number): string {
 }
 
 // Map Fitting bounds safety calculator (prevents crashes from extreme padding / small canvas)
-function safeFitBounds(bounds: maplibregl.LngLatBounds, isFinishedState = false) {
+function safeFitBounds(bounds: LngLatBounds, isFinishedState = false) {
   if (!mapInstance.value) return
   const map = mapInstance.value
   const canvas = map.getCanvas()
@@ -307,7 +308,7 @@ function safeFitBounds(bounds: maplibregl.LngLatBounds, isFinishedState = false)
 }
 
 // Map Loading & Drawing Trigger handlers
-function handleMapLoad(loadedMap: maplibregl.Map) {
+function handleMapLoad(loadedMap: LibreMap) {
   mapInstance.value = loadedMap
 
   loadedMap.on('click', (e) => {
@@ -340,7 +341,7 @@ function updateGuessMarker(lat: number, lng: number) {
       <div class="pin-ring"></div>
       <div class="pin-dot"></div>
     `
-    guessMarker = new maplibregl.Marker({
+    guessMarker = new Marker({
       element: el,
       anchor: 'center',
     })
@@ -375,7 +376,7 @@ function updateActualMarker(lat: number, lng: number) {
     el.appendChild(triangle)
 
     // offset [0, -12] lifts the pin up so guess marker underneath is clearly visible
-    actualMarker = new maplibregl.Marker({
+    actualMarker = new Marker({
       element: el,
       anchor: 'bottom',
       offset: [0, -25],
@@ -407,7 +408,7 @@ function drawDottedLine(coord1: [number, number], coord2: [number, number]) {
   }
 
   if (map.getSource('route')) {
-    ;(map.getSource('route') as maplibregl.GeoJSONSource).setData(geojson)
+    ;(map.getSource('route') as GeoJSONSource).setData(geojson)
   } else {
     map.addSource('route', {
       type: 'geojson',
@@ -479,13 +480,13 @@ function drawAllOnMap() {
         [currentGuess.actualLng, currentGuess.actualLat],
       )
 
-      const bounds = new maplibregl.LngLatBounds()
+      const bounds = new LngLatBounds()
       bounds.extend([currentGuess.guessedLng, currentGuess.guessedLat])
       bounds.extend([currentGuess.actualLng, currentGuess.actualLat])
       map.fitBounds(bounds, { padding: 80, maxZoom: 14, duration: 1000 })
     }
   } else if (gameState.value.status === 'finished') {
-    const bounds = new maplibregl.LngLatBounds()
+    const bounds = new LngLatBounds()
     let validGuesses = 0
 
     gameState.value.guesses.forEach((g, idx) => {
@@ -495,7 +496,7 @@ function drawAllOnMap() {
       const gEl = document.createElement('div')
       gEl.className = 'summary-marker guess-summary'
       gEl.innerHTML = `<span class="marker-label">${idx + 1}</span>`
-      const gMarker = new maplibregl.Marker({ element: gEl, anchor: 'center' })
+      const gMarker = new Marker({ element: gEl, anchor: 'center' })
         .setLngLat([g.guessedLng, g.guessedLat])
         .addTo(map)
       summaryMarkers.push(gMarker)
@@ -504,7 +505,7 @@ function drawAllOnMap() {
       const aEl = document.createElement('div')
       aEl.className = 'summary-marker actual-summary'
       aEl.innerHTML = `<span class="marker-label">${idx + 1}</span>`
-      const aMarker = new maplibregl.Marker({ element: aEl, anchor: 'center' })
+      const aMarker = new Marker({ element: aEl, anchor: 'center' })
         .setLngLat([g.actualLng, g.actualLat])
         .addTo(map)
       summaryMarkers.push(aMarker)

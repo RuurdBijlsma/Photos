@@ -27,7 +27,8 @@ import {
   mdiPauseCircleOutline,
   mdiStop,
   mdiStopCircleOutline,
-  mdiTrashCanOutline, mdiTrayArrowUp,
+  mdiTrashCanOutline,
+  mdiTrayArrowUp,
 } from '@mdi/js'
 
 const ingestStore = useIngestJobsStore()
@@ -431,7 +432,7 @@ onUnmounted(() => {
               @drop.prevent="onDrop"
               @click="triggerFileSelect"
             >
-              <v-icon size="x-large" color="primary" class="dropzone-icon" :icon="mdiTrayArrowUp"/>
+              <v-icon size="x-large" color="primary" class="dropzone-icon" :icon="mdiTrayArrowUp" />
               <div class="dropzone-label">
                 Drag & Drop files here or <span class="browse-link">Browse</span>
               </div>

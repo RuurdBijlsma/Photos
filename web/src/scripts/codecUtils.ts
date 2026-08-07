@@ -2,12 +2,7 @@ export interface CodecInfo {
   friendlyName: string
   codec: string
   category:
-    | 'Modern'
-    | 'Apple ProRes'
-    | 'MPEG'
-    | 'Legacy/QuickTime'
-    | 'Professional'
-    | 'Web/Streaming'
+    'Modern' | 'Apple ProRes' | 'MPEG' | 'Legacy/QuickTime' | 'Professional' | 'Web/Streaming'
 }
 
 /**

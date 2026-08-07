@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { mdiArrowTopRight } from '@mdi/js'
 import { ref, onUnmounted, watch, computed } from 'vue'
-import maplibregl from 'maplibre-gl'
 import type { FullMediaItem } from '@/scripts/types/api/fullPhoto.ts'
 import type { SharedMediaItem } from '@/scripts/types/api/album.ts'
 import BaseMap from '@/vues/components/map/BaseMap.vue'
@@ -9,6 +8,7 @@ import mediaItemService from '@/scripts/services/mediaItemService.ts'
 import { useTheme } from 'vuetify/framework'
 import { makeLocationString } from '@/scripts/utils.ts'
 import { useSettingStore } from '@/scripts/stores/settingsStore.ts'
+import { Map as LibreMap, Marker } from 'maplibre-gl'
 
 const props = defineProps<{
   mediaItem: FullMediaItem | SharedMediaItem
@@ -16,8 +16,8 @@ const props = defineProps<{
 const theme = useTheme()
 const settings = useSettingStore()
 
-const mapInstance = ref<maplibregl.Map | null>(null)
-let markerInstance: maplibregl.Marker | null = null
+const mapInstance = ref<LibreMap | null>(null)
+let markerInstance: Marker | null = null
 
 function getThumbnailUrl() {
   if (!props.mediaItem) return ''
@@ -28,7 +28,7 @@ function getThumbnailUrl() {
   )
 }
 
-function handleMapLoad(loadedMap: maplibregl.Map) {
+function handleMapLoad(loadedMap: LibreMap) {
   mapInstance.value = loadedMap
   updateMarker()
 }
@@ -56,12 +56,12 @@ function updateMarker() {
     el.appendChild(triangle)
 
     // Anchor to bottom so the tip of the triangle points exactly to the coordinate
-    markerInstance = new maplibregl.Marker({
+    markerInstance = new Marker({
       element: el,
       anchor: 'bottom',
     })
       .setLngLat([lon, lat])
-      .addTo(mapInstance.value as unknown as maplibregl.Map)
+      .addTo(mapInstance.value as unknown as LibreMap)
   } else {
     markerInstance.setLngLat([lon, lat])
     const circle = markerInstance.getElement().querySelector('.marker-circle') as HTMLElement

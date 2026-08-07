@@ -1,15 +1,16 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue'
-import maplibregl from 'maplibre-gl'
 import BaseMap, { type StyleName } from '@/vues/components/map/BaseMap.vue'
 import type { LocationMediaItem } from '@/scripts/types/generated/timeline.ts'
 import { useStorage } from '@vueuse/core'
+import { LngLatBounds, Map as LibreMap, NavigationControl } from 'maplibre-gl'
+import type * as GeoJSON from 'geojson'
 
 const props = defineProps<{
   items: LocationMediaItem[]
 }>()
 
-const mapInstance = ref<maplibregl.Map | null>(null)
+const mapInstance = ref<LibreMap | null>(null)
 
 // Filters out items without physical coordinates
 const geoItems = computed(() => {
@@ -25,7 +26,7 @@ const hasCoordinates = computed(() => geoItems.value.length > 0)
 const getBounds = () => {
   if (geoItems.value.length === 0) return null
   const first = geoItems.value[0]!
-  const bounds = new maplibregl.LngLatBounds(
+  const bounds = new LngLatBounds(
     [first.longitude!, first.latitude!],
     [first.longitude!, first.latitude!],
   )
@@ -59,12 +60,12 @@ const mapOptions = computed(() => {
   }
 })
 
-function handleMapLoad(map: maplibregl.Map) {
+function handleMapLoad(map: LibreMap) {
   mapInstance.value = map
 
   // Add standard built-in +/- zoom controls in the bottom right
   map.addControl(
-    new maplibregl.NavigationControl({
+    new NavigationControl({
       showCompass: false,
       showZoom: true,
     }),
