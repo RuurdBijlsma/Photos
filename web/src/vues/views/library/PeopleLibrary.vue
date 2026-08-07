@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { mdiAccountSearchOutline } from '@mdi/js'
 import MainLayoutContainer from '@/vues/components/MainLayoutContainer.vue'
 import { computed, ref } from 'vue'
 import { usePeopleStore } from '@/scripts/stores/peopleStore.ts'
@@ -166,7 +167,7 @@ useRefreshFunction(() => peopleStore.fetchPeople(), { immediate: true })
 
       <!-- Empty State -->
       <div v-else-if="!peopleStore.peopleLoading && totalPeopleCount === 0" class="empty-people">
-        <v-icon color="on-surface-variant" size="140" icon="mdi-account-search-outline" />
+        <v-icon color="on-surface-variant" size="140" :icon="mdiAccountSearchOutline" />
         <h2>No people found</h2>
       </div>
 

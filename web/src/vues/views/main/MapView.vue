@@ -1,4 +1,10 @@
 <script setup lang="ts">
+import {
+  mdiChevronLeft,
+  mdiChevronRight,
+  mdiImageMultipleOutline,
+  mdiMapSearchOutline,
+} from '@mdi/js'
 import { computed, ref, useTemplateRef } from 'vue'
 import MainLayoutContainer from '@/vues/components/MainLayoutContainer.vue'
 import MapContainer, {
@@ -210,7 +216,7 @@ useRefreshFunction(() => loadMediaItems(), { immediate: true })
         @click="openSidebar"
         v-tooltip="{ location: 'left', text: 'Open sidebar' }"
       >
-        <v-icon size="20" icon="mdi-chevron-left" />
+        <v-icon size="20" :icon="mdiChevronLeft" />
       </v-btn>
     </main-layout-container>
 
@@ -241,7 +247,7 @@ useRefreshFunction(() => loadMediaItems(), { immediate: true })
               class="return-cluster-button"
               rounded
               @click="clearMarkerSelection"
-              prepend-icon="mdi-chevron-left"
+              :prepend-icon="mdiChevronLeft"
             >
               Deselect
             </v-btn>
@@ -262,12 +268,12 @@ useRefreshFunction(() => loadMediaItems(), { immediate: true })
           @click="closeSidebar"
           v-tooltip="{ location: 'top', text: 'Close sidebar' }"
         >
-          <v-icon size="18" icon="mdi-chevron-right" />
+          <v-icon size="18" :icon="mdiChevronRight" />
         </v-btn>
       </div>
 
       <div v-if="timelineItems.length === 0" class="map-empty-state">
-        <v-icon icon="mdi-map-search-outline" size="120" class="map-empty-icon" />
+        <v-icon :icon="mdiMapSearchOutline" size="120" class="map-empty-icon" />
         <h3 class="map-empty-title">No items in this area</h3>
         <p class="map-empty-description">
           Move or zoom the map to find photos taken in other locations.
@@ -277,7 +283,7 @@ useRefreshFunction(() => loadMediaItems(), { immediate: true })
           variant="tonal"
           rounded="xl"
           class="map-empty-button"
-          prepend-icon="mdi-image-multiple-outline"
+          :prepend-icon="mdiImageMultipleOutline"
           @click="mapContainerRef?.zoomToFitAll()"
         >
           View All Photos

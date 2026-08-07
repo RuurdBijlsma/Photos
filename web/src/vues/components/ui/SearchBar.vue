@@ -10,6 +10,15 @@ import { isLikelyJwt } from '@/scripts/utils.ts'
 import { useAuthStore } from '@/scripts/stores/authStore.ts'
 import peopleService from '@/scripts/services/peopleService.ts'
 import { useSearchStore } from '@/scripts/stores/searchStore.ts'
+import {
+  mdiClose,
+  mdiHistory,
+  mdiImageAlbum,
+  mdiImageSearchOutline,
+  mdiLoading,
+  mdiMagnify,
+  mdiMapMarkerOutline,
+} from '@mdi/js'
 
 const router = useRouter()
 const route = useRoute()
@@ -395,11 +404,7 @@ watch(
             <v-icon
               class="search-icon"
               :icon="
-                loading
-                  ? 'mdi-loading mdi-spin'
-                  : searchStore.searchImage
-                    ? 'mdi-image-search-outline'
-                    : 'mdi-magnify'
+                loading ? mdiLoading : searchStore.searchImage ? mdiImageSearchOutline : mdiMagnify
               "
             ></v-icon>
           </span>
@@ -426,7 +431,7 @@ watch(
           />
           <v-btn
             class="image-clear-button"
-            icon="mdi-close"
+            :icon="mdiClose"
             v-if="searchStore.searchImage"
             variant="plain"
             @click="clearImage"
@@ -453,19 +458,19 @@ watch(
             >
               <v-icon
                 v-if="suggestion.suggestionType === 'HISTORY'"
-                icon="mdi-history"
+                :icon="mdiHistory"
                 size="small"
                 class="suggestion-icon"
               />
               <v-icon
                 v-else-if="suggestion.suggestionType === SuggestionType.ALBUM"
-                icon="mdi-image-album"
+                :icon="mdiImageAlbum"
                 size="small"
                 class="suggestion-icon"
               />
               <v-icon
                 v-else-if="suggestion.suggestionType === SuggestionType.LOCATION"
-                icon="mdi-map-marker-outline"
+                :icon="mdiMapMarkerOutline"
                 size="small"
                 class="suggestion-icon"
               />

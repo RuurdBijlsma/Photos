@@ -7,6 +7,7 @@ import DialogQueue from '@/vues/components/DialogQueue.vue'
 import { useThemeStore } from '@/scripts/stores/themeStore.ts'
 import { useSnackbarsStore } from '@/scripts/stores/snackbarStore.ts'
 import { useRegisterSW } from 'virtual:pwa-register/vue'
+import { mdiRefresh } from '@mdi/js'
 
 const settings = useSettingStore()
 const themeStore = useThemeStore()
@@ -32,7 +33,7 @@ watch(needRefresh, (refresh) => {
     snackbarsStore.enqueue({
       message: 'New version available. Reload to update.',
       color: 'info',
-      icon: 'mdi-refresh',
+      icon: mdiRefresh,
       timeout: 0,
       action: {
         label: 'Reload',

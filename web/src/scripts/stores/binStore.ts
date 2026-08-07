@@ -1,3 +1,4 @@
+import { mdiAlert, mdiDelete, mdiDeleteForever, mdiRestore } from '@mdi/js'
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import type { SimpleTimelineItem } from '@/scripts/types/generated/timeline.ts'
@@ -49,7 +50,7 @@ export const useBinStore = defineStore('bin', () => {
       await binService.softDelete(ids)
       snackbarStore.enqueue({
         message: `${ids.length} item${ids.length === 1 ? '' : 's'} moved to bin`,
-        icon: 'mdi-delete',
+        icon: mdiDelete,
         action: {
           label: 'Undo',
           onClick: () => restoreItems(ids),
@@ -70,7 +71,7 @@ export const useBinStore = defineStore('bin', () => {
       await binService.restore(ids)
       snackbarStore.enqueue({
         message: `${ids.length} item${ids.length === 1 ? '' : 's'} restored`,
-        icon: 'mdi-restore',
+        icon: mdiRestore,
       })
       callForRefresh()
     } catch (e) {
@@ -85,7 +86,7 @@ export const useBinStore = defineStore('bin', () => {
     let confirmed = await dialogStore.confirm({
       title: 'Delete Permanently?',
       color: 'error',
-      icon: 'mdi-delete',
+      icon: mdiDelete,
       description: `Are you sure you want to permanently delete ${ids.length} item${ids.length === 1 ? '' : 's'}? This action cannot be undone and will delete the files from your storage.`,
       confirmText: 'Delete Permanently',
     })
@@ -94,7 +95,7 @@ export const useBinStore = defineStore('bin', () => {
     confirmed = await dialogStore.confirm({
       title: 'Are you sure??',
       color: 'error',
-      icon: 'mdi-alert',
+      icon: mdiAlert,
       description: `Are you super sure you want to permanently delete ${ids.length} item${ids.length === 1 ? '' : 's'}? This action <strong>cannot be undone</strong> and will delete the files from your storage.`,
       confirmText: 'Delete Permanently',
     })
@@ -106,7 +107,7 @@ export const useBinStore = defineStore('bin', () => {
       await binService.deletePermanently(ids)
       snackbarStore.enqueue({
         message: `${ids.length} item${ids.length === 1 ? '' : 's'} permanently deleted`,
-        icon: 'mdi-delete-forever',
+        icon: mdiDeleteForever,
       })
       callForRefresh()
     } catch (e) {

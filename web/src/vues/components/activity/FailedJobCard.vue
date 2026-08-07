@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { mdiCached } from '@mdi/js'
 import { ref } from 'vue'
 import { caps } from '@/scripts/utils.ts'
 
@@ -47,7 +48,7 @@ const expanded = ref(false)
           color="primary"
           size="small"
           rounded="xl"
-          prepend-icon="mdi-cached"
+          :prepend-icon="mdiCached"
           :loading="retrying"
           @click="emit('retry', id)"
         >

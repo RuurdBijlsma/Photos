@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { mdiAlert } from '@mdi/js'
 import type { PathInfoResponse } from '@/scripts/types/api/admin.js'
 import { prettyBytes } from '@/scripts/utils.ts'
 
@@ -58,7 +59,7 @@ defineProps<{
         </div>
       </div>
       <div v-if="!folder.readAccess || !folder.writeAccess" class="mt-4 text-error">
-        <v-icon icon="mdi-alert" class="mr-3"></v-icon>
+        <v-icon :icon="mdiAlert" class="mr-3"></v-icon>
         This folder has permission issues. Please check read/write access.
       </div>
     </v-card-text>

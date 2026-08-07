@@ -1,4 +1,16 @@
 <script setup lang="ts">
+import {
+  mdiAccountOutline,
+  mdiAlertCircleOutline,
+  mdiCached,
+  mdiCheck,
+  mdiClockFast,
+  mdiClose,
+  mdiCogOutline,
+  mdiInformationOutline,
+  mdiRefresh,
+  mdiStopCircleOutline,
+} from '@mdi/js'
 import { ref, onMounted, computed, watch } from 'vue'
 import { useAdminStore } from '@/scripts/stores/adminStore.ts'
 import type { AdminUserInfo, JobInfo, JobStatus, JobType } from '@/scripts/types/api/admin.ts'
@@ -202,12 +214,12 @@ watch(
         <div class="card-header">
           <div class="card-title-group">
             <span class="card-title">Background Job Queue</span>
-            <v-icon color="primary" size="large" class="ml-2">mdi-clock-fast</v-icon>
+            <v-icon color="primary" size="large" class="ml-2" :icon="mdiClockFast"></v-icon>
           </div>
           <v-spacer />
           <v-btn
             v-if="!autoRefresh"
-            prepend-icon="mdi-refresh"
+            :prepend-icon="mdiRefresh"
             variant="tonal"
             color="primary"
             rounded
@@ -222,8 +234,8 @@ watch(
             color="primary"
             label="Auto refresh"
             size="small"
-            true-icon="mdi-check"
-            false-icon="mdi-close"
+            :true-icon="mdiCheck"
+            :false-icon="mdiClose"
             inset="material"
           ></v-switch>
         </div>
@@ -331,7 +343,7 @@ watch(
                     :media-item-id="userMap.get(item.userId)!.avatarId!"
                     cover
                   />
-                  <v-icon v-else size="small" color="primary">mdi-account-outline</v-icon>
+                  <v-icon v-else size="small" color="primary" :icon="mdiAccountOutline"></v-icon>
                 </v-avatar>
                 <span class="text-caption font-weight-medium">
                   {{ userMap.get(item.userId)?.username || `ID: ${item.userId}` }}
@@ -339,7 +351,7 @@ watch(
               </div>
               <div v-else class="d-flex align-center text-medium-emphasis">
                 <v-avatar size="26" class="mr-2" color="surface-container-highest">
-                  <v-icon size="small">mdi-cog-outline</v-icon>
+                  <v-icon size="small" :icon="mdiCogOutline"></v-icon>
                 </v-avatar>
                 <span class="text-caption italic">System</span>
               </div>
@@ -382,7 +394,7 @@ watch(
             <template #[`item.actions`]="{ item }">
               <v-btn
                 v-if="item.lastError"
-                icon="mdi-alert-circle-outline"
+                :icon="mdiAlertCircleOutline"
                 variant="text"
                 color="error"
                 density="comfortable"
@@ -391,7 +403,7 @@ watch(
               />
               <v-btn
                 v-else
-                icon="mdi-information-outline"
+                :icon="mdiInformationOutline"
                 variant="text"
                 color="primary"
                 density="comfortable"
@@ -416,7 +428,7 @@ watch(
             />
             Job #{{ detailedJob?.id }} ({{ detailedJob?.jobType }})
           </div>
-          <v-btn icon="mdi-close" variant="text" density="comfortable" @click="closeErrorDetail" />
+          <v-btn :icon="mdiClose" variant="text" density="comfortable" @click="closeErrorDetail" />
         </v-card-title>
 
         <v-card-text class="py-4 px-6 overflow-y-auto" style="max-height: 60vh">
@@ -464,7 +476,7 @@ watch(
               detailedJob && (detailedJob.status === 'queued' || detailedJob.status === 'running')
             "
             variant="tonal"
-            prepend-icon="mdi-stop-circle-outline"
+            :prepend-icon="mdiStopCircleOutline"
             rounded
             :loading="isActionLoading"
             @click="handleCancelJob(detailedJob.id)"
@@ -482,7 +494,7 @@ watch(
                 detailedJob.status === 'cancelled')
             "
             variant="tonal"
-            prepend-icon="mdi-cached"
+            :prepend-icon="mdiCached"
             rounded
             :loading="isActionLoading"
             @click="handleRetryJob(detailedJob.id)"

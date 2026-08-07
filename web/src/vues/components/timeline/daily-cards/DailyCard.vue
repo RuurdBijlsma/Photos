@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { mdiClose, mdiImageArea } from '@mdi/js'
 import ThumbnailImg from '@/vues/components/ui/ThumbnailImg.vue'
 import type { DailyCardResponse } from '@/scripts/types/api/dailyCards.ts'
 import { useDailyCardStore } from '@/scripts/stores/timeline/dailyCardStore.ts'
@@ -35,7 +36,7 @@ function isGame(cardType: string) {
         cover
       />
       <div class="card-thumb fake-thumb" v-else>
-        <v-icon icon="mdi-image-area" color="primary" size="150"></v-icon>
+        <v-icon :icon="mdiImageArea" color="primary" size="150"></v-icon>
       </div>
       <div class="card-content">
         <div class="card-top">
@@ -45,7 +46,7 @@ function isGame(cardType: string) {
               location: 'top',
             }"
             class="close-button"
-            icon="mdi-close"
+            :icon="mdiClose"
             variant="plain"
             density="compact"
             @click="closeCard"

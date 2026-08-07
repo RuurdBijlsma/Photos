@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { mdiCamera, mdiCameraOff } from '@mdi/js'
 import { useRoute } from 'vue-router'
 import { computed, ref, useTemplateRef, watch } from 'vue'
 import { useCameraStore } from '@/scripts/stores/cameraStore.ts'
@@ -67,7 +68,7 @@ useRefreshFunction(() => cameraStore.fetchCameraMedia(cameraMake.value, cameraMo
       <div class="camera-header">
         <div class="camera-header-left">
           <div class="camera-icon-container">
-            <v-icon icon="mdi-camera" size="64" color="primary" />
+            <v-icon :icon="mdiCamera" size="64" color="primary" />
           </div>
         </div>
         <div class="camera-header-right">
@@ -89,7 +90,7 @@ useRefreshFunction(() => cameraStore.fetchCameraMedia(cameraMake.value, cameraMo
       </div>
 
       <div class="empty-camera" v-if="items.length === 0 && !isInitialLoad">
-        <v-icon color="on-surface-variant" size="200" icon="mdi-camera-off"></v-icon>
+        <v-icon color="on-surface-variant" size="200" :icon="mdiCameraOff"></v-icon>
         <h2>No media found for this camera</h2>
       </div>
     </simple-timeline>

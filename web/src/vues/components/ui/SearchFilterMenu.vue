@@ -1,4 +1,11 @@
 <script setup lang="ts">
+import {
+  mdiClose,
+  mdiInformationOutline,
+  mdiSortCalendarAscending,
+  mdiSortDescending,
+  mdiTuneVariant,
+} from '@mdi/js'
 import { computed, nextTick, ref, watch, onMounted } from 'vue'
 import HistogramDateRangePicker from '@/vues/components/ui/HistogramDateRangePicker.vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -393,7 +400,7 @@ const activeFilterChips = computed(() => {
       content-class="search-filter-menu"
     >
       <template v-slot:activator="{ props }">
-        <v-btn v-bind="props" variant="text" rounded prepend-icon="mdi-tune-variant">
+        <v-btn v-bind="props" variant="text" rounded :prepend-icon="mdiTuneVariant">
           Filters
         </v-btn>
       </template>
@@ -522,7 +529,7 @@ const activeFilterChips = computed(() => {
                 Exclude
                 <v-icon
                   size="16"
-                  icon="mdi-information-outline"
+                  :icon="mdiInformationOutline"
                   class="ml-2"
                   v-tooltip="{
                     location: 'top',
@@ -549,7 +556,7 @@ const activeFilterChips = computed(() => {
     </v-menu>
 
     <v-btn
-      icon="mdi-close"
+      :icon="mdiClose"
       variant="plain"
       @click="clearFilters"
       class="clear-filters-button"
@@ -578,7 +585,7 @@ const activeFilterChips = computed(() => {
       }"
     >
       <span>Date</span>
-      <v-icon end icon="mdi-sort-calendar-ascending"></v-icon>
+      <v-icon end :icon="mdiSortCalendarAscending"></v-icon>
     </v-btn>
 
     <v-btn-toggle
@@ -597,12 +604,12 @@ const activeFilterChips = computed(() => {
     >
       <v-btn value="date">
         <span>Date</span>
-        <v-icon end icon="mdi-sort-calendar-ascending"></v-icon>
+        <v-icon end :icon="mdiSortCalendarAscending"></v-icon>
       </v-btn>
 
       <v-btn value="relevancy">
         <span>Relevancy</span>
-        <v-icon end icon="mdi-sort-descending"></v-icon>
+        <v-icon end :icon="mdiSortDescending"></v-icon>
       </v-btn>
     </v-btn-toggle>
   </div>

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { mdiChevronRight, mdiCogOutline } from '@mdi/js'
 import { computed, nextTick, onMounted, onUnmounted, ref, useTemplateRef, watch } from 'vue'
 import { useEventListener, useStorage } from '@vueuse/core'
 import { useMediaItemStore } from '@/scripts/stores/timeline/mediaItemStore.ts'
@@ -535,7 +536,7 @@ useEventListener(window, 'keydown', handleKeyDown)
             :close-on-content-click="false"
           >
             <template v-slot:activator="{ props }">
-              <v-btn variant="plain" icon="mdi-cog-outline" rounded="xl" v-bind="props" />
+              <v-btn variant="plain" :icon="mdiCogOutline" rounded="xl" v-bind="props" />
             </template>
             <v-list class="settings-menu-list">
               <!-- Submenu 1: Playback Speed -->
@@ -550,7 +551,7 @@ useEventListener(window, 'keydown', handleKeyDown)
                     <v-list-item-title class="menu-text">Playback speed</v-list-item-title>
                     <template v-slot:append>
                       <span class="current-setting-label">{{ currentPlaybackRate }}x</span>
-                      <v-icon icon="mdi-chevron-right" size="small" class="ml-1" />
+                      <v-icon :icon="mdiChevronRight" size="small" class="ml-1" />
                     </template>
                   </v-list-item>
                 </template>
@@ -583,7 +584,7 @@ useEventListener(window, 'keydown', handleKeyDown)
                           currentQuality === 'source' ? `${sourceHeight}p` : `${currentQuality}p`
                         }}
                       </span>
-                      <v-icon icon="mdi-chevron-right" size="small" class="ml-1" />
+                      <v-icon :icon="mdiChevronRight" size="small" class="ml-1" />
                     </template>
                   </v-list-item>
                 </template>
@@ -614,7 +615,7 @@ useEventListener(window, 'keydown', handleKeyDown)
               </v-menu>
             </v-list>
           </v-menu>
-          <v-btn v-else variant="plain" icon="mdi-cog-outline" rounded="xl" disabled />
+          <v-btn v-else variant="plain" :icon="mdiCogOutline" rounded="xl" disabled />
 
           <!-- Fullscreen Button -->
           <v-btn

@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { isAxiosError } from 'axios'
+import { mdiAlert, mdiCheck, mdiFireAlert, mdiInformationOutline } from '@mdi/js'
 
 // --- Types ---
 
@@ -174,15 +175,15 @@ export const useSnackbarsStore = defineStore('snackbars', () => {
   // --- Convenience Helpers ---
 
   function info(message: string, action?: SnackAction): string {
-    return enqueue({ message, color: 'info', icon: 'mdi-information-outline', action })
+    return enqueue({ message, color: 'info', icon: mdiInformationOutline, action })
   }
 
   function success(message: string, action?: SnackAction): string {
-    return enqueue({ message, color: 'success', icon: 'mdi-check', action })
+    return enqueue({ message, color: 'success', icon: mdiCheck, action })
   }
 
   function warning(message: string, action?: SnackAction): string {
-    return enqueue({ message, color: 'warning', icon: 'mdi-alert', action })
+    return enqueue({ message, color: 'warning', icon: mdiAlert, action })
   }
 
   function error(message: string, error?: unknown, action?: SnackAction): string {
@@ -190,7 +191,7 @@ export const useSnackbarsStore = defineStore('snackbars', () => {
       message,
       error,
       color: 'error',
-      icon: 'mdi-fire-alert',
+      icon: mdiFireAlert,
       timeout: 10000,
       action,
     })

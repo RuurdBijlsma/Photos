@@ -8,6 +8,25 @@ import ShowSelectedFolder from '@/vues/components/onboarding/ShowSelectedFolder.
 import type { JobInfo } from '@/scripts/types/api/admin.ts'
 import { prettyBytes, ProcessingRateTracker } from '@/scripts/utils.ts'
 import PipelineCard from '@/vues/components/activity/PipelineCard.vue'
+import {
+  mdiAlertCircleOutline,
+  mdiCached,
+  mdiCheckCircleOutline,
+  mdiChevronRight,
+  mdiClockOutline,
+  mdiClose,
+  mdiCloudUploadOutline,
+  mdiFileDocumentOutline,
+  mdiFolderOpen,
+  mdiFolderSearchOutline,
+  mdiImageOutline,
+  mdiInformationOutline,
+  mdiMagnify,
+  mdiPauseCircleOutline,
+  mdiStop,
+  mdiStopCircleOutline,
+  mdiTrashCanOutline,
+} from '@mdi/js'
 
 const ingestStore = useIngestJobsStore()
 const uploadStore = useUploadStore()
@@ -195,7 +214,7 @@ const pipelineSteps = computed(() => [
   {
     key: 'upload',
     label: 'Upload',
-    icon: 'mdi-cloud-upload-outline',
+    icon: mdiCloudUploadOutline,
     progress: uploadProgress.value,
     statusText: uploadToGoText.value,
     isActive: isUploadActive.value,
@@ -209,7 +228,7 @@ const pipelineSteps = computed(() => [
   {
     key: 'metadata',
     label: 'Metadata',
-    icon: 'mdi-file-document-outline',
+    icon: mdiFileDocumentOutline,
     progress: metadataProgress.value,
     statusText: metadataToGoText.value,
     isActive: isMetadataActive.value,
@@ -220,7 +239,7 @@ const pipelineSteps = computed(() => [
   {
     key: 'thumbnails',
     label: 'Thumbnails',
-    icon: 'mdi-image-outline',
+    icon: mdiImageOutline,
     progress: thumbnailsProgress.value,
     statusText: thumbnailsToGoText.value,
     isActive: isThumbnailsActive.value,
@@ -231,7 +250,7 @@ const pipelineSteps = computed(() => [
   {
     key: 'analysis',
     label: 'Analysis',
-    icon: 'mdi-magnify',
+    icon: mdiMagnify,
     progress: analysisProgress.value,
     statusText: analysisToGoText.value,
     isActive: isAnalysisActive.value,
@@ -311,17 +330,17 @@ function getStatusColor(status: string) {
 function getStatusIcon(status: string) {
   switch (status) {
     case 'uploading':
-      return 'mdi-cloud-upload-outline'
+      return mdiCloudUploadOutline
     case 'success':
     case 'done':
-      return 'mdi-check-circle-outline'
+      return mdiCheckCircleOutline
     case 'failed':
-      return 'mdi-alert-circle-outline'
+      return mdiAlertCircleOutline
     case 'stopped':
     case 'cancelled':
-      return 'mdi-pause-circle-outline'
+      return mdiPauseCircleOutline
     default:
-      return 'mdi-clock-outline'
+      return mdiClockOutline
   }
 }
 
@@ -388,7 +407,7 @@ onUnmounted(() => {
           />
 
           <div v-if="index < pipelineSteps.length - 1" class="pipeline-arrow">
-            <v-icon size="large">mdi-chevron-right</v-icon>
+            <v-icon size="large" :icon="mdiChevronRight"></v-icon>
           </div>
         </template>
       </div>
@@ -441,7 +460,7 @@ onUnmounted(() => {
                 variant="tonal"
                 color="secondary"
                 rounded
-                prepend-icon="mdi-folder-open"
+                :prepend-icon="mdiFolderOpen"
                 @click="triggerFolderSelect"
               >
                 Upload Folder
@@ -451,7 +470,7 @@ onUnmounted(() => {
                 variant="plain"
                 color="error"
                 rounded
-                prepend-icon="mdi-trash-can-outline"
+                :prepend-icon="mdiTrashCanOutline"
                 @click="uploadStore.clearCompleted"
                 class="clear-button"
               >
@@ -485,7 +504,7 @@ onUnmounted(() => {
               color="secondary"
               variant="tonal"
               rounded="xl"
-              prepend-icon="mdi-folder-search-outline"
+              :prepend-icon="mdiFolderSearchOutline"
               :loading="isScanning"
               @click="handleScan"
               class="scan-button"
@@ -505,7 +524,7 @@ onUnmounted(() => {
                 color="error"
                 size="small"
                 rounded
-                prepend-icon="mdi-stop-circle-outline"
+                :prepend-icon="mdiStopCircleOutline"
                 @click="uploadStore.abortAll"
               >
                 Cancel All
@@ -546,7 +565,7 @@ onUnmounted(() => {
                     v-if="item.status === 'uploading' || item.status === 'pending'"
                     color="error"
                     variant="tonal"
-                    icon="mdi-stop"
+                    :icon="mdiStop"
                     size="x-small"
                     @click="uploadStore.stopUpload(item.id)"
                   />
@@ -554,7 +573,7 @@ onUnmounted(() => {
                     v-else
                     color="grey"
                     variant="text"
-                    icon="mdi-close"
+                    :icon="mdiClose"
                     size="x-small"
                     @click="uploadStore.removeUpload(item.id)"
                   />
@@ -591,7 +610,11 @@ onUnmounted(() => {
                 </div>
               </div>
               <div v-else class="running-empty-state">
-                <v-icon size="large" class="empty-state-icon">mdi-check-circle-outline</v-icon>
+                <v-icon
+                  size="large"
+                  class="empty-state-icon"
+                  :icon="mdiCheckCircleOutline"
+                ></v-icon>
                 <div class="empty-state-text">No active background ingestion tasks running.</div>
               </div>
             </div>
@@ -614,7 +637,7 @@ onUnmounted(() => {
                 rounded="xl"
                 clearable
                 hide-details
-                prepend-inner-icon="mdi-magnify"
+                :prepend-inner-icon="mdiMagnify"
                 @input="handleSearchInput"
                 @click:clear="handleSearchClear"
                 class="search-bar"
@@ -674,7 +697,7 @@ onUnmounted(() => {
                   <!-- Retry button for failed -->
                   <v-btn
                     v-if="item.status === 'failed'"
-                    icon="mdi-cached"
+                    :icon="mdiCached"
                     variant="tonal"
                     color="primary"
                     density="comfortable"
@@ -685,7 +708,7 @@ onUnmounted(() => {
                   />
                   <!-- Detail info button -->
                   <v-btn
-                    icon="mdi-information-outline"
+                    :icon="mdiInformationOutline"
                     variant="text"
                     color="secondary"
                     density="comfortable"
@@ -735,7 +758,7 @@ onUnmounted(() => {
               detailedJob?.jobType ? formatJobType(detailedJob.jobType) : ''
             }})
           </div>
-          <v-btn icon="mdi-close" variant="text" density="comfortable" @click="closeDetails" />
+          <v-btn :icon="mdiClose" variant="text" density="comfortable" @click="closeDetails" />
         </v-card-title>
 
         <v-card-text class="dialog-body">
@@ -785,7 +808,7 @@ onUnmounted(() => {
             "
             variant="tonal"
             color="primary"
-            prepend-icon="mdi-cached"
+            :prepend-icon="mdiCached"
             rounded="xl"
             :loading="isActionLoading"
             @click="handleDialogRetry(detailedJob.id)"

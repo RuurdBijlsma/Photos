@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { mdiAlertCircleOutline } from '@mdi/js'
 import { computed } from 'vue'
 import type { UnsupportedFilesResponse } from '@/scripts/types/api/admin.js'
 
@@ -18,7 +19,7 @@ const virtualScrollHeight = computed(() => {
 <template>
   <v-card class="mb-6 folder-card" variant="text" rounded color="primary">
     <v-card-title class="d-flex align-center card-title">
-      <v-icon icon="mdi-alert-circle-outline" class="mr-2"></v-icon>
+      <v-icon :icon="mdiAlertCircleOutline" class="mr-2"></v-icon>
       Inaccessible Entries ({{ summary.inaccessibleEntries.length.toLocaleString() }})
     </v-card-title>
     <v-card-text>

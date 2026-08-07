@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { mdiArrowTopRight } from '@mdi/js'
 import { ref, onUnmounted, watch, computed } from 'vue'
 import maplibregl from 'maplibre-gl'
 import type { FullMediaItem } from '@/scripts/types/api/fullPhoto.ts'
@@ -135,7 +136,7 @@ watch(
           <span v-if="mediaItem.gps.location">{{
             makeLocationString(mediaItem.gps.location, 3)
           }}</span>
-          <v-icon size="15" class="ml-2 map-button-icon" icon="mdi-arrow-top-right" />
+          <v-icon size="15" class="ml-2 map-button-icon" :icon="mdiArrowTopRight" />
         </a>
       </v-sheet>
     </v-theme-provider>

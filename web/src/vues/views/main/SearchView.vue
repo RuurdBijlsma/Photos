@@ -12,6 +12,7 @@ import { useRefreshFunction } from '@/scripts/composables/useRefreshFunction.ts'
 import ThumbnailImg from '@/vues/components/ui/ThumbnailImg.vue'
 import { getThumbnailHeight } from '@/scripts/utils.ts'
 import { usePageTitle } from '@/scripts/composables/usePageTitle.ts'
+import { mdiClose, mdiMagnify } from '@mdi/js'
 
 const snackStore = useSnackbarsStore()
 const searchStore = useSearchStore()
@@ -231,7 +232,7 @@ usePageTitle(query, { fallback: 'Search' })
   >
     <div class="search-options">
       <h2 class="search-query-title">
-        <v-icon class="mr-5 search-query-icon" icon="mdi-magnify" />
+        <v-icon class="mr-5 search-query-icon" :icon="mdiMagnify" />
         <template v-if="query">
           Search for “<span class="search-query-highlight">{{ query }}</span
           >”
@@ -278,7 +279,7 @@ usePageTitle(query, { fallback: 'Search' })
           +{{ similarIds.length - 8 }}
         </v-avatar>
         <v-btn
-          icon="mdi-close"
+          :icon="mdiClose"
           variant="text"
           size="small"
           class="ml-2"
@@ -290,7 +291,7 @@ usePageTitle(query, { fallback: 'Search' })
 
     <div class="search-margin"></div>
     <div v-if="isEmptySearch && !showLoadingUI && results.length === 0" class="search-empty-state">
-      <v-icon icon="mdi-magnify" size="100" class="mb-4 search-empty-icon" />
+      <v-icon :icon="mdiMagnify" size="100" class="mb-4 search-empty-icon" />
       <h2>Start a search</h2>
       <p>Enter a term in the search bar above, or use filters to browse your library.</p>
     </div>

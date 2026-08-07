@@ -1,5 +1,5 @@
 import { createVuetify } from 'vuetify'
-import { aliases, mdi } from 'vuetify/iconsets/mdi'
+import { aliases, mdi } from 'vuetify/iconsets/mdi-svg'
 import themeJson from '@/assets/themes/etna-theme.json'
 import { transformToVuetifyTheme } from '@/scripts/stores/themeStore.ts'
 import type { Theme } from '@/scripts/types/themeColor.ts'

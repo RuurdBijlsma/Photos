@@ -1,4 +1,12 @@
 <script setup lang="ts">
+import {
+  mdiChevronDown,
+  mdiDotsHorizontal,
+  mdiImageAlbum,
+  mdiPlus,
+  mdiShare,
+  mdiSortAlphabeticalDescendingVariant,
+} from '@mdi/js'
 import { computed, onMounted } from 'vue'
 import MainLayoutContainer from '@/vues/components/MainLayoutContainer.vue'
 import type { Album, AlbumSortField, SortDirection } from '@/scripts/types/api/album'
@@ -11,6 +19,7 @@ import { useAuthStore } from '@/scripts/stores/authStore.ts'
 import { useStorage } from '@vueuse/core'
 import { useRefreshFunction } from '@/scripts/composables/useRefreshFunction.ts'
 import { useDelayedBoolean } from '@/scripts/composables/useDelayedBoolean.ts'
+import { mdiSortAlphabeticalAscendingVariant } from '@mdi/js/commonjs/mdi'
 
 const authStore = useAuthStore()
 const dialogs = useDialogStore()
@@ -72,8 +81,8 @@ const currentSortFieldTitle = computed(() => {
 const sortDirectionIcon = computed(() => {
   if (currentSortField.value === 'name') {
     return currentSortDirection.value === 'asc'
-      ? 'mdi-sort-alphabetical-ascending-variant'
-      : 'mdi-sort-alphabetical-descending-variant'
+      ? mdiSortAlphabeticalAscendingVariant
+      : mdiSortAlphabeticalDescendingVariant
   }
   if (currentSortField.value === 'updatedAt') {
     return currentSortDirection.value === 'asc'
@@ -106,7 +115,7 @@ async function makeNewAlbum() {
   await dialogs.alert({
     title: 'Create album',
     description: 'Create an album by selecting some photos and clicking "Add to album"',
-    icon: 'mdi-image-album',
+    icon: mdiImageAlbum,
     actions: [
       {
         name: 'Go to photos',
@@ -181,7 +190,7 @@ useRefreshFunction(() => albumStore.fetchUserAlbums())
                 color="primary"
                 v-bind="props"
                 rounded="xl"
-                append-icon="mdi-chevron-down"
+                :append-icon="mdiChevronDown"
                 class="text-none sort-text"
               >
                 {{ currentSortFieldTitle }}
@@ -213,7 +222,7 @@ useRefreshFunction(() => albumStore.fetchUserAlbums())
 
           <v-btn
             color="primary"
-            prepend-icon="mdi-plus"
+            :prepend-icon="mdiPlus"
             rounded
             variant="flat"
             class="text-none ml-3 new-album"
@@ -234,7 +243,7 @@ useRefreshFunction(() => albumStore.fetchUserAlbums())
         v-else-if="!albumStore.userAlbumsLoading && sortedAlbums.length === 0"
         class="empty-state"
       >
-        <v-icon icon="mdi-image-album" size="100" class="mb-4 opacity-20" />
+        <v-icon :icon="mdiImageAlbum" size="100" class="mb-4 opacity-20" />
         <h2>No albums yet</h2>
         <p>Create your first album to start organizing your memories.</p>
         <v-btn color="primary" variant="tonal" rounded class="mt-6" @click="makeNewAlbum">
@@ -265,7 +274,7 @@ useRefreshFunction(() => albumStore.fetchUserAlbums())
                 <v-btn
                   v-bind="props"
                   class="album-options-btn"
-                  icon="mdi-dots-horizontal"
+                  :icon="mdiDotsHorizontal"
                   variant="flat"
                   density="comfortable"
                   color="primary"
@@ -294,7 +303,7 @@ useRefreshFunction(() => albumStore.fetchUserAlbums())
                   class="album-shared-avatar"
                   color="primary"
                 >
-                  <v-icon icon="mdi-share" size="23" />
+                  <v-icon :icon="mdiShare" size="23" />
                 </v-avatar>
               </template>
               <v-list density="compact">

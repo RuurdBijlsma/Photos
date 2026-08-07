@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { mdiChevronDown, mdiClose, mdiImageMultipleOutline } from '@mdi/js'
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useWindowSize } from '@vueuse/core'
@@ -234,7 +235,7 @@ onUnmounted(() => {
 <template>
   <div class="collection-container" @scroll="onScroll">
     <div class="empty-collection" v-if="mediaItems.length === 0">
-      <v-icon size="100" icon="mdi-image-multiple-outline" color="grey" />
+      <v-icon size="100" :icon="mdiImageMultipleOutline" color="grey" />
       <p>This collection has no media items.</p>
       <v-btn @click="goBack" color="primary">Go Back</v-btn>
     </div>
@@ -248,7 +249,7 @@ onUnmounted(() => {
             <!-- Left Column: Close Button on top left -->
             <div class="control-left">
               <v-btn
-                icon="mdi-close"
+                :icon="mdiClose"
                 variant="text"
                 color="white"
                 size="small"
@@ -346,7 +347,7 @@ onUnmounted(() => {
 
         <!-- Scroll down indicator -->
         <div class="scroll-down-hint" @click="scrollToGrid">
-          <v-icon icon="mdi-chevron-down" size="28" />
+          <v-icon :icon="mdiChevronDown" size="28" />
           <span>Scroll down for all photos</span>
         </div>
       </div>

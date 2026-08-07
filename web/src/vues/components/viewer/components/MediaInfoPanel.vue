@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { mdiChevronRight, mdiCloudCheckOutline, mdiImageAlbum } from '@mdi/js'
 import type { FullMediaItem, MediaItemAlbumRef } from '@/scripts/types/api/fullPhoto.js'
 import ThumbnailImg from '@/vues/components/ui/ThumbnailImg.vue'
 import { useDialogStore } from '@/scripts/stores/dialogStore.js'
@@ -347,7 +348,7 @@ const showCameraSection = computed(() => {
           "
         />
         <p class="filename">
-          <v-icon icon="mdi-cloud-check-outline" class="mr-3" /><span>{{
+          <v-icon :icon="mdiCloudCheckOutline" class="mr-3" /><span>{{
             mediaItem?.filename.split('.')[0]
           }}</span>
         </p>
@@ -369,7 +370,7 @@ const showCameraSection = computed(() => {
               :height="144"
               cover
             />
-            <v-icon v-else icon="mdi-image-album" size="18" class="album-fallback-icon" />
+            <v-icon v-else :icon="mdiImageAlbum" size="18" class="album-fallback-icon" />
           </v-avatar>
           <span class="album-text">
             <span
@@ -383,7 +384,7 @@ const showCameraSection = computed(() => {
               item{{ album.media_count === 1 ? '' : 's' }}
             </span>
           </span>
-          <v-icon icon="mdi-chevron-right" size="16" class="album-chevron" />
+          <v-icon :icon="mdiChevronRight" size="16" class="album-chevron" />
         </router-link>
       </section>
       <div class="camera-info" v-if="showCameraSection">

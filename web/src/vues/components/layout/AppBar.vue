@@ -1,4 +1,13 @@
 <script setup lang="ts">
+import {
+  mdiAccountCircle,
+  mdiCog,
+  mdiLogin,
+  mdiLogout,
+  mdiSecurity,
+  mdiSync,
+  mdiUpload,
+} from '@mdi/js'
 import { ref } from 'vue'
 import SearchBar from '@/vues/components/ui/SearchBar.vue'
 import { useAuthStore } from '@/scripts/stores/authStore.ts'
@@ -41,12 +50,12 @@ async function logout() {
       >
         <template v-slot:activator="{ props }">
           <v-btn icon v-bind="props" variant="text" color="primary" class="mr-1">
-            <v-icon class="spinning-sync-icon">mdi-sync</v-icon>
+            <v-icon class="spinning-sync-icon" :icon="mdiSync"></v-icon>
           </v-btn>
         </template>
         <ingest-overlay-menu @close-menu="ingestMenuOpen = false" />
       </v-menu>
-      <v-btn variant="plain" rounded prepend-icon="mdi-upload" to="/activity"> Upload </v-btn>
+      <v-btn variant="plain" rounded :prepend-icon="mdiUpload" to="/activity"> Upload </v-btn>
       <v-menu v-model="menuOpen" :close-on-content-click="false">
         <template v-slot:activator="{ props }">
           <v-btn icon v-bind="props">
@@ -107,30 +116,30 @@ async function logout() {
             <v-divider class="mb-2 mt-2" />
             <v-list-item
               v-if="authStore.user"
-              prepend-icon="mdi-account-circle"
+              :prepend-icon="mdiAccountCircle"
               :to="`/user/${authStore.user.id}/${encodeURIComponent(authStore.user.name)}`"
               @click="menuOpen = false"
             >
               <v-list-item-title>Profile</v-list-item-title>
             </v-list-item>
-            <v-list-item prepend-icon="mdi-logout" @click="logout">
+            <v-list-item :prepend-icon="mdiLogout" @click="logout">
               <v-list-item-title>Sign out</v-list-item-title>
             </v-list-item>
 
             <v-divider class="mb-2 mt-2" />
 
             <v-list-item
-              prepend-icon="mdi-security"
+              :prepend-icon="mdiSecurity"
               to="/admin"
               v-if="authStore.isAdmin"
               @click="menuOpen = false"
             >
               <v-list-item-title>Admin</v-list-item-title>
             </v-list-item>
-            <v-list-item prepend-icon="mdi-sync" to="/activity" @click="menuOpen = false">
+            <v-list-item :prepend-icon="mdiSync" to="/activity" @click="menuOpen = false">
               <v-list-item-title>Activity</v-list-item-title>
             </v-list-item>
-            <v-list-item prepend-icon="mdi-cog" to="/settings" @click="menuOpen = false">
+            <v-list-item :prepend-icon="mdiCog" to="/settings" @click="menuOpen = false">
               <v-list-item-title>Settings</v-list-item-title>
             </v-list-item>
           </v-list>
@@ -138,7 +147,7 @@ async function logout() {
       </v-menu>
     </div>
     <div v-else class="header-buttons">
-      <v-btn to="/login" variant="tonal" rounded prepend-icon="mdi-login" class="mr-3">
+      <v-btn to="/login" variant="tonal" rounded :prepend-icon="mdiLogin" class="mr-3">
         Login
       </v-btn>
     </div>

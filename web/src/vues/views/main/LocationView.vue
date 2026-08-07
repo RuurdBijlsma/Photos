@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { mdiImageOutline, mdiMapMarkerQuestionOutline } from '@mdi/js'
 import { computed, ref, useTemplateRef, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useExploreStore } from '@/scripts/stores/exploreStore.ts'
@@ -114,7 +115,7 @@ usePageTitle(primaryName, { fallback: 'Place' })
             class="header-avatar-img"
           />
           <div v-else class="header-avatar-placeholder">
-            <v-icon size="64" color="on-surface-variant">mdi-image-outline</v-icon>
+            <v-icon size="64" color="on-surface-variant" :icon="mdiImageOutline"></v-icon>
           </div>
 
           <v-theme-provider theme="dark" with-background>
@@ -156,7 +157,7 @@ usePageTitle(primaryName, { fallback: 'Place' })
 
       <!-- Empty State -->
       <div class="empty-location" v-if="items.length === 0 && !isInitialLoad">
-        <v-icon color="on-surface-variant" size="170" icon="mdi-map-marker-question-outline" />
+        <v-icon color="on-surface-variant" size="170" :icon="mdiMapMarkerQuestionOutline" />
         <h2>No media items found for this location</h2>
       </div>
     </simple-timeline>

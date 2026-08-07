@@ -1,4 +1,17 @@
 <script setup lang="ts">
+import {
+  mdiAccount,
+  mdiAccountOff,
+  mdiAutoFix,
+  mdiCalendarRange,
+  mdiChevronRight,
+  mdiClose,
+  mdiImageAlbum,
+  mdiImageMultiple,
+  mdiPencil,
+  mdiShareVariant,
+  mdiVideo,
+} from '@mdi/js'
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import MainLayoutContainer from '@/vues/components/MainLayoutContainer.vue'
@@ -114,25 +127,25 @@ const statCards = computed(() => [
   {
     title: 'Photos',
     value: profile.value?.stats.photoCount ?? 0,
-    icon: 'mdi-image-multiple',
+    icon: mdiImageMultiple,
     color: 'primary',
   },
   {
     title: 'Videos',
     value: profile.value?.stats.videoCount ?? 0,
-    icon: 'mdi-video',
+    icon: mdiVideo,
     color: 'secondary',
   },
   {
     title: 'Albums',
     value: profile.value?.stats.albumCount ?? 0,
-    icon: 'mdi-image-album',
+    icon: mdiImageAlbum,
     color: 'tertiary',
   },
   {
     title: 'Shared',
     value: profile.value?.stats.sharedAlbumCount ?? 0,
-    icon: 'mdi-share-variant',
+    icon: mdiShareVariant,
     color: 'info',
   },
 ])
@@ -166,7 +179,7 @@ useRefreshFunction(() => loadProfile())
               <h1 class="user-name">{{ profile.name }}</h1>
               <v-btn
                 v-if="isCurrentUser"
-                prepend-icon="mdi-pencil"
+                :prepend-icon="mdiPencil"
                 variant="tonal"
                 rounded="xl"
                 class="edit-btn"
@@ -178,7 +191,7 @@ useRefreshFunction(() => loadProfile())
             </div>
             <p v-if="profile.email" class="user-email">{{ profile.email }}</p>
             <div class="user-joined">
-              <v-icon icon="mdi-calendar-range" size="small" class="joined-icon" />
+              <v-icon :icon="mdiCalendarRange" size="small" class="joined-icon" />
               <span>Joined {{ formatDate(profile.createdAt) }}</span>
             </div>
           </div>
@@ -207,7 +220,7 @@ useRefreshFunction(() => loadProfile())
       </div>
 
       <div v-else class="not-found-state">
-        <v-icon icon="mdi-account-off" size="100" class="not-found-icon" />
+        <v-icon :icon="mdiAccountOff" size="100" class="not-found-icon" />
         <h2 class="not-found-title">User not found</h2>
         <v-btn color="primary" variant="tonal" rounded class="home-btn" @click="router.push('/')">
           Go Home
@@ -220,7 +233,7 @@ useRefreshFunction(() => loadProfile())
           <v-card-title class="dialog-header">
             <span>Edit Profile</span>
             <v-btn
-              icon="mdi-close"
+              :icon="mdiClose"
               variant="text"
               @click="editDialog = false"
               :disabled="saving"
@@ -243,7 +256,7 @@ useRefreshFunction(() => loadProfile())
                 color="transparent"
                 @click="showExplanation = true"
               >
-                <v-icon class="avatar-edit-icon" size="40" color="white">mdi-pencil</v-icon>
+                <v-icon class="avatar-edit-icon" size="40" color="white" :icon="mdiPencil"></v-icon>
               </v-btn>
             </div>
 
@@ -268,7 +281,7 @@ useRefreshFunction(() => loadProfile())
                     class="px-5"
                     rounded
                     variant="tonal"
-                    prepend-icon="mdi-auto-fix"
+                    :prepend-icon="mdiAutoFix"
                     @click="autoSetProfilePic"
                     >Auto-set</v-btn
                   >
@@ -277,7 +290,7 @@ useRefreshFunction(() => loadProfile())
                     exact
                     rounded
                     variant="tonal"
-                    prepend-icon="mdi-chevron-right"
+                    :prepend-icon="mdiChevronRight"
                     to="/"
                     >Photos</v-btn
                   >
@@ -293,7 +306,7 @@ useRefreshFunction(() => loadProfile())
               autofocus
               class="mt-5"
               rounded
-              prepend-inner-icon="mdi-account"
+              :prepend-inner-icon="mdiAccount"
               :disabled="saving"
               hide-details
               @keyup.enter="saveProfile"

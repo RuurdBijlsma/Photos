@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { mdiCalendarEdit } from '@mdi/js'
 import { computed, ref } from 'vue'
 
 const props = defineProps<{
@@ -112,7 +113,7 @@ const timeLabel = computed(() => {
 
     <v-icon
       v-if="!disabled"
-      icon="mdi-calendar-edit"
+      :icon="mdiCalendarEdit"
       size="small"
       color="primary"
       class="ml-2"

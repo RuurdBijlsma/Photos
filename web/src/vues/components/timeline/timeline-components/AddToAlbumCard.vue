@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { mdiImageAlbum, mdiPlus } from '@mdi/js'
 import { computed, ref } from 'vue'
 import albumService from '@/scripts/services/albumService.ts'
 import { useRouter } from 'vue-router'
@@ -93,7 +94,7 @@ async function addToAlbum(album: Album) {
               :media-item-id="album.thumbnailId"
               :height="144"
             />
-            <v-icon v-else icon="mdi-image-album" color="primary" class="opacity-70" />
+            <v-icon v-else :icon="mdiImageAlbum" color="primary" class="opacity-70" />
           </v-avatar>
         </template>
         <div class="list-content">
@@ -113,7 +114,7 @@ async function addToAlbum(album: Album) {
               :loading="addLoading.has(album.id)"
               class="rounded-pill"
               density="compact"
-              icon="mdi-plus"
+              :icon="mdiPlus"
               v-tooltip:top="'Add'"
             />
           </v-list-item-action>
@@ -122,7 +123,7 @@ async function addToAlbum(album: Album) {
     </v-list>
     <v-card-actions class="card-actions">
       <v-btn @click="createNew" rounded class="px-5" :loading="newLoading">
-        <v-icon icon="mdi-plus" class="mr-2"></v-icon> Create new album
+        <v-icon :icon="mdiPlus" class="mr-2"></v-icon> Create new album
       </v-btn>
     </v-card-actions>
   </v-card>

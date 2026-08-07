@@ -1,4 +1,12 @@
 <script setup lang="ts">
+import {
+  mdiAlertOctagon,
+  mdiEmailOutline,
+  mdiEyeOffOutline,
+  mdiEyeOutline,
+  mdiLockOpenOutline,
+  mdiLockOutline,
+} from '@mdi/js'
 import { onMounted, type Ref, ref } from 'vue'
 import type { VForm } from 'vuetify/components'
 import { useAuthStore } from '@/scripts/stores/authStore.ts'
@@ -96,7 +104,7 @@ async function login() {
         <v-form class="login-form" @submit.prevent="login()" ref="form">
           <v-text-field
             class="text-input"
-            prepend-icon="mdi-email-outline"
+            :prepend-icon="mdiEmailOutline"
             append-icon="empty"
             variant="outlined"
             ref="emailInput"
@@ -121,8 +129,8 @@ async function login() {
           <v-text-field
             class="text-input mb-1"
             variant="outlined"
-            :prepend-icon="showPassword ? 'mdi-lock-open-outline' : 'mdi-lock-outline'"
-            :append-icon="showPassword ? 'mdi-eye-outline' : 'mdi-eye-off-outline'"
+            :prepend-icon="showPassword ? mdiLockOpenOutline : mdiLockOutline"
+            :append-icon="showPassword ? mdiEyeOutline : mdiEyeOffOutline"
             @click:append="showPassword = !showPassword"
             :rules="isSubmitted ? [rules.passRequired] : []"
             :type="showPassword ? 'text' : 'password'"
@@ -161,7 +169,7 @@ async function login() {
 
         <app-alert
           v-model="errorMessage"
-          icon="mdi-alert-octagon"
+          :icon="mdiAlertOctagon"
           class="mt-8"
           background-color="error-container"
           text-color="on-error-container"

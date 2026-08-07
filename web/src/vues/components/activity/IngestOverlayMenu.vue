@@ -1,4 +1,12 @@
 <script setup lang="ts">
+import {
+  mdiArrowRight,
+  mdiFileImageOutline,
+  mdiImageOutline,
+  mdiRefresh,
+  mdiSearchWeb,
+  mdiSwapVertical,
+} from '@mdi/js'
 import { onMounted, onUnmounted, computed } from 'vue'
 import { useIngestJobsStore } from '@/scripts/stores/ingestJobsStore.ts'
 import IngestPipelineRow from '@/vues/components/activity/IngestPipelineRow.vue'
@@ -19,9 +27,9 @@ onUnmounted(() => {
 })
 
 const categories = [
-  { id: 'metadata', label: 'File import', icon: 'mdi-file-image-outline' },
-  { id: 'thumbnails', label: 'Generate thumbnails', icon: 'mdi-image-outline' },
-  { id: 'analysis', label: 'Index for search', icon: 'mdi-search-web' },
+  { id: 'metadata', label: 'File import', icon: mdiFileImageOutline },
+  { id: 'thumbnails', label: 'Generate thumbnails', icon: mdiImageOutline },
+  { id: 'analysis', label: 'Index for search', icon: mdiSearchWeb },
 ] as const
 
 const activeCategories = computed(() => {
@@ -70,7 +78,7 @@ const filteredCategoryProgress = computed(() => {
       <div class="ingest-header">
         <span class="font-weight-bold">Importing photos and videos...</span>
         <v-btn
-          icon="mdi-refresh"
+          :icon="mdiRefresh"
           variant="text"
           density="comfortable"
           color="primary"
@@ -90,7 +98,7 @@ const filteredCategoryProgress = computed(() => {
 
       <div class="running-jobs-section">
         <div class="section-title">
-          <v-icon icon="mdi-swap-vertical" color="primary" />
+          <v-icon :icon="mdiSwapVertical" color="primary" />
           <span>Currently importing</span>
         </div>
 
@@ -115,7 +123,7 @@ const filteredCategoryProgress = computed(() => {
           block
           variant="tonal"
           rounded="xl"
-          prepend-icon="mdi-arrow-right"
+          :prepend-icon="mdiArrowRight"
           @click="emit('close-menu')"
         >
           View Full Activity

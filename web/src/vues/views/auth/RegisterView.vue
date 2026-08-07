@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { mdiAccountOutline, mdiAlertOctagon, mdiEmailOutline, mdiLockCheckOutline } from '@mdi/js'
 import type { VForm } from 'vuetify/components'
 import { onMounted, type Ref, ref } from 'vue'
 import { useAuthStore } from '@/scripts/stores/authStore.ts'
@@ -91,7 +92,7 @@ async function register() {
         <div class="row-input mb-3">
           <v-text-field
             class="text-input"
-            prepend-icon="mdi-account-outline"
+            :prepend-icon="mdiAccountOutline"
             variant="outlined"
             ref="userInput"
             rounded
@@ -106,7 +107,7 @@ async function register() {
           />
           <v-text-field
             class="text-input ml-5"
-            prepend-icon="mdi-email-outline"
+            :prepend-icon="mdiEmailOutline"
             append-icon="empty"
             variant="outlined"
             rounded
@@ -138,7 +139,7 @@ async function register() {
           <v-text-field
             class="text-input ml-5"
             variant="outlined"
-            prepend-icon="mdi-lock-check-outline"
+            :prepend-icon="mdiLockCheckOutline"
             :append-icon="showPassword ? 'mdi-eye-outline' : 'mdi-eye-off-outline'"
             @click:append="showPassword = !showPassword"
             :rules="isSubmitted ? [rules.passRequired, rules.noMatch] : []"
@@ -176,7 +177,7 @@ async function register() {
 
       <app-alert
         v-model="errorMessage"
-        icon="mdi-alert-octagon"
+        :icon="mdiAlertOctagon"
         class="mt-8"
         background-color="error-container"
         text-color="on-error-container"

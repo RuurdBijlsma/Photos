@@ -1,3 +1,4 @@
+import { mdiInformation } from '@mdi/js'
 import { defineStore } from 'pinia'
 import { computed, ref, shallowRef, triggerRef, watch } from 'vue'
 import {
@@ -106,7 +107,7 @@ export const useTimelineStore = defineStore('timeline', () => {
     if (unloadedCount / totalCount > 0.01) {
       snackbarStore.enqueue({
         message: `Your photos are still being prepared. Browsing may be slower and thumbnails may load gradually until processing is complete. [${unloadedCount} remaining]`,
-        icon: 'mdi-information',
+        icon: mdiInformation,
         timeout: -1,
       })
     } else if (unloadedCount > 0) {

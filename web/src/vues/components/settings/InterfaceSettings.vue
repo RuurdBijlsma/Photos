@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { mdiBlur, mdiEyeOutline, mdiMonitorDashboard } from '@mdi/js'
 import { TIMELINE_ROW_HEIGHT, useSettingStore } from '@/scripts/stores/settingsStore.ts'
 import ViewPhoto from '@/vues/views/main/ViewPhoto.vue'
 import { ref } from 'vue'
@@ -39,7 +40,7 @@ searchService.search({ query: 'sunset', limit: 10, mediaType: 'photo' }).then((i
         <!-- Card Header -->
         <div class="card-header">
           <span class="card-title">User Interface Options</span>
-          <v-icon color="primary" size="large">mdi-monitor-dashboard</v-icon>
+          <v-icon color="primary" size="large" :icon="mdiMonitorDashboard"></v-icon>
         </div>
 
         <div class="card-body">
@@ -160,7 +161,7 @@ searchService.search({ query: 'sunset', limit: 10, mediaType: 'photo' }).then((i
       <v-card class="settings-card height-100" flat border>
         <div class="card-header">
           <span class="card-title">Live Preview</span>
-          <v-icon color="secondary" size="large">mdi-eye-outline</v-icon>
+          <v-icon color="secondary" size="large" :icon="mdiEyeOutline"></v-icon>
         </div>
 
         <div class="card-body preview-container">
@@ -206,7 +207,7 @@ searchService.search({ query: 'sunset', limit: 10, mediaType: 'photo' }).then((i
               <div class="mock-dialog-overlay">
                 <div class="mock-dialog-card" :class="{ 'apply-blur': settings.useBackdropBlur }">
                   <div class="mock-dialog-header">
-                    <v-icon size="small" class="mr-1">mdi-blur</v-icon>
+                    <v-icon size="small" class="mr-1" :icon="mdiBlur"></v-icon>
                     <span>System Settings</span>
                   </div>
                   <div class="mock-dialog-body">
