@@ -11,43 +11,42 @@ from rich.console import Console
 
 console = Console()
 
-# Pattern matching `@mdi/js` import blocks (single or multi-line)
+# Fixed regex: [^}]* strictly prevents matching past a closing brace '}'
 MDI_IMPORT_PATTERN = re.compile(
-    r"import\s*\{([\s\S]*?)\}\s*from\s*['\"]@mdi/js['\"]",
+    r"import\s*\{([^}]*)\}\s*from\s*['\"]@mdi/js['\"](?:\s*;)?",
     re.MULTILINE,
 )
 
 
 def pascal_to_kebab(name: str) -> str:
     """Convert a PascalCase or camelCase icon name (without 'mdi') to kebab-case."""
-    # Insert hyphen before capital letters
-    s1 = re.sub(r"(.)([A-Z][a-z]+)", r"\1-\2", name)
-    s2 = re.sub(r"([a-z0-9])([A-Z])", r"\1-\2", s1)
-    return s2.lower()
+    s1 = re.sub(r"([a-z0-9])([A-Z])", r"\1-\2", name)
+    s2 = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1-\2", s1)
+    s3 = re.sub(r"([a-zA-Z])([0-9]+)$", r"\1-\2", s2)
+    s4 = re.sub(r"([a-zA-Z])([0-9]+)([A-Z])", r"\1-\2-\3", s3)
+    s5 = re.sub(r"-+", "-", s4)
+    return s5.lower()
 
 
 def transform_file_content(content: str) -> tuple[str, int]:
-    """Transforms @mdi/js imports and usages to unplugin-icons format."""
+    """Transforms @mdi/js imports and usages to unplugin-icons format safely."""
     matches = list(MDI_IMPORT_PATTERN.finditer(content))
     if not matches:
         return content, 0
 
     icons_found: list[tuple[str, str, str]] = []  # (old_name, new_component_name, kebab_path)
 
-    # Process each import block
+    # Process each @mdi/js import block individually from bottom to top
     new_content = content
     for match in reversed(matches):
         block_text = match.group(1)
-        # Extract all icon identifier names (e.g., mdiAlertCircleOutline)
+        # Extract icon names starting with 'mdi'
         extracted_names = re.findall(r"\b(mdi[A-Za-z0-9_]+)\b", block_text)
 
         new_import_lines = []
         for old_name in extracted_names:
-            # Strip 'mdi' prefix to get icon base name
             base_name = old_name[3:]
-            # PascalCase component name for script/template usage (e.g., MdiAlertCircleOutline)
             new_component_name = f"Mdi{base_name}"
-            # Kebab-case icon path for unplugin-icons (e.g., alert-circle-outline)
             kebab_path = pascal_to_kebab(base_name)
 
             icons_found.append((old_name, new_component_name, kebab_path))
@@ -59,8 +58,7 @@ def transform_file_content(content: str) -> tuple[str, int]:
         start, end = match.span()
         new_content = new_content[:start] + replacement_imports + new_content[end:]
 
-    # Replace all usage occurrences of old names (e.g. mdiAlertCircleOutline -> MdiAlertCircleOutline)
-    # Using word boundary (\b) to avoid partial variable name replacements
+    # Replace usages (e.g. mdiRefresh -> MdiRefresh) using word boundaries
     for old_name, new_component_name, _ in icons_found:
         new_content = re.sub(
             r"\b" + re.escape(old_name) + r"\b",
