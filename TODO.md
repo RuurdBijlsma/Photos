@@ -29,11 +29,11 @@
 * import albums from google photos
 * duplicate photo remover tool
 * better error if exiftool isnt there (worker wont work then)
+* rename /hosted/ to /static/
+* [BUG] het is nu mogelijk om pano's te rotaten
 
 # INFRASTRUCTURE:
 
-* make setup to host only backend, frontend could be gh pages or something?
-  * I think this would be faster than hosting web on laptop
 * update available checker
 * nginx thumbnail hosting (optional maak setting voor Rust thumb hosting).
 * restart server button?
