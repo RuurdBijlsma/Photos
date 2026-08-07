@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { mdiClose, mdiImageArea } from '@mdi/js'
+import { mdiCheck, mdiClose, mdiController, mdiImageArea } from '@mdi/js'
 import ThumbnailImg from '@/vues/components/ui/ThumbnailImg.vue'
 import type { DailyCardResponse } from '@/scripts/types/api/dailyCards.ts'
 import { useDailyCardStore } from '@/scripts/stores/timeline/dailyCardStore.ts'
@@ -61,7 +61,7 @@ function isGame(cardType: string) {
           <div class="card-icon-container">
             <v-icon
               size="40"
-              :icon="cardStore.completedCards.includes(card.id) ? `mdi-check` : `mdi-controller`"
+              :icon="cardStore.completedCards.includes(card.id) ? mdiCheck : mdiController"
               color="on-surface-variant"
               v-if="isGame(card.cardType)"
             />

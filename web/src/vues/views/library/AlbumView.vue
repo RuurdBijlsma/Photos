@@ -607,7 +607,7 @@ useRefreshFunction(() => {
                   text: album?.isPublic ? 'Publicly available' : 'Private',
                 }"
               >
-                <v-icon size="20" :icon="album?.isPublic ? `mdi-earth` : `mdi-lock`" />
+                <v-icon size="20" :icon="album?.isPublic ? mdiEarth : mdiLock" />
               </v-btn>
               <span>•</span>
             </template>
