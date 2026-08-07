@@ -29,6 +29,7 @@
 * import albums from google photos
 * duplicate photo remover tool
 * better error if exiftool isnt there (worker wont work then)
+* 50 megapixels plaatjes willen niet rotaten om een of andere reden (die van tiramisu)
 
 # INFRASTRUCTURE:
 

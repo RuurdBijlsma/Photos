@@ -6,6 +6,7 @@ use app_state::constants::HOSTED_FOLDER;
 use axum::Router;
 use axum::routing::get_service;
 use color_eyre::Result;
+use common_services::graceful_exit::{wait_for_kill_signal};
 use common_services::s2s_client::S2SClient;
 use http::{HeaderValue, header};
 use open_clip_inference::{TextEmbedder, VisionEmbedder};
@@ -67,6 +68,7 @@ pub async fn serve(pool: PgPool, settings: AppSettings, run_task_scheduler: bool
         listener,
         app.into_make_service_with_connect_info::<SocketAddr>(),
     )
+    .with_graceful_shutdown(wait_for_kill_signal())
     .await?;
 
     Ok(())
