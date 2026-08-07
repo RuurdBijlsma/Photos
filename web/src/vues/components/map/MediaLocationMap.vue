@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { mdiArrowTopRight } from '@mdi/js'
-import { computed, onUnmounted, ref, watch } from 'vue'
+import { computed, onUnmounted, shallowRef, watch } from 'vue'
 import type { FullMediaItem } from '@/scripts/types/api/fullPhoto.ts'
 import type { SharedMediaItem } from '@/scripts/types/api/album.ts'
 import BaseMap from '@/vues/components/map/BaseMap.vue'
@@ -15,13 +15,13 @@ const props = defineProps<{
 const theme = useTheme()
 const settings = useSettingStore()
 
-const mapInstance = ref<LibreMap | null>(null)
+const mapInstance = shallowRef<LibreMap | null>(null)
 let markerInstance: Marker | null = null
 
 const mapTheme = computed(() =>
   settings.lightPhotoViewerMap || !theme.current.value.dark ? 'light' : 'dark',
 )
-const primaryColor = computed(() => theme.themes.value[mapTheme.value].colors.primary)
+const primaryColor = computed(() => String(theme.themes.value[mapTheme.value].colors.primary))
 
 function handleMapLoad(loadedMap: LibreMap) {
   mapInstance.value = loadedMap
@@ -39,7 +39,7 @@ function updateMarker() {
       color: primaryColor.value,
     })
       .setLngLat([lon, lat])
-      .addTo(mapInstance.value)
+      .addTo(mapInstance.value as LibreMap)
   } else {
     markerInstance.setLngLat([lon, lat])
   }
