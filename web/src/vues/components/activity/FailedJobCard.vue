@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { mdiCached } from '@mdi/js'
+import { mdiCached, mdiChevronDown, mdiChevronUp } from '@mdi/js'
 import { ref } from 'vue'
 import { caps } from '@/scripts/utils.ts'
 
@@ -36,7 +36,7 @@ const expanded = ref(false)
       <div class="failed-actions">
         <v-btn
           v-if="lastError"
-          :icon="expanded ? 'mdi-chevron-up' : 'mdi-chevron-down'"
+          :icon="expanded ? mdiChevronUp : mdiChevronDown"
           variant="text"
           color="medium-emphasis"
           density="comfortable"

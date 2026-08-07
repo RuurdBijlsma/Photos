@@ -92,13 +92,13 @@ const sortModeIcon = computed(() => {
   if (!album.value) return null
   const sortMode = album.value.sortMode as AlbumSort
   if (sortMode === 'AddedDesc') {
-    return 'mdi-sort-clock-descending-outline'
+    return mdiSortClockDescendingOutline
   } else if (sortMode === 'AddedAsc') {
-    return 'mdi-sort-clock-ascending-outline'
+    return mdiSortClockAscendingOutline
   } else if (sortMode === 'DateAsc') {
-    return 'mdi-sort-calendar-ascending'
+    return mdiSortCalendarAscending
   } else if (sortMode === 'DateDesc') {
-    return 'mdi-sort-calendar-descending'
+    return mdiSortCalendarDescending
   }
   return null
 })

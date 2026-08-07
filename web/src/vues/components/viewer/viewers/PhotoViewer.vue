@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { mdiImageOutline, mdiPanoramaVariantOutline } from '@mdi/js'
 import { computed, defineAsyncComponent, nextTick, onUnmounted, ref, watch } from 'vue'
 import { useSettingStore } from '@/scripts/stores/settingsStore.ts'
 import { useMediaItemStore } from '@/scripts/stores/timeline/mediaItemStore.ts'
@@ -658,7 +659,7 @@ useEventListener(containerRef, 'wheel', handleWheel, { passive: false })
       :class="{ 'hide-ui': !showUi }"
     >
       <v-btn rounded="xl" variant="plain" class="pano-toggle-btn" @click="is3DMode = !is3DMode">
-        <v-icon start :icon="is3DMode ? 'mdi-image-outline' : 'mdi-panorama-variant-outline'" />
+        <v-icon start :icon="is3DMode ? mdiImageOutline : mdiPanoramaVariantOutline" />
         <span>{{ is3DMode ? 'View as Photo' : 'Enter 3D Panorama' }}</span>
       </v-btn>
     </div>

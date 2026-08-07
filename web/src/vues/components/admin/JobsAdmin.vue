@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import {
   mdiAccountOutline,
+  mdiAlertCircle,
   mdiAlertCircleOutline,
   mdiCached,
   mdiCheck,
   mdiClockFast,
   mdiClose,
   mdiCogOutline,
+  mdiInformation,
   mdiInformationOutline,
   mdiRefresh,
   mdiStopCircleOutline,
@@ -422,7 +424,7 @@ watch(
         <v-card-title class="dialog-header d-flex align-center justify-space-between py-4 px-6">
           <div class="d-flex align-center font-weight-bold">
             <v-icon
-              :icon="detailedJob?.lastError ? 'mdi-alert-circle' : 'mdi-information'"
+              :icon="detailedJob?.lastError ? mdiAlertCircle : mdiInformation"
               :color="detailedJob?.lastError ? 'error' : 'primary'"
               class="mr-2"
             />

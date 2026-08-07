@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { mdiChevronDown, mdiClose, mdiImageMultipleOutline } from '@mdi/js'
+import { mdiChevronDown, mdiClose, mdiImageMultipleOutline, mdiPause, mdiPlay } from '@mdi/js'
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useWindowSize } from '@vueuse/core'
@@ -269,7 +269,7 @@ onUnmounted(() => {
             <div class="control-center">
               <div class="story-progress-wrapper">
                 <v-btn
-                  :icon="isPaused ? 'mdi-play' : 'mdi-pause'"
+                  :icon="isPaused ? mdiPlay : mdiPause"
                   variant="text"
                   color="white"
                   size="small"

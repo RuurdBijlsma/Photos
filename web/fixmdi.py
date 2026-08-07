@@ -1,148 +1,162 @@
 # /// script
-# dependencies = [
-#     "rich",
-# ]
+# requires-python = ">=3.10"
+# dependencies = []
 # ///
 
-import os
+import argparse
 import re
-import sys
 from pathlib import Path
-from rich.console import Console
 
-console = Console()
+# Match icon="mdi-foo-bar" or icon='mdi-foo-bar' -> :icon="mdiFooBar"
+PATTERN_ATTR_DOUBLE = re.compile(r'\bicon="mdi-([a-z0-9-]+)"')
+PATTERN_ATTR_SINGLE = re.compile(r"\bicon='mdi-([a-z0-9-]+)'")
 
-def kebab_to_camel(kebab_str: str) -> str:
-    """Converts 'mdi-image-multiple-outline' or 'image-multiple-outline' to 'mdiImageMultipleOutline'."""
-    if not kebab_str.startswith("mdi-"):
-        kebab_str = "mdi-" + kebab_str
-    parts = kebab_str.split("-")
-    return parts[0] + "".join(part.capitalize() for part in parts[1:])
+# Match string literal 'mdi-foo-bar' or "mdi-foo-bar" -> mdiFooBar
+PATTERN_STRING_SINGLE = re.compile(r"'mdi-([a-z0-9-]+)'")
+PATTERN_STRING_DOUBLE = re.compile(r'"mdi-([a-z0-9-]+)"')
 
-def process_file_content(content: str, is_vue: bool) -> tuple[str, set[str], int]:
-    new_imports = set()
-    replacements_count = 0
+# Match existing @mdi/js import: import { mdiFoo, mdiBar } from '@mdi/js'
+PATTERN_MDI_IMPORT = re.compile(r"import\s+\{([^}]+)\}\s+from\s+['\"]@mdi/js['\"]")
 
-    # 1. Attribute string literals: e.g. icon="mdi-refresh", prepend-icon="mdi-calendar-filter", prepend-inner-icon="mdi-text"
-    # Matches any attribute ending in 'icon' or '-icon' equal to "mdi-..."
-    attr_pattern = re.compile(r'\b([a-zA-Z0-9-]*icon)="mdi-([a-z0-9-]+)"')
-    def attr_replacer(match):
-        nonlocal replacements_count
-        attr_name = match.group(1)
-        kebab_icon = match.group(2)
-        var_name = kebab_to_camel(kebab_icon)
-        new_imports.add(var_name)
-        replacements_count += 1
-        return f':{attr_name}="{var_name}"'
 
-    content = attr_pattern.sub(attr_replacer, content)
+def kebab_to_camel_mdi(kebab_name: str) -> str:
+    """Converts 'first-second' or 'check-bold' to 'mdiFirstSecond' or 'mdiCheckBold'."""
+    parts = [p for p in kebab_name.split("-") if p]
+    return "mdi" + "".join(p.capitalize() for p in parts)
 
-    # 2. Tag content in <v-icon>: e.g. <v-icon size="20"> mdi-cloud-outline </v-icon>
-    v_icon_pattern = re.compile(r'<v-icon([^>]*)>\s*mdi-([a-z0-9-]+)\s*</v-icon>', re.MULTILINE)
-    def v_icon_replacer(match):
-        nonlocal replacements_count
-        attrs = match.group(1)
-        kebab_icon = match.group(2)
-        var_name = kebab_to_camel(kebab_icon)
-        new_imports.add(var_name)
-        replacements_count += 1
-        return f'<v-icon{attrs} :icon="{var_name}"></v-icon>'
 
-    content = v_icon_pattern.sub(v_icon_replacer, content)
+def update_mdi_imports(content: str, new_icons: set[str], is_vue: bool) -> str:
+    if not new_icons:
+        return content
 
-    # 3. Object property string values: e.g. icon: 'mdi-image-multiple-outline' or prependIcon: "mdi-plus"
-    prop_pattern = re.compile(r'\b([a-zA-Z0-9_]*[iI]con):\s*[\'"]mdi-([a-z0-9-]+)[\'"]')
-    def prop_replacer(match):
-        nonlocal replacements_count
-        prop_name = match.group(1)
-        kebab_icon = match.group(2)
-        var_name = kebab_to_camel(kebab_icon)
-        new_imports.add(var_name)
-        replacements_count += 1
-        return f'{prop_name}: {var_name}'
+    import_match = PATTERN_MDI_IMPORT.search(content)
 
-    content = prop_pattern.sub(prop_replacer, content)
+    if import_match:
+        existing_str = import_match.group(1)
+        existing_icons = {
+            name.strip() for name in existing_str.split(",") if name.strip()
+        }
+        all_icons = sorted(existing_icons.union(new_icons))
+        new_import_stmt = f"import {{ {', '.join(all_icons)} }} from '@mdi/js'"
+        return (
+            content[: import_match.start()]
+            + new_import_stmt
+            + content[import_match.end() :]
+        )
 
-    # If no replacements were made, return unchanged
-    if not new_imports:
-        return content, new_imports, 0
+    # No existing @mdi/js import
+    all_icons = sorted(new_icons)
+    import_stmt = f"import {{ {', '.join(all_icons)} }} from '@mdi/js'"
 
-    # 4. Inject or update @mdi/js imports
-    content = update_mdi_imports(content, is_vue, new_imports)
-
-    return content, new_imports, replacements_count
-
-def update_mdi_imports(content: str, is_vue: bool, new_imports: set[str]) -> str:
-    import_regex = re.compile(r'import\s+\{\s*([^}]+)\s*\}\s+from\s+[\'"]@mdi\/js[\'"]')
-    match = import_regex.search(content)
-
-    existing_imports = set()
-    if match:
-        # Extract existing imported names
-        raw_names = match.group(1).split(",")
-        existing_imports = {n.strip() for n in raw_names if n.strip()}
-
-    all_imports = sorted(existing_imports | new_imports)
-    import_statement = f"import {{ {', '.join(all_imports)} }} from '@mdi/js'"
-
-    if match:
-        # Replace existing import line
-        return content[:match.start()] + import_statement + content[match.end():]
-
-    # Insert new import statement
     if is_vue:
-        # Look for <script setup ...> or <script ...>
-        script_match = re.search(r'(<script[^>]*>)', content)
-        if script_match:
-            insert_pos = script_match.end()
-            return content[:insert_pos] + f"\n{import_statement}" + content[insert_pos:]
+        # Find <script setup ...> or <script ...>
+        script_setup_match = re.search(
+            r"(<script[^>]*setup[^>]*>)", content, re.IGNORECASE
+        )
+        script_match = re.search(r"(<script[^>]*>)", content, re.IGNORECASE)
+        target_script = script_setup_match or script_match
+
+        if target_script:
+            pos = target_script.end()
+            return content[:pos] + f"\n{import_stmt}" + content[pos:]
         else:
-            # Vue file with no script tag -> prepend script block at top
-            return f"<script setup lang=\"ts\">\n{import_statement}\n</script>\n\n" + content
+            return (
+                content + f'\n\n<script setup lang="ts">\n{import_stmt}\n</script>\n'
+            )
     else:
-        # Regular .ts or .js file -> insert at top
-        return f"{import_statement}\n" + content
+        # TS / JS file: prepend import at top
+        return f"{import_stmt}\n" + content
+
+
+def process_file(file_path: Path, dry_run: bool = False) -> tuple[bool, set[str]]:
+    try:
+        content = file_path.read_text(encoding="utf-8")
+    except Exception as e:
+        print(f"⚠️ Could not read {file_path}: {e}")
+        return False, set()
+
+    original_content = content
+    found_icons: set[str] = set()
+
+    # 1. Replace template attributes: icon="mdi-foo-bar" -> :icon="mdiFooBar"
+    def repl_attr(match: re.Match) -> str:
+        icon_name = kebab_to_camel_mdi(match.group(1))
+        found_icons.add(icon_name)
+        return f':icon="{icon_name}"'
+
+    content = PATTERN_ATTR_DOUBLE.sub(repl_attr, content)
+    content = PATTERN_ATTR_SINGLE.sub(repl_attr, content)
+
+    # 2. Replace string literals: 'mdi-foo-bar' -> mdiFooBar
+    def repl_str(match: re.Match) -> str:
+        icon_name = kebab_to_camel_mdi(match.group(1))
+        found_icons.add(icon_name)
+        return icon_name
+
+    content = PATTERN_STRING_SINGLE.sub(repl_str, content)
+    content = PATTERN_STRING_DOUBLE.sub(repl_str, content)
+
+    if not found_icons and content == original_content:
+        return False, set()
+
+    # 3. Insert or update @mdi/js import
+    is_vue = file_path.suffix.lower() == ".vue"
+    content = update_mdi_imports(content, found_icons, is_vue)
+
+    changed = content != original_content
+    if changed and not dry_run:
+        file_path.write_text(content, encoding="utf-8")
+
+    return changed, found_icons
+
 
 def main():
-    target_dir = Path("src")
-    if len(sys.argv) > 1:
-        target_dir = Path(sys.argv[1])
+    parser = argparse.ArgumentParser(
+        description="Migrate MDI kebab-case icon strings to @mdi/js camelCase imports."
+    )
+    parser.add_argument(
+        "target",
+        nargs="?",
+        default="web/src",
+        help="Target directory or file (default: web/src)",
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Preview modifications without writing to disk",
+    )
+    args = parser.parse_args()
 
-    if not target_dir.exists():
-        console.print(f"[bold red]Error:[/bold red] Directory '{target_dir}' does not exist.")
-        sys.exit(1)
+    target_path = Path(args.target)
+    if not target_path.exists():
+        print(f"❌ Target path '{target_path}' does not exist.")
+        return
 
-    console.print(f"[bold blue]Scanning for MDI icons in:[/bold blue] {target_dir.resolve()}\n")
+    extensions = {".vue", ".ts", ".js", ".jsx", ".tsx"}
+    files = (
+        [target_path]
+        if target_path.is_file()
+        else [p for p in target_path.rglob("*") if p.suffix.lower() in extensions]
+    )
 
-    file_extensions = {".vue", ".ts", ".js"}
-    modified_files = 0
-    total_replacements = 0
+    modified_count = 0
+    total_icons_found = 0
 
-    for root, _, files in os.walk(target_dir):
-        for file in files:
-            file_path = Path(root) / file
-            if file_path.suffix not in file_extensions:
-                continue
+    mode_label = "[DRY RUN] " if args.dry_run else ""
+    print(f"🚀 {mode_label}Scanning {len(files)} files in '{target_path}'...")
 
-            try:
-                original_content = file_path.read_text(encoding="utf-8")
-                is_vue = file_path.suffix == ".vue"
+    for file_path in files:
+        changed, icons = process_file(file_path, dry_run=args.dry_run)
+        if changed:
+            modified_count += 1
+            total_icons_found += len(icons)
+            icons_str = ", ".join(sorted(icons))
+            print(f"  ✨ {file_path} -> ({len(icons)} icons: {icons_str})")
 
-                new_content, imports, count = process_file_content(original_content, is_vue)
+    print("\n✅ Migration complete!")
+    print(f"   Files modified: {modified_count}")
+    print(f"   Icons updated: {total_icons_found}")
 
-                if count > 0 and new_content != original_content:
-                    file_path.write_text(new_content, encoding="utf-8")
-                    modified_files += 1
-                    total_replacements += count
-                    console.print(
-                        f"[green]✔ Modified[/green] [bold]{file_path.relative_to(target_dir)}[/bold] "
-                        f"({count} icon(s) updated: [dim]{', '.join(sorted(imports))}[/dim])"
-                    )
-
-            except Exception as e:
-                console.print(f"[red]Failed to process {file_path}: {e}[/red]")
-
-    console.print(f"\n[bold green]Done![/bold green] Updated {total_replacements} icon(s) across {modified_files} file(s).")
 
 if __name__ == "__main__":
     main()

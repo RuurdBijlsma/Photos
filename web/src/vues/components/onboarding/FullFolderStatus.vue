@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { mdiAlert } from '@mdi/js'
+import { mdiAlert, mdiCheck, mdiClose } from '@mdi/js'
 import type { PathInfoResponse } from '@/scripts/types/api/admin.js'
 import { prettyBytes } from '@/scripts/utils.ts'
 
@@ -45,7 +45,7 @@ defineProps<{
             density="compact"
             :color="folder.readAccess ? 'primary' : 'error'"
           >
-            <v-icon class="mr-2" :icon="folder.readAccess ? 'mdi-check' : 'mdi-close'"></v-icon>
+            <v-icon class="mr-2" :icon="folder.readAccess ? mdiCheck : mdiClose"></v-icon>
             Read
           </v-chip>
           <v-chip
@@ -53,7 +53,7 @@ defineProps<{
             density="compact"
             :color="folder.writeAccess ? 'primary' : 'error'"
           >
-            <v-icon class="mr-2" :icon="folder.writeAccess ? 'mdi-check' : 'mdi-close'"></v-icon>
+            <v-icon class="mr-2" :icon="folder.writeAccess ? mdiCheck : mdiClose"></v-icon>
             Write
           </v-chip>
         </div>

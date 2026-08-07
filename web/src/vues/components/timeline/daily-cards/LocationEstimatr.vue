@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { mdiCheckCircleOutline, mdiClose, mdiResizeBottomRight } from '@mdi/js'
+import { mdiCheckCircleOutline, mdiClose, mdiEarth, mdiMap, mdiResizeBottomRight } from '@mdi/js'
 import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useEventListener } from '@vueuse/core'
@@ -722,7 +722,7 @@ onUnmounted(() => {
               color="primary"
               density="compact"
               elevation="3"
-              :icon="mapStyle === 'SATELLITE' ? 'mdi-map' : 'mdi-earth'"
+              :icon="mapStyle === 'SATELLITE' ? mdiMap : mdiEarth"
               @click="toggleMapStyle"
             />
           </div>
@@ -795,7 +795,7 @@ onUnmounted(() => {
             size="x-small"
             color="surface"
             elevation="3"
-            :icon="mapStyle === 'SATELLITE' ? 'mdi-map' : 'mdi-earth'"
+            :icon="mapStyle === 'SATELLITE' ? mdiMap : mdiEarth"
             @click="toggleMapStyle"
           />
         </div>

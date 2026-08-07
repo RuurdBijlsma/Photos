@@ -1,5 +1,15 @@
 <script setup lang="ts">
-import { mdiChevronRight, mdiCogOutline } from '@mdi/js'
+import {
+  mdiChevronRight,
+  mdiCogOutline,
+  mdiFullscreen,
+  mdiFullscreenExit,
+  mdiPause,
+  mdiPlay,
+  mdiVolumeHigh,
+  mdiVolumeMedium,
+  mdiVolumeMute,
+} from '@mdi/js'
 import { computed, nextTick, onMounted, onUnmounted, ref, useTemplateRef, watch } from 'vue'
 import { useEventListener, useStorage } from '@vueuse/core'
 import { useMediaItemStore } from '@/scripts/stores/timeline/mediaItemStore.ts'
@@ -426,9 +436,9 @@ function handleKeyDown(e: KeyboardEvent) {
 }
 
 const volumeIcon = computed(() => {
-  if (isMuted.value || savedVolume.value === 0) return 'mdi-volume-mute'
-  if (savedVolume.value < 0.5) return 'mdi-volume-medium'
-  return 'mdi-volume-high'
+  if (isMuted.value || savedVolume.value === 0) return mdiVolumeMute
+  if (savedVolume.value < 0.5) return mdiVolumeMedium
+  return mdiVolumeHigh
 })
 
 onMounted(() => {
@@ -475,7 +485,7 @@ useEventListener(window, 'keydown', handleKeyDown)
     <!-- Play/Pause Overlay Indication -->
     <div v-if="overlayAction" :key="overlayTrigger" class="play-pause-overlay">
       <div class="overlay-circle">
-        <v-icon :icon="overlayAction === 'play' ? 'mdi-play' : 'mdi-pause'" size="40" />
+        <v-icon :icon="overlayAction === 'play' ? mdiPlay : mdiPause" size="40" />
       </div>
     </div>
 
@@ -498,7 +508,7 @@ useEventListener(window, 'keydown', handleKeyDown)
           <!-- Clicking bottom-left control capsule buttons will play/pause silently without screen overlay feedback -->
           <v-btn
             variant="plain"
-            :icon="isPlaying ? 'mdi-pause' : 'mdi-play'"
+            :icon="isPlaying ? mdiPause : mdiPlay"
             rounded="xl"
             @click="togglePlay()"
           />
@@ -620,7 +630,7 @@ useEventListener(window, 'keydown', handleKeyDown)
           <!-- Fullscreen Button -->
           <v-btn
             variant="plain"
-            :icon="isFullscreen ? 'mdi-fullscreen-exit' : 'mdi-fullscreen'"
+            :icon="isFullscreen ? mdiFullscreenExit : mdiFullscreen"
             rounded="xl"
             @click="toggleFullscreen"
           />

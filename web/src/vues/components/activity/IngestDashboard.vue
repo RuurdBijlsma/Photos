@@ -9,6 +9,7 @@ import type { JobInfo } from '@/scripts/types/api/admin.ts'
 import { prettyBytes, ProcessingRateTracker } from '@/scripts/utils.ts'
 import PipelineCard from '@/vues/components/activity/PipelineCard.vue'
 import {
+  mdiAlertCircle,
   mdiAlertCircleOutline,
   mdiCached,
   mdiCheckCircleOutline,
@@ -20,6 +21,7 @@ import {
   mdiFolderOpen,
   mdiFolderSearchOutline,
   mdiImageOutline,
+  mdiInformation,
   mdiInformationOutline,
   mdiMagnify,
   mdiPauseCircleOutline,
@@ -750,7 +752,7 @@ onUnmounted(() => {
         <v-card-title class="dialog-header">
           <div class="dialog-title">
             <v-icon
-              :icon="detailedJob?.lastError ? 'mdi-alert-circle' : 'mdi-information'"
+              :icon="detailedJob?.lastError ? mdiAlertCircle : mdiInformation"
               :color="detailedJob?.lastError ? 'error' : 'primary'"
               class="dialog-title-icon"
             />

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { mdiChevronUp, mdiPlus } from '@mdi/js'
 import { ref } from 'vue'
 import AddToAlbumCard from '@/vues/components/timeline/timeline-components/AddToAlbumCard.vue'
 
@@ -20,7 +21,7 @@ const show = ref(false)
     <template v-slot:activator="{ props }">
       <v-btn
         v-bind="props"
-        :icon="show ? 'mdi-chevron-up' : 'mdi-plus'"
+        :icon="show ? mdiChevronUp : mdiPlus"
         variant="plain"
         density="compact"
         :disabled="show"

@@ -6,6 +6,10 @@ import {
   mdiPlus,
   mdiShare,
   mdiSortAlphabeticalDescendingVariant,
+  mdiSortCalendarAscending,
+  mdiSortCalendarDescending,
+  mdiSortClockAscendingOutline,
+  mdiSortClockDescendingOutline,
 } from '@mdi/js'
 import { computed, onMounted } from 'vue'
 import MainLayoutContainer from '@/vues/components/MainLayoutContainer.vue'
@@ -86,12 +90,10 @@ const sortDirectionIcon = computed(() => {
   }
   if (currentSortField.value === 'updatedAt') {
     return currentSortDirection.value === 'asc'
-      ? 'mdi-sort-clock-ascending-outline'
-      : 'mdi-sort-clock-descending-outline'
+      ? mdiSortClockAscendingOutline
+      : mdiSortClockDescendingOutline
   }
-  return currentSortDirection.value === 'asc'
-    ? 'mdi-sort-calendar-ascending'
-    : 'mdi-sort-calendar-descending'
+  return currentSortDirection.value === 'asc' ? mdiSortCalendarAscending : mdiSortCalendarDescending
 })
 
 const sortDirectionTooltip = computed(() => {
