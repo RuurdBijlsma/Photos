@@ -29,11 +29,8 @@
 * import albums from google photos
 * duplicate photo remover tool
 * better error if exiftool isnt there (worker wont work then)
-* rename /hosted/ to /static/
-* [BUG] het is nu mogelijk om pano's te rotaten
 
 # INFRASTRUCTURE:
 
 * update available checker
-* nginx thumbnail hosting (optional maak setting voor Rust thumb hosting).
 * restart server button?

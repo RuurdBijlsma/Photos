@@ -75,6 +75,10 @@ const imageUrl = computed(() => {
     !generatedThumbsAvailable.value,
   )
 })
+const pixelCount = computed(() => {
+  if (!fullImage.value) return null
+  return fullImage.value.width * fullImage.value.height
+})
 
 // Full Resolution Background Load
 const fullResUrl = ref<string | null>(null)
@@ -312,19 +316,7 @@ const wrapperStyle = computed(() => {
       position: 'absolute' as const,
       top: '50%',
       left: '50%',
-      transform: `translate(-50%, -50%) rotate(${normRot}deg)`,
-      transformOrigin: 'center center',
-    }
-  }
-
-  if (normRot === 180) {
-    return {
-      width: '100%',
-      height: '100%',
-      position: 'absolute' as const,
-      top: '0px',
-      left: '0px',
-      transform: 'rotate(180deg)',
+      transform: `translate(-50%, -50%) rotate(${normRot}deg) translate3d(${translateX.value}px, ${translateY.value}px, 0) scale(${scale.value})`,
       transformOrigin: 'center center',
     }
   }
@@ -335,7 +327,7 @@ const wrapperStyle = computed(() => {
     position: 'absolute' as const,
     top: '0px',
     left: '0px',
-    transform: `translate3d(${translateX.value}px, ${translateY.value}px, 0) scale(${scale.value})`,
+    transform: `translate3d(${translateX.value}px, ${translateY.value}px, 0) scale(${scale.value}) rotate(${normRot}deg)`,
     transformOrigin: '0 0',
   }
 })
@@ -364,7 +356,8 @@ function zoomToPoint(clientX: number, clientY: number, newScale: number) {
   const yScreen = clientY - rect.top
 
   const minScale = 1
-  const maxScale = 8
+  let maxScale = 16
+  if (pixelCount.value) maxScale = Math.max(10, pixelCount.value / 2000000)
   const clampedScale = Math.max(minScale, Math.min(maxScale, newScale))
 
   const oldScale = scale.value
@@ -711,7 +704,9 @@ useEventListener(containerRef, 'wheel', handleWheel, { passive: false })
 
 .image-wrapper {
   position: absolute;
-  will-change: transform;
+  top: 0;
+  left: 0;
+  will-change: auto;
 }
 
 .image-tag {

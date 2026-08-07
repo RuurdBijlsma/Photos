@@ -456,27 +456,6 @@ useDetailTitle(mediaDetailTitle, { fallback: 'Photo' })
             width: 140,
           }"
         />
-        <v-btn
-          v-if="
-            !isVideo &&
-            !isPanoActive &&
-            id &&
-            fullImage &&
-            authStore.isAuthenticated &&
-            mimeSupportsRotation(fullImage.media_features.mime_type)
-          "
-          rounded="xl"
-          icon="mdi-rotate-right"
-          variant="plain"
-          :loading="viewPhotoStore.rotationLoading"
-          @click="viewPhotoStore.rotatePhoto(id, fullImage?.orientation, route.query)"
-          v-tooltip="{
-            text: 'Rotate clockwise',
-            location: 'bottom',
-            attach: true,
-            width: 140,
-          }"
-        />
 
         <v-menu
           v-if="!isBin"
@@ -509,6 +488,26 @@ useDetailTitle(mediaDetailTitle, { fallback: 'Photo' })
           />
         </v-menu>
         <template v-if="authStore.isAuthenticated">
+          <v-btn
+            v-if="
+              fullImage &&
+              !isVideo &&
+              !fullImage.use_panorama_viewer &&
+              id &&
+              mimeSupportsRotation(fullImage.media_features.mime_type)
+            "
+            rounded="xl"
+            icon="mdi-rotate-right"
+            variant="plain"
+            :loading="viewPhotoStore.rotationLoading"
+            @click="viewPhotoStore.rotatePhoto(id, fullImage?.orientation, route.query)"
+            v-tooltip="{
+              text: 'Rotate clockwise',
+              location: 'bottom',
+              attach: true,
+              width: 140,
+            }"
+          />
           <v-btn
             rounded="xl"
             @click="shareMedia"

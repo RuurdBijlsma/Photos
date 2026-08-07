@@ -5,10 +5,20 @@ import { useDailyCardStore } from '@/scripts/stores/timeline/dailyCardStore.ts'
 
 const cardStore = useDailyCardStore()
 
+const emit = defineEmits<{
+  (e: 'close-card'): void
+}>()
+
 defineProps<{
   card: DailyCardResponse
   width: number
 }>()
+
+function closeCard(e: PointerEvent) {
+  e.stopPropagation()
+  e.preventDefault()
+  emit('close-card')
+}
 
 function isGame(cardType: string) {
   return ['estimatr'].includes(cardType)
@@ -28,6 +38,19 @@ function isGame(cardType: string) {
         <v-icon icon="mdi-image-area" color="primary" size="150"></v-icon>
       </div>
       <div class="card-content">
+        <div class="card-top">
+          <v-btn
+            v-tooltip="{
+              text: `Dismiss card`,
+              location: 'top',
+            }"
+            class="close-button"
+            icon="mdi-close"
+            variant="plain"
+            density="compact"
+            @click="closeCard"
+          />
+        </div>
         <v-spacer />
         <div class="card-bottom">
           <div class="card-info">
@@ -70,10 +93,6 @@ function isGame(cardType: string) {
   filter: brightness(120%);
 }
 
-.daily-card * {
-  pointer-events: none;
-}
-
 .card-content {
   display: flex;
   flex-direction: column;
@@ -85,6 +104,21 @@ function isGame(cardType: string) {
   background: linear-gradient(180deg, rgba(0, 0, 0, 0) 30%, rgba(0, 0, 0, 0.6) 100%);
   border-radius: 40px;
   overflow: hidden;
+}
+
+.card-top {
+  display: flex;
+  justify-content: flex-end;
+  padding: 20px;
+}
+
+.close-button {
+  opacity: 0.3;
+  transition: opacity 0.2s;
+}
+
+.close-button:hover {
+  opacity: 0.8;
 }
 
 .card-bottom {
