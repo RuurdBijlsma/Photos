@@ -5,10 +5,9 @@ on:
     branches: [ main ]
     paths:
       - 'server/**'
-      - '.github/workflows/server-quality.yml'
+      - '.github/workflows/web-quality.yml'
   pull_request:
-    branches:
-      - main
+    branches: [ main ]
 
 jobs:
   web-lint-build:
