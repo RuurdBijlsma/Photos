@@ -22,6 +22,7 @@ const mapTheme = computed(() =>
   settings.lightPhotoViewerMap || !theme.current.value.dark ? 'light' : 'dark',
 )
 const primaryColor = computed(() => String(theme.themes.value[mapTheme.value].colors.primary))
+const bgColor = computed(() => String(theme.themes.value[mapTheme.value].colors['on-primary']))
 
 function handleMapLoad(loadedMap: LibreMap) {
   mapInstance.value = loadedMap
@@ -142,5 +143,14 @@ onUnmounted(() => {
 .base-map-comp {
   width: 100%;
   height: 100%;
+}
+
+/* Custom styling for MapLibre GL default SVG marker */
+:deep(.maplibregl-marker circle) {
+  fill: v-bind(bgColor) !important;
+}
+
+:deep(.maplibregl-marker svg) {
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.35));
 }
 </style>
