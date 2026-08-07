@@ -126,7 +126,7 @@ function formatCoords(lat: number | null, lon: number | null): string {
         <template #[`item.thumbnail`]="{ item }">
           <div class="thumbnail-wrapper">
             <thumbnail-img v-if="item.id" :media-item-id="item.id" class="table-thumbnail" cover />
-            <v-icon v-else size="small" color="primary" :icon="MdiImageOutline"></v-icon>
+            <v-icon v-else size="small" color="primary" :icon="MdiImageOutline" />
           </div>
         </template>
 

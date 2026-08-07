@@ -404,7 +404,7 @@ watch(
               :icon="
                 loading ? MdiLoading : searchStore.searchImage ? MdiImageSearchOutline : MdiMagnify
               "
-            ></v-icon>
+            />
           </span>
           <img
             v-if="searchStore.imagePreview"

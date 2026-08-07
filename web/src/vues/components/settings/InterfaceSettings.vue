@@ -42,7 +42,7 @@ searchService.search({ query: 'sunset', limit: 10, mediaType: 'photo' }).then((i
         <!-- Card Header -->
         <div class="card-header">
           <span class="card-title">User Interface Options</span>
-          <v-icon color="primary" size="large" :icon="MdiMonitorDashboard"></v-icon>
+          <v-icon color="primary" size="large" :icon="MdiMonitorDashboard" />
         </div>
 
         <div class="card-body">
@@ -163,7 +163,7 @@ searchService.search({ query: 'sunset', limit: 10, mediaType: 'photo' }).then((i
       <v-card class="settings-card height-100" flat border>
         <div class="card-header">
           <span class="card-title">Live Preview</span>
-          <v-icon color="secondary" size="large" :icon="MdiEyeOutline"></v-icon>
+          <v-icon color="secondary" size="large" :icon="MdiEyeOutline" />
         </div>
 
         <div class="card-body preview-container">
@@ -209,7 +209,7 @@ searchService.search({ query: 'sunset', limit: 10, mediaType: 'photo' }).then((i
               <div class="mock-dialog-overlay">
                 <div class="mock-dialog-card" :class="{ 'apply-blur': settings.useBackdropBlur }">
                   <div class="mock-dialog-header">
-                    <v-icon size="small" class="mr-1" :icon="MdiBlur"></v-icon>
+                    <v-icon size="small" class="mr-1" :icon="MdiBlur" />
                     <span>System Settings</span>
                   </div>
                   <div class="mock-dialog-body">

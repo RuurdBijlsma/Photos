@@ -189,12 +189,7 @@ async function deleteUser(user: AdminUserInfo) {
         <div class="card-header">
           <div class="card-title-group">
             <span class="card-title">User Accounts</span>
-            <v-icon
-              color="primary"
-              size="large"
-              class="ml-2"
-              :icon="MdiAccountMultipleOutline"
-            ></v-icon>
+            <v-icon color="primary" size="large" class="ml-2" :icon="MdiAccountMultipleOutline" />
           </div>
           <v-btn
             :prepend-icon="MdiAccountPlusOutline"
@@ -216,7 +211,7 @@ async function deleteUser(user: AdminUserInfo) {
 
           <!-- Empty State -->
           <div v-else-if="adminStore.users.length === 0" class="empty-state">
-            <v-icon size="64" color="on-surface-variant" :icon="MdiAccountSearchOutline"></v-icon>
+            <v-icon size="64" color="on-surface-variant" :icon="MdiAccountSearchOutline" />
             <p class="empty-text">No registered users found on this server.</p>
           </div>
 
@@ -238,7 +233,7 @@ async function deleteUser(user: AdminUserInfo) {
                     size="52"
                     class="border-fallback"
                   >
-                    <v-icon color="primary" size="x-large" :icon="MdiAccountOutline"></v-icon>
+                    <v-icon color="primary" size="x-large" :icon="MdiAccountOutline" />
                   </v-avatar>
                 </div>
 

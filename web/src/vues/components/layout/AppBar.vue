@@ -48,7 +48,7 @@ async function logout() {
       >
         <template v-slot:activator="{ props }">
           <v-btn icon v-bind="props" variant="text" color="primary" class="mr-1">
-            <v-icon class="spinning-sync-icon" :icon="MdiSync"></v-icon>
+            <v-icon class="spinning-sync-icon" :icon="MdiSync" />
           </v-btn>
         </template>
         <ingest-overlay-menu @close-menu="ingestMenuOpen = false" />

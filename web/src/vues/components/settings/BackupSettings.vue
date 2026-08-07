@@ -38,7 +38,7 @@ function formatDate(dateString: string) {
         <!-- Card Header -->
         <div class="card-header">
           <span class="card-title">System Backup & Recovery</span>
-          <v-icon color="primary" size="large" :icon="MdiBackupRestore"></v-icon>
+          <v-icon color="primary" size="large" :icon="MdiBackupRestore" />
         </div>
 
         <div class="card-body">
@@ -63,7 +63,7 @@ function formatDate(dateString: string) {
               border
             >
               <template v-slot:prepend>
-                <v-icon color="secondary" class="mr-2" :icon="MdiFileDocumentOutline"></v-icon>
+                <v-icon color="secondary" class="mr-2" :icon="MdiFileDocumentOutline" />
               </template>
 
               <v-list-item-title class="backup-filename">

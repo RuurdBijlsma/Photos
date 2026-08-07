@@ -41,7 +41,7 @@ const appDataUsedPct = computed(() => {
             class="drive-icon"
             :color="isStorageActive ? 'primary' : 'on-surface-variant'"
             :icon="MdiCloudOutline"
-          ></v-icon>
+          />
           <span class="drive-title">{{ diskStats.areSameDrive ? 'Storage' : 'Media' }}</span>
         </div>
         <span class="pct-badge"> {{ mediaUsedPct.toFixed(0) }}% </span>
@@ -75,7 +75,7 @@ const appDataUsedPct = computed(() => {
               color="on-surface-variant"
               class="drive-icon"
               :icon="MdiFolderOutline"
-            ></v-icon>
+            />
             <span class="drive-title text-caption font-weight-medium">App Data</span>
           </div>
           <span class="pct-badge"> {{ appDataUsedPct.toFixed(0) }}% </span>

@@ -214,7 +214,7 @@ watch(
         <div class="card-header">
           <div class="card-title-group">
             <span class="card-title">Background Job Queue</span>
-            <v-icon color="primary" size="large" class="ml-2" :icon="MdiClockFast"></v-icon>
+            <v-icon color="primary" size="large" class="ml-2" :icon="MdiClockFast" />
           </div>
           <v-spacer />
           <v-btn
@@ -343,7 +343,7 @@ watch(
                     :media-item-id="userMap.get(item.userId)!.avatarId!"
                     cover
                   />
-                  <v-icon v-else size="small" color="primary" :icon="MdiAccountOutline"></v-icon>
+                  <v-icon v-else size="small" color="primary" :icon="MdiAccountOutline" />
                 </v-avatar>
                 <span class="text-caption font-weight-medium">
                   {{ userMap.get(item.userId)?.username || `ID: ${item.userId}` }}
@@ -351,7 +351,7 @@ watch(
               </div>
               <div v-else class="d-flex align-center text-medium-emphasis">
                 <v-avatar size="26" class="mr-2" color="surface-container-highest">
-                  <v-icon size="small" :icon="MdiCogOutline"></v-icon>
+                  <v-icon size="small" :icon="MdiCogOutline" />
                 </v-avatar>
                 <span class="text-caption italic">System</span>
               </div>

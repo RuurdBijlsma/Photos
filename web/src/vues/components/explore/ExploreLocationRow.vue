@@ -104,7 +104,7 @@ watch(
               class="location-avatar"
             />
             <div v-else class="location-avatar-placeholder">
-              <v-icon size="40" color="primary" :icon="MdiMapMarkerOutline"></v-icon>
+              <v-icon size="40" color="primary" :icon="MdiMapMarkerOutline" />
             </div>
           </div>
           <span class="location-primary" :title="loc.name">{{ loc.name }}</span>

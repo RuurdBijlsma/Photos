@@ -91,7 +91,7 @@ useRefreshFunction(() => cameraStore.fetchCameraMedia(cameraMake.value, cameraMo
       </div>
 
       <div class="empty-camera" v-if="items.length === 0 && !isInitialLoad">
-        <v-icon color="on-surface-variant" size="200" :icon="MdiCameraOff"></v-icon>
+        <v-icon color="on-surface-variant" size="200" :icon="MdiCameraOff" />
         <h2>No media found for this camera</h2>
       </div>
     </simple-timeline>

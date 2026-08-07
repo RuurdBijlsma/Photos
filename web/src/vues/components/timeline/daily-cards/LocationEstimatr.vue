@@ -718,7 +718,7 @@ onUnmounted(() => {
             @touchstart="startResizeTouch"
             title="Drag to resize map"
           >
-            <v-icon size="14" color="on-surface" :icon="MdiResizeBottomRight"></v-icon>
+            <v-icon size="14" color="on-surface" :icon="MdiResizeBottomRight" />
           </div>
 
           <!-- Floating Map Style controls -->
@@ -810,12 +810,7 @@ onUnmounted(() => {
       <div class="summary-details-panel">
         <v-card class="summary-details-card" flat border>
           <div class="summary-card-header">
-            <v-icon
-              size="48"
-              color="success"
-              class="success-icon"
-              :icon="MdiCheckCircleOutline"
-            ></v-icon>
+            <v-icon size="48" color="success" class="success-icon" :icon="MdiCheckCircleOutline" />
             <h2>Challenge Completed!</h2>
             <p class="summary-desc">Come back tomorrow for another game.</p>
           </div>

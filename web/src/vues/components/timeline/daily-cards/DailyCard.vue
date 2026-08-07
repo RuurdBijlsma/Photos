@@ -39,7 +39,7 @@ function isGame(cardType: string) {
         cover
       />
       <div class="card-thumb fake-thumb" v-else>
-        <v-icon :icon="MdiImageArea" color="primary" size="150"></v-icon>
+        <v-icon :icon="MdiImageArea" color="primary" size="150" />
       </div>
       <div class="card-content">
         <div class="card-top">

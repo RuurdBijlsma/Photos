@@ -14,7 +14,7 @@ const settings = useSettingStore()
         <!-- Card Header -->
         <div class="card-header">
           <span class="card-title">Upload Config</span>
-          <v-icon color="primary" size="large" :icon="MdiCogOutline"></v-icon>
+          <v-icon color="primary" size="large" :icon="MdiCogOutline" />
         </div>
 
         <div class="card-body">

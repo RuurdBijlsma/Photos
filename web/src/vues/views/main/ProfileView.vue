@@ -254,7 +254,7 @@ useRefreshFunction(() => loadProfile())
                 color="transparent"
                 @click="showExplanation = true"
               >
-                <v-icon class="avatar-edit-icon" size="40" color="white" :icon="MdiPencil"></v-icon>
+                <v-icon class="avatar-edit-icon" size="40" color="white" :icon="MdiPencil" />
               </v-btn>
             </div>
 

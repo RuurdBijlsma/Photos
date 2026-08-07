@@ -74,7 +74,7 @@ const previewSwatches = [
         <!-- Card Header -->
         <div class="card-header">
           <span class="card-title">Theme Configuration</span>
-          <v-icon color="primary" size="large" :icon="MdiPaletteOutline"></v-icon>
+          <v-icon color="primary" size="large" :icon="MdiPaletteOutline" />
         </div>
 
         <div class="card-body">
@@ -116,7 +116,7 @@ const previewSwatches = [
                 <div v-if="!settings.useSunSchedule" class="time-picker-grid">
                   <v-card class="time-picker-card" flat border>
                     <div class="time-picker-header">
-                      <v-icon color="warning" :icon="MdiWhiteBalanceSunny"></v-icon>
+                      <v-icon color="warning" :icon="MdiWhiteBalanceSunny" />
                       <span class="time-picker-label">Turn on light theme</span>
                     </div>
                     <div class="time-picker-body">
@@ -133,7 +133,7 @@ const previewSwatches = [
 
                   <v-card class="time-picker-card" flat border>
                     <div class="time-picker-header">
-                      <v-icon color="primary" :icon="MdiWeatherNight"></v-icon>
+                      <v-icon color="primary" :icon="MdiWeatherNight" />
                       <span class="time-picker-label">Turn on dark theme</span>
                     </div>
                     <div class="time-picker-body">
@@ -243,7 +243,7 @@ const previewSwatches = [
       <v-card class="settings-card height-100" flat border>
         <div class="card-header">
           <span class="card-title">Active Swatches</span>
-          <v-icon color="secondary" size="large" :icon="MdiEyedropper"></v-icon>
+          <v-icon color="secondary" size="large" :icon="MdiEyedropper" />
         </div>
 
         <div class="card-body">

@@ -124,7 +124,7 @@ async function addToAlbum(album: Album) {
     </v-list>
     <v-card-actions class="card-actions">
       <v-btn @click="createNew" rounded class="px-5" :loading="newLoading">
-        <v-icon :icon="MdiPlus" class="mr-2"></v-icon> Create new album
+        <v-icon :icon="MdiPlus" class="mr-2" /> Create new album
       </v-btn>
     </v-card-actions>
   </v-card>

@@ -111,12 +111,7 @@ function selectItem(e: PointerEvent) {
 
       <div v-if="selectionStore.isSelecting" class="selecting-overlay" @click="selectItem">
         <div class="checkbox-selecting">
-          <v-icon
-            color="secondary"
-            class="check-item-selecting"
-            size="15"
-            :icon="MdiCheckBold"
-          ></v-icon>
+          <v-icon color="secondary" class="check-item-selecting" size="15" :icon="MdiCheckBold" />
         </div>
         <router-link
           class="fullscreen"

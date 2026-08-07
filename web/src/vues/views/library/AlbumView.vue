@@ -760,7 +760,7 @@ useRefreshFunction(() => {
         </div>
       </div>
       <div class="empty-album" v-if="displayedItems.length === 0 && !isInitialLoad">
-        <v-icon color="on-surface-variant" size="200" :icon="MdiImageAlbum"></v-icon>
+        <v-icon color="on-surface-variant" size="200" :icon="MdiImageAlbum" />
         <h2>This album is empty</h2>
         <template v-if="route.query.importing === 'true'">
           <p>Importing media from remote server...</p>

@@ -63,7 +63,7 @@ const formattedSpeed = computed(() => {
         class="pipeline-circle"
       >
         <div class="circle-inner">
-          <v-icon size="default">{{ icon }}</v-icon>
+          <v-icon size="default" :icon="icon" />
           <span class="circle-pct">{{ Math.round(progress) }}%</span>
         </div>
       </v-progress-circular>

@@ -19,7 +19,7 @@ const virtualScrollHeight = computed(() => {
 <template>
   <v-card class="mb-6 folder-card" variant="text" rounded color="primary">
     <v-card-title class="d-flex align-center card-title">
-      <v-icon :icon="MdiAlertCircleOutline" class="mr-2"></v-icon>
+      <v-icon :icon="MdiAlertCircleOutline" class="mr-2" />
       Inaccessible Entries ({{ summary.inaccessibleEntries.length.toLocaleString() }})
     </v-card-title>
     <v-card-text>

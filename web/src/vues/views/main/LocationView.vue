@@ -116,7 +116,7 @@ usePageTitle(primaryName, { fallback: 'Place' })
             class="header-avatar-img"
           />
           <div v-else class="header-avatar-placeholder">
-            <v-icon size="64" color="on-surface-variant" :icon="MdiImageOutline"></v-icon>
+            <v-icon size="64" color="on-surface-variant" :icon="MdiImageOutline" />
           </div>
 
           <v-theme-provider theme="dark" with-background>

@@ -533,7 +533,7 @@ const activeFilterChips = computed(() => {
                     location: 'top',
                     text: 'Remove results matching these terms (e.g. “cat” + exclude “orange” → non-orange cats)',
                   }"
-                ></v-icon>
+                />
               </p>
               <v-text-field
                 v-model="filterNegativeQuery"
@@ -583,7 +583,7 @@ const activeFilterChips = computed(() => {
       }"
     >
       <span>Date</span>
-      <v-icon end :icon="MdiSortCalendarAscending"></v-icon>
+      <v-icon end :icon="MdiSortCalendarAscending" />
     </v-btn>
 
     <v-btn-toggle
@@ -602,12 +602,12 @@ const activeFilterChips = computed(() => {
     >
       <v-btn value="date">
         <span>Date</span>
-        <v-icon end :icon="MdiSortCalendarAscending"></v-icon>
+        <v-icon end :icon="MdiSortCalendarAscending" />
       </v-btn>
 
       <v-btn value="relevancy">
         <span>Relevancy</span>
-        <v-icon end :icon="MdiSortDescending"></v-icon>
+        <v-icon end :icon="MdiSortDescending" />
       </v-btn>
     </v-btn-toggle>
   </div>

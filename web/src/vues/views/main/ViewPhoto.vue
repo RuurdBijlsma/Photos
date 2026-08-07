@@ -772,9 +772,9 @@ useDetailTitle(mediaDetailTitle, { fallback: 'Photo' })
 .next-area {
   position: absolute;
   right: 0;
-  top: 70px;
-  height: calc(100% - 190px);
-  width: 33%;
+  top: 150px;
+  height: calc(100% - 360px);
+  width: 30%;
   min-width: 92px;
   cursor: pointer;
   display: flex;
@@ -787,9 +787,9 @@ useDetailTitle(mediaDetailTitle, { fallback: 'Photo' })
 .prev-area {
   position: absolute;
   left: 0;
-  top: 70px;
-  height: calc(100% - 190px);
-  width: 33%;
+  top: 150px;
+  height: calc(100% - 360px);
+  width: 30%;
   min-width: 92px;
   cursor: pointer;
   display: flex;

@@ -408,7 +408,7 @@ onUnmounted(() => {
           />
 
           <div v-if="index < pipelineSteps.length - 1" class="pipeline-arrow">
-            <v-icon size="large" :icon="MdiChevronRight"></v-icon>
+            <v-icon size="large" :icon="MdiChevronRight" />
           </div>
         </template>
       </div>
@@ -541,9 +541,11 @@ onUnmounted(() => {
                     size="24"
                     width="3"
                   />
-                  <v-icon v-else :color="getStatusColor(item.status)">
-                    {{ getStatusIcon(item.status) }}
-                  </v-icon>
+                  <v-icon
+                    v-else
+                    :color="getStatusColor(item.status)"
+                    :icon="getStatusIcon(item.status)"
+                  />
                 </div>
 
                 <div class="upload-item-details">
@@ -609,11 +611,7 @@ onUnmounted(() => {
                 </div>
               </div>
               <div v-else class="running-empty-state">
-                <v-icon
-                  size="large"
-                  class="empty-state-icon"
-                  :icon="MdiCheckCircleOutline"
-                ></v-icon>
+                <v-icon size="large" class="empty-state-icon" :icon="MdiCheckCircleOutline" />
                 <div class="empty-state-text">No active background ingestion tasks running.</div>
               </div>
             </div>

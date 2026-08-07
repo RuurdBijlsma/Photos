@@ -38,7 +38,7 @@ const cardCaption = computed(() => {
 <template>
   <v-card rounded class="folder-card" variant="text">
     <v-card-title class="d-flex align-center">
-      <v-icon :icon="MdiEyeCheckOutline" class="mr-2"></v-icon>
+      <v-icon :icon="MdiEyeCheckOutline" class="mr-2" />
       {{ cardTitle }}
     </v-card-title>
 

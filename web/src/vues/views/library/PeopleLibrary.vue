@@ -174,7 +174,7 @@ useRefreshFunction(() => peopleStore.fetchPeople(), { immediate: true })
       <!-- Grid Layout -->
       <template v-else>
         <section v-for="section in sections" :key="section.title" class="people-section">
-          <div class="section-header" v-if="section.title==='Unnamed'">
+          <div class="section-header" v-if="section.title === 'Unnamed'">
             <h2>{{ section.title }}</h2>
             <p>{{ section.items.length.toLocaleString() }}</p>
           </div>
