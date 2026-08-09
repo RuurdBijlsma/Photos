@@ -21,6 +21,9 @@
 * When no user exists and user visits login page -> redirect to register?admin=true and show messaging to create admin
   account
 * door alle requests kijken op verse page load om te zien of ze allemaal relevant zijn (ik zag thunder icon geladen worden op timeline page load)
+# HIGH PRIO
+* rotate 180 deg is broken
+* test of nieuwe icons perf impact hebben
 
 # SERVER
 
@@ -29,6 +32,7 @@
 * import albums from google photos
 * duplicate photo remover tool
 * better error if exiftool isnt there (worker wont work then)
+# HIGH PRIO
 * 50 megapixels plaatjes willen niet rotaten om een of andere reden (die van tiramisu)
 
 # INFRASTRUCTURE:
