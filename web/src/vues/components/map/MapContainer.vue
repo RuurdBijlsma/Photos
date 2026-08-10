@@ -2,7 +2,7 @@
 import { computed, onUnmounted, ref, watch } from 'vue'
 import {
   type GeoJSONFeature,
-  MapSourceDataEvent,
+  type MapSourceDataEvent,
   GeoJSONSource,
   LngLatBounds,
   type MapOptions,
@@ -226,7 +226,7 @@ function initializeMap() {
 
   map.on('zoomend', debouncedUpdate)
   map.on('moveend', debouncedUpdate)
-  map.on('data', (e: MapSourceDataEvent & { sourceId?: string; isSourceLoaded?: boolean }) => {
+  map.on('sourcedata', (e: MapSourceDataEvent) => {
     if (e.sourceId === 'photos' && e.isSourceLoaded) debouncedUpdate()
   })
   map.on('click', () => {
