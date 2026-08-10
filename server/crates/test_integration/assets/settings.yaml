@@ -67,11 +67,26 @@ ingest:
           quality: 40
 
 logging:
-  level: "info"
+  filters:
+    main: info
+    targets:
+      ort: warn
+      api: debug
+      tower_http: debug
+      hf_hub: error
+      xet_client: warn
+      xet_data: warn
+      xet_runtime: warn
+      xet: warn
+      open_clip_inference: warn
+      object_detector: warn
+      face_id: warn
+      sqlx: warn
 
 api:
   host: "127.0.0.1"
   port: 5272
+  serve_static_assets: true
   allowed_origins:
     - "http://localhost:5173"
     - "http://localhost:3000"
@@ -115,14 +130,15 @@ daily_cards:
     rounds_per_day: 3
 
 scaler:
-  tick_interval_secs: 1
-  system_memory_buffer_percentage: 10.0
-  system_memory_buffer_maximum_mb: 2000
+  tick_interval_secs: 5
+  quick_tick_interval_secs: 1
+  system_memory_buffer_percentage: 5.0
+  system_memory_buffer_maximum_mb: 1000
   profiles:
     light:
-      priority: 2
+      priority: 4
       estimated_ram_mb: 100
-      max_workers: 10
+      max_workers: 5
       excluded_jobs:
         - "ingest_thumbnails"
         - "ingest_analysis"
@@ -132,12 +148,13 @@ scaler:
     medium:
       priority: 3
       estimated_ram_mb: 500
-      max_workers: 5
+      max_workers: 3
       excluded_jobs:
         - "ingest_llm"
         - "ingest_thumbnails"
+        - "cluster_photos"
     heavy:
-      priority: 4
+      priority: 2
       estimated_ram_mb: 1000
       max_workers: 2
       excluded_jobs:
