@@ -24,6 +24,9 @@
 # HIGH PRIO
 * rotate 180 deg is broken
 * test of nieuwe icons perf impact hebben
+  * load time (perf tab)
+  * network load bytes & time
+  * bundle size
 
 # SERVER
 

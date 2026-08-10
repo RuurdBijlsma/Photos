@@ -330,7 +330,7 @@ const wrapperStyle = computed(() => {
     top: '0px',
     left: '0px',
     transform: `translate3d(${translateX.value}px, ${translateY.value}px, 0) scale(${scale.value}) rotate(${normRot}deg)`,
-    transformOrigin: '0 0',
+    transformOrigin: normRot === 0 ? '0 0' : 'center center', // <-- Fix here
   }
 })
 
