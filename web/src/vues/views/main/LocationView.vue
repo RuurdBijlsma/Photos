@@ -35,10 +35,26 @@ watch(
   { immediate: true },
 )
 
+watch(
+  locationId,
+  () => {
+    console.log('locationId', locationId.value)
+  },
+  { immediate: true },
+)
+
 const details = computed(() => {
   if (locationId.value === null) return null
   return exploreStore.locations.get(locationId.value)?.location ?? null
 })
+
+watch(
+  details,
+  () => {
+    console.log('details', details.value)
+  },
+  { immediate: true },
+)
 
 const items = computed(() => {
   if (locationId.value === null) return []
@@ -92,6 +108,7 @@ function handleSelectLocation(targetLocationId: string) {
 }
 
 function handleHoverLocation(targetLocationId: string) {
+  console.log("HOVER", targetLocationId)
   prefetchLocation(targetLocationId)
 }
 

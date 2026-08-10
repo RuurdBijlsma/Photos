@@ -91,7 +91,7 @@ export const useExploreStore = defineStore('explore', () => {
     isLocationLoading.value = true
     try {
       const response = await exploreService.getLocation(locationKey)
-      console.log('location', response)
+      console.log('location', locationKey, response)
       locations.value.set(locationKey, response)
       triggerRef(locations)
     } catch (error) {

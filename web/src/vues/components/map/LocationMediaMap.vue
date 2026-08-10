@@ -103,7 +103,7 @@ function setupMapResources() {
       },
       properties: {
         id: item.id,
-        locationId: item.locationId,
+        locationId: item.locationId.toString(),
       },
     })),
   }
