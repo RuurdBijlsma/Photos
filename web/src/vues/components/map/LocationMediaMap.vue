@@ -10,6 +10,11 @@ const props = defineProps<{
   items: LocationMediaItem[]
 }>()
 
+const emit = defineEmits<{
+  (e: 'select-location', locationId: string): void
+  (e: 'hover-location', locationId: string): void
+}>()
+
 const mapInstance = ref<LibreMap | null>(null)
 
 // Filters out items without physical coordinates
@@ -97,6 +102,7 @@ function setupMapResources() {
       },
       properties: {
         id: item.id,
+        locationId: item.locationId,
       },
     })),
   }
@@ -119,6 +125,31 @@ function setupMapResources() {
       'circle-opacity': 0.85,
       'circle-stroke-opacity': 0.9,
     },
+  })
+
+  // Change cursor and trigger background prefetch when hovering over a point
+  map.on('mouseenter', 'media-points', (e) => {
+    map.getCanvas().style.cursor = 'pointer'
+    if (e.features && e.features.length > 0) {
+      const locId = e.features[0].properties?.locationId
+      if (locId) {
+        emit('hover-location', locId)
+      }
+    }
+  })
+
+  map.on('mouseleave', 'media-points', () => {
+    map.getCanvas().style.cursor = ''
+  })
+
+  // Handle clicking a point to select location
+  map.on('click', 'media-points', (e) => {
+    if (e.features && e.features.length > 0) {
+      const locId = e.features[0].properties?.locationId
+      if (locId) {
+        emit('select-location', locId)
+      }
+    }
   })
 }
 

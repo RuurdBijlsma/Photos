@@ -2,7 +2,7 @@
 import MdiImageOutline from '~icons/mdi/image-outline'
 import MdiMapMarkerQuestionOutline from '~icons/mdi/map-marker-question-outline'
 import { computed, ref, useTemplateRef, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useExploreStore } from '@/scripts/stores/exploreStore.ts'
 import SimpleTimeline from '@/vues/components/timeline/simple-timeline/SimpleTimeline.vue'
 import ThumbnailImg from '@/vues/components/ui/ThumbnailImg.vue'
@@ -12,6 +12,7 @@ import { getThumbnailHeight } from '@/scripts/utils.ts'
 import { usePageTitle } from '@/scripts/composables/usePageTitle.ts'
 
 const route = useRoute()
+const router = useRouter()
 const exploreStore = useExploreStore()
 const simpleTimelineRef = useTemplateRef('simpleTimeline')
 
@@ -72,6 +73,16 @@ function prefetchLocation(id: string) {
   if (id && !exploreStore.locations.has(id)) {
     exploreStore.fetchLocationData(id)
   }
+}
+
+function handleSelectLocation(targetLocationId: string) {
+  if (targetLocationId && targetLocationId !== locationId.value) {
+    router.push(`/explore/location/${targetLocationId}`)
+  }
+}
+
+function handleHoverLocation(targetLocationId: string) {
+  prefetchLocation(targetLocationId)
 }
 
 watch(
@@ -143,7 +154,11 @@ usePageTitle(primaryName, { fallback: 'Place' })
           </v-theme-provider>
         </div>
 
-        <location-media-map :items="items" />
+        <location-media-map
+          :items="items"
+          @select-location="handleSelectLocation"
+          @hover-location="handleHoverLocation"
+        />
       </div>
 
       <!-- Loading State -->
