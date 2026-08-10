@@ -30,7 +30,6 @@ function getInitialThemeMode(): 'light' | 'dark' | 'system' {
   )
 }
 
-
 export const vuetify = createVuetify({
   directives: { Tooltip },
   theme: {
