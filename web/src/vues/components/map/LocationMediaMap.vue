@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import BaseMap, { type StyleName } from '@/vues/components/map/BaseMap.vue'
 import type { LocationMediaItem } from '@/scripts/types/generated/timeline.ts'
 import { useStorage } from '@vueuse/core'
@@ -8,6 +8,7 @@ import type * as GeoJSON from 'geojson'
 
 const props = defineProps<{
   items: LocationMediaItem[]
+  isPlace: boolean
 }>()
 
 const emit = defineEmits<{
@@ -129,6 +130,7 @@ function setupMapResources() {
 
   // Change cursor and trigger background prefetch when hovering over a point
   map.on('mouseenter', 'media-points', (e) => {
+    if (props.isPlace) return
     map.getCanvas().style.cursor = 'pointer'
     if (e.features && e.features.length > 0) {
       const locId = e.features[0].properties?.locationId
@@ -144,7 +146,7 @@ function setupMapResources() {
 
   // Handle clicking a point to select location
   map.on('click', 'media-points', (e) => {
-    if (e.features && e.features.length > 0) {
+    if (e.features && e.features.length > 0 && !props.isPlace) {
       const locId = e.features[0].properties?.locationId
       if (locId) {
         emit('select-location', locId)

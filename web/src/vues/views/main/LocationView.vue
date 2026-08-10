@@ -25,6 +25,16 @@ const locationId = computed(() => {
   return idStr || null
 })
 
+const isPlace = computed(() => !locationId.value?.includes(':'))
+
+watch(
+  isPlace,
+  () => {
+    console.log('isPlace', isPlace.value)
+  },
+  { immediate: true },
+)
+
 const details = computed(() => {
   if (locationId.value === null) return null
   return exploreStore.locations.get(locationId.value)?.location ?? null
@@ -155,6 +165,7 @@ usePageTitle(primaryName, { fallback: 'Place' })
         </div>
 
         <location-media-map
+          :is-place="isPlace"
           :items="items"
           @select-location="handleSelectLocation"
           @hover-location="handleHoverLocation"
