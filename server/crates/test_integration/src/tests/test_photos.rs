@@ -123,7 +123,10 @@ pub async fn test_get_full_item(context: &TestContext) -> Result<()> {
 
     if let Some(record) = media_item {
         let valid_id = record.id;
-        let valid_id_url = format!("{}/api/photos/{valid_id}/item", context.settings.api.public_url);
+        let valid_id_url = format!(
+            "{}/api/photos/{valid_id}/item",
+            context.settings.api.public_url
+        );
 
         // --- TEST 1: Valid ID ---
         let response = client.get(&valid_id_url).send().await?;
@@ -133,7 +136,10 @@ pub async fn test_get_full_item(context: &TestContext) -> Result<()> {
         assert_eq!(item.media_item.id, valid_id);
 
         // --- TEST 2: Invalid ID ---
-        let invalid_id_url = format!("{}/api/photos/invalid-id/item", context.settings.api.public_url);
+        let invalid_id_url = format!(
+            "{}/api/photos/invalid-id/item",
+            context.settings.api.public_url
+        );
         let response = client.get(&invalid_id_url).send().await?;
 
         assert_eq!(response.status(), StatusCode::NOT_FOUND);

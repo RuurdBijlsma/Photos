@@ -142,7 +142,10 @@ pub async fn test_album_media_management(context: &TestContext) -> Result<()> {
 
     // 2. Remove Media from Album
     let response = client
-        .delete(format!("{base_url}/api/album/{}/media/{}", album.id, media_id))
+        .delete(format!(
+            "{base_url}/api/album/{}/media/{}",
+            album.id, media_id
+        ))
         .send()
         .await?;
 
