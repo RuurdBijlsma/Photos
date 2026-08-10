@@ -22,7 +22,7 @@ pub async fn test_onboarding(context: &TestContext) -> Result<()> {
 
     // 2. Get Disk Info
     let response = client
-        .get(format!("{api_url}/admin/disk-info"))
+        .get(format!("{api_url}/api/admin/disk-info"))
         .send()
         .await?;
 
@@ -33,7 +33,7 @@ pub async fn test_onboarding(context: &TestContext) -> Result<()> {
 
     // 3. List Folders (root)
     let response = client
-        .get(format!("{api_url}/admin/folders"))
+        .get(format!("{api_url}/api/admin/folders"))
         .query(&[("folder", "")])
         .send()
         .await?;
@@ -44,7 +44,7 @@ pub async fn test_onboarding(context: &TestContext) -> Result<()> {
     // 4. Create a new folder
     let created_folder = "integration_test_folder";
     let response = client
-        .post(format!("{api_url}/admin/make-folder"))
+        .post(format!("{api_url}/api/admin/make-folder"))
         .json(&MakeFolderBody {
             base_folder: String::new(),
             new_name: created_folder.to_string(),
@@ -56,7 +56,7 @@ pub async fn test_onboarding(context: &TestContext) -> Result<()> {
 
     // 5. Verify the folder exists
     let response = client
-        .get(format!("{api_url}/admin/folders"))
+        .get(format!("{api_url}/api/admin/folders"))
         .query(&[("folder", "")])
         .send()
         .await?;
@@ -69,7 +69,7 @@ pub async fn test_onboarding(context: &TestContext) -> Result<()> {
 
     // 6. Check Media Sample
     let response = client
-        .get(format!("{api_url}/admin/media-sample"))
+        .get(format!("{api_url}/api/admin/media-sample"))
         .query(&[("folder", "")])
         .send()
         .await?;
@@ -82,7 +82,7 @@ pub async fn test_onboarding(context: &TestContext) -> Result<()> {
 
     // 7. Check Unsupported Files
     let response = client
-        .get(format!("{api_url}/admin/unsupported-files"))
+        .get(format!("{api_url}/api/admin/unsupported-files"))
         .query(&[("folder", "")])
         .send()
         .await?;
@@ -107,7 +107,7 @@ pub async fn test_start_processing(context: &TestContext) -> Result<()> {
     // 3. Start Processing
     let user_id = 1;
     let response = client
-        .put(format!("{api_url}/admin/users/{user_id}/media-folder"))
+        .put(format!("{api_url}/api/admin/users/{user_id}/media-folder"))
         .json(&UpdateUserMediaFolderBody {
             user_folder: String::new(),
         })

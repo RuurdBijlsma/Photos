@@ -32,7 +32,7 @@ pub async fn test_album_lifecycle(context: &TestContext) -> Result<()> {
     };
 
     let response = client
-        .post(format!("{base_url}/album"))
+        .post(format!("{base_url}/api/album"))
         .json(&create_payload)
         .send()
         .await?;
@@ -42,7 +42,7 @@ pub async fn test_album_lifecycle(context: &TestContext) -> Result<()> {
     assert_eq!(created_album.name, create_payload.name);
 
     // 2. List Albums
-    let response = client.get(format!("{base_url}/album")).send().await?;
+    let response = client.get(format!("{base_url}/api/album")).send().await?;
 
     assert_eq!(response.status(), StatusCode::OK);
     let albums: Vec<Album> = response.json().await?;
@@ -59,7 +59,7 @@ pub async fn test_update_album(context: &TestContext) -> Result<()> {
 
     // Create an album first
     let created_album: Album = client
-        .post(format!("{base_url}/album"))
+        .post(format!("{base_url}/api/album"))
         .json(&CreateAlbumRequest {
             name: "Original Name".to_string(),
             description: None,
@@ -80,7 +80,7 @@ pub async fn test_update_album(context: &TestContext) -> Result<()> {
     };
 
     let response = client
-        .put(format!("{base_url}/album/{}", created_album.id))
+        .put(format!("{base_url}/api/album/{}", created_album.id))
         .json(&update_payload)
         .send()
         .await?;
@@ -117,7 +117,7 @@ pub async fn test_album_media_management(context: &TestContext) -> Result<()> {
 
     // Create Album
     let album: Album = client
-        .post(format!("{base_url}/album"))
+        .post(format!("{base_url}/api/album"))
         .json(&CreateAlbumRequest {
             name: "Media Test Album".to_string(),
             description: None,
@@ -131,7 +131,7 @@ pub async fn test_album_media_management(context: &TestContext) -> Result<()> {
 
     // 1. Add Media to Album
     let response = client
-        .post(format!("{base_url}/album/{}/media", album.id))
+        .post(format!("{base_url}/api/album/{}/media", album.id))
         .json(&AddMediaToAlbumRequest {
             media_item_ids: vec![media_id.clone()],
         })
@@ -142,7 +142,7 @@ pub async fn test_album_media_management(context: &TestContext) -> Result<()> {
 
     // 2. Remove Media from Album
     let response = client
-        .delete(format!("{base_url}/album/{}/media/{}", album.id, media_id))
+        .delete(format!("{base_url}/api/album/{}/media/{}", album.id, media_id))
         .send()
         .await?;
 
@@ -167,7 +167,7 @@ pub async fn test_album_sharing(context: &TestContext) -> Result<()> {
     };
 
     let album: Album = client
-        .post(format!("{base_url}/album"))
+        .post(format!("{base_url}/api/album"))
         .json(&CreateAlbumRequest {
             name: source_album_name.to_string(),
             description: None,
@@ -181,7 +181,7 @@ pub async fn test_album_sharing(context: &TestContext) -> Result<()> {
 
     // Add Media to Album
     let response = client
-        .post(format!("{base_url}/album/{}/media", album.id))
+        .post(format!("{base_url}/api/album/{}/media", album.id))
         .json(&AddMediaToAlbumRequest {
             media_item_ids: vec![media_id.clone()],
         })
@@ -191,7 +191,7 @@ pub async fn test_album_sharing(context: &TestContext) -> Result<()> {
 
     // ACT
     let response = client
-        .get(format!("{base_url}/album/{}/invite", album.id))
+        .get(format!("{base_url}/api/album/{}/invite", album.id))
         .send()
         .await?;
 
@@ -201,7 +201,7 @@ pub async fn test_album_sharing(context: &TestContext) -> Result<()> {
 
     // Check JWT invite
     let response = client
-        .post(format!("{base_url}/album/invite/check"))
+        .post(format!("{base_url}/api/album/invite/check"))
         .json(&CheckInviteRequest {
             token: invite_token.clone(),
         })
@@ -220,7 +220,7 @@ pub async fn test_album_sharing(context: &TestContext) -> Result<()> {
     let imported_album_name = "My new imported album";
     let imported_album_description = "New description";
     let response = client
-        .post(format!("{base_url}/album/invite/accept"))
+        .post(format!("{base_url}/api/album/invite/accept"))
         .json(&AcceptInviteRequest {
             token: invite_token.clone(),
             name: imported_album_name.to_owned(),

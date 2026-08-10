@@ -20,7 +20,7 @@ pub async fn test_photo_download(context: &TestContext) -> Result<()> {
     login(context).await?;
     let (photos, videos) = media_dir_contents(context)?;
     let client = &context.http_client;
-    let url = format!("{}/photos/download", context.settings.api.public_url);
+    let url = format!("{}/api/photos/download", context.settings.api.public_url);
 
     // --- TEST 1: Download a Photo (Happy Path) ---
     if let Some(photo_path) = photos.first() {
@@ -123,7 +123,7 @@ pub async fn test_get_full_item(context: &TestContext) -> Result<()> {
 
     if let Some(record) = media_item {
         let valid_id = record.id;
-        let valid_id_url = format!("{}/photos/{valid_id}/item", context.settings.api.public_url);
+        let valid_id_url = format!("{}/api/photos/{valid_id}/item", context.settings.api.public_url);
 
         // --- TEST 1: Valid ID ---
         let response = client.get(&valid_id_url).send().await?;
@@ -133,7 +133,7 @@ pub async fn test_get_full_item(context: &TestContext) -> Result<()> {
         assert_eq!(item.media_item.id, valid_id);
 
         // --- TEST 2: Invalid ID ---
-        let invalid_id_url = format!("{}/photos/invalid-id/item", context.settings.api.public_url);
+        let invalid_id_url = format!("{}/api/photos/invalid-id/item", context.settings.api.public_url);
         let response = client.get(&invalid_id_url).send().await?;
 
         assert_eq!(response.status(), StatusCode::NOT_FOUND);
@@ -159,7 +159,7 @@ pub async fn test_get_full_item_albums(context: &TestContext) -> Result<()> {
     let media_id = media_record.id;
 
     let album: Album = client
-        .post(format!("{base_url}/album"))
+        .post(format!("{base_url}/api/album"))
         .json(&CreateAlbumRequest {
             name: "Info Panel Album".to_string(),
             description: None,
@@ -172,7 +172,7 @@ pub async fn test_get_full_item_albums(context: &TestContext) -> Result<()> {
         .await?;
 
     let response = client
-        .post(format!("{base_url}/album/{}/media", album.id))
+        .post(format!("{base_url}/api/album/{}/media", album.id))
         .json(&AddMediaToAlbumRequest {
             media_item_ids: vec![media_id.clone()],
         })
@@ -180,7 +180,7 @@ pub async fn test_get_full_item_albums(context: &TestContext) -> Result<()> {
         .await?;
     assert_eq!(response.status(), StatusCode::OK);
 
-    let item_url = format!("{base_url}/photos/{media_id}/item");
+    let item_url = format!("{base_url}/api/photos/{media_id}/item");
     let response = client.get(&item_url).send().await?;
     assert_eq!(response.status(), StatusCode::OK);
 
@@ -201,7 +201,7 @@ pub async fn test_get_color_theme(context: &TestContext) -> Result<()> {
     // ARRANGE
     login(context).await?;
     let client = &context.http_client;
-    let url = format!("{}/theme/by-color", context.settings.api.public_url);
+    let url = format!("{}/api/theme/by-color", context.settings.api.public_url);
     let color = "#FF5733";
     let theme_variant =
         serde_json::to_value(context.settings.ingest.analyzer.theme_generation.variant)?
@@ -262,7 +262,7 @@ pub async fn test_get_random_photo(context: &TestContext) -> Result<()> {
     // ARRANGE
     login(context).await?;
     let client = &context.http_client;
-    let url = format!("{}/theme/random-photo", context.settings.api.public_url);
+    let url = format!("{}/api/theme/random-photo", context.settings.api.public_url);
     let theme_variant =
         serde_json::to_value(context.settings.ingest.analyzer.theme_generation.variant)?
             .as_str()

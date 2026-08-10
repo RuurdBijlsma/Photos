@@ -12,7 +12,7 @@ pub async fn test_get_timeline_ids(context: &TestContext) -> Result<()> {
     // ARRANGE
     login(context).await?;
     let client = &context.http_client;
-    let url = format!("{}/timeline/ids", context.settings.api.public_url);
+    let url = format!("{}/api/timeline/ids", context.settings.api.public_url);
 
     // ACT
     let response = client.get(&url).send().await?;
@@ -37,7 +37,7 @@ pub async fn test_get_timeline_ratios(context: &TestContext) -> Result<()> {
     // ARRANGE
     login(context).await?;
     let client = &context.http_client;
-    let url = format!("{}/timeline/ratios", context.settings.api.public_url);
+    let url = format!("{}/api/timeline/ratios", context.settings.api.public_url);
 
     // ACT
     let response = client.get(&url).send().await?;
@@ -62,7 +62,7 @@ pub async fn test_get_photos_by_month(context: &TestContext) -> Result<()> {
     login(context).await?;
     let client = &context.http_client;
 
-    let ratios_url = format!("{}/timeline/ratios", context.settings.api.public_url);
+    let ratios_url = format!("{}/api/timeline/ratios", context.settings.api.public_url);
     let ratio_res = client.get(&ratios_url).send().await?;
     let ratio_bytes = ratio_res.bytes().await?;
     let timeline = TimelineRatiosResponse::decode(Cursor::new(ratio_bytes))?;
@@ -71,7 +71,7 @@ pub async fn test_get_photos_by_month(context: &TestContext) -> Result<()> {
         bail!("No first month returned from timeline/ratios endpoint.");
     };
     let target_month = &first_month.month_id;
-    let url = format!("{}/timeline/by-month", context.settings.api.public_url);
+    let url = format!("{}/api/timeline/by-month", context.settings.api.public_url);
 
     // ACT
     let response = client

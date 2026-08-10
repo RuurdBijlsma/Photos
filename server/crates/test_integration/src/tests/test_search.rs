@@ -10,7 +10,7 @@ pub async fn test_search_filters(context: &TestContext) -> Result<()> {
     // ARRANGE
     login(context).await?;
     let client = &context.http_client;
-    let url = format!("{}/search", context.settings.api.public_url);
+    let url = format!("{}/api/search", context.settings.api.public_url);
 
     // --- TEST 1: Basic Search ---
     let res = client.get(&url).query(&[("query", "photo")]).send().await?;

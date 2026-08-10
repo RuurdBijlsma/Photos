@@ -2,7 +2,7 @@ use crate::runner::context::test_context::TestContext;
 
 pub async fn test_health_endpoint(context: &TestContext) -> color_eyre::Result<()> {
     // ARRANGE
-    let url = format!("{}/health", context.settings.api.public_url);
+    let url = format!("{}/api/health", context.settings.api.public_url);
 
     // ACT
     let response = context.http_client.get(url).send().await?;
