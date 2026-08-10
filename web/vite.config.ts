@@ -7,7 +7,6 @@ import vueDevTools from 'vite-plugin-vue-devtools'
 import vuetify from 'vite-plugin-vuetify'
 import { VitePWA } from 'vite-plugin-pwa'
 import Icons from 'unplugin-icons/vite'
-import visualizer from 'rollup-plugin-visualizer'
 
 const repoName = 'Photos'
 
@@ -38,12 +37,6 @@ export default defineConfig({
     proxy: proxyConfig,
   },
   plugins: [
-    visualizer({
-      filename: 'stats.html',
-      open: false,
-      gzipSize: true,
-      brotliSize: true,
-    }),
     vue(),
     vueJsx(),
     vueDevTools(),
