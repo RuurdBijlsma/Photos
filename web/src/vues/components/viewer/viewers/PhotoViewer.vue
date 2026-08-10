@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import MdiImageOutline from '~icons/mdi/image-outline'
+import MdiPanoramaVariantOutline from '~icons/mdi/panorama-variant-outline'
 import { computed, defineAsyncComponent, nextTick, onUnmounted, ref, watch } from 'vue'
 import { useSettingStore } from '@/scripts/stores/settingsStore.ts'
 import { useMediaItemStore } from '@/scripts/stores/timeline/mediaItemStore.ts'
@@ -74,6 +76,10 @@ const imageUrl = computed(() => {
     1440,
     !generatedThumbsAvailable.value,
   )
+})
+const pixelCount = computed(() => {
+  if (!fullImage.value) return null
+  return fullImage.value.width * fullImage.value.height
 })
 
 // Full Resolution Background Load
@@ -312,19 +318,7 @@ const wrapperStyle = computed(() => {
       position: 'absolute' as const,
       top: '50%',
       left: '50%',
-      transform: `translate(-50%, -50%) rotate(${normRot}deg)`,
-      transformOrigin: 'center center',
-    }
-  }
-
-  if (normRot === 180) {
-    return {
-      width: '100%',
-      height: '100%',
-      position: 'absolute' as const,
-      top: '0px',
-      left: '0px',
-      transform: 'rotate(180deg)',
+      transform: `translate(-50%, -50%) rotate(${normRot}deg) translate3d(${translateX.value}px, ${translateY.value}px, 0) scale(${scale.value})`,
       transformOrigin: 'center center',
     }
   }
@@ -335,8 +329,8 @@ const wrapperStyle = computed(() => {
     position: 'absolute' as const,
     top: '0px',
     left: '0px',
-    transform: `translate3d(${translateX.value}px, ${translateY.value}px, 0) scale(${scale.value})`,
-    transformOrigin: '0 0',
+    transform: `translate3d(${translateX.value}px, ${translateY.value}px, 0) scale(${scale.value}) rotate(${normRot}deg)`,
+    transformOrigin: normRot === 0 ? '0 0' : 'center center', // <-- Fix here
   }
 })
 
@@ -364,7 +358,8 @@ function zoomToPoint(clientX: number, clientY: number, newScale: number) {
   const yScreen = clientY - rect.top
 
   const minScale = 1
-  const maxScale = 8
+  let maxScale = 16
+  if (pixelCount.value) maxScale = Math.max(10, pixelCount.value / 2000000)
   const clampedScale = Math.max(minScale, Math.min(maxScale, newScale))
 
   const oldScale = scale.value
@@ -665,7 +660,7 @@ useEventListener(containerRef, 'wheel', handleWheel, { passive: false })
       :class="{ 'hide-ui': !showUi }"
     >
       <v-btn rounded="xl" variant="plain" class="pano-toggle-btn" @click="is3DMode = !is3DMode">
-        <v-icon start :icon="is3DMode ? 'mdi-image-outline' : 'mdi-panorama-variant-outline'" />
+        <v-icon start :icon="is3DMode ? MdiImageOutline : MdiPanoramaVariantOutline" />
         <span>{{ is3DMode ? 'View as Photo' : 'Enter 3D Panorama' }}</span>
       </v-btn>
     </div>
@@ -711,7 +706,9 @@ useEventListener(containerRef, 'wheel', handleWheel, { passive: false })
 
 .image-wrapper {
   position: absolute;
-  will-change: transform;
+  top: 0;
+  left: 0;
+  will-change: auto;
 }
 
 .image-tag {

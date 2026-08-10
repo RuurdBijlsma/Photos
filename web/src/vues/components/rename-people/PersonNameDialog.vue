@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import MdiAccountEdit from '~icons/mdi/account-edit'
+import MdiClose from '~icons/mdi/close'
 import { ref, computed, watch } from 'vue'
 import { useTheme } from 'vuetify/framework'
 import { usePeopleStore } from '@/scripts/stores/peopleStore'
@@ -132,11 +134,11 @@ async function onMergeConfirmed() {
     <v-dialog v-model="nameDialogVisible" max-width="520">
       <v-card rounded="xl" color="surface-container" class="name-dialog">
         <v-card-title class="dialog-title">
-          <v-icon icon="mdi-account-edit" class="dialog-title-icon" />
+          <v-icon :icon="MdiAccountEdit" class="dialog-title-icon" />
           <span>Edit person name</span>
           <v-spacer />
           <v-btn
-            icon="mdi-close"
+            :icon="MdiClose"
             variant="text"
             density="comfortable"
             @click="nameDialogVisible = false"

@@ -1,4 +1,9 @@
 <script setup lang="ts">
+import MdiEyedropper from '~icons/mdi/eyedropper'
+import MdiPaletteOutline from '~icons/mdi/palette-outline'
+import MdiShuffleVariant from '~icons/mdi/shuffle-variant'
+import MdiWeatherNight from '~icons/mdi/weather-night'
+import MdiWhiteBalanceSunny from '~icons/mdi/white-balance-sunny'
 import { CUSTOM_THEME_CONTRAST, useSettingStore } from '@/scripts/stores/settingsStore.ts'
 import { useSunStore } from '@/scripts/stores/sunStore.ts'
 import { useBackgroundStore } from '@/scripts/stores/backgroundStore.ts'
@@ -69,7 +74,7 @@ const previewSwatches = [
         <!-- Card Header -->
         <div class="card-header">
           <span class="card-title">Theme Configuration</span>
-          <v-icon color="primary" size="large">mdi-palette-outline</v-icon>
+          <v-icon color="primary" size="large" :icon="MdiPaletteOutline" />
         </div>
 
         <div class="card-body">
@@ -111,7 +116,7 @@ const previewSwatches = [
                 <div v-if="!settings.useSunSchedule" class="time-picker-grid">
                   <v-card class="time-picker-card" flat border>
                     <div class="time-picker-header">
-                      <v-icon color="warning">mdi-white-balance-sunny</v-icon>
+                      <v-icon color="warning" :icon="MdiWhiteBalanceSunny" />
                       <span class="time-picker-label">Turn on light theme</span>
                     </div>
                     <div class="time-picker-body">
@@ -128,7 +133,7 @@ const previewSwatches = [
 
                   <v-card class="time-picker-card" flat border>
                     <div class="time-picker-header">
-                      <v-icon color="primary">mdi-weather-night</v-icon>
+                      <v-icon color="primary" :icon="MdiWeatherNight" />
                       <span class="time-picker-label">Turn on dark theme</span>
                     </div>
                     <div class="time-picker-body">
@@ -179,7 +184,7 @@ const previewSwatches = [
               v-if="settings.useImageBackground"
               rounded
               variant="text"
-              prepend-icon="mdi-shuffle-variant"
+              :prepend-icon="MdiShuffleVariant"
               @click="backgroundStore.newBackgroundTheme"
               color="primary"
               class="new-background-btn"
@@ -238,7 +243,7 @@ const previewSwatches = [
       <v-card class="settings-card height-100" flat border>
         <div class="card-header">
           <span class="card-title">Active Swatches</span>
-          <v-icon color="secondary" size="large">mdi-eyedropper</v-icon>
+          <v-icon color="secondary" size="large" :icon="MdiEyedropper" />
         </div>
 
         <div class="card-body">

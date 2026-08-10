@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import MdiAccountMultiplePlus from '~icons/mdi/account-multiple-plus'
+import MdiArrowRight from '~icons/mdi/arrow-right'
 import { computed, ref } from 'vue'
 import { useTheme } from 'vuetify/framework'
 import { usePeopleStore } from '@/scripts/stores/peopleStore'
@@ -76,7 +78,7 @@ async function confirm() {
   <v-dialog v-model="visible" max-width="520" persistent>
     <v-card rounded="xl" color="surface-container" class="merge-dialog">
       <v-card-title class="dialog-title">
-        <v-icon icon="mdi-account-multiple-plus" class="dialog-title-icon" />
+        <v-icon :icon="MdiAccountMultiplePlus" class="dialog-title-icon" />
         <span>Are these the same person?</span>
       </v-card-title>
 
@@ -93,7 +95,7 @@ async function confirm() {
             </div>
 
             <!-- Arrow -->
-            <v-icon icon="mdi-arrow-right" size="36" color="primary" />
+            <v-icon :icon="MdiArrowRight" size="36" color="primary" />
 
             <!-- Source (Remains) -->
             <div class="person-info source">

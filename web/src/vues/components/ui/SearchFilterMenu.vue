@@ -1,4 +1,9 @@
 <script setup lang="ts">
+import MdiClose from '~icons/mdi/close'
+import MdiInformationOutline from '~icons/mdi/information-outline'
+import MdiSortCalendarAscending from '~icons/mdi/sort-calendar-ascending'
+import MdiSortDescending from '~icons/mdi/sort-descending'
+import MdiTuneVariant from '~icons/mdi/tune-variant'
 import { computed, nextTick, ref, watch, onMounted } from 'vue'
 import HistogramDateRangePicker from '@/vues/components/ui/HistogramDateRangePicker.vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -393,7 +398,7 @@ const activeFilterChips = computed(() => {
       content-class="search-filter-menu"
     >
       <template v-slot:activator="{ props }">
-        <v-btn v-bind="props" variant="text" rounded prepend-icon="mdi-tune-variant">
+        <v-btn v-bind="props" variant="text" rounded :prepend-icon="MdiTuneVariant">
           Filters
         </v-btn>
       </template>
@@ -522,13 +527,13 @@ const activeFilterChips = computed(() => {
                 Exclude
                 <v-icon
                   size="16"
-                  icon="mdi-information-outline"
+                  :icon="MdiInformationOutline"
                   class="ml-2"
                   v-tooltip="{
                     location: 'top',
                     text: 'Remove results matching these terms (e.g. “cat” + exclude “orange” → non-orange cats)',
                   }"
-                ></v-icon>
+                />
               </p>
               <v-text-field
                 v-model="filterNegativeQuery"
@@ -549,7 +554,7 @@ const activeFilterChips = computed(() => {
     </v-menu>
 
     <v-btn
-      icon="mdi-close"
+      :icon="MdiClose"
       variant="plain"
       @click="clearFilters"
       class="clear-filters-button"
@@ -578,7 +583,7 @@ const activeFilterChips = computed(() => {
       }"
     >
       <span>Date</span>
-      <v-icon end icon="mdi-sort-calendar-ascending"></v-icon>
+      <v-icon end :icon="MdiSortCalendarAscending" />
     </v-btn>
 
     <v-btn-toggle
@@ -597,12 +602,12 @@ const activeFilterChips = computed(() => {
     >
       <v-btn value="date">
         <span>Date</span>
-        <v-icon end icon="mdi-sort-calendar-ascending"></v-icon>
+        <v-icon end :icon="MdiSortCalendarAscending" />
       </v-btn>
 
       <v-btn value="relevancy">
         <span>Relevancy</span>
-        <v-icon end icon="mdi-sort-descending"></v-icon>
+        <v-icon end :icon="MdiSortDescending" />
       </v-btn>
     </v-btn-toggle>
   </div>

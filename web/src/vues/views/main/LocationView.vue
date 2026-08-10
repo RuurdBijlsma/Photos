@@ -1,6 +1,8 @@
 <script setup lang="ts">
+import MdiImageOutline from '~icons/mdi/image-outline'
+import MdiMapMarkerQuestionOutline from '~icons/mdi/map-marker-question-outline'
 import { computed, ref, useTemplateRef, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useExploreStore } from '@/scripts/stores/exploreStore.ts'
 import SimpleTimeline from '@/vues/components/timeline/simple-timeline/SimpleTimeline.vue'
 import ThumbnailImg from '@/vues/components/ui/ThumbnailImg.vue'
@@ -10,6 +12,7 @@ import { getThumbnailHeight } from '@/scripts/utils.ts'
 import { usePageTitle } from '@/scripts/composables/usePageTitle.ts'
 
 const route = useRoute()
+const router = useRouter()
 const exploreStore = useExploreStore()
 const simpleTimelineRef = useTemplateRef('simpleTimeline')
 
@@ -22,10 +25,36 @@ const locationId = computed(() => {
   return idStr || null
 })
 
+const isPlace = computed(() => !locationId.value?.includes(':'))
+
+watch(
+  isPlace,
+  () => {
+    console.log('isPlace', isPlace.value)
+  },
+  { immediate: true },
+)
+
+watch(
+  locationId,
+  () => {
+    console.log('locationId', locationId.value)
+  },
+  { immediate: true },
+)
+
 const details = computed(() => {
   if (locationId.value === null) return null
   return exploreStore.locations.get(locationId.value)?.location ?? null
 })
+
+watch(
+  details,
+  () => {
+    console.log('details', details.value)
+  },
+  { immediate: true },
+)
 
 const items = computed(() => {
   if (locationId.value === null) return []
@@ -72,6 +101,18 @@ function prefetchLocation(id: string) {
   }
 }
 
+async function handleSelectLocation(targetLocationId: string) {
+  if (targetLocationId && targetLocationId !== locationId.value) {
+    await exploreStore.fetchLocationData(targetLocationId)
+    router.push(`/explore/location/${targetLocationId}`)
+  }
+}
+
+function handleHoverLocation(targetLocationId: string) {
+  console.log('HOVER', targetLocationId)
+  prefetchLocation(targetLocationId)
+}
+
 watch(
   locationId,
   () => {
@@ -114,7 +155,7 @@ usePageTitle(primaryName, { fallback: 'Place' })
             class="header-avatar-img"
           />
           <div v-else class="header-avatar-placeholder">
-            <v-icon size="64" color="on-surface-variant">mdi-image-outline</v-icon>
+            <v-icon size="64" color="on-surface-variant" :icon="MdiImageOutline" />
           </div>
 
           <v-theme-provider theme="dark" with-background>
@@ -141,7 +182,12 @@ usePageTitle(primaryName, { fallback: 'Place' })
           </v-theme-provider>
         </div>
 
-        <location-media-map :items="items" />
+        <location-media-map
+          :is-place="isPlace"
+          :items="items"
+          @select-location="handleSelectLocation"
+          @hover-location="handleHoverLocation"
+        />
       </div>
 
       <!-- Loading State -->
@@ -156,7 +202,7 @@ usePageTitle(primaryName, { fallback: 'Place' })
 
       <!-- Empty State -->
       <div class="empty-location" v-if="items.length === 0 && !isInitialLoad">
-        <v-icon color="on-surface-variant" size="170" icon="mdi-map-marker-question-outline" />
+        <v-icon color="on-surface-variant" size="170" :icon="MdiMapMarkerQuestionOutline" />
         <h2>No media items found for this location</h2>
       </div>
     </simple-timeline>

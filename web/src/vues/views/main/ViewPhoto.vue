@@ -1,4 +1,17 @@
 <script setup lang="ts">
+import MdiCheckboxBlankCircleOutline from '~icons/mdi/checkbox-blank-circle-outline'
+import MdiCheckCircle from '~icons/mdi/check-circle'
+import MdiChevronLeft from '~icons/mdi/chevron-left'
+import MdiChevronRight from '~icons/mdi/chevron-right'
+import MdiClose from '~icons/mdi/close'
+import MdiCloudDownloadOutline from '~icons/mdi/cloud-download-outline'
+import MdiDotsHorizontal from '~icons/mdi/dots-horizontal'
+import MdiInformationOutline from '~icons/mdi/information-outline'
+import MdiMotionPlayOutline from '~icons/mdi/motion-play-outline'
+import MdiRotateRight from '~icons/mdi/rotate-right'
+import MdiShareVariantOutline from '~icons/mdi/share-variant-outline'
+import MdiTrashCanOutline from '~icons/mdi/trash-can-outline'
+import MdiViewGalleryOutline from '~icons/mdi/view-gallery-outline'
 import { useRoute, useRouter } from 'vue-router'
 import { computed, ref, watch } from 'vue'
 import { useSettingStore } from '@/scripts/stores/settingsStore.ts'
@@ -379,13 +392,13 @@ useDetailTitle(mediaDetailTitle, { fallback: 'Photo' })
         <v-btn
           :to="parentLocation"
           rounded="xl"
-          icon="mdi-close"
+          :icon="MdiClose"
           variant="plain"
           v-tooltip="{ text: 'Close viewer', location: 'bottom', attach: true, width: 140 }"
         />
         <v-btn
           rounded="xl"
-          icon="mdi-view-gallery-outline"
+          :icon="MdiViewGalleryOutline"
           @click="showGallery = !showGallery"
           variant="plain"
           v-tooltip="{ text: 'Toggle gallery', location: 'bottom', attach: true, width: 140 }"
@@ -432,7 +445,7 @@ useDetailTitle(mediaDetailTitle, { fallback: 'Photo' })
         <v-btn
           v-if="settings.playMotionPhotos && fullImage?.media_features?.is_motion_photo"
           rounded="xl"
-          icon="mdi-motion-play-outline"
+          :icon="MdiMotionPlayOutline"
           variant="plain"
           @click="viewPhotoStore.triggerPlayMotion"
           v-tooltip="{
@@ -446,32 +459,11 @@ useDetailTitle(mediaDetailTitle, { fallback: 'Photo' })
           v-if="selectionStore.selection.size > 0"
           :color="isSelected ? 'secondary' : 'default'"
           rounded="xl"
-          :icon="isSelected ? 'mdi-check-circle' : 'mdi-checkbox-blank-circle-outline'"
+          :icon="isSelected ? MdiCheckCircle : MdiCheckboxBlankCircleOutline"
           variant="plain"
           @click="toggleSelected"
           v-tooltip="{
             text: isSelected ? 'Remove from selection' : 'Add to selection',
-            location: 'bottom',
-            attach: true,
-            width: 140,
-          }"
-        />
-        <v-btn
-          v-if="
-            !isVideo &&
-            !isPanoActive &&
-            id &&
-            fullImage &&
-            authStore.isAuthenticated &&
-            mimeSupportsRotation(fullImage.media_features.mime_type)
-          "
-          rounded="xl"
-          icon="mdi-rotate-right"
-          variant="plain"
-          :loading="viewPhotoStore.rotationLoading"
-          @click="viewPhotoStore.rotatePhoto(id, fullImage?.orientation, route.query)"
-          v-tooltip="{
-            text: 'Rotate clockwise',
             location: 'bottom',
             attach: true,
             width: 140,
@@ -490,7 +482,7 @@ useDetailTitle(mediaDetailTitle, { fallback: 'Photo' })
               :loading="fullImage === undefined"
               v-bind="props"
               rounded="xl"
-              icon="mdi-information-outline"
+              :icon="MdiInformationOutline"
               variant="plain"
               v-tooltip="{
                 text: 'Extra info',
@@ -510,10 +502,30 @@ useDetailTitle(mediaDetailTitle, { fallback: 'Photo' })
         </v-menu>
         <template v-if="authStore.isAuthenticated">
           <v-btn
+            v-if="
+              fullImage &&
+              !isVideo &&
+              !fullImage.use_panorama_viewer &&
+              id &&
+              mimeSupportsRotation(fullImage.media_features.mime_type)
+            "
+            rounded="xl"
+            :icon="MdiRotateRight"
+            variant="plain"
+            :loading="viewPhotoStore.rotationLoading"
+            @click="viewPhotoStore.rotatePhoto(id, fullImage?.orientation, route.query)"
+            v-tooltip="{
+              text: 'Rotate clockwise',
+              location: 'bottom',
+              attach: true,
+              width: 140,
+            }"
+          />
+          <v-btn
             rounded="xl"
             @click="shareMedia"
             :loading="isSharing"
-            icon="mdi-share-variant-outline"
+            :icon="MdiShareVariantOutline"
             variant="plain"
             v-tooltip="{ text: 'Share', location: 'bottom', attach: true, width: 140 }"
           />
@@ -522,13 +534,13 @@ useDetailTitle(mediaDetailTitle, { fallback: 'Photo' })
             v-if="id"
             :loading="downloadStore.downloadingIds.has(id)"
             @click="downloadStore.downloadItem(id)"
-            icon="mdi-cloud-download-outline"
+            :icon="MdiCloudDownloadOutline"
             variant="plain"
             v-tooltip="{ text: 'Download', location: 'bottom', attach: true, width: 140 }"
           />
           <v-btn
             rounded="xl"
-            icon="mdi-trash-can-outline"
+            :icon="MdiTrashCanOutline"
             variant="plain"
             v-if="id"
             @click="moveToBin()"
@@ -537,7 +549,7 @@ useDetailTitle(mediaDetailTitle, { fallback: 'Photo' })
           />
           <v-menu v-model="optionsOpen">
             <template v-slot:activator="{ props }">
-              <v-btn rounded="xl" icon="mdi-dots-horizontal" variant="plain" v-bind="props" />
+              <v-btn rounded="xl" :icon="MdiDotsHorizontal" variant="plain" v-bind="props" />
             </template>
             <v-list>
               <v-list-item :to="`/search?mode=similar&ids=${id}`">Find similar images</v-list-item>
@@ -574,7 +586,7 @@ useDetailTitle(mediaDetailTitle, { fallback: 'Photo' })
       <v-btn
         class="nav-btn"
         :class="{ 'show-btn': showLeftButton }"
-        icon="mdi-chevron-left"
+        :icon="MdiChevronLeft"
         variant="elevated"
         rounded="xl"
         size="70"
@@ -592,7 +604,7 @@ useDetailTitle(mediaDetailTitle, { fallback: 'Photo' })
       <v-btn
         class="nav-btn"
         :class="{ 'show-btn': showRightButton }"
-        icon="mdi-chevron-right"
+        :icon="MdiChevronRight"
         variant="elevated"
         rounded="xl"
         size="70"
@@ -760,9 +772,9 @@ useDetailTitle(mediaDetailTitle, { fallback: 'Photo' })
 .next-area {
   position: absolute;
   right: 0;
-  top: 70px;
-  height: calc(100% - 190px);
-  width: 33%;
+  top: 150px;
+  height: calc(100% - 360px);
+  width: 30%;
   min-width: 92px;
   cursor: pointer;
   display: flex;
@@ -775,9 +787,9 @@ useDetailTitle(mediaDetailTitle, { fallback: 'Photo' })
 .prev-area {
   position: absolute;
   left: 0;
-  top: 70px;
-  height: calc(100% - 190px);
-  width: 33%;
+  top: 150px;
+  height: calc(100% - 360px);
+  width: 30%;
   min-width: 92px;
   cursor: pointer;
   display: flex;

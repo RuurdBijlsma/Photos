@@ -137,6 +137,7 @@ pub struct ApiSettings {
     pub public_url: String,
     pub cookie_secure: bool,
     pub rate_limiting: RateLimitingSettings,
+    pub serve_static_assets: bool,
 }
 
 #[derive(Debug, Deserialize, Clone)]

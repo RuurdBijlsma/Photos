@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import MdiDeleteEmpty from '~icons/mdi/delete-empty'
+import MdiDeleteOutline from '~icons/mdi/delete-outline'
 import { computed } from 'vue'
 import { useBinStore } from '@/scripts/stores/binStore.ts'
 import SimpleTimeline from '@/vues/components/timeline/simple-timeline/SimpleTimeline.vue'
@@ -42,7 +44,7 @@ useRefreshFunction(() => binStore.fetchBin(), { immediate: true })
             v-if="binStore.binItems.length > 0 && systemStore.stats.allowFileDeletion"
             variant="text"
             color="error"
-            prepend-icon="mdi-delete-empty"
+            :prepend-icon="MdiDeleteEmpty"
             rounded="xl"
             class="text-none"
             @click="emptyBin"
@@ -59,7 +61,7 @@ useRefreshFunction(() => binStore.fetchBin(), { immediate: true })
 
       <!-- Empty State -->
       <div v-else-if="!binStore.binLoading && binStore.binItems.length === 0" class="empty-state">
-        <v-icon icon="mdi-delete-outline" size="100" class="mb-4 opacity-20" />
+        <v-icon :icon="MdiDeleteOutline" size="100" class="mb-4 opacity-20" />
         <h2>Bin is empty</h2>
         <p>Once you delete photos or videos, they will appear here.</p>
       </div>

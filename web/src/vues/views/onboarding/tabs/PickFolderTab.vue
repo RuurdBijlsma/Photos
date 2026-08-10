@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import MdiFolderOutline from '~icons/mdi/folder-outline'
 import { useAuthStore } from '@/scripts/stores/authStore.ts'
 import FullFolderPicker from '@/vues/components/onboarding/FullFolderPicker.vue'
 
@@ -9,7 +10,7 @@ const authStore = useAuthStore()
   <section>
     <v-card class="folder-card" variant="text" rounded color="primary">
       <v-card-title class="d-flex align-center card-title">
-        <v-icon icon="mdi-folder-outline" class="mr-2"></v-icon>
+        <v-icon :icon="MdiFolderOutline" class="mr-2" />
         Pick your user folder.
       </v-card-title>
       <v-card-text>

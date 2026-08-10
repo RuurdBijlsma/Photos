@@ -1,18 +1,22 @@
 <script setup lang="ts">
+import MdiAlert from '~icons/mdi/alert'
+import MdiCheck from '~icons/mdi/check'
+import MdiClose from '~icons/mdi/close'
 import type { PathInfoResponse } from '@/scripts/types/api/admin.js'
 import { prettyBytes } from '@/scripts/utils.ts'
+import type { IconValue } from '@/scripts/types/iconValue.ts'
 
 defineProps<{
   folder: PathInfoResponse
   envVar: string
-  titleIcon: string
+  titleIcon: IconValue
 }>()
 </script>
 
 <template>
   <v-card class="mb-6 folder-card pa-3" variant="flat" color="surface-container">
     <v-card-title class="d-flex align-center card-title">
-      <v-icon size="22" :icon="titleIcon" class="mr-5"></v-icon>
+      <v-icon size="22" :icon="titleIcon" class="mr-5" />
       {{ folder.folder }}
       <v-spacer />
       <v-chip
@@ -44,7 +48,7 @@ defineProps<{
             density="compact"
             :color="folder.readAccess ? 'primary' : 'error'"
           >
-            <v-icon class="mr-2" :icon="folder.readAccess ? 'mdi-check' : 'mdi-close'"></v-icon>
+            <v-icon class="mr-2" :icon="folder.readAccess ? MdiCheck : MdiClose" />
             Read
           </v-chip>
           <v-chip
@@ -52,13 +56,13 @@ defineProps<{
             density="compact"
             :color="folder.writeAccess ? 'primary' : 'error'"
           >
-            <v-icon class="mr-2" :icon="folder.writeAccess ? 'mdi-check' : 'mdi-close'"></v-icon>
+            <v-icon class="mr-2" :icon="folder.writeAccess ? MdiCheck : MdiClose" />
             Write
           </v-chip>
         </div>
       </div>
       <div v-if="!folder.readAccess || !folder.writeAccess" class="mt-4 text-error">
-        <v-icon icon="mdi-alert" class="mr-3"></v-icon>
+        <v-icon :icon="MdiAlert" class="mr-3" />
         This folder has permission issues. Please check read/write access.
       </div>
     </v-card-text>

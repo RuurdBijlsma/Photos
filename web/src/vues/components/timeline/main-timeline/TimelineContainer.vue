@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import MdiImageOffOutline from '~icons/mdi/image-off-outline'
+import MdiImageSyncOutline from '~icons/mdi/image-sync-outline'
 import MainLayoutContainer from '@/vues/components/MainLayoutContainer.vue'
 import {
   computed,
@@ -784,13 +786,13 @@ if (!timelineStore.isInitialized) timelineStore.initialize()
       <!-- Empty state -->
       <div v-if="showEmptyState" class="empty-state">
         <template v-if="isOnboarding">
-          <v-icon color="surface-variant" size="200" icon="mdi-image-sync-outline" />
+          <v-icon color="surface-variant" size="200" :icon="MdiImageSyncOutline" />
           <h2 class="empty-title">Loading your photos&hellip;</h2>
           <p class="empty-subtitle">Your library is being built. This may take a moment...</p>
           <v-progress-circular indeterminate color="primary" size="50" class="mt-5" />
         </template>
         <template v-else>
-          <v-icon color="surface-variant" size="200" icon="mdi-image-off-outline" />
+          <v-icon color="surface-variant" size="200" :icon="MdiImageOffOutline" />
           <h2 class="empty-title">No photos yet</h2>
           <p class="empty-subtitle">Once you add photos to your library they'll appear here.</p>
         </template>

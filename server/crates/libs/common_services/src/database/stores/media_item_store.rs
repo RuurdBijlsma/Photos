@@ -574,24 +574,15 @@ impl MediaItemStore {
     ) -> Result<i32, DbError> {
         let id: i32 = sqlx::query_scalar!(
             r#"
-            WITH existing AS (
-                SELECT id FROM location
-                WHERE name = $1 AND admin1 = $2 AND country_code = $3
-                LIMIT 1
-            ),
-            inserted AS (
-                INSERT INTO location (name, admin1, admin2, country_code, country_name)
-                SELECT $1, $2, $4, $3, $5
-                WHERE NOT EXISTS (SELECT 1 FROM existing)
-                RETURNING id
-            )
-            SELECT id AS "id!" FROM inserted
-            UNION ALL
-            SELECT id AS "id!" FROM existing
-            "#,
-            &location_data.name,
-            &location_data.admin1,
+        INSERT INTO location (country_code, admin1, name, admin2, country_name)
+        VALUES ($1, $2, $3, $4, $5)
+        ON CONFLICT (country_code, admin1, name, admin2)
+        DO UPDATE SET country_name = EXCLUDED.country_name
+        RETURNING id
+        "#,
             &location_data.country_code,
+            &location_data.admin1,
+            &location_data.name,
             &location_data.admin2,
             &location_data.country_name,
         )

@@ -44,6 +44,7 @@ services:
       <<: *backend-env
       APP__API__HOST: "0.0.0.0"
       APP__API__PORT: "5272"
+      APP__API__SERVE_STATIC_ASSETS: "false"
     healthcheck:
       test: [ "CMD-SHELL", "curl -f http://localhost:5272/api/health || exit 1" ]
       interval: 15s
@@ -76,6 +77,8 @@ services:
     restart: always
     ports:
       - "${WEB_PORT:-9475}:9475"
+    volumes:
+      - ${APP_DATA_LOCATION:-app_data}:/app_data:ro
     depends_on:
       api:
         condition: service_healthy

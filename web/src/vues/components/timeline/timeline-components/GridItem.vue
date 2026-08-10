@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import MdiCheckBold from '~icons/mdi/check-bold'
+import MdiFullscreen from '~icons/mdi/fullscreen'
+import MdiPlay from '~icons/mdi/play'
 import type { SimpleTimelineItem, TimelineItem } from '@/scripts/types/generated/timeline.ts'
 import { toHms } from '@/scripts/utils.ts'
 import { useSelectionStore } from '@/scripts/stores/timeline/selectionStore.ts'
@@ -100,12 +103,7 @@ function selectItem(e: PointerEvent) {
 
       <div v-if="selectionStore.isSelecting" class="selecting-overlay" @click="selectItem">
         <div class="checkbox-selecting">
-          <v-icon
-            color="secondary"
-            class="check-item-selecting"
-            size="15"
-            icon="mdi-check-bold"
-          ></v-icon>
+          <v-icon color="secondary" class="check-item-selecting" size="15" :icon="MdiCheckBold" />
         </div>
         <router-link
           class="fullscreen"
@@ -113,7 +111,7 @@ function selectItem(e: PointerEvent) {
           title="View in fullscreen"
           @click.stop
         >
-          <v-icon color="white" class="fullscreen-icon" size="21" icon="mdi-fullscreen" />
+          <v-icon color="white" class="fullscreen-icon" size="21" :icon="MdiFullscreen" />
         </router-link>
         <div class="video-events" @mouseenter="mouseEnter" @mouseleave="mouseLeave" />
       </div>
@@ -126,13 +124,13 @@ function selectItem(e: PointerEvent) {
           <div class="video-events" @mouseenter="mouseEnter" @mouseleave="mouseLeave" />
         </router-link>
         <div class="checkbox" @click.prevent="selectItem">
-          <v-icon color="secondary" class="check-item" size="15" icon="mdi-check-bold" />
+          <v-icon color="secondary" class="check-item" size="15" :icon="MdiCheckBold" />
         </div>
       </template>
 
       <div class="video-info" v-if="isVideo">
         <span>{{ toHms(durationMs / 1000) }}</span>
-        <v-icon color="white" size="16" icon="mdi-play" />
+        <v-icon color="white" size="16" :icon="MdiPlay" />
       </div>
     </template>
   </div>

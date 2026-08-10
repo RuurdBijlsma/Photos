@@ -1,7 +1,15 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, watch } from 'vue'
-import maplibregl, { type MapOptions } from 'maplibre-gl'
+import { onMounted, onUnmounted, ref, watch } from 'vue'
+import {
+  Map as LibreMap,
+  type MapOptions,
+  setWorkerUrl,
+  type StyleSpecification,
+} from 'maplibre-gl'
+import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import 'maplibre-gl/dist/maplibre-gl.css'
+
+setWorkerUrl(workerUrl)
 
 type MapOptionsWithoutContainer = Omit<MapOptions, 'container' | 'style'>
 
@@ -25,7 +33,7 @@ const props = withDefaults(
 const emit = defineEmits(['load', 'style-load'])
 
 const mapContainer = ref<HTMLElement | null>(null)
-let map: null | maplibregl.Map = null
+let map: null | LibreMap = null
 
 const styles = {
   SATELLITE: {
@@ -63,10 +71,10 @@ export type StyleName = keyof typeof styles
 
 onMounted(() => {
   if (!mapContainer.value) return
-  map = new maplibregl.Map({
+  map = new LibreMap({
     ...props.mapOptions,
     container: mapContainer.value,
-    style: styles[props.mapStyle] as unknown as maplibregl.StyleSpecification,
+    style: styles[props.mapStyle] as unknown as StyleSpecification,
   })
 
   map.on('load', () => {
@@ -115,7 +123,7 @@ watch(
   () => props.mapStyle,
   (newStyle) => {
     if (map === null || !newStyle) return
-    map.setStyle(styles[newStyle] as unknown as maplibregl.StyleSpecification)
+    map.setStyle(styles[newStyle] as unknown as StyleSpecification)
   },
 )
 </script>

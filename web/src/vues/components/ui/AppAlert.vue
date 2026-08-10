@@ -1,6 +1,9 @@
 <script setup lang="ts">
+import MdiClose from '~icons/mdi/close'
+import type { IconValue } from '@/scripts/types/iconValue.ts'
+
 defineProps<{
-  icon: string
+  icon: IconValue
 }>()
 
 const errorMessage = defineModel({
@@ -17,7 +20,7 @@ const errorMessage = defineModel({
       {{ errorMessage }}
     </p>
     <v-spacer></v-spacer>
-    <v-btn @click="errorMessage = ''" icon="mdi-close" variant="plain" density="compact" />
+    <v-btn @click="errorMessage = ''" :icon="MdiClose" variant="plain" density="compact" />
   </v-alert>
 </template>
 

@@ -1,10 +1,21 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT\n            m.id as \"media_item_id!\",\n            m.is_video as \"is_video!\",\n            m.has_thumbnails as \"has_thumbnails!\",\n            m.duration_ms::INT as \"duration_ms?\",\n            (m.width::real / m.height::real) AS \"ratio!\",\n            g.latitude AS \"latitude?\",\n            g.longitude AS \"longitude?\",\n            l.name as \"location_name!\",\n            l.admin1 as \"admin1!\",\n            l.admin2 as \"admin2!\",\n            l.country_code as \"country_code!\",\n            l.country_name as \"country_name!\"\n        FROM media_item m\n        JOIN gps g ON m.id = g.media_item_id\n        JOIN location l ON g.location_id = l.id\n        WHERE m.user_id = $1\n          AND m.deleted = false\n          AND ($2::int IS NULL OR l.id = $2)\n          AND ($3::text IS NULL OR l.country_code = $3)\n          AND ($4::text IS NULL OR l.admin1 = $4)\n        ORDER BY m.sort_timestamp, m.id\n        ",
+  "query": "\n        SELECT\n            l.id as \"location_id!\",\n            m.id as \"media_item_id!\",\n            m.is_video as \"is_video!\",\n            m.has_thumbnails as \"has_thumbnails!\",\n            m.duration_ms::INT as \"duration_ms?\",\n            (m.width::real / m.height::real) AS \"ratio!\",\n            g.latitude AS \"latitude?\",\n            g.longitude AS \"longitude?\",\n            l.name as \"location_name!\",\n            l.admin1 as \"admin1!\",\n            l.admin2 as \"admin2!\",\n            l.country_code as \"country_code!\",\n            l.country_name as \"country_name!\"\n        FROM media_item m\n        JOIN gps g ON m.id = g.media_item_id\n        JOIN location l ON g.location_id = l.id\n        WHERE m.user_id = $1\n          AND m.deleted = false\n          AND ($2::int IS NULL OR l.id = $2)\n          AND ($3::text IS NULL OR l.country_code = $3)\n          AND ($4::text IS NULL OR l.admin1 = $4)\n        ORDER BY m.sort_timestamp, m.id\n        ",
   "describe": {
     "columns": [
       {
         "ordinal": 0,
+        "name": "location_id!",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "location",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
         "name": "media_item_id!",
         "type_info": "Varchar",
         "origin": {
@@ -15,7 +26,7 @@
         }
       },
       {
-        "ordinal": 1,
+        "ordinal": 2,
         "name": "is_video!",
         "type_info": "Bool",
         "origin": {
@@ -26,7 +37,7 @@
         }
       },
       {
-        "ordinal": 2,
+        "ordinal": 3,
         "name": "has_thumbnails!",
         "type_info": "Bool",
         "origin": {
@@ -37,19 +48,19 @@
         }
       },
       {
-        "ordinal": 3,
+        "ordinal": 4,
         "name": "duration_ms?",
         "type_info": "Int4",
         "origin": "Expression"
       },
       {
-        "ordinal": 4,
+        "ordinal": 5,
         "name": "ratio!",
         "type_info": "Float4",
         "origin": "Expression"
       },
       {
-        "ordinal": 5,
+        "ordinal": 6,
         "name": "latitude?",
         "type_info": "Float8",
         "origin": {
@@ -60,7 +71,7 @@
         }
       },
       {
-        "ordinal": 6,
+        "ordinal": 7,
         "name": "longitude?",
         "type_info": "Float8",
         "origin": {
@@ -71,7 +82,7 @@
         }
       },
       {
-        "ordinal": 7,
+        "ordinal": 8,
         "name": "location_name!",
         "type_info": "Text",
         "origin": {
@@ -82,7 +93,7 @@
         }
       },
       {
-        "ordinal": 8,
+        "ordinal": 9,
         "name": "admin1!",
         "type_info": "Text",
         "origin": {
@@ -93,7 +104,7 @@
         }
       },
       {
-        "ordinal": 9,
+        "ordinal": 10,
         "name": "admin2!",
         "type_info": "Text",
         "origin": {
@@ -104,7 +115,7 @@
         }
       },
       {
-        "ordinal": 10,
+        "ordinal": 11,
         "name": "country_code!",
         "type_info": "Text",
         "origin": {
@@ -115,7 +126,7 @@
         }
       },
       {
-        "ordinal": 11,
+        "ordinal": 12,
         "name": "country_name!",
         "type_info": "Text",
         "origin": {
@@ -138,6 +149,7 @@
       false,
       false,
       false,
+      false,
       null,
       null,
       false,
@@ -149,5 +161,5 @@
       false
     ]
   },
-  "hash": "1d8a2b8525a6a7c8d8d510804cc260fdae33344d7b42899e1007bf778b612c61"
+  "hash": "07008c813135833908f48fdf073c3237aa83c67194b6d80dc348b7af03aed8ff"
 }

@@ -229,6 +229,7 @@ pub async fn get_location(
     let rows = sqlx::query!(
         r#"
         SELECT
+            l.id as "location_id!",
             m.id as "media_item_id!",
             m.is_video as "is_video!",
             m.has_thumbnails as "has_thumbnails!",
@@ -280,6 +281,7 @@ pub async fn get_location(
         .iter()
         .map(|r| LocationMediaItem {
             id: r.media_item_id.clone(),
+            location_id: r.location_id,
             is_video: r.is_video,
             has_thumbnails: r.has_thumbnails,
             duration_ms: r.duration_ms,

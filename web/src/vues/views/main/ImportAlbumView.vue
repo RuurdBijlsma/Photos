@@ -1,4 +1,9 @@
 <script setup lang="ts">
+import MdiAlertCircleOutline from '~icons/mdi/alert-circle-outline'
+import MdiImageMultiple from '~icons/mdi/image-multiple'
+import MdiPencil from '~icons/mdi/pencil'
+import MdiShareVariant from '~icons/mdi/share-variant'
+import MdiText from '~icons/mdi/text'
 import { onMounted, ref, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import albumService from '@/scripts/services/albumService.ts'
@@ -83,7 +88,7 @@ onMounted(() => {
 
       <!-- Error State -->
       <div v-else-if="error" class="state-container">
-        <v-icon icon="mdi-alert-circle-outline" color="error" size="80" />
+        <v-icon :icon="MdiAlertCircleOutline" color="error" size="80" />
         <h2 class="text-h4 mt-4">Invalid Link</h2>
         <p class="opacity-70 mt-2">{{ error }}</p>
         <v-btn color="primary" variant="tonal" rounded="xl" class="mt-6" to="/"> Go Home </v-btn>
@@ -92,7 +97,7 @@ onMounted(() => {
       <!-- Content State -->
       <div v-else-if="summary" class="import-content">
         <div class="header-section mb-8">
-          <v-icon icon="mdi-share-variant" color="primary" size="48" class="mb-4" />
+          <v-icon :icon="MdiShareVariant" color="primary" size="48" class="mb-4" />
           <h1 class="text-h3 font-weight-bold">Import Album</h1>
           <p class="text-subtitle-1 opacity-70">Someone shared a collection with you</p>
         </div>
@@ -102,7 +107,7 @@ onMounted(() => {
             <v-card color="surface-container-high" rounded="xl" class="pa-6" elevation="2">
               <div class="d-flex align-center mb-6">
                 <v-avatar color="primary" variant="tonal" size="64" rounded="lg" class="mr-4">
-                  <v-icon icon="mdi-image-multiple" size="32" />
+                  <v-icon :icon="MdiImageMultiple" size="32" />
                 </v-avatar>
                 <div>
                   <div class="text-h5 font-weight-bold">{{ summary.name }}</div>
@@ -121,7 +126,7 @@ onMounted(() => {
                   label="Album Name"
                   variant="outlined"
                   rounded="lg"
-                  prepend-inner-icon="mdi-pencil"
+                  :prepend-inner-icon="MdiPencil"
                   class="mb-2"
                   persistent-placeholder
                 />
@@ -130,7 +135,7 @@ onMounted(() => {
                   label="Description (Optional)"
                   variant="outlined"
                   rounded="lg"
-                  prepend-inner-icon="mdi-text"
+                  :prepend-inner-icon="MdiText"
                   rows="3"
                   auto-grow
                 />

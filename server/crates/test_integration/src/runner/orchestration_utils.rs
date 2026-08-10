@@ -1,7 +1,8 @@
-use app_state::load_app_settings;
+use app_state::load_settings_from_path;
 use color_eyre::Result;
 use colored::*;
 use std::future::Future;
+use std::path::PathBuf;
 use std::time::Instant;
 use tracing::Level;
 use tracing_subscriber::{EnvFilter, fmt};
@@ -95,7 +96,11 @@ where
 }
 
 pub fn setup_tracing_and_panic_handling() {
-    let settings = load_app_settings().expect("Can't load settings");
+    let settings_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("assets/settings.yaml")
+        .canonicalize()
+        .expect("Can't construct settings path");
+    let settings = load_settings_from_path(&settings_path, None).expect("Can't load settings");
     let filter = EnvFilter::try_from_default_env()
         .unwrap_or_else(|_| settings.logging.filters.to_filter_string().into());
 

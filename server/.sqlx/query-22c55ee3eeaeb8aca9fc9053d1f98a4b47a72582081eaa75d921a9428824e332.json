@@ -1,0 +1,32 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO location (country_code, admin1, name, admin2, country_name)\n        VALUES ($1, $2, $3, $4, $5)\n        ON CONFLICT (country_code, admin1, name, admin2)\n        DO UPDATE SET country_name = EXCLUDED.country_name\n        RETURNING id\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "location",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "22c55ee3eeaeb8aca9fc9053d1f98a4b47a72582081eaa75d921a9428824e332"
+}

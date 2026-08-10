@@ -1,4 +1,21 @@
 <script setup lang="ts">
+import MdiBabyFaceOutline from '~icons/mdi/baby-face-outline'
+import MdiCamera from '~icons/mdi/camera'
+import MdiCloudOutline from '~icons/mdi/cloud-outline'
+import MdiCompassOutline from '~icons/mdi/compass-outline'
+import MdiFaceMan from '~icons/mdi/face-man'
+import MdiFaceManOutline from '~icons/mdi/face-man-outline'
+import MdiFaceManShimmer from '~icons/mdi/face-man-shimmer'
+import MdiFaceManShimmerOutline from '~icons/mdi/face-man-shimmer-outline'
+import MdiFaceWoman from '~icons/mdi/face-woman'
+import MdiFaceWomanOutline from '~icons/mdi/face-woman-outline'
+import MdiFaceWomanShimmer from '~icons/mdi/face-woman-shimmer'
+import MdiFaceWomanShimmerOutline from '~icons/mdi/face-woman-shimmer-outline'
+import MdiImageAlbum from '~icons/mdi/image-album'
+import MdiImageOutline from '~icons/mdi/image-outline'
+import MdiMapOutline from '~icons/mdi/map-outline'
+import MdiTrashCan from '~icons/mdi/trash-can'
+import MdiTrashCanOutline from '~icons/mdi/trash-can-outline'
 import { useRoute } from 'vue-router'
 import { computed, useTemplateRef } from 'vue'
 import { useAlbumStore } from '@/scripts/stores/albumStore.ts'
@@ -19,15 +36,15 @@ const theme = useTheme()
 const route = useRoute()
 
 const faceIcons = [
-  'mdi-face-man',
-  'mdi-face-man-outline',
-  'mdi-face-man-shimmer',
-  'mdi-face-man-shimmer-outline',
-  'mdi-face-woman',
-  'mdi-face-woman-outline',
-  'mdi-face-woman-shimmer',
-  'mdi-face-woman-shimmer-outline',
-  'mdi-baby-face-outline',
+  MdiFaceMan,
+  MdiFaceManOutline,
+  MdiFaceManShimmer,
+  MdiFaceManShimmerOutline,
+  MdiFaceWoman,
+  MdiFaceWomanOutline,
+  MdiFaceWomanShimmer,
+  MdiFaceWomanShimmerOutline,
+  MdiBabyFaceOutline,
 ]
 const faceIcon = faceIcons[Math.floor(Math.random() * faceIcons.length)]
 
@@ -83,14 +100,14 @@ const { isScrolling } = useScroll(() => navList.value?.$el as HTMLElement | null
       <v-list-item
         class="mt-3"
         rounded
-        prepend-icon="mdi-image-outline"
+        :prepend-icon="MdiImageOutline"
         title="Photos"
         to="/"
         :active="route.path === '/'"
         @click="route.path === '/' ? timelineToTop() : undefined"
       />
-      <v-list-item rounded prepend-icon="mdi-compass-outline" title="Explore" to="/explore" />
-      <v-list-item rounded prepend-icon="mdi-map-outline" title="Map" to="/map" />
+      <v-list-item rounded :prepend-icon="MdiCompassOutline" title="Explore" to="/explore" />
+      <v-list-item rounded :prepend-icon="MdiMapOutline" title="Map" to="/map" />
 
       <v-list-subheader class="mt-5">Collections</v-list-subheader>
 
@@ -98,7 +115,7 @@ const { isScrolling } = useScroll(() => navList.value?.$el as HTMLElement | null
         v-model:expanded="albumsExpanded"
         title="Albums"
         to="/albums"
-        icon="mdi-image-album"
+        :icon="MdiImageAlbum"
         :items="albumStore.userAlbums"
       >
         <template #item="{ item: album }">
@@ -177,11 +194,11 @@ const { isScrolling } = useScroll(() => navList.value?.$el as HTMLElement | null
         </template>
       </NavExpandableList>
 
-      <v-list-item rounded prepend-icon="mdi-camera" title="Cameras" to="/cameras" />
+      <v-list-item rounded :prepend-icon="MdiCamera" title="Cameras" to="/cameras" />
 
       <v-divider class="mx-5 mt-2 mb-2" />
 
-      <v-list-item rounded prepend-icon="mdi-trash-can-outline" title="Bin" to="/bin" />
+      <v-list-item rounded :prepend-icon="MdiTrashCanOutline" title="Bin" to="/bin" />
 
       <v-spacer />
 
@@ -189,7 +206,7 @@ const { isScrolling } = useScroll(() => navList.value?.$el as HTMLElement | null
     </v-list>
     <div v-else class="collapsed-list">
       <v-btn
-        icon="mdi-image-outline"
+        :icon="MdiImageOutline"
         @click="route.path === '/' ? timelineToTop() : undefined"
         :variant="route.path === '/' ? 'tonal' : 'plain'"
         :color="route.path === '/' ? 'primary-darken-1' : undefined"
@@ -198,14 +215,14 @@ const { isScrolling } = useScroll(() => navList.value?.$el as HTMLElement | null
         :active="route.path === '/'"
       />
       <v-btn
-        icon="mdi-compass-outline"
+        :icon="MdiCompassOutline"
         :variant="route.path.startsWith('/explore') ? 'tonal' : 'plain'"
         :color="route.path === '/explore' ? 'primary-darken-1' : undefined"
         to="/explore"
         title="Explore"
       />
       <v-btn
-        icon="mdi-map-outline"
+        :icon="MdiMapOutline"
         :variant="route.path.startsWith('/map') ? 'tonal' : 'plain'"
         :color="route.path === '/map' ? 'primary-darken-1' : undefined"
         to="/map"
@@ -213,7 +230,7 @@ const { isScrolling } = useScroll(() => navList.value?.$el as HTMLElement | null
       />
       <v-divider class="ma-2" />
       <v-btn
-        icon="mdi-image-album"
+        :icon="MdiImageAlbum"
         :variant="route.path.startsWith('/albums') ? 'tonal' : 'plain'"
         :color="route.path === '/albums' ? 'primary-darken-1' : undefined"
         to="/albums"
@@ -228,7 +245,7 @@ const { isScrolling } = useScroll(() => navList.value?.$el as HTMLElement | null
         title="People"
       />
       <v-btn
-        icon="mdi-camera"
+        :icon="MdiCamera"
         :variant="route.path.startsWith('/cameras') ? 'tonal' : 'plain'"
         :color="route.path === '/cameras' ? 'primary-darken-1' : undefined"
         to="/cameras"
@@ -236,14 +253,14 @@ const { isScrolling } = useScroll(() => navList.value?.$el as HTMLElement | null
       />
       <v-divider class="ma-2" />
       <v-btn
-        icon="mdi-trash-can"
+        :icon="MdiTrashCan"
         :variant="route.path.startsWith('/bin') ? 'tonal' : 'plain'"
         :color="route.path === '/bin' ? 'primary-darken-1' : undefined"
         to="/bin"
         title="Bin"
       />
       <v-btn
-        icon="mdi-cloud-outline"
+        :icon="MdiCloudOutline"
         :variant="route.path.startsWith('/storage') ? 'tonal' : 'plain'"
         :color="route.path === '/storage' ? 'primary-darken-1' : undefined"
         to="/storage"

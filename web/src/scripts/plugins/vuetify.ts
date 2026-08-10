@@ -1,13 +1,13 @@
 import { createVuetify } from 'vuetify'
-import { aliases, mdi } from 'vuetify/iconsets/mdi'
 import themeJson from '@/assets/themes/etna-theme.json'
 import { transformToVuetifyTheme } from '@/scripts/stores/themeStore.ts'
 import type { Theme } from '@/scripts/types/themeColor.ts'
 import { Tooltip } from 'vuetify/directives'
 import { useStorage } from '@vueuse/core'
-import { resolveThemeMode } from '@/scripts/themeUtils.ts'
 import type { SunCache } from '@/scripts/themeUtils.ts'
+import { resolveThemeMode } from '@/scripts/themeUtils.ts'
 import { useObjStorage } from '@/scripts/utils.ts'
+import { vuetifyIcons } from '@/scripts/plugins/vuetifyIcons.ts'
 
 const theme: Theme = themeJson
 const lightDefinition = transformToVuetifyTheme(theme.schemes?.light, false)
@@ -39,11 +39,5 @@ export const vuetify = createVuetify({
       dark: darkDefinition,
     },
   },
-  icons: {
-    defaultSet: 'mdi',
-    aliases,
-    sets: {
-      mdi,
-    },
-  },
+  icons: vuetifyIcons,
 })

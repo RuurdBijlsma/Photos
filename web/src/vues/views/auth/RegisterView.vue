@@ -1,4 +1,12 @@
 <script setup lang="ts">
+import MdiAccountOutline from '~icons/mdi/account-outline'
+import MdiAlertOctagon from '~icons/mdi/alert-octagon'
+import MdiEmailOutline from '~icons/mdi/email-outline'
+import MdiEyeOffOutline from '~icons/mdi/eye-off-outline'
+import MdiEyeOutline from '~icons/mdi/eye-outline'
+import MdiLockCheckOutline from '~icons/mdi/lock-check-outline'
+import MdiLockOpenOutline from '~icons/mdi/lock-open-outline'
+import MdiLockOutline from '~icons/mdi/lock-outline'
 import type { VForm } from 'vuetify/components'
 import { onMounted, type Ref, ref } from 'vue'
 import { useAuthStore } from '@/scripts/stores/authStore.ts'
@@ -91,7 +99,7 @@ async function register() {
         <div class="row-input mb-3">
           <v-text-field
             class="text-input"
-            prepend-icon="mdi-account-outline"
+            :prepend-icon="MdiAccountOutline"
             variant="outlined"
             ref="userInput"
             rounded
@@ -106,7 +114,7 @@ async function register() {
           />
           <v-text-field
             class="text-input ml-5"
-            prepend-icon="mdi-email-outline"
+            :prepend-icon="MdiEmailOutline"
             append-icon="empty"
             variant="outlined"
             rounded
@@ -124,7 +132,7 @@ async function register() {
           <v-text-field
             class="text-input"
             variant="outlined"
-            :prepend-icon="showPassword ? 'mdi-lock-open-outline' : 'mdi-lock-outline'"
+            :prepend-icon="showPassword ? MdiLockOpenOutline : MdiLockOutline"
             :rules="isSubmitted ? [rules.passRequired] : []"
             :type="showPassword ? 'text' : 'password'"
             rounded
@@ -138,8 +146,8 @@ async function register() {
           <v-text-field
             class="text-input ml-5"
             variant="outlined"
-            prepend-icon="mdi-lock-check-outline"
-            :append-icon="showPassword ? 'mdi-eye-outline' : 'mdi-eye-off-outline'"
+            :prepend-icon="MdiLockCheckOutline"
+            :append-icon="showPassword ? MdiEyeOutline : MdiEyeOffOutline"
             @click:append="showPassword = !showPassword"
             :rules="isSubmitted ? [rules.passRequired, rules.noMatch] : []"
             :type="showPassword ? 'text' : 'password'"
@@ -176,7 +184,7 @@ async function register() {
 
       <app-alert
         v-model="errorMessage"
-        icon="mdi-alert-octagon"
+        :icon="MdiAlertOctagon"
         class="mt-8"
         background-color="error-container"
         text-color="on-error-container"

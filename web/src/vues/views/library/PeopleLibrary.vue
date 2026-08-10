@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import MdiAccountSearchOutline from '~icons/mdi/account-search-outline'
 import MainLayoutContainer from '@/vues/components/MainLayoutContainer.vue'
 import { computed, ref } from 'vue'
 import { usePeopleStore } from '@/scripts/stores/peopleStore.ts'
@@ -166,14 +167,14 @@ useRefreshFunction(() => peopleStore.fetchPeople(), { immediate: true })
 
       <!-- Empty State -->
       <div v-else-if="!peopleStore.peopleLoading && totalPeopleCount === 0" class="empty-people">
-        <v-icon color="on-surface-variant" size="140" icon="mdi-account-search-outline" />
+        <v-icon color="on-surface-variant" size="140" :icon="MdiAccountSearchOutline" />
         <h2>No people found</h2>
       </div>
 
       <!-- Grid Layout -->
       <template v-else>
         <section v-for="section in sections" :key="section.title" class="people-section">
-          <div class="section-header">
+          <div class="section-header" v-if="section.title === 'Unnamed'">
             <h2>{{ section.title }}</h2>
             <p>{{ section.items.length.toLocaleString() }}</p>
           </div>

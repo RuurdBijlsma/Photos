@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import type { StyleName } from '@/vues/components/map/BaseMap.vue'
+import MdiCheckCircle from '~icons/mdi/check-circle'
+import MdiFire from '~icons/mdi/fire'
+import MdiMapMarkerMultipleOutline from '~icons/mdi/map-marker-multiple-outline'
 
 export interface MapStyle {
   key: StyleName
@@ -51,14 +54,14 @@ function handleCycleStyle() {
             column
           >
             <v-chip
-              prepend-icon="mdi-map-marker-multiple-outline"
+              :prepend-icon="MdiMapMarkerMultipleOutline"
               value="markers"
               key="markers"
               variant="flat"
             >
               Markers
             </v-chip>
-            <v-chip prepend-icon="mdi-fire" value="heatmap" key="heatmap" variant="flat">
+            <v-chip :prepend-icon="MdiFire" value="heatmap" key="heatmap" variant="flat">
               Heatmap
             </v-chip>
           </v-chip-group>
@@ -79,7 +82,7 @@ function handleCycleStyle() {
               <v-icon
                 v-if="currentStyle === style.key"
                 color="primary"
-                icon="mdi-check-circle"
+                :icon="MdiCheckCircle"
                 class="map-style-option-check"
                 size="20"
               />

@@ -29,13 +29,12 @@
 * import albums from google photos
 * duplicate photo remover tool
 * better error if exiftool isnt there (worker wont work then)
-* --- HIGH PRIO ---
-* rotate image by changing thumbnail orientation?
+* apply rotation immidiately when going next/prev to other media item.
+# HIGH PRIO
+* 50 megapixels plaatjes willen niet rotaten om een of andere reden (die van tiramisu)
+* er is een bug in `get_or_create_location`, http://localhost:5173/explore/location/614 -> er zijn 4 Otterlo, Gelderland, NL in de DB
 
 # INFRASTRUCTURE:
 
-* make setup to host only backend, frontend could be gh pages or something?
-  * I think this would be faster than hosting web on laptop
 * update available checker
-* nginx thumbnail hosting (optional maak setting voor Rust thumb hosting).
 * restart server button?

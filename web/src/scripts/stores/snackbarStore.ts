@@ -1,6 +1,11 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { isAxiosError } from 'axios'
+import MdiAlert from '~icons/mdi/alert'
+import MdiCheck from '~icons/mdi/check'
+import MdiFireAlert from '~icons/mdi/fire-alert'
+import MdiInformationOutline from '~icons/mdi/information-outline'
+import type { IconValue } from '@/scripts/types/iconValue.ts'
 
 // --- Types ---
 
@@ -13,7 +18,7 @@ export interface SnackAction {
 export interface Snack {
   id: string
   message: string
-  icon?: string
+  icon?: IconValue
   color: 'success' | 'info' | 'warning' | 'error' | 'surface-container-high' | string
   timeout: number
   action?: SnackAction
@@ -30,7 +35,7 @@ export type SnackOptions = {
   color?: Snack['color']
   timeout?: number
   action?: SnackAction
-  icon?: string
+  icon?: IconValue
   error?: unknown
   loading?: boolean
   dismissable?: boolean
@@ -174,15 +179,15 @@ export const useSnackbarsStore = defineStore('snackbars', () => {
   // --- Convenience Helpers ---
 
   function info(message: string, action?: SnackAction): string {
-    return enqueue({ message, color: 'info', icon: 'mdi-information-outline', action })
+    return enqueue({ message, color: 'info', icon: MdiInformationOutline, action })
   }
 
   function success(message: string, action?: SnackAction): string {
-    return enqueue({ message, color: 'success', icon: 'mdi-check', action })
+    return enqueue({ message, color: 'success', icon: MdiCheck, action })
   }
 
   function warning(message: string, action?: SnackAction): string {
-    return enqueue({ message, color: 'warning', icon: 'mdi-alert', action })
+    return enqueue({ message, color: 'warning', icon: MdiAlert, action })
   }
 
   function error(message: string, error?: unknown, action?: SnackAction): string {
@@ -190,7 +195,7 @@ export const useSnackbarsStore = defineStore('snackbars', () => {
       message,
       error,
       color: 'error',
-      icon: 'mdi-fire-alert',
+      icon: MdiFireAlert,
       timeout: 10000,
       action,
     })

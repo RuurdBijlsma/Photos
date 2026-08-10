@@ -1,10 +1,12 @@
 <script setup lang="ts" generic="T extends { id: string }">
+import MdiMenuDown from '~icons/mdi/menu-down'
 import { computed, ref } from 'vue'
+import type { IconValue } from '@/scripts/types/iconValue.ts'
 
 const props = defineProps<{
   title: string
   to: string
-  icon: string
+  icon: IconValue
   items: T[]
 }>()
 
@@ -26,7 +28,7 @@ const hasMore = computed(() => props.items.length > maxShown.value)
         @click="expanded = !expanded"
         class="albums-nav-btn"
         density="compact"
-        icon="mdi-menu-down"
+        :icon="MdiMenuDown"
         v-if="items.length > 0"
         :class="{
           'point-down': expanded,

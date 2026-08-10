@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import MdiEyeCheckOutline from '~icons/mdi/eye-check-outline'
 import { computed } from 'vue'
 import type { MediaSampleResponse } from '@/scripts/types/api/admin.js'
 
@@ -37,7 +38,7 @@ const cardCaption = computed(() => {
 <template>
   <v-card rounded class="folder-card" variant="text">
     <v-card-title class="d-flex align-center">
-      <v-icon icon="mdi-eye-check-outline" class="mr-2"></v-icon>
+      <v-icon :icon="MdiEyeCheckOutline" class="mr-2" />
       {{ cardTitle }}
     </v-card-title>
 

@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import MdiCached from '~icons/mdi/cached'
+import MdiChevronDown from '~icons/mdi/chevron-down'
+import MdiChevronUp from '~icons/mdi/chevron-up'
 import { ref } from 'vue'
 import { caps } from '@/scripts/utils.ts'
 
@@ -35,7 +38,7 @@ const expanded = ref(false)
       <div class="failed-actions">
         <v-btn
           v-if="lastError"
-          :icon="expanded ? 'mdi-chevron-up' : 'mdi-chevron-down'"
+          :icon="expanded ? MdiChevronUp : MdiChevronDown"
           variant="text"
           color="medium-emphasis"
           density="comfortable"
@@ -47,7 +50,7 @@ const expanded = ref(false)
           color="primary"
           size="small"
           rounded="xl"
-          prepend-icon="mdi-cached"
+          :prepend-icon="MdiCached"
           :loading="retrying"
           @click="emit('retry', id)"
         >

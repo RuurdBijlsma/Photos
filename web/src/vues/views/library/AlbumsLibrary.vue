@@ -1,4 +1,15 @@
 <script setup lang="ts">
+import MdiChevronDown from '~icons/mdi/chevron-down'
+import MdiDotsHorizontal from '~icons/mdi/dots-horizontal'
+import MdiImageAlbum from '~icons/mdi/image-album'
+import MdiPlus from '~icons/mdi/plus'
+import MdiShare from '~icons/mdi/share'
+import MdiSortAlphabeticalDescendingVariant from '~icons/mdi/sort-alphabetical-descending-variant'
+import MdiSortAlphabeticalAscendingVariant from '~icons/mdi/sort-alphabetical-ascending-variant'
+import MdiSortCalendarAscending from '~icons/mdi/sort-calendar-ascending'
+import MdiSortCalendarDescending from '~icons/mdi/sort-calendar-descending'
+import MdiSortClockAscendingOutline from '~icons/mdi/sort-clock-ascending-outline'
+import MdiSortClockDescendingOutline from '~icons/mdi/sort-clock-descending-outline'
 import { computed, onMounted } from 'vue'
 import MainLayoutContainer from '@/vues/components/MainLayoutContainer.vue'
 import type { Album, AlbumSortField, SortDirection } from '@/scripts/types/api/album'
@@ -72,17 +83,15 @@ const currentSortFieldTitle = computed(() => {
 const sortDirectionIcon = computed(() => {
   if (currentSortField.value === 'name') {
     return currentSortDirection.value === 'asc'
-      ? 'mdi-sort-alphabetical-ascending-variant'
-      : 'mdi-sort-alphabetical-descending-variant'
+      ? MdiSortAlphabeticalAscendingVariant
+      : MdiSortAlphabeticalDescendingVariant
   }
   if (currentSortField.value === 'updatedAt') {
     return currentSortDirection.value === 'asc'
-      ? 'mdi-sort-clock-ascending-outline'
-      : 'mdi-sort-clock-descending-outline'
+      ? MdiSortClockAscendingOutline
+      : MdiSortClockDescendingOutline
   }
-  return currentSortDirection.value === 'asc'
-    ? 'mdi-sort-calendar-ascending'
-    : 'mdi-sort-calendar-descending'
+  return currentSortDirection.value === 'asc' ? MdiSortCalendarAscending : MdiSortCalendarDescending
 })
 
 const sortDirectionTooltip = computed(() => {
@@ -106,7 +115,7 @@ async function makeNewAlbum() {
   await dialogs.alert({
     title: 'Create album',
     description: 'Create an album by selecting some photos and clicking "Add to album"',
-    icon: 'mdi-image-album',
+    icon: MdiImageAlbum,
     actions: [
       {
         name: 'Go to photos',
@@ -181,7 +190,7 @@ useRefreshFunction(() => albumStore.fetchUserAlbums())
                 color="primary"
                 v-bind="props"
                 rounded="xl"
-                append-icon="mdi-chevron-down"
+                :append-icon="MdiChevronDown"
                 class="text-none sort-text"
               >
                 {{ currentSortFieldTitle }}
@@ -213,7 +222,7 @@ useRefreshFunction(() => albumStore.fetchUserAlbums())
 
           <v-btn
             color="primary"
-            prepend-icon="mdi-plus"
+            :prepend-icon="MdiPlus"
             rounded
             variant="flat"
             class="text-none ml-3 new-album"
@@ -234,7 +243,7 @@ useRefreshFunction(() => albumStore.fetchUserAlbums())
         v-else-if="!albumStore.userAlbumsLoading && sortedAlbums.length === 0"
         class="empty-state"
       >
-        <v-icon icon="mdi-image-album" size="100" class="mb-4 opacity-20" />
+        <v-icon :icon="MdiImageAlbum" size="100" class="mb-4 opacity-20" />
         <h2>No albums yet</h2>
         <p>Create your first album to start organizing your memories.</p>
         <v-btn color="primary" variant="tonal" rounded class="mt-6" @click="makeNewAlbum">
@@ -265,7 +274,7 @@ useRefreshFunction(() => albumStore.fetchUserAlbums())
                 <v-btn
                   v-bind="props"
                   class="album-options-btn"
-                  icon="mdi-dots-horizontal"
+                  :icon="MdiDotsHorizontal"
                   variant="flat"
                   density="comfortable"
                   color="primary"
@@ -294,7 +303,7 @@ useRefreshFunction(() => albumStore.fetchUserAlbums())
                   class="album-shared-avatar"
                   color="primary"
                 >
-                  <v-icon icon="mdi-share" size="23" />
+                  <v-icon :icon="MdiShare" size="23" />
                 </v-avatar>
               </template>
               <v-list density="compact">

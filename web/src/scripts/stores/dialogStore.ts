@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
+import type { IconValue } from '@/scripts/types/iconValue.ts'
 
 export type DialogType = 'alert' | 'confirm' | 'prompt'
 
@@ -12,7 +13,7 @@ export interface DialogAction {
 export interface DialogOptions {
   title: string
   description?: string
-  icon?: string
+  icon?: IconValue
   confirmText?: string
   cancelText?: string
   defaultValue?: string

@@ -1,4 +1,11 @@
 <script setup lang="ts">
+import MdiImageFilterHdr from '~icons/mdi/image-filter-hdr'
+import MdiImageOutline from '~icons/mdi/image-outline'
+import MdiSnowflake from '~icons/mdi/snowflake'
+import MdiThermometer from '~icons/mdi/thermometer'
+import MdiWaterPercent from '~icons/mdi/water-percent'
+import MdiWeatherPouring from '~icons/mdi/weather-pouring'
+import MdiWeatherWindy from '~icons/mdi/weather-windy'
 import { watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useExploreStore } from '@/scripts/stores/exploreStore.ts'
@@ -119,7 +126,7 @@ function formatCoords(lat: number | null, lon: number | null): string {
         <template #[`item.thumbnail`]="{ item }">
           <div class="thumbnail-wrapper">
             <thumbnail-img v-if="item.id" :media-item-id="item.id" class="table-thumbnail" cover />
-            <v-icon v-else size="small" color="primary">mdi-image-outline</v-icon>
+            <v-icon v-else size="small" color="primary" :icon="MdiImageOutline" />
           </div>
         </template>
 
@@ -133,7 +140,7 @@ function formatCoords(lat: number | null, lon: number | null): string {
         <!-- Weather: Temp Column -->
         <template #[`item.temperature`]="{ item }">
           <div v-if="item.temperature !== null" class="d-flex align-center">
-            <v-icon icon="mdi-thermometer" size="small" color="orange" class="mr-1" />
+            <v-icon :icon="MdiThermometer" size="small" color="orange" class="mr-1" />
             <span class="val-text">{{ item.temperature.toFixed(1) }}°C</span>
           </div>
           <span v-else class="text-disabled">-</span>
@@ -142,7 +149,7 @@ function formatCoords(lat: number | null, lon: number | null): string {
         <!-- Weather: Wind Speed Column -->
         <template #[`item.windSpeed`]="{ item }">
           <div v-if="item.windSpeed !== null" class="d-flex align-center">
-            <v-icon icon="mdi-weather-windy" size="small" color="blue-lighten-2" class="mr-1" />
+            <v-icon :icon="MdiWeatherWindy" size="small" color="blue-lighten-2" class="mr-1" />
             <span class="val-text">{{ item.windSpeed.toFixed(1) }} km/h</span>
           </div>
           <span v-else class="text-disabled">-</span>
@@ -151,7 +158,7 @@ function formatCoords(lat: number | null, lon: number | null): string {
         <!-- Weather: Relative Humidity Column -->
         <template #[`item.relative_humidity`]="{ item }">
           <div v-if="item.relativeHumidity !== null" class="d-flex align-center">
-            <v-icon icon="mdi-water-percent" size="small" color="blue-lighten-2" class="mr-1" />
+            <v-icon :icon="MdiWaterPercent" size="small" color="blue-lighten-2" class="mr-1" />
             <span class="val-text">{{ item.relativeHumidity.toFixed(1) }}%</span>
           </div>
           <span v-else class="text-disabled">-</span>
@@ -160,7 +167,7 @@ function formatCoords(lat: number | null, lon: number | null): string {
         <!-- Weather: Precipitation Column -->
         <template #[`item.precipitation`]="{ item }">
           <div v-if="item.precipitation !== null" class="d-flex align-center">
-            <v-icon icon="mdi-weather-pouring" size="small" color="blue-lighten-2" class="mr-1" />
+            <v-icon :icon="MdiWeatherPouring" size="small" color="blue-lighten-2" class="mr-1" />
             <span class="val-text">{{ item.precipitation.toFixed(1) }} mm</span>
           </div>
           <span v-else class="text-disabled">-</span>
@@ -169,7 +176,7 @@ function formatCoords(lat: number | null, lon: number | null): string {
         <!-- Weather: Snow Column -->
         <template #[`item.snow`]="{ item }">
           <div v-if="item.snow !== null" class="d-flex align-center">
-            <v-icon icon="mdi-snowflake" size="small" color="blue-lighten-2" class="mr-1" />
+            <v-icon :icon="MdiSnowflake" size="small" color="blue-lighten-2" class="mr-1" />
             <span class="val-text">{{ item.snow.toFixed(1) }} mm</span>
           </div>
           <span v-else class="text-disabled">-</span>
@@ -200,7 +207,7 @@ function formatCoords(lat: number | null, lon: number | null): string {
             class="d-flex align-center"
             :title="formatCoords(item.latitude, item.longitude)"
           >
-            <v-icon icon="mdi-image-filter-hdr" size="small" color="teal" class="mr-1" />
+            <v-icon :icon="MdiImageFilterHdr" size="small" color="teal" class="mr-1" />
             <span class="val-text">{{ Math.round(item.altitude) }}m</span>
           </div>
           <span v-else class="text-disabled">-</span>

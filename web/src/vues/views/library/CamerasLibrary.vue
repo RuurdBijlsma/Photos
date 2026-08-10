@@ -1,4 +1,10 @@
 <script setup lang="ts">
+import MdiCamera from '~icons/mdi/camera'
+import MdiChevronDown from '~icons/mdi/chevron-down'
+import MdiSortAlphabeticalDescendingVariant from '~icons/mdi/sort-alphabetical-descending-variant'
+import MdiSortAlphabeticalAscendingVariant from '~icons/mdi/sort-alphabetical-ascending-variant'
+import MdiSortNumericAscending from '~icons/mdi/sort-numeric-ascending'
+import MdiSortNumericDescending from '~icons/mdi/sort-numeric-descending'
 import { onMounted, computed } from 'vue'
 import MainLayoutContainer from '@/vues/components/MainLayoutContainer.vue'
 import GlowThumbnail from '@/vues/components/ui/GlowThumbnail.vue'
@@ -32,12 +38,10 @@ const currentSortFieldTitle = computed(() => {
 const sortDirectionIcon = computed(() => {
   if (currentSortField.value === 'make' || currentSortField.value === 'model') {
     return currentSortDirection.value === 'asc'
-      ? 'mdi-sort-alphabetical-ascending-variant'
-      : 'mdi-sort-alphabetical-descending-variant'
+      ? MdiSortAlphabeticalAscendingVariant
+      : MdiSortAlphabeticalDescendingVariant
   }
-  return currentSortDirection.value === 'asc'
-    ? 'mdi-sort-numeric-ascending'
-    : 'mdi-sort-numeric-descending'
+  return currentSortDirection.value === 'asc' ? MdiSortNumericAscending : MdiSortNumericDescending
 })
 
 const sortDirectionTooltip = computed(() => {
@@ -114,7 +118,7 @@ useRefreshFunction(() => cameraStore.fetchCameras())
                 color="primary"
                 v-bind="props"
                 rounded="xl"
-                append-icon="mdi-chevron-down"
+                :append-icon="MdiChevronDown"
                 class="text-none sort-text"
               >
                 {{ currentSortFieldTitle }}
@@ -156,7 +160,7 @@ useRefreshFunction(() => cameraStore.fetchCameras())
         v-else-if="!cameraStore.camerasLoading && sortedCameras.length === 0"
         class="empty-state"
       >
-        <v-icon icon="mdi-camera" size="100" class="mb-4 opacity-20" />
+        <v-icon :icon="MdiCamera" size="100" class="mb-4 opacity-20" />
         <h2>No cameras found</h2>
         <p>Once you import media with camera metadata, they will appear here.</p>
       </div>
@@ -173,7 +177,7 @@ useRefreshFunction(() => cameraStore.fetchCameras())
           <div class="album-image">
             <!-- Icon placeholder fallback if no thumbnail is preloaded yet -->
             <div class="camera-thumbnail-placeholder" v-if="!getCameraThumbnailId(camera)">
-              <v-icon icon="mdi-camera" size="50" color="on-surface-variant" />
+              <v-icon :icon="MdiCamera" size="50" color="on-surface-variant" />
             </div>
             <glow-thumbnail
               v-else

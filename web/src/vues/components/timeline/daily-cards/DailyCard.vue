@@ -1,14 +1,28 @@
 <script setup lang="ts">
+import MdiCheck from '~icons/mdi/check'
+import MdiClose from '~icons/mdi/close'
+import MdiController from '~icons/mdi/controller'
+import MdiImageArea from '~icons/mdi/image-area'
 import ThumbnailImg from '@/vues/components/ui/ThumbnailImg.vue'
 import type { DailyCardResponse } from '@/scripts/types/api/dailyCards.ts'
 import { useDailyCardStore } from '@/scripts/stores/timeline/dailyCardStore.ts'
 
 const cardStore = useDailyCardStore()
 
+const emit = defineEmits<{
+  (e: 'close-card'): void
+}>()
+
 defineProps<{
   card: DailyCardResponse
   width: number
 }>()
+
+function closeCard(e: PointerEvent) {
+  e.stopPropagation()
+  e.preventDefault()
+  emit('close-card')
+}
 
 function isGame(cardType: string) {
   return ['estimatr'].includes(cardType)
@@ -25,9 +39,22 @@ function isGame(cardType: string) {
         cover
       />
       <div class="card-thumb fake-thumb" v-else>
-        <v-icon icon="mdi-image-area" color="primary" size="150"></v-icon>
+        <v-icon :icon="MdiImageArea" color="primary" size="150" />
       </div>
       <div class="card-content">
+        <div class="card-top">
+          <v-btn
+            v-tooltip="{
+              text: `Dismiss card`,
+              location: 'top',
+            }"
+            class="close-button"
+            :icon="MdiClose"
+            variant="plain"
+            density="compact"
+            @click="closeCard"
+          />
+        </div>
         <v-spacer />
         <div class="card-bottom">
           <div class="card-info">
@@ -37,7 +64,7 @@ function isGame(cardType: string) {
           <div class="card-icon-container">
             <v-icon
               size="40"
-              :icon="cardStore.completedCards.includes(card.id) ? `mdi-check` : `mdi-controller`"
+              :icon="cardStore.completedCards.includes(card.id) ? MdiCheck : MdiController"
               color="on-surface-variant"
               v-if="isGame(card.cardType)"
             />
@@ -70,10 +97,6 @@ function isGame(cardType: string) {
   filter: brightness(120%);
 }
 
-.daily-card * {
-  pointer-events: none;
-}
-
 .card-content {
   display: flex;
   flex-direction: column;
@@ -85,6 +108,21 @@ function isGame(cardType: string) {
   background: linear-gradient(180deg, rgba(0, 0, 0, 0) 30%, rgba(0, 0, 0, 0.6) 100%);
   border-radius: 40px;
   overflow: hidden;
+}
+
+.card-top {
+  display: flex;
+  justify-content: flex-end;
+  padding: 20px;
+}
+
+.close-button {
+  opacity: 0.3;
+  transition: opacity 0.2s;
+}
+
+.close-button:hover {
+  opacity: 0.8;
 }
 
 .card-bottom {

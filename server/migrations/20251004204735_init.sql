@@ -9,7 +9,8 @@ CREATE TABLE location
     country_code TEXT NOT NULL,
     country_name TEXT NOT NULL
 );
-CREATE INDEX idx_location_lookup ON location (name, admin1, country_code);
+CREATE UNIQUE INDEX idx_location_unique
+    ON location (country_code, admin1, name, admin2);
 
 CREATE TABLE app_user
 (

@@ -1,4 +1,10 @@
 <script setup lang="ts">
+import MdiCheckboxMultipleMarkedCircleOutline from '~icons/mdi/checkbox-multiple-marked-circle-outline'
+import MdiClose from '~icons/mdi/close'
+import MdiDeleteForever from '~icons/mdi/delete-forever'
+import MdiDeleteOutline from '~icons/mdi/delete-outline'
+import MdiDotsHorizontal from '~icons/mdi/dots-horizontal'
+import MdiRestore from '~icons/mdi/restore'
 import AddToAlbumButton from '@/vues/components/timeline/timeline-components/AddToAlbumButton.vue'
 import { useSelectionStore } from '@/scripts/stores/timeline/selectionStore.ts'
 import type { TimelineContext } from '@/scripts/types/timeline/layout.ts'
@@ -70,14 +76,14 @@ const avoidSnackbarBottom = computed(() => {
       }"
     >
       <v-btn
-        icon="mdi-close"
+        :icon="MdiClose"
         variant="plain"
         density="compact"
         v-tooltip:top="'Deselect'"
         @click="selectionStore.deselectAll"
       />
       <v-btn
-        icon="mdi-checkbox-multiple-marked-circle-outline"
+        :icon="MdiCheckboxMultipleMarkedCircleOutline"
         variant="plain"
         density="compact"
         @click="selectionStore.selectAll"
@@ -96,7 +102,7 @@ const avoidSnackbarBottom = computed(() => {
           :ids-to-add="[...selectionStore.selection]"
         />
         <v-btn
-          icon="mdi-delete-outline"
+          :icon="MdiDeleteOutline"
           variant="plain"
           density="compact"
           v-tooltip:top="'Move to bin'"
@@ -106,7 +112,7 @@ const avoidSnackbarBottom = computed(() => {
 
         <v-menu>
           <template v-slot:activator="{ props }">
-            <v-btn v-bind="props" icon="mdi-dots-horizontal" variant="plain" density="compact" />
+            <v-btn v-bind="props" :icon="MdiDotsHorizontal" variant="plain" density="compact" />
           </template>
           <v-list density="compact">
             <v-list-item v-if="selectionStore.selection.size === 1" @click="setProfilePic">
@@ -144,7 +150,7 @@ const avoidSnackbarBottom = computed(() => {
       <!-- Bin-specific Actions -->
       <template v-else>
         <v-btn
-          icon="mdi-restore"
+          :icon="MdiRestore"
           variant="plain"
           density="compact"
           v-tooltip:top="'Restore'"
@@ -153,7 +159,7 @@ const avoidSnackbarBottom = computed(() => {
         />
         <v-btn
           v-if="systemStore.stats.allowFileDeletion"
-          icon="mdi-delete-forever"
+          :icon="MdiDeleteForever"
           variant="plain"
           density="compact"
           v-tooltip:top="'Delete permanently'"

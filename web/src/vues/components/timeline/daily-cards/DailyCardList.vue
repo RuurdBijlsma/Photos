@@ -1,8 +1,11 @@
 <script setup lang="ts">
+import MdiChevronLeft from '~icons/mdi/chevron-left'
+import MdiChevronRight from '~icons/mdi/chevron-right'
 import { useDailyCardStore } from '@/scripts/stores/timeline/dailyCardStore.ts'
-import { computed, onMounted, watch, ref, nextTick } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useResizeObserver } from '@vueuse/core'
 import DailyCard from '@/vues/components/timeline/daily-cards/DailyCard.vue'
+import type { DailyCardResponse } from '@/scripts/types/api/dailyCards.ts'
 
 defineProps<{
   width: number
@@ -34,6 +37,11 @@ function scroll(direction: 'left' | 'right') {
   })
 }
 
+function closeCard(card: DailyCardResponse) {
+  const removalIndex = cards.value.findIndex((c) => c.id === card.id)
+  cards.value.splice(removalIndex, 1)
+}
+
 // Watch cards to update scroll buttons state after DOM rendering
 watch(
   cards,
@@ -59,7 +67,7 @@ onMounted(() => cardStore.fetchDailyCards())
     <transition name="fade">
       <v-btn
         v-if="canScrollLeft"
-        icon="mdi-chevron-left"
+        :icon="MdiChevronLeft"
         class="scroll-btn scroll-btn-left"
         variant="elevated"
         color="surface"
@@ -71,14 +79,20 @@ onMounted(() => cardStore.fetchDailyCards())
 
     <!-- Scrollable Cards Container -->
     <div class="daily-cards" ref="containerRef" @scroll="updateScrollButtons">
-      <daily-card :card="card" :width="500" v-for="card in cards" :key="card.id" />
+      <daily-card
+        @close-card="closeCard(card)"
+        :card="card"
+        :width="500"
+        v-for="card in cards"
+        :key="card.id"
+      />
     </div>
 
     <!-- Scroll Right Button -->
     <transition name="fade">
       <v-btn
         v-if="canScrollRight"
-        icon="mdi-chevron-right"
+        :icon="MdiChevronRight"
         class="scroll-btn scroll-btn-right"
         variant="flat"
         color="surface"

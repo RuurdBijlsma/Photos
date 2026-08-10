@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import MdiCloudOutline from '~icons/mdi/cloud-outline'
+import MdiFolderOutline from '~icons/mdi/folder-outline'
 import { useSystemStore } from '@/scripts/stores/systemStore.ts'
 import { prettyBytes } from '@/scripts/utils.ts'
 import { computed } from 'vue'
@@ -38,9 +40,8 @@ const appDataUsedPct = computed(() => {
             size="20"
             class="drive-icon"
             :color="isStorageActive ? 'primary' : 'on-surface-variant'"
-          >
-            mdi-cloud-outline
-          </v-icon>
+            :icon="MdiCloudOutline"
+          />
           <span class="drive-title">{{ diskStats.areSameDrive ? 'Storage' : 'Media' }}</span>
         </div>
         <span class="pct-badge"> {{ mediaUsedPct.toFixed(0) }}% </span>
@@ -69,9 +70,12 @@ const appDataUsedPct = computed(() => {
       <div class="drive-section">
         <div class="drive-header">
           <div class="drive-title-wrap">
-            <v-icon size="18" color="on-surface-variant" class="drive-icon">
-              mdi-folder-outline
-            </v-icon>
+            <v-icon
+              size="18"
+              color="on-surface-variant"
+              class="drive-icon"
+              :icon="MdiFolderOutline"
+            />
             <span class="drive-title text-caption font-weight-medium">App Data</span>
           </div>
           <span class="pct-badge"> {{ appDataUsedPct.toFixed(0) }}% </span>

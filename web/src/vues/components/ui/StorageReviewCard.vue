@@ -1,4 +1,10 @@
 <script setup lang="ts">
+import MdiCheckboxBlankCircleOutline from '~icons/mdi/checkbox-blank-circle-outline'
+import MdiCheckboxMarkedCircle from '~icons/mdi/checkbox-marked-circle'
+import MdiDelete from '~icons/mdi/delete'
+import MdiDownload from '~icons/mdi/download'
+import MdiFullscreen from '~icons/mdi/fullscreen'
+import MdiPlay from '~icons/mdi/play'
 import { computed } from 'vue'
 import type { StorageReviewItem } from '@/scripts/types/generated/timeline.ts'
 import mediaItemService from '@/scripts/services/mediaItemService.ts'
@@ -51,7 +57,7 @@ const roundedScore = computed(() =>
           class="thumbnail-img"
         />
         <div class="video-chip" v-if="item.isVideo">
-          <v-icon icon="mdi-play" size="16" />
+          <v-icon :icon="MdiPlay" size="16" />
           <span>{{ formattedDuration }}</span>
         </div>
       </div>
@@ -65,7 +71,7 @@ const roundedScore = computed(() =>
           class="thumbnail-img"
         />
         <div class="video-chip" v-if="item.isVideo">
-          <v-icon icon="mdi-play" size="16" />
+          <v-icon :icon="MdiPlay" size="16" />
           <span>{{ formattedDuration }}</span>
         </div>
       </router-link>
@@ -78,7 +84,7 @@ const roundedScore = computed(() =>
         title="View in fullscreen"
         @click.stop
       >
-        <v-icon size="18" icon="mdi-fullscreen" />
+        <v-icon size="18" :icon="MdiFullscreen" />
       </router-link>
 
       <!-- Selector button circle -->
@@ -89,7 +95,7 @@ const roundedScore = computed(() =>
         @click.stop="emit('toggle')"
       >
         <v-icon
-          :icon="isSelected ? 'mdi-checkbox-marked-circle' : 'mdi-checkbox-blank-circle-outline'"
+          :icon="isSelected ? MdiCheckboxMarkedCircle : MdiCheckboxBlankCircleOutline"
           size="20"
         />
       </button>
@@ -110,7 +116,7 @@ const roundedScore = computed(() =>
           title="Download original"
           @click="emit('download')"
         >
-          <v-icon v-if="!isDownloading" icon="mdi-download" color="primary" size="20" />
+          <v-icon v-if="!isDownloading" :icon="MdiDownload" color="primary" size="20" />
           <v-progress-circular v-else indeterminate color="primary" size="16" width="2" />
         </button>
         <button
@@ -120,7 +126,7 @@ const roundedScore = computed(() =>
           title="Move to bin"
           @click="emit('delete')"
         >
-          <v-icon icon="mdi-delete" color="error" size="20" />
+          <v-icon :icon="MdiDelete" color="error" size="20" />
         </button>
       </div>
     </div>

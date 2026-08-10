@@ -6,35 +6,44 @@ import vueJsx from '@vitejs/plugin-vue-jsx'
 import vueDevTools from 'vite-plugin-vue-devtools'
 import vuetify from 'vite-plugin-vuetify'
 import { VitePWA } from 'vite-plugin-pwa'
+import Icons from 'unplugin-icons/vite'
 
 const repoName = 'Photos'
 
+const proxyConfig = {
+  '/api': {
+    target: 'http://localhost:5272',
+    changeOrigin: true,
+    ws: true,
+  },
+  '/thumbnails': {
+    target: 'http://localhost:5272',
+    changeOrigin: true,
+  },
+  '/hosted': {
+    target: 'http://localhost:5272',
+    changeOrigin: true,
+  },
+}
+
 // https://vitejs.dev/config/
 export default defineConfig({
-  // Conditionally set the base path for GitHub Pages deployment
   base: process.env.GITHUB_PAGES ? `/${repoName}/` : '/',
   server: {
-    proxy: {
-      '/api': {
-        target: 'http://localhost:5272',
-        changeOrigin: true,
-        ws: true,
-      },
-      '/thumbnails': {
-        target: 'http://localhost:5272',
-        changeOrigin: true,
-      },
-      '/hosted': {
-        target: 'http://localhost:5272',
-        changeOrigin: true,
-      },
-    },
+    proxy: proxyConfig,
+  },
+  preview: {
+    port: 4173,
+    proxy: proxyConfig,
   },
   plugins: [
     vue(),
     vueJsx(),
     vueDevTools(),
     vuetify({ autoImport: { labs: true } }),
+    Icons({
+      compiler: 'vue3',
+    }),
     VitePWA({
       registerType: 'prompt', // Prompt users before updating (allows showing a reload notification)
       injectRegister: 'auto',

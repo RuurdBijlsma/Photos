@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import MdiBackupRestore from '~icons/mdi/backup-restore'
+import MdiFileDocumentOutline from '~icons/mdi/file-document-outline'
+import MdiRestore from '~icons/mdi/restore'
 import { onMounted } from 'vue'
 import { useAlbumBackupStore } from '@/scripts/stores/albumBackupStore.ts'
 
@@ -35,7 +38,7 @@ function formatDate(dateString: string) {
         <!-- Card Header -->
         <div class="card-header">
           <span class="card-title">System Backup & Recovery</span>
-          <v-icon color="primary" size="large">mdi-backup-restore</v-icon>
+          <v-icon color="primary" size="large" :icon="MdiBackupRestore" />
         </div>
 
         <div class="card-body">
@@ -60,7 +63,7 @@ function formatDate(dateString: string) {
               border
             >
               <template v-slot:prepend>
-                <v-icon color="secondary" class="mr-2">mdi-file-document-outline</v-icon>
+                <v-icon color="secondary" class="mr-2" :icon="MdiFileDocumentOutline" />
               </template>
 
               <v-list-item-title class="backup-filename">
@@ -76,7 +79,7 @@ function formatDate(dateString: string) {
                   variant="tonal"
                   rounded
                   size="small"
-                  prepend-icon="mdi-restore"
+                  :prepend-icon="MdiRestore"
                   @click="backupStore.restoreBackup(backup.filename)"
                 >
                   Restore
