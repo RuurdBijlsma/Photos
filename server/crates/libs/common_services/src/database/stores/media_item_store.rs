@@ -573,21 +573,21 @@ impl MediaItemStore {
         location_data: &Location,
     ) -> Result<i32, DbError> {
         let id: i32 = sqlx::query_scalar!(
-        r#"
+            r#"
         INSERT INTO location (country_code, admin1, name, admin2, country_name)
         VALUES ($1, $2, $3, $4, $5)
         ON CONFLICT (country_code, admin1, name, admin2)
         DO UPDATE SET country_name = EXCLUDED.country_name
         RETURNING id
         "#,
-        &location_data.country_code,
-        &location_data.admin1,
-        &location_data.name,
-        &location_data.admin2,
-        &location_data.country_name,
-    )
-            .fetch_one(&mut **tx)
-            .await?;
+            &location_data.country_code,
+            &location_data.admin1,
+            &location_data.name,
+            &location_data.admin2,
+            &location_data.country_name,
+        )
+        .fetch_one(&mut **tx)
+        .await?;
 
         Ok(id)
     }
