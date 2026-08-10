@@ -572,20 +572,18 @@ impl MediaItemStore {
         tx: &mut PgTransaction<'_>,
         location_data: &Location,
     ) -> Result<i32, DbError> {
-        // ON CONFLICT DO UPDATE SET name = EXCLUDED.name guarantees an ID is ALWAYS returned,
-        // even if a concurrent worker inserted the row a millisecond prior.
         let id: i32 = sqlx::query_scalar!(
         r#"
-        INSERT INTO location (name, admin1, admin2, country_code, country_name)
+        INSERT INTO location (country_code, admin1, name, admin2, country_name)
         VALUES ($1, $2, $3, $4, $5)
-        ON CONFLICT (name, admin1, admin2, country_code)
-        DO UPDATE SET name = EXCLUDED.name
+        ON CONFLICT (country_code, admin1, name, admin2)
+        DO UPDATE SET country_name = EXCLUDED.country_name
         RETURNING id
         "#,
-        &location_data.name,
-        &location_data.admin1,
-        &location_data.admin2,
         &location_data.country_code,
+        &location_data.admin1,
+        &location_data.name,
+        &location_data.admin2,
         &location_data.country_name,
     )
             .fetch_one(&mut **tx)
