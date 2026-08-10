@@ -101,14 +101,15 @@ function prefetchLocation(id: string) {
   }
 }
 
-function handleSelectLocation(targetLocationId: string) {
+async function handleSelectLocation(targetLocationId: string) {
   if (targetLocationId && targetLocationId !== locationId.value) {
+    await exploreStore.fetchLocationData(targetLocationId)
     router.push(`/explore/location/${targetLocationId}`)
   }
 }
 
 function handleHoverLocation(targetLocationId: string) {
-  console.log("HOVER", targetLocationId)
+  console.log('HOVER', targetLocationId)
   prefetchLocation(targetLocationId)
 }
 

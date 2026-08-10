@@ -37,6 +37,7 @@
 * better error if exiftool isnt there (worker wont work then)
 # HIGH PRIO
 * 50 megapixels plaatjes willen niet rotaten om een of andere reden (die van tiramisu)
+* er is een bug in `get_or_create_location`, http://localhost:5173/explore/location/614 -> er zijn 4 Otterlo, Gelderland, NL in de DB
 
 # INFRASTRUCTURE:
 
