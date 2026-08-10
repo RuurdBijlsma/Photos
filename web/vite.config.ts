@@ -7,31 +7,43 @@ import vueDevTools from 'vite-plugin-vue-devtools'
 import vuetify from 'vite-plugin-vuetify'
 import { VitePWA } from 'vite-plugin-pwa'
 import Icons from 'unplugin-icons/vite'
+import visualizer from 'rollup-plugin-visualizer'
 
 const repoName = 'Photos'
 
+const proxyConfig = {
+  '/api': {
+    target: 'http://localhost:5272',
+    changeOrigin: true,
+    ws: true,
+  },
+  '/thumbnails': {
+    target: 'http://localhost:5272',
+    changeOrigin: true,
+  },
+  '/hosted': {
+    target: 'http://localhost:5272',
+    changeOrigin: true,
+  },
+}
+
 // https://vitejs.dev/config/
 export default defineConfig({
-  // Conditionally set the base path for GitHub Pages deployment
   base: process.env.GITHUB_PAGES ? `/${repoName}/` : '/',
   server: {
-    proxy: {
-      '/api': {
-        target: 'http://localhost:5272',
-        changeOrigin: true,
-        ws: true,
-      },
-      '/thumbnails': {
-        target: 'http://localhost:5272',
-        changeOrigin: true,
-      },
-      '/hosted': {
-        target: 'http://localhost:5272',
-        changeOrigin: true,
-      },
-    },
+    proxy: proxyConfig,
+  },
+  preview: {
+    port: 4173,
+    proxy: proxyConfig,
   },
   plugins: [
+    visualizer({
+      filename: 'stats.html',
+      open: false,
+      gzipSize: true,
+      brotliSize: true,
+    }),
     vue(),
     vueJsx(),
     vueDevTools(),
