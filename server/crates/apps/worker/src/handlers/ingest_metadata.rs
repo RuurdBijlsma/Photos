@@ -3,7 +3,6 @@ use crate::handlers::JobResult;
 use crate::handlers::common::cache::ingest_cache::{get_ingest_cache, write_ingest_cache};
 use crate::handlers::common::remote_user::get_or_create_remote_user;
 use crate::jobs::management::is_job_cancelled;
-use app_state::constants;
 use color_eyre::eyre::Context;
 use color_eyre::{Result, eyre::eyre};
 use common_services::api::album::interfaces::AlbumSort;
@@ -13,7 +12,6 @@ use common_services::database::album_store::AlbumStore;
 use common_services::database::jobs::Job;
 use common_services::database::media_item_store::MediaItemStore;
 use common_services::job_queue::IngestMetadataPayload;
-use common_services::utils::nice_id;
 use media_analyzer::MediaMetadata;
 use serde_json::from_value;
 use sqlx::PgPool;
@@ -34,7 +32,6 @@ pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
         return Ok(JobResult::Cancelled);
     }
     let file_hash = hash_file(&file_path)?;
-    let media_item_id = nice_id(constants().database.media_item_id_length);
     let media_info = get_media_info(context, &file_path, &file_hash).await?;
     let payload = if let Some(payload_json) = &job.payload {
         let payload: IngestMetadataPayload = from_value(payload_json.clone())?;
@@ -45,15 +42,7 @@ pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
     if !file_path.exists() || is_job_cancelled(&context.pool, job.id).await? {
         return Ok(JobResult::Cancelled);
     }
-    store_media_item(
-        &context.pool,
-        user_id,
-        relative_path,
-        media_info,
-        &media_item_id,
-        payload,
-    )
-    .await?;
+    store_media_item(&context.pool, user_id, relative_path, media_info, payload).await?;
     Ok(JobResult::Done)
 }
 
@@ -91,7 +80,6 @@ async fn store_media_item(
     user_id: i32,
     relative_path: &str,
     analyze_result: MediaMetadata,
-    new_id: &str,
     pending_payload: Option<IngestMetadataPayload>,
 ) -> Result<()> {
     let mut tx = pool.begin().await?;
@@ -100,10 +88,8 @@ async fn store_media_item(
     } else {
         None
     };
-    MediaItemStore::delete_by_relative_path(&mut *tx, relative_path).await?;
-    MediaItemStore::create(
+    let item_id = MediaItemStore::upsert(
         &mut tx,
-        new_id,
         relative_path,
         user_id,
         remote_user_id,
@@ -111,8 +97,7 @@ async fn store_media_item(
     )
     .await?;
     if let Some(info) = &pending_payload {
-        AlbumStore::add_media_items(&mut *tx, &info.album_id, &[new_id.to_string()], user_id)
-            .await?;
+        AlbumStore::add_media_items(&mut *tx, &info.album_id, &[item_id.clone()], user_id).await?;
         if let Some(album) = AlbumStore::find_by_id(&mut *tx, &info.album_id).await?
             && album.sort_mode != AlbumSort::None
         {
@@ -126,7 +111,7 @@ async fn store_media_item(
                 &info.album_id,
                 None,
                 UpdateField::Ignore,
-                UpdateField::Value(new_id.to_owned()),
+                UpdateField::Value(item_id),
                 None,
             )
             .await?;
