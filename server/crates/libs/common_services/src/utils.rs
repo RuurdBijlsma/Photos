@@ -25,7 +25,7 @@ pub fn write_exif_orientation(file_path: &Path, orientation: i32) -> color_eyre:
     let et = exiftool::ExifTool::new()?;
     et.write_tag(
         file_path,
-        "Orientation",
+        "all:Orientation",
         &orientation.to_string(),
         &["-n", "-overwrite_original"],
     )?;
