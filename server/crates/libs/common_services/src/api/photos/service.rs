@@ -530,11 +530,6 @@ pub async fn reprocess_media_item(
         .user_id(user_id)
         .call()
         .await?;
-    enqueue_job::<()>(pool, settings, JobType::IngestLlm)
-        .relative_path(relative_path)
-        .user_id(user_id)
-        .call()
-        .await?;
 
     Ok(())
 }
