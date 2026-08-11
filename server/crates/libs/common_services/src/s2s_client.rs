@@ -52,7 +52,7 @@ impl S2SClient {
         let claims = insecure_extract_token_claims(token)?;
         let remote_url = {
             let mut url: Url = claims.iss.parse()?;
-            url.set_path("/s2s/album/invite-summary");
+            url.set_path("/api/s2s/album/invite-summary");
             url
         };
 
@@ -83,7 +83,7 @@ impl S2SClient {
         let claims = insecure_extract_token_claims(token)?;
         let remote_url = {
             let mut url: Url = claims.iss.parse()?;
-            url.set_path("/s2s/album/files");
+            url.set_path("/api/s2s/album/files");
             url.query_pairs_mut()
                 .append_pair("relativePath", remote_relative_path);
             url

@@ -131,9 +131,9 @@ impl TestContext {
 
     /// Polls the `/health` endpoint until it receives a successful response or times out.
     async fn wait_for_healthy_api(settings: &AppSettings, http_client: &Client) -> Result<()> {
-        for attempt in 1..=20 {
+        for attempt in 1..=240 {
             info!("Health check attempt {}...", attempt);
-            let health_url = format!("{}/health", settings.api.public_url);
+            let health_url = format!("{}/api/health", settings.api.public_url);
             match http_client.get(&health_url).send().await {
                 Ok(response) if response.status().is_success() => {
                     info!("API is healthy!");
@@ -149,7 +149,7 @@ impl TestContext {
                     warn!("API health check failed: {:?}. Retrying...", e);
                 }
             }
-            sleep(Duration::from_millis(500)).await;
+            sleep(Duration::from_secs(1)).await;
         }
         Err(eyre!(
             "API did not become healthy within the timeout period."

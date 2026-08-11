@@ -7,7 +7,7 @@ use common_types::dev_constants::{EMAIL, PASSWORD, USERNAME};
 
 pub async fn test_register(context: &TestContext) -> Result<()> {
     // ARRANGE
-    let url = format!("{}/auth/register", context.settings.api.public_url);
+    let url = format!("{}/api/auth/register", context.settings.api.public_url);
 
     // ACT
     let response = context
@@ -45,7 +45,7 @@ pub async fn test_register(context: &TestContext) -> Result<()> {
 
 pub async fn test_second_register_attempt(context: &TestContext) -> Result<()> {
     // ARRANGE
-    let url = format!("{}/auth/register", context.settings.api.public_url);
+    let url = format!("{}/api/auth/register", context.settings.api.public_url);
 
     // ACT
     let response = context
@@ -71,8 +71,8 @@ pub async fn test_second_register_attempt(context: &TestContext) -> Result<()> {
 
 pub async fn test_login(context: &TestContext) -> Result<()> {
     // ARRANGE
-    let login_url = format!("{}/auth/login", context.settings.api.public_url);
-    let me_url = format!("{}/auth/me", context.settings.api.public_url);
+    let login_url = format!("{}/api/auth/login", context.settings.api.public_url);
+    let me_url = format!("{}/api/auth/me", context.settings.api.public_url);
 
     // ACT
     let response = context
@@ -103,9 +103,9 @@ pub async fn test_login(context: &TestContext) -> Result<()> {
 
 pub async fn test_refresh(context: &TestContext) -> Result<()> {
     // ARRANGE
-    let login_url = format!("{}/auth/login", context.settings.api.public_url);
-    let refresh_url = format!("{}/auth/refresh", context.settings.api.public_url);
-    let me_url = format!("{}/auth/me", context.settings.api.public_url);
+    let login_url = format!("{}/api/auth/login", context.settings.api.public_url);
+    let refresh_url = format!("{}/api/auth/refresh", context.settings.api.public_url);
+    let me_url = format!("{}/api/auth/me", context.settings.api.public_url);
 
     // 1. Login to set cookie
     let response = context
@@ -138,9 +138,9 @@ pub async fn test_refresh(context: &TestContext) -> Result<()> {
 
 pub async fn test_logout(context: &TestContext) -> Result<()> {
     // ARRANGE
-    let login_url = format!("{}/auth/login", context.settings.api.public_url);
-    let logout_url = format!("{}/auth/logout", context.settings.api.public_url);
-    let refresh_url = format!("{}/auth/refresh", context.settings.api.public_url);
+    let login_url = format!("{}/api/auth/login", context.settings.api.public_url);
+    let logout_url = format!("{}/api/auth/logout", context.settings.api.public_url);
+    let refresh_url = format!("{}/api/auth/refresh", context.settings.api.public_url);
 
     // 1. Login
     let response = context

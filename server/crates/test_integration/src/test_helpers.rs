@@ -7,7 +7,7 @@ use std::path::PathBuf;
 use walkdir::WalkDir;
 
 pub async fn login(context: &TestContext) -> Result<()> {
-    let url = format!("{}/auth/login", context.settings.api.public_url);
+    let url = format!("{}/api/auth/login", context.settings.api.public_url);
     let response = context
         .http_client
         .post(url)
