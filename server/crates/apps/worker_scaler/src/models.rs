@@ -152,7 +152,7 @@ impl ModelRegistry {
         ))
     }
 
-    /// Checks for models unused by workers and unloads them if idle for longer than 5 minutes.
+    /// Checks for models unused by workers and unloads them if idle for too long
     pub fn cleanup_idle_models(&mut self) {
         self.media_analyzer.cleanup_idle();
         self.visual_analyzer.cleanup_idle();
