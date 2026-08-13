@@ -104,7 +104,10 @@ impl Scaler {
             return Ok(is_idle);
         }
 
-        // Find the most capable candidate profile
+        // Find the most capable candidate profile that:
+        // 1. Is allowed by max_workers limits
+        // 2. Fits within available memory headroom
+        // 3. Can pick up at least one job type currently in demand
         let best_profile = self
             .settings
             .scaler
@@ -124,8 +127,8 @@ impl Scaler {
                 demand.iter().any(|(&job_type, &count)| {
                     count > 0
                         && !profile.excluded_jobs.iter().any(|excluded| {
-                        JobType::parse_from_str(excluded).ok() == Some(job_type)
-                    })
+                            JobType::parse_from_str(excluded).ok() == Some(job_type)
+                        })
                 })
             })
             .max_by_key(|profile| profile.priority);
@@ -198,7 +201,7 @@ impl Scaler {
                 true,
                 shutdown_rx,
             )
-                .await
+            .await
         });
 
         self.active_workers.push(ActiveWorker {
@@ -214,6 +217,7 @@ impl Scaler {
     }
 
     fn scale_down(&self) {
+        // Order profiles by priority ASC for scale-down (lowest priority scale-down first)
         let mut profiles = self.settings.scaler.profiles.clone();
         profiles.sort_by_key(|a| a.priority);
 
@@ -225,7 +229,7 @@ impl Scaler {
             {
                 let worker = &self.active_workers[pos];
                 info!(
-                    "📉 Sending shutdown signal to worker: id={}, profile={}",
+                    "🔫 Sending shutdown signal to worker: id={}, profile={}",
                     worker.id, worker.profile
                 );
                 let _ = worker.shutdown_tx.send(true);

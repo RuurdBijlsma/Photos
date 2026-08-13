@@ -33,7 +33,7 @@ async fn main() -> Result<()> {
         nice_id(8),
         excluded_jobs,
         models,
-        false, // keep running
+        false,
         kill_signal,
     )
         .await?;

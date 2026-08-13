@@ -30,7 +30,7 @@ impl WorkerModels {
     }
 
     /// Helper to load required models for a worker based on excluded job types.
-    /// This can be used when starting a standalone worker without `worker_scaler`.
+    /// Used in worker/main.rs only
     pub async fn load_for_jobs(
         settings: &AppSettings,
         excluded_job_types: &[JobType],
