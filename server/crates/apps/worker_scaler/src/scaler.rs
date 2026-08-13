@@ -5,7 +5,7 @@ use app_state::{AppSettings, ProfileSettings};
 use color_eyre::Result;
 use common_services::database::jobs::JobType;
 use sqlx::PgPool;
-use std::time::{Duration, Instant};
+use std::time::{Instant};
 use tokio::sync::watch;
 use tokio::task::JoinHandle;
 use tracing::{Instrument, error, info, info_span, warn};
@@ -31,7 +31,7 @@ pub struct Scaler {
 impl Scaler {
     #[must_use]
     pub fn new(pool: PgPool, settings: AppSettings) -> Self {
-        let models = ModelRegistry::new(settings.clone());
+        let models = ModelRegistry::new(settings.clone(), settings.scaler.unload_models_timeout);
         Self {
             pool,
             settings,
@@ -52,20 +52,17 @@ impl Scaler {
     async fn run_inner(&mut self, shutdown_rx: &mut watch::Receiver<bool>) -> Result<()> {
         info!("⚖️ Starting scaler...");
 
-        let normal_delay = Duration::from_secs(self.settings.scaler.tick_interval_secs);
-        let busy_delay = Duration::from_secs(self.settings.scaler.quick_tick_interval_secs);
-
         loop {
             if *shutdown_rx.borrow() {
                 break;
             }
 
             let tick_delay = match self.tick().await {
-                Ok(true) => normal_delay,
-                Ok(false) => busy_delay,
+                Ok(true) => self.settings.scaler.tick_interval,
+                Ok(false) => self.settings.scaler.quick_tick_interval,
                 Err(e) => {
                     error!("🚨 Error during scaler tick: {e}");
-                    normal_delay
+                    self.settings.scaler.tick_interval
                 }
             };
 
@@ -83,6 +80,7 @@ impl Scaler {
     /// Performs a tick and returns `true` if the system is completely idle.
     async fn tick(&mut self) -> Result<bool> {
         self.clean_up_sleeping_workers();
+        self.models.cleanup_idle_models();
         let demand = get_demand(&self.pool).await?;
         let telemetry = Telemetry::fetch();
 

@@ -5,62 +5,122 @@ use media_analyzer::MediaAnalyzer;
 use ml_analysis::VisualAnalyzer;
 use open_clip_inference::TextEmbedder;
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 use tracing::info;
 use worker::models::WorkerModels;
 
-/// Manages shared ML model instances in `worker_scaler` to share across worker contexts.
+struct ModelSlot<T> {
+    name: String,
+    instance: Option<Arc<T>>,
+    idle_since: Option<Instant>,
+    idle_timeout: Duration,
+}
+
+impl<T> ModelSlot<T> {
+    fn new(name: &str, idle_timeout: Duration) -> Self {
+        Self {
+            name: name.to_owned(),
+            instance: None,
+            idle_since: None,
+            idle_timeout,
+        }
+    }
+
+    fn get(&mut self) -> Option<Arc<T>> {
+        if let Some(ref arc) = self.instance {
+            self.idle_since = None; // Reset idle timer when requested
+            Some(arc.clone())
+        } else {
+            None
+        }
+    }
+
+    fn set(&mut self, arc: Arc<T>) {
+        self.idle_since = None;
+        self.instance = Some(arc);
+    }
+
+    fn cleanup_idle(&mut self) {
+        if let Some(ref arc) = self.instance {
+            if Arc::strong_count(arc) > 1 {
+                // At least one active worker is currently using this model
+                self.idle_since = None;
+            } else {
+                // Model is only held by ModelRegistry (0 active workers using it)
+                let idle_since = *self.idle_since.get_or_insert_with(Instant::now);
+                if idle_since.elapsed() >= self.idle_timeout {
+                    info!(
+                        "🪶 Unloading {} after {:?} of inactivity.",
+                        &self.name,
+                        self.idle_timeout
+                    );
+                    self.instance = None;
+                    self.idle_since = None;
+                }
+            }
+        }
+    }
+}
+
+/// Manages shared ML model instances in `worker_scaler`.
 pub struct ModelRegistry {
     settings: AppSettings,
-    media_analyzer: Option<Arc<MediaAnalyzer>>,
-    visual_analyzer: Option<Arc<VisualAnalyzer>>,
-    text_embedder: Option<Arc<TextEmbedder>>,
+    media_analyzer: ModelSlot<MediaAnalyzer>,
+    visual_analyzer: ModelSlot<VisualAnalyzer>,
+    text_embedder: ModelSlot<TextEmbedder>,
 }
 
 impl ModelRegistry {
     #[must_use]
-    pub const fn new(settings: AppSettings) -> Self {
+    pub fn new(settings: AppSettings, idle_timeout: Duration) -> Self {
         Self {
             settings,
-            media_analyzer: None,
-            visual_analyzer: None,
-            text_embedder: None,
+            media_analyzer: ModelSlot::new("MediaAnalyzer", idle_timeout),
+            visual_analyzer: ModelSlot::new("VisualAnalyzer", idle_timeout),
+            text_embedder: ModelSlot::new("TextEmbedder", idle_timeout),
         }
     }
 
     pub async fn get_or_load_media_analyzer(&mut self) -> Result<Arc<MediaAnalyzer>> {
-        if let Some(ref analyzer) = self.media_analyzer {
-            return Ok(analyzer.clone());
+        if let Some(analyzer) = self.media_analyzer.get() {
+            return Ok(analyzer);
         }
 
-        info!("Loading MediaAnalyzer in Scaler...");
+        info!("Loading MediaAnalyzer...");
         let analyzer = Arc::new(MediaAnalyzer::builder().build().await?);
-        self.media_analyzer = Some(analyzer.clone());
+        self.media_analyzer.set(analyzer.clone());
         Ok(analyzer)
     }
 
     pub async fn get_or_load_visual_analyzer(&mut self) -> Result<Arc<VisualAnalyzer>> {
-        if let Some(ref analyzer) = self.visual_analyzer {
-            return Ok(analyzer.clone());
+        if let Some(analyzer) = self.visual_analyzer.get() {
+            return Ok(analyzer);
         }
 
-        info!("Loading VisualAnalyzer in Scaler...");
-        let analyzer = Arc::new(VisualAnalyzer::new(&self.settings.ingest.analyzer.search.embedder_model_id, &self.settings.ingest.hf_cache_root).await?);
-        self.visual_analyzer = Some(analyzer.clone());
+        let embedder_model_id = &self.settings.ingest.analyzer.search.embedder_model_id;
+        let cache_folder = &self.settings.ingest.hf_cache_root;
+
+        info!("Loading VisualAnalyzer...");
+        let analyzer = Arc::new(VisualAnalyzer::new(embedder_model_id, cache_folder).await?);
+        self.visual_analyzer.set(analyzer.clone());
         Ok(analyzer)
     }
 
     pub async fn get_or_load_text_embedder(&mut self) -> Result<Arc<TextEmbedder>> {
-        if let Some(ref embedder) = self.text_embedder {
-            return Ok(embedder.clone());
+        if let Some(embedder) = self.text_embedder.get() {
+            return Ok(embedder);
         }
 
-        info!("Loading CLIP text embedder in Scaler...");
-        let embedder = TextEmbedder::from_hf(&self.settings.ingest.analyzer.search.embedder_model_id)
-            .cache_dir(&self.settings.ingest.hf_cache_root)
+        let embedder_model_id = &self.settings.ingest.analyzer.search.embedder_model_id;
+        let cache_folder = &self.settings.ingest.hf_cache_root;
+
+        info!("Loading CLIP text embedder...");
+        let embedder = TextEmbedder::from_hf(embedder_model_id)
+            .cache_dir(cache_folder)
             .build()
             .await?;
         let embedder = Arc::new(embedder);
-        self.text_embedder = Some(embedder.clone());
+        self.text_embedder.set(embedder.clone());
         Ok(embedder)
     }
 
@@ -90,5 +150,12 @@ impl ModelRegistry {
             visual_analyzer,
             text_embedder,
         ))
+    }
+
+    /// Checks for models unused by workers and unloads them if idle for longer than 5 minutes.
+    pub fn cleanup_idle_models(&mut self) {
+        self.media_analyzer.cleanup_idle();
+        self.visual_analyzer.cleanup_idle();
+        self.text_embedder.cleanup_idle();
     }
 }

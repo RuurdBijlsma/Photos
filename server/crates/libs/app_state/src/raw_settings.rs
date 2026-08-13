@@ -213,5 +213,6 @@ pub struct RawScalerSettings {
     pub quick_tick_interval_secs: u64,
     pub system_memory_buffer_percentage: f64,
     pub system_memory_buffer_maximum_mb: u64,
+    pub unload_models_timeout_secs: u64,
     pub profiles: HashMap<String, RawProfileSettings>,
 }

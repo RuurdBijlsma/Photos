@@ -134,6 +134,7 @@ scaler:
   quick_tick_interval_secs: 3
   system_memory_buffer_percentage: 5.0
   system_memory_buffer_maximum_mb: 1000
+  unload_models_timeout_secs: 30
   profiles:
     light:
       priority: 4

@@ -11,6 +11,7 @@ use serde::Deserialize;
 use sqlx::{Executor, Postgres};
 use std::fs::canonicalize;
 use std::path::{Path, PathBuf, absolute};
+use std::time::Duration;
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct AppSettings {
@@ -84,10 +85,11 @@ impl From<RawSettings> for AppSettings {
         scaler_profiles.sort_by_key(|b| std::cmp::Reverse(b.priority));
 
         let scaler = ScalerSettings {
-            tick_interval_secs: raw.scaler.tick_interval_secs,
-            quick_tick_interval_secs: raw.scaler.quick_tick_interval_secs,
+            tick_interval: Duration::from_secs(raw.scaler.tick_interval_secs),
+            quick_tick_interval: Duration::from_secs(raw.scaler.quick_tick_interval_secs),
             system_memory_buffer_percentage: raw.scaler.system_memory_buffer_percentage,
             system_memory_buffer_maximum_mb: raw.scaler.system_memory_buffer_maximum_mb,
+            unload_models_timeout: Duration::from_secs(raw.scaler.unload_models_timeout_secs),
             profiles: scaler_profiles,
         };
 
@@ -224,10 +226,11 @@ impl IngestSettings {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct ScalerSettings {
-    pub tick_interval_secs: u64,
-    pub quick_tick_interval_secs: u64,
+    pub tick_interval: Duration,
+    pub quick_tick_interval: Duration,
     pub system_memory_buffer_percentage: f64,
     pub system_memory_buffer_maximum_mb: u64,
+    pub unload_models_timeout: Duration,
     pub profiles: Vec<ProfileSettings>, // sorted by priority, descending
 }
 
