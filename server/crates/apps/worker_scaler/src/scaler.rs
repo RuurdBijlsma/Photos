@@ -1,4 +1,5 @@
 use crate::demand::get_demand;
+use crate::models::ModelRegistry;
 use crate::telemetry::Telemetry;
 use app_state::{AppSettings, ProfileSettings};
 use color_eyre::Result;
@@ -21,6 +22,7 @@ pub struct ActiveWorker {
 pub struct Scaler {
     pool: PgPool,
     settings: AppSettings,
+    models: ModelRegistry,
     active_workers: Vec<ActiveWorker>,
     last_spawn_time: Option<Instant>,
     worker_counter: u64,
@@ -28,10 +30,12 @@ pub struct Scaler {
 
 impl Scaler {
     #[must_use]
-    pub const fn new(pool: PgPool, settings: AppSettings) -> Self {
+    pub fn new(pool: PgPool, settings: AppSettings) -> Self {
+        let models = ModelRegistry::new(settings.clone());
         Self {
             pool,
             settings,
+            models,
             active_workers: Vec::new(),
             last_spawn_time: None,
             worker_counter: 0,
@@ -100,10 +104,7 @@ impl Scaler {
             return Ok(is_idle);
         }
 
-        // Find the most capable candidate profile that:
-        // 1. Is allowed by max_workers limits
-        // 2. Fits within available memory headroom
-        // 3. Can pick up at least one job type currently in demand
+        // Find the most capable candidate profile
         let best_profile = self
             .settings
             .scaler
@@ -123,14 +124,16 @@ impl Scaler {
                 demand.iter().any(|(&job_type, &count)| {
                     count > 0
                         && !profile.excluded_jobs.iter().any(|excluded| {
-                            JobType::parse_from_str(excluded).ok() == Some(job_type)
-                        })
+                        JobType::parse_from_str(excluded).ok() == Some(job_type)
+                    })
                 })
             })
             .max_by_key(|profile| profile.priority);
 
         if let Some(profile) = best_profile.cloned() {
-            self.spawn_worker(&profile);
+            if let Err(e) = self.spawn_worker(&profile).await {
+                error!("Failed to spawn worker for profile {}: {e}", profile.name);
+            }
             self.last_spawn_time = Some(Instant::now());
         }
         Ok(is_idle)
@@ -168,7 +171,7 @@ impl Scaler {
             .count()
     }
 
-    fn spawn_worker(&mut self, profile: &ProfileSettings) {
+    async fn spawn_worker(&mut self, profile: &ProfileSettings) -> Result<()> {
         self.worker_counter += 1;
         let worker_id = format!("w{}-{}", self.worker_counter, profile.name);
         let (shutdown_tx, shutdown_rx) = watch::channel(false);
@@ -182,6 +185,8 @@ impl Scaler {
             .filter_map(|job_str| JobType::parse_from_str(job_str).ok())
             .collect();
 
+        let models = self.models.prepare_models_for_jobs(&excluded_jobs).await?;
+
         let worker_id_clone = worker_id.clone();
         let handle = tokio::spawn(async move {
             create_worker(
@@ -189,10 +194,11 @@ impl Scaler {
                 settings,
                 worker_id_clone,
                 excluded_jobs,
+                models,
                 true,
                 shutdown_rx,
             )
-            .await
+                .await
         });
 
         self.active_workers.push(ActiveWorker {
@@ -204,10 +210,10 @@ impl Scaler {
         });
 
         self.log_worker_state_change(&format!("[➕ ] Spawned {} worker", profile.name));
+        Ok(())
     }
 
     fn scale_down(&self) {
-        // Order profiles by priority ASC for scale-down (lowest priority scale-down first)
         let mut profiles = self.settings.scaler.profiles.clone();
         profiles.sort_by_key(|a| a.priority);
 
@@ -219,7 +225,7 @@ impl Scaler {
             {
                 let worker = &self.active_workers[pos];
                 info!(
-                    "🔫 Sending shutdown signal to worker: id={}, profile={}",
+                    "📉 Sending shutdown signal to worker: id={}, profile={}",
                     worker.id, worker.profile
                 );
                 let _ = worker.shutdown_tx.send(true);
