@@ -36,7 +36,7 @@ async fn main() -> Result<()> {
         false,
         kill_signal,
     )
-        .await?;
+    .await?;
 
     Ok(())
 }

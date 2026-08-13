@@ -24,7 +24,13 @@ pub async fn create_worker(
         "🛠️ [Worker ID: {}, IgnoreJobs: {:?}] Starting...",
         worker_id, excluded_job_types
     );
-    let context = WorkerContext::new(pool, settings, worker_id.clone(), excluded_job_types, models);
+    let context = WorkerContext::new(
+        pool,
+        settings,
+        worker_id.clone(),
+        excluded_job_types,
+        models,
+    );
     run_worker_loop(&context, stop_on_sleep, shutdown_rx)
         .instrument(worker_span)
         .await

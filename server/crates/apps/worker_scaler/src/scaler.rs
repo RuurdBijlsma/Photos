@@ -5,7 +5,7 @@ use app_state::{AppSettings, ProfileSettings};
 use color_eyre::Result;
 use common_services::database::jobs::JobType;
 use sqlx::PgPool;
-use std::time::{Instant};
+use std::time::Instant;
 use tokio::sync::watch;
 use tokio::task::JoinHandle;
 use tracing::{Instrument, error, info, info_span, warn};

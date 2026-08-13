@@ -51,8 +51,7 @@ impl<T> ModelSlot<T> {
                 if idle_since.elapsed() >= self.idle_timeout {
                     info!(
                         "🪶 Unloading {} after {:?} of inactivity.",
-                        &self.name,
-                        self.idle_timeout
+                        &self.name, self.idle_timeout
                     );
                     self.instance = None;
                     self.idle_since = None;
