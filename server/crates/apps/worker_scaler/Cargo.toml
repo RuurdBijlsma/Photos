@@ -18,11 +18,13 @@ tracing-subscriber = { version = "0.3.22", features = ["env-filter"] }
 sysinfo = "0.33.1"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.145"
+ort = { version = "2.0.0-rc.12" }
 
 [features]
 load-dynamic = [
     "worker/load-dynamic",
     "common_services/load-dynamic",
     "ml_analysis/load-dynamic",
-    "open_clip_inference/load-dynamic"
+    "open_clip_inference/load-dynamic",
+    "ort/load-dynamic"
 ]
