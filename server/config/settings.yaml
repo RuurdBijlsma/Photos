@@ -149,7 +149,7 @@ scaler:
     medium:
       priority: 2
       estimated_ram_mb: 500
-      max_workers: 3
+      max_workers: 2
       excluded_jobs:
         - "ingest_llm"
         - "ingest_thumbnails"
