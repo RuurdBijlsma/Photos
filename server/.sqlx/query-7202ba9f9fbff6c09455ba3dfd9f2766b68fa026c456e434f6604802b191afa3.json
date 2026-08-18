@@ -1,0 +1,21 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE media_item\n            SET has_thumbnails = $8,\n                hash = $2,\n                width = $3,\n                height = $4,\n                is_video = $5,\n                duration_ms = $6,\n                taken_at_local = media_item.taken_at_local,\n                taken_at_utc = media_item.taken_at_utc,\n                og_taken_at_local = media_item.og_taken_at_local,\n                sort_timestamp = media_item.sort_timestamp,\n                orientation = $7,\n                use_panorama_viewer = media_item.use_panorama_viewer,\n                timezone_name = media_item.timezone_name,\n                timezone_offset_seconds = media_item.timezone_offset_seconds,\n                og_timezone_offset_seconds = media_item.og_timezone_offset_seconds,\n                updated_at = now()\n            WHERE id = $1\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Int4",
+        "Int4",
+        "Bool",
+        "Int8",
+        "Int4",
+        "Bool"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "7202ba9f9fbff6c09455ba3dfd9f2766b68fa026c456e434f6604802b191afa3"
+}
