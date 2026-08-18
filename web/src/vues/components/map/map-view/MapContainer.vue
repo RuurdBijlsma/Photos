@@ -2,23 +2,23 @@
 import { computed, ref, shallowRef, watch } from 'vue'
 import { LngLatBounds, type MapOptions } from 'maplibre-gl'
 import { Map as LibreMap } from 'maplibre-gl'
-import BaseMap, { type StyleName } from '@/vues/components/map/BaseMap.vue'
-import MapLayerSelector from '@/vues/components/map/MapLayerSelector.vue'
-import MapDateFilter from '@/vues/components/map/MapDateFilter.vue'
 import MapMarkersLayer, {
   type EmitClusterSelected,
   type EmitMarkerSelected,
-} from '@/vues/components/map/layers/MapMarkersLayer.vue'
-import MapDotsLayer from '@/vues/components/map/layers/MapDotsLayer.vue'
-import MapHeatmapLayer from '@/vues/components/map/layers/MapHeatmapLayer.vue'
-import { getLngLat } from '@/vues/components/map/layers/mapUtils.ts'
+} from './MapMarkersLayer.vue'
+import MapDotsLayer from './MapDotsLayer.vue'
+import MapHeatmapLayer from './MapHeatmapLayer.vue'
+import { getLngLat } from '@/scripts/mapUtils/mapUtils.ts'
 import { useStorage } from '@vueuse/core'
-import libertyMapThumb from '@/assets/img/map-thumb/LIBERTY.png'
-import darkColorfulMapThumb from '@/assets/img/map-thumb/DARK_COLORFUL.png'
-import satelliteMapThumb from '@/assets/img/map-thumb/SATELLITE.png'
-import terrainMapThumb from '@/assets/img/map-thumb/TERRAIN.png'
-import watercolorMapThumb from '@/assets/img/map-thumb/WATERCOLOR.png'
+import libertyMapThumb from 'src/assets/img/map-thumb/LIBERTY.png'
+import darkColorfulMapThumb from 'src/assets/img/map-thumb/DARK_COLORFUL.png'
+import satelliteMapThumb from 'src/assets/img/map-thumb/SATELLITE.png'
+import terrainMapThumb from 'src/assets/img/map-thumb/TERRAIN.png'
+import watercolorMapThumb from 'src/assets/img/map-thumb/WATERCOLOR.png'
 import type { MapPhotosResponse, SimpleTimelineItem } from '@/scripts/types/generated/timeline.ts'
+import BaseMap, { type StyleName } from '@/vues/components/map/BaseMap.vue'
+import MapDateFilter from '@/vues/components/map/map-view/MapDateFilter.vue'
+import MapLayerSelector from '@/vues/components/map/map-view/MapLayerSelector.vue'
 
 export type { EmitMarkerSelected, EmitClusterSelected }
 

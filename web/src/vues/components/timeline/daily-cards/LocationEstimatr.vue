@@ -113,7 +113,7 @@ useEventListener(document, 'touchend', () => {
   if (isResizing) stopResizeTouch()
 })
 
-// Stable map options to prevent viewport resets when switching style layers
+// Stable map options to prevent viewport resets when switching style map-view
 const stableMapOptions = {
   center: { lon: 5, lat: 20 },
   zoom: 0,

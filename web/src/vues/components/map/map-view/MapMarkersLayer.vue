@@ -13,8 +13,8 @@ import {
   getFeatureCoordinates,
   getItemFromProperties,
   getThumbnailUrl,
-} from '@/vues/components/map/layers/mapUtils.ts'
-import { MapMediaPopupController } from '@/vues/components/map/layers/mapPopup.ts'
+} from '@/scripts/mapUtils/mapUtils.ts'
+import { MapMediaPopupController } from '@/scripts/mapUtils/mapPopup.ts'
 import { useDebounceFn } from '@vueuse/core'
 import { useRoute, useRouter } from 'vue-router'
 

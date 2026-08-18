@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import type { StyleName } from '@/vues/components/map/BaseMap.vue'
 import MdiCheckCircle from '~icons/mdi/check-circle'
 import MdiCircleMultipleOutline from '~icons/mdi/circle-multiple-outline'
 import MdiFire from '~icons/mdi/fire'
 import MdiMapMarkerMultipleOutline from '~icons/mdi/map-marker-multiple-outline'
+import type { StyleName } from '@/vues/components/map/BaseMap.vue'
 
 export interface MapStyle {
   key: StyleName

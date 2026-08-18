@@ -2,7 +2,7 @@ import { Marker, type Map as LibreMap } from 'maplibre-gl'
 import type { Router } from 'vue-router'
 import type { SimpleTimelineItem } from '@/scripts/types/generated/timeline.ts'
 import mediaItemService from '@/scripts/services/mediaItemService.ts'
-import { getThumbnailUrl } from '@/vues/components/map/layers/mapUtils.ts'
+import { getThumbnailUrl } from '@/scripts/mapUtils/mapUtils.ts'
 import { getVideoHeight } from '@/scripts/utils.ts'
 
 export interface MapMediaPopupOptions {
