@@ -11,6 +11,7 @@
 )]
 
 pub mod demand;
+pub mod models;
 pub mod scaler;
 pub mod telemetry;
 

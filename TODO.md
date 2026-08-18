@@ -31,8 +31,6 @@
 * better error if exiftool isnt there (worker wont work then)
 * apply rotation immidiately when going next/prev to other media item.
 # HIGH PRIO
-* 50 megapixels plaatjes willen niet rotaten om een of andere reden (die van tiramisu)
-* er is een bug in `get_or_create_location`, http://localhost:5173/explore/location/614 -> er zijn 4 Otterlo, Gelderland, NL in de DB
 * onnxruntime::Initializer::Initializer [ONNXRuntimeError] : 1 : FAIL : open file visual.onnx.data fail, errcode = 32 - The process cannot access the file because it is being used by another process.
 
 # INFRASTRUCTURE:

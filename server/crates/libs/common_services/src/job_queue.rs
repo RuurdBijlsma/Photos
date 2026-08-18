@@ -128,11 +128,6 @@ pub async fn enqueue_full_ingest(
         .user_id(user_id)
         .call()
         .await?;
-    enqueue_job::<()>(pool, settings, JobType::IngestLlm)
-        .relative_path(relative_path)
-        .user_id(user_id)
-        .call()
-        .await?;
     Ok(())
 }
 
@@ -234,7 +229,6 @@ pub async fn bulk_enqueue_full_ingest(
         JobType::IngestMetadata,
         JobType::IngestThumbnails,
         JobType::IngestAnalysis,
-        JobType::IngestLlm,
     ];
     let capacity = relative_paths.len() * job_types.len();
 

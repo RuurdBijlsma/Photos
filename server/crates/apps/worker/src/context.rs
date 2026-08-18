@@ -1,5 +1,5 @@
+use crate::models::WorkerModels;
 use app_state::AppSettings;
-use color_eyre::Result;
 use common_services::database::jobs::JobType;
 use common_services::s2s_client::S2SClient;
 use media_analyzer::MediaAnalyzer;
@@ -8,7 +8,6 @@ use open_clip_inference::TextEmbedder;
 use reqwest::Client;
 use sqlx::PgPool;
 use std::sync::Arc;
-use tracing::info;
 
 pub struct WorkerContext {
     pub worker_id: String,
@@ -22,47 +21,24 @@ pub struct WorkerContext {
 }
 
 impl WorkerContext {
-    /// Creates a new instance of `WorkerContext`.
-    pub async fn new(
+    /// Creates a new instance of `WorkerContext` using provided models.
+    #[must_use]
+    pub fn new(
         pool: PgPool,
         settings: AppSettings,
         worker_id: String,
         excluded_job_types: Vec<JobType>,
-    ) -> Result<Self> {
-        let embedder_model_id = &settings.ingest.analyzer.search.embedder_model_id;
-
-        // Load visual_analyzer IF the worker CAN run IngestLlm OR IngestAnalysis
-        let visual_analyzer = if !excluded_job_types.contains(&JobType::IngestLlm)
-            || !excluded_job_types.contains(&JobType::IngestAnalysis)
-        {
-            Some(Arc::new(
-                VisualAnalyzer::new(embedder_model_id, &settings.ingest.hf_cache_root).await?,
-            ))
-        } else {
-            None
-        };
-
-        // Load text_embedder IF the worker CAN run ClusterPhotos
-        let text_embedder = if excluded_job_types.contains(&JobType::ClusterPhotos) {
-            None
-        } else {
-            info!("Loading CLIP text embedder...");
-            let embedder = TextEmbedder::from_hf(embedder_model_id)
-                .cache_dir(&settings.ingest.hf_cache_root)
-                .build()
-                .await?;
-            Some(Arc::new(embedder))
-        };
-
-        Ok(Self {
+        models: WorkerModels,
+    ) -> Self {
+        Self {
             worker_id,
             excluded_job_types,
             pool,
             settings,
-            media_analyzer: Arc::new(MediaAnalyzer::builder().build().await?),
-            visual_analyzer,
+            media_analyzer: models.media_analyzer,
+            visual_analyzer: models.visual_analyzer,
+            text_embedder: models.text_embedder,
             s2s_client: S2SClient::new(Client::new()),
-            text_embedder,
-        })
+        }
     }
 }

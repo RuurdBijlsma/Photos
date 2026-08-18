@@ -1,8 +1,7 @@
 use crate::color_data::get_color_data;
-use crate::get_llm_classification;
 use crate::quality_judge::get_quality_judgement;
 use crate::quality_measure::get_quality_measurement;
-use crate::utils::convert_media_file;
+use crate::{convert_media_file_sync, get_llm_classification};
 use app_state::AnalyzerSettings;
 use color_eyre::eyre::eyre;
 use common_types::ml_analysis::{MLChatAnalysis, MLFastAnalysis};
@@ -57,10 +56,7 @@ impl VisualAnalyzer {
         ChatSession::new(self.llm_client.clone())
     }
 
-    async fn get_analysis_file(
-        file: &Path,
-        analyze_image_size: u64,
-    ) -> color_eyre::Result<PathBuf> {
+    fn get_analysis_file(file: &Path, analyze_image_size: u64) -> color_eyre::Result<PathBuf> {
         let Some(extension) = file.extension().map(|e| e.to_string_lossy().to_string()) else {
             return Err(eyre!("Can't get extension from file"));
         };
@@ -72,7 +68,7 @@ impl VisualAnalyzer {
                 .disable_cleanup(true)
                 .tempfile()?;
             analysis_file = temp_file.path().to_path_buf();
-            convert_media_file(file, &analysis_file, analyze_image_size).await?;
+            convert_media_file_sync(file, &analysis_file, analyze_image_size)?;
         }
         Ok(analysis_file)
     }
@@ -82,13 +78,13 @@ impl VisualAnalyzer {
     /// # Errors
     ///
     /// Returns an error if the file extension cannot be determined, if file conversion to JPEG fails, or if any of the underlying analysis steps encounter an error.
-    pub async fn fast_image_analysis(
+    pub fn fast_image_analysis(
         &self,
         config: &AnalyzerSettings,
         file: &Path,
         percentage: i32,
     ) -> color_eyre::Result<MLFastAnalysis> {
-        let analysis_file = Self::get_analysis_file(file, config.analyze_image_size).await?;
+        let analysis_file = Self::get_analysis_file(file, config.analyze_image_size)?;
         let img = image::open(&analysis_file)?;
 
         let color_data = get_color_data(&img)?;
@@ -101,7 +97,7 @@ impl VisualAnalyzer {
             .call()?;
         let measured_quality = get_quality_measurement(&analysis_file)?;
 
-        let _ = tokio::fs::remove_file(&analysis_file).await;
+        let _ = std::fs::remove_file(&analysis_file);
         Ok(MLFastAnalysis {
             percentage,
             color_data,
@@ -123,7 +119,7 @@ impl VisualAnalyzer {
         file: &Path,
         percentage: i32,
     ) -> color_eyre::Result<MLChatAnalysis> {
-        let analysis_file = Self::get_analysis_file(file, config.analyze_image_size).await?;
+        let analysis_file = Self::get_analysis_file(file, config.analyze_image_size)?;
 
         let llm_classification = get_llm_classification(&self.llm_client, &analysis_file).await?;
         let quality_judge = get_quality_judgement(&self.llm_client, &analysis_file).await?;

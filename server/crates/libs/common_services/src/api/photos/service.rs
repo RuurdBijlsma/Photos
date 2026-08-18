@@ -530,11 +530,6 @@ pub async fn reprocess_media_item(
         .user_id(user_id)
         .call()
         .await?;
-    enqueue_job::<()>(pool, settings, JobType::IngestLlm)
-        .relative_path(relative_path)
-        .user_id(user_id)
-        .call()
-        .await?;
 
     Ok(())
 }
@@ -593,6 +588,11 @@ pub async fn update_media_item(
             &file_path,
         )
         .await?;
+
+        let thumb_dir = settings.thumbnails_root.join(media_item_id);
+        if thumb_dir.exists() {
+            let _ = tokio::fs::remove_dir_all(&thumb_dir).await;
+        }
 
         let new_id = nice_id(constants().database.media_item_id_length);
         let mut tx = pool.begin().await?;

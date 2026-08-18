@@ -10,6 +10,8 @@ use crate::database::media_item::weather::Weather;
 use crate::database::structs::UpdateMediaItemPayload;
 use crate::database::visual_analysis::visual_analysis::ReadVisualAnalysis;
 use crate::database::{DbError, with_fallback_timezone};
+use crate::utils::nice_id;
+use app_state::constants;
 use chrono::{DateTime, Utc};
 use common_types::pb::api::{MapPhotoItem, SimpleTimelineItem};
 use sqlx::postgres::PgQueryResult;
@@ -202,7 +204,7 @@ impl MediaItemStore {
     }
 
     /// Inserts a full media item and all its associated metadata into the database.
-    pub async fn create(
+    async fn create(
         tx: &mut PgTransaction<'_>,
         id: &str,
         relative_path: &str,
@@ -254,6 +256,34 @@ impl MediaItemStore {
         Self::insert_child_metadata(tx, id, media_item).await
     }
 
+    pub async fn upsert(
+        tx: &mut PgTransaction<'_>,
+        relative_path: &str,
+        user_id: i32,
+        remote_user_id: Option<i32>,
+        media_item: &CreateFullMediaItem,
+    ) -> Result<String, DbError> {
+        if let Some(existing_id) = Self::find_id_by_relative_path(&mut **tx, relative_path).await? {
+            if let Some(remote_uid) = remote_user_id {
+                Self::update_remote_user_id(&mut **tx, &existing_id, remote_uid).await?;
+            }
+            Self::update_full(tx, &existing_id, false, media_item).await?;
+            Ok(existing_id)
+        } else {
+            let new_id = nice_id(constants().database.media_item_id_length);
+            Self::create(
+                tx,
+                &new_id,
+                relative_path,
+                user_id,
+                remote_user_id,
+                media_item,
+            )
+            .await?;
+            Ok(new_id)
+        }
+    }
+
     /// Updates a media item's main attributes and refreshes its child metadata tables.
     pub async fn update_full(
         tx: &mut PgTransaction<'_>,
@@ -261,9 +291,6 @@ impl MediaItemStore {
         has_thumbnails: bool,
         media_item: &CreateFullMediaItem,
     ) -> Result<(), DbError> {
-        let sort_timestamp =
-            with_fallback_timezone(media_item.taken_at_utc, &media_item.taken_at_local);
-
         // Clear child metadata tables for clean re-insertion
         sqlx::query!(
             r#"
@@ -283,21 +310,22 @@ impl MediaItemStore {
         sqlx::query!(
             r#"
             UPDATE media_item
-            SET has_thumbnails = $16,
+            SET has_thumbnails = $8,
                 hash = $2,
                 width = $3,
                 height = $4,
                 is_video = $5,
                 duration_ms = $6,
-                taken_at_local = $7,
-                taken_at_utc = $8,
-                og_taken_at_local = $9,
-                sort_timestamp = $10,
-                orientation = $11,
-                use_panorama_viewer = $12,
-                timezone_name = $13,
-                timezone_offset_seconds = $14,
-                og_timezone_offset_seconds = $15
+                taken_at_local = media_item.taken_at_local,
+                taken_at_utc = media_item.taken_at_utc,
+                og_taken_at_local = media_item.og_taken_at_local,
+                sort_timestamp = media_item.sort_timestamp,
+                orientation = $7,
+                use_panorama_viewer = media_item.use_panorama_viewer,
+                timezone_name = media_item.timezone_name,
+                timezone_offset_seconds = media_item.timezone_offset_seconds,
+                og_timezone_offset_seconds = media_item.og_timezone_offset_seconds,
+                updated_at = now()
             WHERE id = $1
             "#,
             id,
@@ -306,15 +334,7 @@ impl MediaItemStore {
             media_item.height,
             media_item.is_video,
             media_item.duration_ms,
-            media_item.taken_at_local,
-            media_item.taken_at_utc,
-            media_item.og_taken_at_local,
-            sort_timestamp,
             media_item.orientation,
-            media_item.use_panorama_viewer,
-            media_item.timezone_name,
-            media_item.timezone_offset_seconds,
-            media_item.og_timezone_offset_seconds,
             has_thumbnails,
         )
         .execute(&mut **tx)

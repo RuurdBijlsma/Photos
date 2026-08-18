@@ -108,11 +108,7 @@ async fn compute_analysis(
             eyre!("No visual_analyzer on worker that picked up ingest_analysis job")
         })?;
         let analysis_result = tokio::task::spawn_blocking(move || {
-            tokio::runtime::Handle::current().block_on(async move {
-                analyzer
-                    .fast_image_analysis(&analyzer_settings, &image_path, percentage)
-                    .await
-            })
+            analyzer.fast_image_analysis(&analyzer_settings, &image_path, percentage)
         })
         .await??;
 

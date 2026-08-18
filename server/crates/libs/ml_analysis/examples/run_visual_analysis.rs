@@ -74,9 +74,8 @@ async fn main() -> color_eyre::Result<()> {
             .to_string();
         println!("analyze image {image_filename}");
         let now = Instant::now();
-        let analysis = analyzer
-            .fast_image_analysis(&settings.ingest.analyzer, &resized_img_file, 0)
-            .await?;
+        let analysis =
+            analyzer.fast_image_analysis(&settings.ingest.analyzer, &resized_img_file, 0)?;
         let filename = format!("{image_filename}-analysis.json");
         let file = File::create(Path::new(&filename))?;
         serde_json::to_writer_pretty(file, &analysis)?;
