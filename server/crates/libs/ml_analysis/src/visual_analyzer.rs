@@ -1,7 +1,7 @@
 use crate::color_data::get_color_data;
-use crate::{convert_media_file_sync, get_llm_classification};
 use crate::quality_judge::get_quality_judgement;
 use crate::quality_measure::get_quality_measurement;
+use crate::{convert_media_file_sync, get_llm_classification};
 use app_state::AnalyzerSettings;
 use color_eyre::eyre::eyre;
 use common_types::ml_analysis::{MLChatAnalysis, MLFastAnalysis};
@@ -56,10 +56,7 @@ impl VisualAnalyzer {
         ChatSession::new(self.llm_client.clone())
     }
 
-    fn get_analysis_file(
-        file: &Path,
-        analyze_image_size: u64,
-    ) -> color_eyre::Result<PathBuf> {
+    fn get_analysis_file(file: &Path, analyze_image_size: u64) -> color_eyre::Result<PathBuf> {
         let Some(extension) = file.extension().map(|e| e.to_string_lossy().to_string()) else {
             return Err(eyre!("Can't get extension from file"));
         };

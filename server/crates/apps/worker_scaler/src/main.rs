@@ -1,8 +1,8 @@
 use color_eyre::Result;
 use common_services::binary_setup::setup_binary;
 use common_services::graceful_exit::get_kill_signal;
-use worker_scaler::start_scaler;
 use ort::environment::GlobalThreadPoolOptions;
+use worker_scaler::start_scaler;
 
 #[tokio::main]
 #[allow(clippy::large_futures)]

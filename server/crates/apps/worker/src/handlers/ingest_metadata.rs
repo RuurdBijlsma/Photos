@@ -97,7 +97,13 @@ async fn store_media_item(
     )
     .await?;
     if let Some(info) = &pending_payload {
-        AlbumStore::add_media_items(&mut *tx, &info.album_id, std::slice::from_ref(&item_id), user_id).await?;
+        AlbumStore::add_media_items(
+            &mut *tx,
+            &info.album_id,
+            std::slice::from_ref(&item_id),
+            user_id,
+        )
+        .await?;
         if let Some(album) = AlbumStore::find_by_id(&mut *tx, &info.album_id).await?
             && album.sort_mode != AlbumSort::None
         {
