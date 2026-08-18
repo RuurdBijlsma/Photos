@@ -9,6 +9,7 @@ import MapMarkersLayer, {
   type EmitClusterSelected,
   type EmitMarkerSelected,
 } from '@/vues/components/map/layers/MapMarkersLayer.vue'
+import MapDotsLayer from '@/vues/components/map/layers/MapDotsLayer.vue'
 import MapHeatmapLayer from '@/vues/components/map/layers/MapHeatmapLayer.vue'
 import { getLngLat } from '@/vues/components/map/layers/mapUtils.ts'
 import { useStorage } from '@vueuse/core'
@@ -58,7 +59,7 @@ const emit = defineEmits<{
 }>()
 
 // --- State & Storage ---
-const mapMode = useStorage<'markers' | 'heatmap'>('mapLayerMode', 'markers')
+const mapMode = useStorage<'markers' | 'heatmap' | 'dots'>('mapLayerMode', 'markers')
 const map = shallowRef<LibreMap | null>(null)
 const photoIdToOrder = new Map<string, number>()
 
@@ -221,7 +222,7 @@ defineExpose({
         <v-progress-circular indeterminate color="primary" />
       </div>
 
-      <!-- Marker / Heatmap Layers -->
+      <!-- Marker / Dots / Heatmap Layers -->
       <template v-if="map">
         <map-markers-layer
           v-if="mapMode === 'markers'"
@@ -230,6 +231,12 @@ defineExpose({
           @visible-items-changed="emit('visible-items-changed', $event)"
           @marker-selected="emit('marker-selected', $event)"
           @cluster-selected="emit('cluster-selected', $event)"
+        />
+        <map-dots-layer
+          v-else-if="mapMode === 'dots'"
+          :map="map"
+          :map-photos="props.mapPhotos"
+          @visible-items-changed="emit('visible-items-changed', $event)"
         />
         <map-heatmap-layer
           v-else
@@ -287,5 +294,74 @@ defineExpose({
   height: 100%;
   display: grid;
   place-items: center;
+}
+</style>
+
+<style>
+/* Shared Map Media Popup Styles */
+.map-media-popup {
+  position: relative;
+  border: 2px solid rgba(255, 255, 255, 0.86);
+  border-radius: 12px;
+  background: rgba(20, 20, 24, 0.78);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+  z-index: 20;
+}
+
+.map-media-popup::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -14px;
+  width: 0;
+  height: 0;
+  border-left: 13px solid transparent;
+  border-right: 13px solid transparent;
+  border-top: 14px solid rgba(255, 255, 255, 0.86);
+  transform: translateX(-50%);
+}
+
+.map-media-popup::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -11px;
+  width: 0;
+  height: 0;
+  border-left: 10px solid transparent;
+  border-right: 10px solid transparent;
+  border-top: 11px solid rgba(20, 20, 24, 0.78);
+  transform: translateX(-50%);
+  z-index: 1;
+}
+
+.map-media-popup-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 10px;
+}
+
+.map-media-popup-close {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.45);
+  color: white;
+  cursor: pointer;
+  font-size: 18px;
+  display: grid;
+  place-items: center;
+  z-index: 1;
+}
+
+.map-media-popup-close:hover {
+  background: rgba(0, 0, 0, 0.68);
 }
 </style>

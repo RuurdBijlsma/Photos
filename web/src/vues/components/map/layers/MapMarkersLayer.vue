@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import {
-  type GeoJSONFeature,
   GeoJSONSource,
   type Map as LibreMap,
   type MapSourceDataEvent,
@@ -15,8 +14,7 @@ import {
   getItemFromProperties,
   getThumbnailUrl,
 } from '@/vues/components/map/layers/mapUtils.ts'
-import mediaItemService from '@/scripts/services/mediaItemService.ts'
-import { getVideoHeight } from '@/scripts/utils.ts'
+import { MapMediaPopupController } from '@/vues/components/map/layers/mapPopup.ts'
 import { useDebounceFn } from '@vueuse/core'
 import { useRoute, useRouter } from 'vue-router'
 
@@ -47,7 +45,7 @@ let isUnmounted = false
 let updateRun = 0
 const markers: Record<string, Marker> = {}
 const clusterPreviewCache = new Map<number, SimpleTimelineItem>()
-let popupMarker: Marker | null = null
+const popupController = new MapMediaPopupController()
 
 const currentVisibleIds = new Set<string>()
 const visibleItems = ref<SimpleTimelineItem[]>([])
@@ -319,7 +317,15 @@ async function handleMarkerClick(key: string, coords: [number, number]) {
     if (!item) return
     selectedClusterItems.value = null
     selectedPopupItem.value = item
-    showPopup(item, coords)
+    popupController.show({
+      map: props.map,
+      item,
+      coords,
+      router,
+      query: route.query,
+      offset: [0, -38],
+      onClose: () => clearMarkerSelection(),
+    })
     emit('marker-selected', { key, coords })
   }
 }
@@ -342,7 +348,15 @@ async function selectCluster(clusterId: number) {
     selectedClusterItems.value = items
     selectedPopupItem.value = getClusterPreviewItem(clusterId, leaves)
     if (selectedPopupItem.value && selectedLngLat.value) {
-      showPopup(selectedPopupItem.value, selectedLngLat.value)
+      popupController.show({
+        map: props.map,
+        item: selectedPopupItem.value,
+        coords: selectedLngLat.value,
+        router,
+        query: route.query,
+        offset: [0, -38],
+        onClose: () => clearMarkerSelection(),
+      })
     }
     emit('cluster-selected', {
       items,
@@ -359,77 +373,13 @@ function clearMarkerSelection() {
   selectedPopupItem.value = null
   selectedLngLat.value = null
   updateSelectedMarkerClasses()
-  closePopup()
+  popupController.close()
 }
 
 function updateSelectedMarkerClasses() {
   for (const [key, marker] of Object.entries(markers)) {
     marker.getElement().classList.toggle('map-marker-selected', key === selectedMarkerKey.value)
   }
-}
-
-function showPopup(item: SimpleTimelineItem, coords: [number, number]) {
-  closePopup()
-  const map = props.map
-
-  const popupArea = 300 ** 2
-  const popupWidth = Math.sqrt(popupArea * item.ratio)
-  const popupHeight = Math.sqrt(popupArea * (1 / item.ratio))
-
-  const popupEl = document.createElement('div')
-  popupEl.style.width = `${popupWidth}px`
-  popupEl.style.height = `${popupHeight}px`
-  popupEl.className = 'map-media-popup'
-
-  const closeButton = document.createElement('button')
-  let mediaEl: HTMLImageElement | HTMLVideoElement
-
-  if (item.isVideo) {
-    const videoEl = document.createElement('video')
-    videoEl.autoplay = true
-    videoEl.muted = true
-    videoEl.loop = true
-    videoEl.playsInline = true
-    videoEl.poster = getThumbnailUrl(item, 480)
-    videoEl.src = mediaItemService.getVideo(item.id, getVideoHeight(480), !item.hasThumbnails)
-    mediaEl = videoEl
-  } else {
-    const imageEl = document.createElement('img')
-    imageEl.src = getThumbnailUrl(item, 480)
-    imageEl.alt = ''
-    mediaEl = imageEl
-  }
-
-  mediaEl.className = 'map-media-popup-image'
-  closeButton.className = 'map-media-popup-close'
-  closeButton.type = 'button'
-  closeButton.textContent = '×'
-
-  closeButton.addEventListener('click', (e) => {
-    e.preventDefault()
-    e.stopPropagation()
-    clearMarkerSelection()
-  })
-
-  popupEl.addEventListener('click', (e) => {
-    e.stopPropagation()
-    router.push({ path: `/map/view/${item.id}`, query: route.query })
-  })
-
-  popupEl.append(mediaEl, closeButton)
-
-  popupMarker = new Marker({
-    element: popupEl,
-    anchor: 'bottom',
-    offset: [0, -38],
-  })
-    .setLngLat(coords)
-    .addTo(map)
-}
-
-function closePopup() {
-  popupMarker?.remove()
-  popupMarker = null
 }
 
 const debouncedUpdate = useDebounceFn(syncVisibleMarkers, 80)
@@ -610,72 +560,5 @@ watch(
     0 2px 8px rgba(0, 0, 0, 0.35),
     0 0 0 4px rgba(var(--v-theme-secondary), 0.45);
   z-index: 2;
-}
-
-/* --- Map Media Popup --- */
-.map-media-popup {
-  position: relative;
-  border: 2px solid rgba(255, 255, 255, 0.86);
-  border-radius: 12px;
-  background: rgba(20, 20, 24, 0.78);
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
-  cursor: pointer;
-  z-index: 20;
-}
-
-.map-media-popup::after {
-  content: '';
-  position: absolute;
-  left: 50%;
-  bottom: -14px;
-  width: 0;
-  height: 0;
-  border-left: 13px solid transparent;
-  border-right: 13px solid transparent;
-  border-top: 14px solid rgba(255, 255, 255, 0.86);
-  transform: translateX(-50%);
-}
-
-.map-media-popup::before {
-  content: '';
-  position: absolute;
-  left: 50%;
-  bottom: -11px;
-  width: 0;
-  height: 0;
-  border-left: 10px solid transparent;
-  border-right: 10px solid transparent;
-  border-top: 11px solid rgba(20, 20, 24, 0.78);
-  transform: translateX(-50%);
-  z-index: 1;
-}
-
-.map-media-popup-image {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  border-radius: 10px;
-}
-
-.map-media-popup-close {
-  position: absolute;
-  top: 6px;
-  right: 6px;
-  width: 26px;
-  height: 26px;
-  border: none;
-  border-radius: 50%;
-  background: rgba(0, 0, 0, 0.45);
-  color: white;
-  cursor: pointer;
-  font-size: 18px;
-  display: grid;
-  place-items: center;
-  z-index: 1;
-}
-
-.map-media-popup-close:hover {
-  background: rgba(0, 0, 0, 0.68);
 }
 </style>

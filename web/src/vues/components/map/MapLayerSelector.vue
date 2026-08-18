@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import type { StyleName } from '@/vues/components/map/BaseMap.vue'
 import MdiCheckCircle from '~icons/mdi/check-circle'
+import MdiCircleMultipleOutline from '~icons/mdi/circle-multiple-outline'
 import MdiFire from '~icons/mdi/fire'
 import MdiMapMarkerMultipleOutline from '~icons/mdi/map-marker-multiple-outline'
 
@@ -13,14 +14,14 @@ export interface MapStyle {
 
 defineProps<{
   currentStyle: StyleName
-  mapMode: 'markers' | 'heatmap'
+  mapMode: 'markers' | 'heatmap' | 'dots'
   nextStyle: MapStyle
   mapStyles: readonly MapStyle[]
 }>()
 
 const emit = defineEmits<{
   'update:currentStyle': [value: StyleName]
-  'update:mapMode': [value: 'markers' | 'heatmap']
+  'update:mapMode': [value: 'markers' | 'heatmap' | 'dots']
   'cycle-style': []
 }>()
 
@@ -30,7 +31,7 @@ function handleStyleClick(key: StyleName) {
   emit('update:currentStyle', key)
 }
 
-function handleModeChange(newMode: 'markers' | 'heatmap') {
+function handleModeChange(newMode: 'markers' | 'heatmap' | 'dots') {
   emit('update:mapMode', newMode)
 }
 
@@ -60,6 +61,9 @@ function handleCycleStyle() {
               variant="flat"
             >
               Markers
+            </v-chip>
+            <v-chip :prepend-icon="MdiCircleMultipleOutline" value="dots" key="dots" variant="flat">
+              Dots
             </v-chip>
             <v-chip :prepend-icon="MdiFire" value="heatmap" key="heatmap" variant="flat">
               Heatmap
