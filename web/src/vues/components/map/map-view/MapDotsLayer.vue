@@ -3,10 +3,7 @@ import { onMounted, onUnmounted, ref, watch } from 'vue'
 import type { GeoJSONSource, Map as LibreMap, MapMouseEvent, MapSourceDataEvent } from 'maplibre-gl'
 import type * as GeoJSON from 'geojson'
 import type { MapPhotosResponse, SimpleTimelineItem } from '@/scripts/types/generated/timeline.ts'
-import {
-  createPhotosGeoJson,
-  getItemFromProperties,
-} from '@/scripts/mapUtils/mapUtils.ts'
+import { createPhotosGeoJson, getItemFromProperties } from '@/scripts/mapUtils/mapUtils.ts'
 import { MapMediaPopupController } from '@/scripts/mapUtils/mapPopup.ts'
 import { useDebounceFn } from '@vueuse/core'
 import { useRoute, useRouter } from 'vue-router'

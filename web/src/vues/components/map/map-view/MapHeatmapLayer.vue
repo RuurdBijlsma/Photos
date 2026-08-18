@@ -3,10 +3,7 @@ import { onMounted, onUnmounted, ref, watch } from 'vue'
 import type { GeoJSONSource, Map as LibreMap, MapSourceDataEvent } from 'maplibre-gl'
 import type { MapPhotosResponse, SimpleTimelineItem } from '@/scripts/types/generated/timeline.ts'
 import { HEATMAP_CONFIG } from '@/scripts/mapUtils/heatmapConfig.ts'
-import {
-  createPhotosGeoJson,
-  getItemFromProperties,
-} from '@/scripts/mapUtils/mapUtils.ts'
+import { createPhotosGeoJson, getItemFromProperties } from '@/scripts/mapUtils/mapUtils.ts'
 import { useDebounceFn } from '@vueuse/core'
 
 const props = defineProps<{

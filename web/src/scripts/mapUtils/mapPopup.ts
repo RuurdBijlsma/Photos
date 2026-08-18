@@ -1,5 +1,5 @@
 import { Marker, type Map as LibreMap } from 'maplibre-gl'
-import type { Router } from 'vue-router'
+import type { LocationQueryRaw, Router } from 'vue-router'
 import type { SimpleTimelineItem } from '@/scripts/types/generated/timeline.ts'
 import mediaItemService from '@/scripts/services/mediaItemService.ts'
 import { getThumbnailUrl } from '@/scripts/mapUtils/mapUtils.ts'
@@ -10,7 +10,7 @@ export interface MapMediaPopupOptions {
   item: SimpleTimelineItem
   coords: [number, number]
   router: Router
-  query?: Record<string, unknown>
+  query?: LocationQueryRaw
   offset?: [number, number]
   onClose?: () => void
 }
