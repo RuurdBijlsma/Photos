@@ -1,12 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import {
-  type GeoJSONFeature,
-  GeoJSONSource,
-  type Map as LibreMap,
-  type MapSourceDataEvent,
-  Marker,
-} from 'maplibre-gl'
+import { GeoJSONSource, type Map as LibreMap, type MapSourceDataEvent, Marker } from 'maplibre-gl'
 import type * as GeoJSON from 'geojson'
 import type { MapPhotosResponse, SimpleTimelineItem } from '@/scripts/types/generated/timeline.ts'
 import {
@@ -56,7 +50,7 @@ const selectedPopupItem = ref<SimpleTimelineItem | null>(null)
 const selectedLngLat = ref<[number, number] | null>(null)
 
 const photoItems = computed(() => {
-  return props.mapPhotos?.items.map((p) => p.item).filter((p) => !p) ?? []
+  return props.mapPhotos?.items.map((p) => p.item).filter((p) => !!p) ?? []
 })
 
 function addMarkerLayers(loadedMap: LibreMap) {
