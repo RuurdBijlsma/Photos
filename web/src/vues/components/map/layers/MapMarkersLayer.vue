@@ -1,6 +1,12 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { GeoJSONSource, type Map as LibreMap, type MapSourceDataEvent, Marker } from 'maplibre-gl'
+import {
+  type GeoJSONFeature,
+  GeoJSONSource,
+  type Map as LibreMap,
+  type MapSourceDataEvent,
+  Marker,
+} from 'maplibre-gl'
 import type * as GeoJSON from 'geojson'
 import type { MapPhotosResponse, SimpleTimelineItem } from '@/scripts/types/generated/timeline.ts'
 import {
@@ -37,6 +43,7 @@ const emit = defineEmits<{
 const route = useRoute()
 const router = useRouter()
 
+let isUnmounted = false
 let updateRun = 0
 const markers: Record<string, Marker> = {}
 const clusterPreviewCache = new Map<number, SimpleTimelineItem>()
@@ -78,6 +85,7 @@ function addMarkerLayers(loadedMap: LibreMap) {
 }
 
 async function syncVisibleMarkers() {
+  if (isUnmounted) return
   const loadedMap = props.map
   const run = ++updateRun
   const source = loadedMap.getSource('photos') as GeoJSONSource
@@ -109,7 +117,8 @@ async function syncVisibleMarkers() {
     return // Source changed mid-query, abort execution
   }
 
-  if (run !== updateRun) return
+  // Abort if unmounted or if a newer sync run has started
+  if (isUnmounted || run !== updateRun) return
 
   // 1. Process clusters
   for (const res of clusterResults) {
@@ -133,6 +142,8 @@ async function syncVisibleMarkers() {
     visibleItemMap.set(item.id, item)
     addOrUpdatePhotoMarker(loadedMap, item, getFeatureCoordinates(feature), newMarkers)
   }
+
+  if (isUnmounted || run !== updateRun) return
 
   // Apply deep-diff cache matching for markers to save Vue computation overhead
   const newIds = new Set(visibleItemMap.keys())
@@ -216,6 +227,8 @@ function addOrUpdateMarker(
   createElement: () => HTMLElement,
   updateElement?: (el: HTMLElement) => void,
 ) {
+  if (isUnmounted) return
+
   let marker = markers[key]
   if (!marker) {
     const element = createElement()
@@ -444,7 +457,9 @@ function setupResources() {
 
   addMarkerLayers(props.map)
   props.map.once('idle', () => {
-    syncVisibleMarkers()
+    if (!isUnmounted) {
+      syncVisibleMarkers()
+    }
   })
 }
 
@@ -469,6 +484,7 @@ function handleStyleLoad() {
 }
 
 onMounted(() => {
+  isUnmounted = false
   setupResources()
   props.map.on('zoomend', debouncedUpdate)
   props.map.on('moveend', debouncedUpdate)
@@ -478,6 +494,10 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  isUnmounted = true
+  updateRun++
+  debouncedUpdate.cancel?.()
+
   props.map.off('zoomend', debouncedUpdate)
   props.map.off('moveend', debouncedUpdate)
   props.map.off('sourcedata', handleSourceData)
@@ -490,13 +510,15 @@ onUnmounted(() => {
 watch(
   () => props.mapPhotos,
   (newPhotos) => {
-    if (!props.map) return
+    if (!props.map || isUnmounted) return
     const source = props.map.getSource('photos') as GeoJSONSource | undefined
     if (source && newPhotos) {
       source.setData(createPhotosGeoJson(newPhotos))
       props.map.triggerRepaint()
       setTimeout(() => {
-        debouncedUpdate()
+        if (!isUnmounted) {
+          debouncedUpdate()
+        }
       }, 75)
     } else if (newPhotos) {
       setupResources()
