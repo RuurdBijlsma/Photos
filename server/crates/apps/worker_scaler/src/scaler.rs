@@ -1,10 +1,11 @@
 use crate::demand::get_demand;
+use crate::models::ModelRegistry;
 use crate::telemetry::Telemetry;
 use app_state::{AppSettings, ProfileSettings};
 use color_eyre::Result;
 use common_services::database::jobs::JobType;
 use sqlx::PgPool;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 use tokio::sync::watch;
 use tokio::task::JoinHandle;
 use tracing::{Instrument, error, info, info_span, warn};
@@ -21,6 +22,7 @@ pub struct ActiveWorker {
 pub struct Scaler {
     pool: PgPool,
     settings: AppSettings,
+    models: ModelRegistry,
     active_workers: Vec<ActiveWorker>,
     last_spawn_time: Option<Instant>,
     worker_counter: u64,
@@ -28,10 +30,12 @@ pub struct Scaler {
 
 impl Scaler {
     #[must_use]
-    pub const fn new(pool: PgPool, settings: AppSettings) -> Self {
+    pub fn new(pool: PgPool, settings: AppSettings) -> Self {
+        let models = ModelRegistry::new(settings.clone(), settings.scaler.unload_models_timeout);
         Self {
             pool,
             settings,
+            models,
             active_workers: Vec::new(),
             last_spawn_time: None,
             worker_counter: 0,
@@ -48,20 +52,17 @@ impl Scaler {
     async fn run_inner(&mut self, shutdown_rx: &mut watch::Receiver<bool>) -> Result<()> {
         info!("⚖️ Starting scaler...");
 
-        let normal_delay = Duration::from_secs(self.settings.scaler.tick_interval_secs);
-        let busy_delay = Duration::from_secs(self.settings.scaler.quick_tick_interval_secs);
-
         loop {
             if *shutdown_rx.borrow() {
                 break;
             }
 
             let tick_delay = match self.tick().await {
-                Ok(true) => normal_delay,
-                Ok(false) => busy_delay,
+                Ok(true) => self.settings.scaler.tick_interval,
+                Ok(false) => self.settings.scaler.quick_tick_interval,
                 Err(e) => {
                     error!("🚨 Error during scaler tick: {e}");
-                    normal_delay
+                    self.settings.scaler.tick_interval
                 }
             };
 
@@ -79,6 +80,7 @@ impl Scaler {
     /// Performs a tick and returns `true` if the system is completely idle.
     async fn tick(&mut self) -> Result<bool> {
         self.clean_up_sleeping_workers();
+        self.models.cleanup_idle_models();
         let demand = get_demand(&self.pool).await?;
         let telemetry = Telemetry::fetch();
 
@@ -130,7 +132,9 @@ impl Scaler {
             .max_by_key(|profile| profile.priority);
 
         if let Some(profile) = best_profile.cloned() {
-            self.spawn_worker(&profile);
+            if let Err(e) = self.spawn_worker(&profile).await {
+                error!("Failed to spawn worker for profile {}: {e}", profile.name);
+            }
             self.last_spawn_time = Some(Instant::now());
         }
         Ok(is_idle)
@@ -168,7 +172,7 @@ impl Scaler {
             .count()
     }
 
-    fn spawn_worker(&mut self, profile: &ProfileSettings) {
+    async fn spawn_worker(&mut self, profile: &ProfileSettings) -> Result<()> {
         self.worker_counter += 1;
         let worker_id = format!("w{}-{}", self.worker_counter, profile.name);
         let (shutdown_tx, shutdown_rx) = watch::channel(false);
@@ -182,6 +186,8 @@ impl Scaler {
             .filter_map(|job_str| JobType::parse_from_str(job_str).ok())
             .collect();
 
+        let models = self.models.prepare_models_for_jobs(&excluded_jobs).await?;
+
         let worker_id_clone = worker_id.clone();
         let handle = tokio::spawn(async move {
             create_worker(
@@ -189,6 +195,7 @@ impl Scaler {
                 settings,
                 worker_id_clone,
                 excluded_jobs,
+                models,
                 true,
                 shutdown_rx,
             )
@@ -204,6 +211,7 @@ impl Scaler {
         });
 
         self.log_worker_state_change(&format!("[➕ ] Spawned {} worker", profile.name));
+        Ok(())
     }
 
     fn scale_down(&self) {

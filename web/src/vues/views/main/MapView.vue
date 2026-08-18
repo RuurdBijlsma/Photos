@@ -9,7 +9,7 @@ import MapContainer, {
   type DateFilter,
   type EmitClusterSelected,
   type EmitMarkerSelected,
-} from '@/vues/components/map/MapContainer.vue'
+} from '../../components/map/map-view/MapContainer.vue'
 import mediaItemService from '@/scripts/services/mediaItemService.ts'
 import { useEventListener, useResizeObserver, useStorage, useThrottleFn } from '@vueuse/core'
 import type { MapPhotosResponse, SimpleTimelineItem } from '@/scripts/types/generated/timeline.ts'
