@@ -231,3 +231,7 @@ CREATE INDEX idx_camera_settings_normalized_make_model
                         LOWER(TRIM(camera_make)),
                         LOWER(REGEXP_REPLACE(TRIM(camera_model), '\s*\(.*\)$', '', 'i'))
         );
+
+-- For missing since
+CREATE INDEX idx_media_item_missing ON media_item (user_id, missing_since)
+    WHERE missing_since IS NOT NULL;

@@ -9,7 +9,7 @@ use common_services::job_queue::{bulk_enqueue_full_ingest, enqueue_job};
 use sqlx::PgPool;
 use std::collections::HashSet;
 use std::path::Path;
-use tracing::info;
+use tracing::{info, warn};
 use walkdir::WalkDir;
 
 /// Checks if a file path has an extension present in a given set of allowed extensions.
@@ -30,13 +30,21 @@ fn get_media_files(folder: &Path, allowed_exts: &HashSet<&str>) -> Vec<std::path
     files
 }
 
-/// Synchronizes the filesystem state with the database by enqueuing new files for ingest and old files for removal.
+/// Synchronizes the filesystem state with the database.
 pub async fn sync_user_files_to_db(
     pool: &PgPool,
     settings: &IngestSettings,
     user_folder: &Path,
     user_id: i32,
 ) -> Result<()> {
+    if !user_folder.exists() || !user_folder.is_dir() {
+        warn!(
+            "User folder {:?} does not exist or is not a directory. Skipping sync for user {}",
+            user_folder, user_id
+        );
+        return Ok(());
+    }
+
     let detection = &settings.file_detection;
     let allowed: HashSet<_> = detection
         .photo_extensions
@@ -72,40 +80,90 @@ pub async fn sync_user_files_to_db(
         })
         .collect();
 
-    let db_paths_all: HashSet<String> = sqlx::query_scalar!(
-        "SELECT relative_path FROM media_item WHERE user_id = $1",
+    let db_rows = sqlx::query!(
+        r#"
+        SELECT relative_path, (missing_since IS NOT NULL) AS "is_missing!"
+        FROM media_item
+        WHERE user_id = $1
+        "#,
         user_id
     )
     .fetch_all(pool)
-    .await?
-    .into_iter()
-    .collect();
+    .await?;
 
-    let to_ingest: Vec<_> = fs_paths.difference(&db_paths_all).cloned().collect();
-    let to_remove: Vec<_> = db_paths_all.difference(&fs_paths).cloned().collect();
+    let mut db_all_paths = HashSet::with_capacity(db_rows.len());
+    let mut db_present_paths = HashSet::new();
+    let mut db_missing_paths = HashSet::new();
 
-    bulk_enqueue_full_ingest(pool, settings, &to_ingest, user_id).await?;
+    for row in db_rows {
+        if row.is_missing {
+            db_missing_paths.insert(row.relative_path.clone());
+        } else {
+            db_present_paths.insert(row.relative_path.clone());
+        }
+        db_all_paths.insert(row.relative_path);
+    }
 
-    tokio::try_join!(
-        enqueue_job::<()>(pool, settings, JobType::UpdateGlobalCentroid).call(),
-        enqueue_job::<()>(pool, settings, JobType::ClusterFaces).call(),
-        enqueue_job::<()>(pool, settings, JobType::ClusterPhotos).call(),
-        enqueue_job::<()>(pool, settings, JobType::GenerateDailyCards).call(),
-        enqueue_job::<()>(pool, settings, JobType::CalcSystemStats).call(),
-    )?;
-
-    if !to_remove.is_empty() {
-        info!(
-            "Cleaning up {} missing files for user {}",
-            to_remove.len(),
+    // Safety guard: if filesystem has no files but the DB has records, the mount is likely disconnected
+    if fs_paths.is_empty() && !db_all_paths.is_empty() {
+        warn!(
+            "User folder {:?} contains 0 media files while {} items exist in DB. Storage may be unmounted. Aborting scan for user {}.",
+            user_folder,
+            db_all_paths.len(),
             user_id
         );
-        MediaItemStore::mark_relative_paths_as_missing(pool, &to_remove).await?;
+        return Ok(());
+    }
+
+    // New files on disk -> Enqueue ingest
+    let to_ingest: Vec<_> = fs_paths.difference(&db_all_paths).cloned().collect();
+
+    // Previously present files that are now missing -> Set missing_since = NOW()
+    let to_mark_missing: Vec<_> = db_present_paths.difference(&fs_paths).cloned().collect();
+
+    // Reconnected files that were marked missing -> Set missing_since = NULL
+    let to_unmark_missing: Vec<_> = db_missing_paths.intersection(&fs_paths).cloned().collect();
+
+    if !to_ingest.is_empty() {
+        info!(
+            "Enqueuing {} new files for user {}",
+            to_ingest.len(),
+            user_id
+        );
+        bulk_enqueue_full_ingest(pool, settings, &to_ingest, user_id).await?;
+    }
+
+    if !to_unmark_missing.is_empty() {
+        info!(
+            "Restoring {} reconnected files for user {}",
+            to_unmark_missing.len(),
+            user_id
+        );
+        MediaItemStore::unmark_relative_paths_as_missing(pool, &to_unmark_missing).await?;
+    }
+
+    if !to_mark_missing.is_empty() {
+        info!(
+            "Marking {} missing files for user {}",
+            to_mark_missing.len(),
+            user_id
+        );
+        MediaItemStore::mark_relative_paths_as_missing(pool, &to_mark_missing).await?;
+    }
+
+    if !to_ingest.is_empty() || !to_unmark_missing.is_empty() {
+        tokio::try_join!(
+            enqueue_job::<()>(pool, settings, JobType::UpdateGlobalCentroid).call(),
+            enqueue_job::<()>(pool, settings, JobType::ClusterFaces).call(),
+            enqueue_job::<()>(pool, settings, JobType::ClusterPhotos).call(),
+            enqueue_job::<()>(pool, settings, JobType::GenerateDailyCards).call(),
+            enqueue_job::<()>(pool, settings, JobType::CalcSystemStats).call(),
+        )?;
     }
     Ok(())
 }
 
-/// Run the indexing scan.
+/// Run the indexing scan across all users.
 pub async fn run_scan(pool: &PgPool, settings: &IngestSettings) -> Result<()> {
     let users = UserStore::list_users_with_media_folders(pool).await?;
     let media_root = &settings.media_root;
@@ -124,6 +182,5 @@ pub async fn run_scan(pool: &PgPool, settings: &IngestSettings) -> Result<()> {
 /// Triggers a full scan to synchronise the filesystem and database.
 pub async fn handle(context: &WorkerContext, _job: &Job) -> Result<JobResult> {
     run_scan(&context.pool, &context.settings.ingest).await?;
-
     Ok(JobResult::Done)
 }
