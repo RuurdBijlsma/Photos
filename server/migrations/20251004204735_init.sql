@@ -89,6 +89,7 @@ CREATE TABLE media_item
     user_caption               TEXT,
     -- Other
     deleted                    BOOLEAN     NOT NULL DEFAULT false,
+    missing_since              TIMESTAMPTZ,
     search_vector              TSVECTOR,
     CONSTRAINT width_positive CHECK (width > 0),
     CONSTRAINT height_positive CHECK (height > 0)

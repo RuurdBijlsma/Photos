@@ -503,7 +503,7 @@ impl MediaItemStore {
     }
 
     /// Deletes multiple media items by their relative paths.
-    pub async fn delete_by_relative_paths(
+    pub async fn mark_relative_paths_as_missing(
         executor: impl Executor<'_, Database = Postgres>,
         relative_paths: &[String],
     ) -> Result<PgQueryResult, DbError> {

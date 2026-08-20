@@ -100,7 +100,7 @@ pub async fn sync_user_files_to_db(
             to_remove.len(),
             user_id
         );
-        MediaItemStore::delete_by_relative_paths(pool, &to_remove).await?;
+        MediaItemStore::mark_relative_paths_as_missing(pool, &to_remove).await?;
     }
     Ok(())
 }
