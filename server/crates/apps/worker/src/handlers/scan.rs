@@ -31,6 +31,7 @@ fn get_media_files(folder: &Path, allowed_exts: &HashSet<&str>) -> Vec<std::path
 }
 
 /// Synchronizes the filesystem state with the database.
+#[allow(clippy::too_many_lines)]
 pub async fn sync_user_files_to_db(
     pool: &PgPool,
     settings: &IngestSettings,

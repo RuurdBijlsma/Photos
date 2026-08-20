@@ -62,7 +62,7 @@ async fn sync_thumbnails(pool: &PgPool, settings: &IngestSettings) -> Result<()>
             warn!(
                 "Couldn't remove dir {:?} in `sync_thumbnails` job: {:?}",
                 &path_to_remove, e
-            )
+            );
         }
     }
 
