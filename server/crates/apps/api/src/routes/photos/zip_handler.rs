@@ -54,7 +54,7 @@ pub async fn download_zip_stream_handler(
     let ids: Vec<String> = params
         .ids
         .split(',')
-        .map(std::string::ToString::to_string)
+        .map(ToString::to_string)
         .collect();
     if ids.is_empty() {
         return Err(AppError::BadRequest("No media IDs provided".to_string()));

@@ -576,6 +576,12 @@ pub async fn update_media_item(
             .ok_or_else(|| AppError::NotFound(media_item_id.to_owned()))?;
 
         let file_path = settings.media_root.join(&relative_path);
+        if !file_path.exists() {
+            return Err(AppError::BadRequest(
+                "Cannot modify orientation because the media file is missing from disk."
+                    .to_string(),
+            ));
+        }
 
         write_exif_orientation(&file_path, *new_orientation)?;
 
