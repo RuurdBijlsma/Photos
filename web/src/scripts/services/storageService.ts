@@ -27,6 +27,20 @@ const storageService = {
     return StorageReviewResponse.decode(new Uint8Array(response.data))
   },
 
+  async getMissingItems(): Promise<StorageReviewResponse> {
+    const response = await apiClient.get('/storage/missing', {
+      responseType: 'arraybuffer',
+    })
+    return StorageReviewResponse.decode(new Uint8Array(response.data))
+  },
+
+  async pruneMissingItems(ids?: string[]): Promise<{ prunedCount: number }> {
+    const response = await apiClient.post('/storage/missing/prune', {
+      ids: ids ?? null,
+    })
+    return response.data
+  },
+
   async deletePermanently(ids: string[]): Promise<void> {
     await binService.softDelete(ids)
     // await binService.deletePermanently(ids)

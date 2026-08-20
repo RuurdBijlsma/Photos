@@ -177,6 +177,7 @@ export interface FullMediaItem {
   relative_path: string
   created_at: string
   updated_at: string
+  missing_since?: string | null
   width: number
   height: number
   orientation: number

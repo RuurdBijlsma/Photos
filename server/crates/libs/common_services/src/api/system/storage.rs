@@ -222,23 +222,44 @@ pub async fn get_missing_storage_items(
     Ok(StorageReviewResponse { items, total_size })
 }
 
-pub async fn prune_all_missing_items(
+pub async fn prune_missing_items(
     pool: &PgPool,
     settings: &IngestSettings,
     user_id: i32,
+    ids: Option<&[String]>,
 ) -> Result<usize, AppError> {
-    let deleted_ids: Vec<String> = sqlx::query_scalar!(
-        r#"
-        DELETE FROM media_item
-        WHERE user_id = $1
-          AND deleted = false
-          AND missing_since IS NOT NULL
-        RETURNING id
-        "#,
-        user_id
-    )
-    .fetch_all(pool)
-    .await?;
+    let deleted_ids: Vec<String> = match ids {
+        Some(ids) => {
+            sqlx::query_scalar!(
+                r#"
+                DELETE FROM media_item
+                WHERE user_id = $1
+                  AND id = ANY($2)
+                  AND deleted = false
+                  AND missing_since IS NOT NULL
+                RETURNING id
+                "#,
+                user_id,
+                ids
+            )
+            .fetch_all(pool)
+            .await?
+        }
+        None => {
+            sqlx::query_scalar!(
+                r#"
+                DELETE FROM media_item
+                WHERE user_id = $1
+                  AND deleted = false
+                  AND missing_since IS NOT NULL
+                RETURNING id
+                "#,
+                user_id
+            )
+            .fetch_all(pool)
+            .await?
+        }
+    };
 
     let count = deleted_ids.len();
 
@@ -250,38 +271,4 @@ pub async fn prune_all_missing_items(
     }
 
     Ok(count)
-}
-
-pub async fn prune_single_missing_item(
-    pool: &PgPool,
-    settings: &IngestSettings,
-    user_id: i32,
-    media_item_id: &str,
-) -> Result<(), AppError> {
-    let deleted_id: Option<String> = sqlx::query_scalar!(
-        r#"
-        DELETE FROM media_item
-        WHERE id = $1
-          AND user_id = $2
-          AND missing_since IS NOT NULL
-        RETURNING id
-        "#,
-        media_item_id,
-        user_id
-    )
-    .fetch_optional(pool)
-    .await?;
-
-    let Some(id) = deleted_id else {
-        return Err(AppError::NotFound(format!(
-            "Missing media item {media_item_id} not found"
-        )));
-    };
-
-    let thumb_dir = settings.thumbnails_root.join(id);
-    if thumb_dir.exists() {
-        let _ = tokio::fs::remove_dir_all(thumb_dir).await;
-    }
-
-    Ok(())
 }

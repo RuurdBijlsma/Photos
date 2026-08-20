@@ -244,7 +244,11 @@ watch(
     // clean up previous blob URLs or active network requests
     cleanup()
 
-    if (authStore.isAuthenticated && isMimeTypeSupported(item.media_features?.mime_type)) {
+    if (
+      authStore.isAuthenticated &&
+      isMimeTypeSupported(item.media_features?.mime_type) &&
+      !item.missing_since
+    ) {
       // Check if a preloaded blob is available
       if (viewPhotoStore.preloadedBlobs.has(item.id)) {
         loadFromStore(item as FullMediaItem)

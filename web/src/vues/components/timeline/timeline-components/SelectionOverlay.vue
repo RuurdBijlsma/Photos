@@ -12,6 +12,7 @@ import { useAlbumStore } from '@/scripts/stores/albumStore.ts'
 import { useProfileStore } from '@/scripts/stores/profileStore.ts'
 import { useAuthStore } from '@/scripts/stores/authStore.ts'
 import { useBinStore } from '@/scripts/stores/binStore.ts'
+import { useMissingMediaStore } from '@/scripts/stores/missingMediaStore.ts'
 import { useSystemStore } from '@/scripts/stores/systemStore.ts'
 import { computed } from 'vue'
 import { useDownloadStore } from '@/scripts/stores/downloadStore.ts'
@@ -34,6 +35,7 @@ const selectionStore = useSelectionStore()
 const albumStore = useAlbumStore()
 const authStore = useAuthStore()
 const binStore = useBinStore()
+const missingMediaStore = useMissingMediaStore()
 const downloadStore = useDownloadStore()
 const snackbarStore = useSnackbarsStore()
 
@@ -96,7 +98,7 @@ const avoidSnackbarBottom = computed(() => {
       <v-spacer />
 
       <!-- Regular Actions -->
-      <template v-if="!context?.isBin">
+      <template v-if="!context?.isBin && !context?.isMissing">
         <add-to-album-button
           :exclude-album-ids="excludeAlbumIds"
           :ids-to-add="[...selectionStore.selection]"
@@ -145,6 +147,18 @@ const avoidSnackbarBottom = computed(() => {
             </template>
           </v-list>
         </v-menu>
+      </template>
+
+      <!-- Missing-specific Actions -->
+      <template v-else-if="context?.isMissing">
+        <v-btn
+          :icon="MdiDeleteForever"
+          variant="plain"
+          density="compact"
+          v-tooltip:top="'Prune from database'"
+          :loading="missingMediaStore.pruning"
+          @click="missingMediaStore.pruneItems([...selectionStore.selection])"
+        />
       </template>
 
       <!-- Bin-specific Actions -->

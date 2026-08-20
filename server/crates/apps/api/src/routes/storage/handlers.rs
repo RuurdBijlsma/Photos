@@ -1,14 +1,13 @@
 use crate::api_state::ApiContext;
 use crate::auth::middlewares::user::ApiUser;
-use axum::extract::{Path, State};
-use axum::http::StatusCode;
+use axum::extract::State;
 use axum::{Extension, Json};
 use axum_extra::protobuf::Protobuf;
 use common_services::api::app_error::AppError;
-use common_services::api::system::interfaces::PruneMissingResponse;
+use common_services::api::system::interfaces::{PruneMissingRequest, PruneMissingResponse};
 use common_services::api::system::storage::{
     get_blurry_storage_items, get_large_storage_items, get_missing_storage_items,
-    get_storage_summary, prune_all_missing_items, prune_single_missing_item,
+    get_storage_summary, prune_missing_items,
 };
 use common_types::pb::api::{StorageReviewResponse, StorageSummaryResponse};
 use sqlx::PgPool;
@@ -49,27 +48,17 @@ pub async fn storage_missing_handler(
 }
 
 #[instrument(skip(context, user), err(Debug))]
-pub async fn prune_all_missing_handler(
+pub async fn prune_missing_handler(
     State(context): State<ApiContext>,
     Extension(user): Extension<ApiUser>,
+    Json(payload): Json<PruneMissingRequest>,
 ) -> Result<Json<PruneMissingResponse>, AppError> {
-    let pruned_count =
-        prune_all_missing_items(&context.pool, &context.settings.ingest, user.id).await?;
-    Ok(Json(PruneMissingResponse { pruned_count }))
-}
-
-#[instrument(skip(context, user), err(Debug))]
-pub async fn prune_single_missing_handler(
-    State(context): State<ApiContext>,
-    Extension(user): Extension<ApiUser>,
-    Path(media_item_id): Path<String>,
-) -> Result<StatusCode, AppError> {
-    prune_single_missing_item(
+    let pruned_count = prune_missing_items(
         &context.pool,
         &context.settings.ingest,
         user.id,
-        &media_item_id,
+        payload.ids.as_deref(),
     )
     .await?;
-    Ok(StatusCode::NO_CONTENT)
+    Ok(Json(PruneMissingResponse { pruned_count }))
 }
