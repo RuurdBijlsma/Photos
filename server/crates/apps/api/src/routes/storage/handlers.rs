@@ -5,15 +5,14 @@ use axum::http::StatusCode;
 use axum::{Extension, Json};
 use axum_extra::protobuf::Protobuf;
 use common_services::api::app_error::AppError;
+use common_services::api::system::interfaces::PruneMissingResponse;
 use common_services::api::system::storage::{
-    get_blurry_storage_items, get_large_storage_items,
-    get_missing_storage_items, get_storage_summary, prune_all_missing_items,
-    prune_single_missing_item,
+    get_blurry_storage_items, get_large_storage_items, get_missing_storage_items,
+    get_storage_summary, prune_all_missing_items, prune_single_missing_item,
 };
 use common_types::pb::api::{StorageReviewResponse, StorageSummaryResponse};
 use sqlx::PgPool;
 use tracing::instrument;
-use common_services::api::system::interfaces::PruneMissingResponse;
 
 #[instrument(skip(context, user), err(Debug))]
 pub async fn storage_summary_handler(
@@ -71,6 +70,6 @@ pub async fn prune_single_missing_handler(
         user.id,
         &media_item_id,
     )
-        .await?;
+    .await?;
     Ok(StatusCode::NO_CONTENT)
 }

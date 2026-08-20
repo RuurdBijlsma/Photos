@@ -50,14 +50,12 @@ async fn handle_file_create(
         "#,
         relative_path
     )
-        .fetch_optional(pool)
-        .await?;
+    .fetch_optional(pool)
+    .await?;
 
     if let Some(item) = existing {
         if item.is_missing {
-            info!(
-                "Re-discovered missing file on disk: {relative_path}, clearing missing status."
-            );
+            info!("Re-discovered missing file on disk: {relative_path}, clearing missing status.");
             MediaItemStore::unmark_relative_paths_as_missing(pool, &[relative_path]).await?;
         }
         return Ok(());

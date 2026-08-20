@@ -516,8 +516,8 @@ impl MediaItemStore {
             "#,
             relative_paths
         )
-            .execute(executor)
-            .await?)
+        .execute(executor)
+        .await?)
     }
 
     /// Clears the `missing_since` timestamp for multiple media items when they reappear on disk.
@@ -533,8 +533,8 @@ impl MediaItemStore {
             "#,
             relative_paths
         )
-            .execute(executor)
-            .await?)
+        .execute(executor)
+        .await?)
     }
 
     /// Marks a media item as deleted without removing it from the database.
