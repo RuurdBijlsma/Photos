@@ -309,7 +309,7 @@ async function handleMissingItemAction(mediaId: string) {
       'The source file for this media item cannot be found on disk (e.g. external drive disconnected or file was removed). Its metadata and thumbnail are still stored in the database.<br><br>Would you like to delete this item from the database?',
     icon: MdiAlertCircleOutline,
     color: 'error',
-    confirmText: 'Delete from database',
+    confirmText: 'Remove from database',
     cancelText: 'Keep',
   })
 
@@ -607,6 +607,7 @@ useDetailTitle(mediaDetailTitle, { fallback: 'Photo' })
               <v-btn rounded="xl" :icon="MdiDotsHorizontal" variant="plain" v-bind="props" />
             </template>
             <v-list>
+              <v-list-item v-if="id" @click="mediaItemStore.reprocessMediaItem(id)">Reprocess item</v-list-item>
               <v-list-item :to="`/search?mode=similar&ids=${id}`">Find similar images</v-list-item>
               <v-list-item v-if="id" @click="profileStore.setProfilePic(id)">
                 Set as profile picture

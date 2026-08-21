@@ -55,7 +55,7 @@ export const useMissingMediaStore = defineStore('missingMedia', () => {
       title: 'Delete from Database?',
       color: 'error',
       icon: MdiDeleteForever,
-      description: `Are you sure you want to permanently delete ${ids.length} missing item${ids.length === 1 ? '' : 's'} from the database? This cannot be undone.`,
+      description: `Are you sure you want to delete ${ids.length} missing item${ids.length === 1 ? '' : 's'} from the database?`,
       confirmText: 'Delete from Database',
     })
 

@@ -17,6 +17,7 @@ import { useSystemStore } from '@/scripts/stores/systemStore.ts'
 import { computed } from 'vue'
 import { useDownloadStore } from '@/scripts/stores/downloadStore.ts'
 import { useSnackbarsStore } from '@/scripts/stores/snackbarStore.ts'
+import { useMediaItemStore } from '@/scripts/stores/timeline/mediaItemStore.ts'
 
 withDefaults(
   defineProps<{
@@ -38,6 +39,7 @@ const binStore = useBinStore()
 const missingMediaStore = useMissingMediaStore()
 const downloadStore = useDownloadStore()
 const snackbarStore = useSnackbarsStore()
+const mediaItemStore = useMediaItemStore()
 
 async function setProfilePic() {
   if (selectionStore.selection.size !== 1) return
@@ -119,6 +121,12 @@ const avoidSnackbarBottom = computed(() => {
           <v-list density="compact">
             <v-list-item v-if="selectionStore.selection.size === 1" @click="setProfilePic">
               <v-list-item-title>Set as profile picture</v-list-item-title>
+            </v-list-item>
+            <v-list-item
+              v-if="selectionStore.selection.size === 1"
+              @click="mediaItemStore.reprocessMediaItem([...selectionStore.selection][0])"
+            >
+              <v-list-item-title>Reprocess media item</v-list-item-title>
             </v-list-item>
             <v-list-item :to="searchSimilarUrl">
               <v-list-item-title>Find similar images</v-list-item-title>

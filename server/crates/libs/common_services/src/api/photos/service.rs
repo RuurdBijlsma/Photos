@@ -490,15 +490,23 @@ pub async fn reprocess_media_item(
     media_item_id: &str,
     user_id: i32,
     relative_path: &str,
-    file_path: &Path,
 ) -> Result<(), AppError> {
+    let file_path = settings.media_root.join(relative_path);
+    dbg!("Reprocessing media item", &file_path);
+    if !file_path.exists() {
+        return Err(AppError::NotFound(
+            "No file found for media item".to_owned(),
+        ));
+    }
+    dbg!("File exists");
+
     let analyzer = media_analyzer::MediaAnalyzer::builder()
         .build()
         .await
         .map_err(|e| AppError::Internal(eyre!("Failed to build MediaAnalyzer: {}", e)))?;
 
     let media_info = analyzer
-        .analyze_media(file_path)
+        .analyze_media(&file_path)
         .await
         .map_err(|e| AppError::Internal(eyre!("Failed to analyze media {:?}: {}", file_path, e)))?;
 
@@ -585,15 +593,7 @@ pub async fn update_media_item(
 
         write_exif_orientation(&file_path, *new_orientation)?;
 
-        reprocess_media_item(
-            pool,
-            settings,
-            media_item_id,
-            user_id,
-            &relative_path,
-            &file_path,
-        )
-        .await?;
+        reprocess_media_item(pool, settings, media_item_id, user_id, &relative_path).await?;
 
         let thumb_dir = settings.thumbnails_root.join(media_item_id);
         if thumb_dir.exists() {

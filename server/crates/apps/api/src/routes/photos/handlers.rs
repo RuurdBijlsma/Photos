@@ -6,7 +6,8 @@ use common_services::api::photos::interfaces::{
     DownloadMediaParams, GeoPhotosParams, UpdateMediaItemRequest, UpdateMediaItemResponse,
 };
 use common_services::api::photos::service::{
-    download_media_file, stream_video_file, thumbnail_on_demand_cached, update_media_item,
+    download_media_file, reprocess_media_item, stream_video_file, thumbnail_on_demand_cached,
+    update_media_item,
 };
 use common_services::database::album_store::AlbumStore;
 
@@ -158,6 +159,29 @@ pub async fn get_geo_photos_handler(
         MediaItemStore::find_all_geo_by_user_id(&pool, user.id, params.start_date, params.end_date)
             .await?;
     Ok(Protobuf(MapPhotosResponse { items }))
+}
+
+#[instrument(skip(context, user), err(Debug))]
+pub async fn reprocess_media_item_handler(
+    State(context): State<ApiContext>,
+    Extension(user): Extension<ApiUser>,
+    Path(media_item_id): Path<String>,
+) -> Result<(), AppError> {
+    let Some(relative_path) =
+        MediaItemStore::find_relative_path_by_id(&context.pool, &media_item_id).await?
+    else {
+        return Err(AppError::NotFound("Media item not found".to_owned()));
+    };
+
+    reprocess_media_item(
+        &context.pool,
+        &context.settings.ingest,
+        &media_item_id,
+        user.id,
+        &relative_path,
+    )
+    .await?;
+    Ok(())
 }
 
 #[instrument(skip(pool), err(Debug))]

@@ -8,18 +8,30 @@ use std::path::Path;
 use tracing::info;
 use walkdir::WalkDir;
 
-/// Handles a create event from the watcher.
+fn is_allowed_file(path: &Path, settings: &IngestSettings) -> bool {
+    let Some(ext) = path.extension().and_then(|e| e.to_str()) else {
+        return false;
+    };
+    let ext_lower = ext.to_lowercase();
+    let detection = &settings.file_detection;
+
+    detection.photo_extensions.iter().any(|e| e.eq_ignore_ascii_case(&ext_lower))
+        || detection.video_extensions.iter().any(|e| e.eq_ignore_ascii_case(&ext_lower))
+}
+
 pub async fn handle_create(
     pool: &PgPool,
     settings: &IngestSettings,
     path: &Path,
 ) -> color_eyre::Result<()> {
     if path.is_file() {
-        handle_file_create(pool, settings, path).await?;
+        if is_allowed_file(path, settings) {
+            handle_file_create(pool, settings, path).await?;
+        }
     } else {
         info!("Directory created: {:?}. Scanning for new files.", path);
         for entry in WalkDir::new(path).into_iter().filter_map(Result::ok) {
-            if entry.file_type().is_file() {
+            if entry.file_type().is_file() && is_allowed_file(entry.path(), settings) {
                 handle_file_create(pool, settings, entry.path()).await?;
             }
         }
