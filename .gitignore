@@ -7,3 +7,4 @@ web/node_modules
 web/dist
 .env
 app_data
+japp_data
