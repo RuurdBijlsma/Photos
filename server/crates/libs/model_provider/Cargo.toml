@@ -1,0 +1,18 @@
+[package]
+name = "model_provider"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+app_state = { path = "../../libs/app_state" }
+ml_analysis = { path = "../../libs/ml_analysis" }
+open_clip_inference = { version = "0.4.2" }
+tokio = { version = "1.47.1", features = ["sync", "time"] }
+color-eyre = "0.6.5"
+tracing = "0.1.41"
+
+[features]
+load-dynamic = [
+    "ml_analysis/load-dynamic",
+    "open_clip_inference/load-dynamic"
+]
