@@ -40,14 +40,12 @@ impl WorkerModels {
         let media_analyzer = Arc::new(MediaAnalyzer::builder().build().await?);
 
         // Load visual_analyzer IF the worker CAN run IngestLlm OR IngestAnalysis
-        let visual_analyzer = if !excluded_job_types.contains(&JobType::IngestLlm)
-            || !excluded_job_types.contains(&JobType::IngestAnalysis)
-        {
+        let visual_analyzer = if excluded_job_types.contains(&JobType::IngestAnalysis) {
+            None
+        } else {
             Some(Arc::new(
                 VisualAnalyzer::new(embedder_model_id, &settings.ingest.hf_cache_root).await?,
             ))
-        } else {
-            None
         };
 
         // Load text_embedder IF the worker CAN run ClusterPhotos

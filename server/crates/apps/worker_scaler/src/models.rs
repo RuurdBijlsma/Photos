@@ -115,12 +115,10 @@ impl ModelRegistry {
         &mut self,
         excluded_jobs: &[JobType],
     ) -> Result<WorkerModels> {
-        let visual_analyzer = if !excluded_jobs.contains(&JobType::IngestLlm)
-            || !excluded_jobs.contains(&JobType::IngestAnalysis)
-        {
-            Some(self.get_or_load_visual_analyzer().await?)
-        } else {
+        let visual_analyzer = if excluded_jobs.contains(&JobType::IngestAnalysis) {
             None
+        } else {
+            Some(self.get_or_load_visual_analyzer().await?)
         };
 
         let text_embedder = if excluded_jobs.contains(&JobType::ClusterPhotos) {

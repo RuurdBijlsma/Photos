@@ -34,7 +34,6 @@ pub async fn get_user_ingest_overview(
             JobType::IngestMetadata => &mut overview.metadata,
             JobType::IngestThumbnails => &mut overview.thumbnails,
             JobType::IngestAnalysis => &mut overview.analysis,
-            JobType::IngestLlm => &mut overview.llm,
             _ => continue,
         };
 

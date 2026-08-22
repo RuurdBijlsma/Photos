@@ -15,7 +15,6 @@ pub mod generate_daily_cards;
 pub mod handle_web_upload;
 pub mod import_album_item;
 pub mod ingest_analysis;
-pub mod ingest_llm;
 pub mod ingest_metadata;
 pub mod ingest_thumbnails;
 pub mod remove;
@@ -39,7 +38,6 @@ pub async fn handle_job(context: &WorkerContext, job: &Job) -> Result<JobResult>
         JobType::IngestMetadata => ingest_metadata::handle(context, job).await,
         JobType::IngestThumbnails => ingest_thumbnails::handle(context, job).await,
         JobType::IngestAnalysis => ingest_analysis::handle(context, job).await,
-        JobType::IngestLlm => ingest_llm::handle(context, job).await,
         JobType::Remove => remove::handle(context, job).await,
         JobType::Scan => scan::handle(context, job).await,
         JobType::CleanDb => clean_db::handle(context, job).await,

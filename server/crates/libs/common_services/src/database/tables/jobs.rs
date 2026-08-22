@@ -33,7 +33,6 @@ pub enum JobType {
     IngestMetadata,
     IngestThumbnails,
     IngestAnalysis,
-    IngestLlm,
     Remove,
     Scan,
     CleanDb,
@@ -72,7 +71,6 @@ impl JobType {
             | Self::SyncThumbnails => 50,
             Self::UpdateGlobalCentroid | Self::CalcSystemStats => 60,
             Self::GenerateDailyCards => 80,
-            Self::IngestLlm => 100_000,
         }
     }
 
@@ -82,7 +80,6 @@ impl JobType {
             Self::IngestMetadata
             | Self::IngestThumbnails
             | Self::IngestAnalysis
-            | Self::IngestLlm
             | Self::Remove => JobScope::Path,
 
             Self::Scan
@@ -114,13 +111,6 @@ impl JobType {
                     95
                 } else {
                     90
-                }
-            }
-            Self::IngestLlm => {
-                if is_video {
-                    250
-                } else {
-                    240
                 }
             }
             Self::Remove => 0,
