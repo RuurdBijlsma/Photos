@@ -1,4 +1,4 @@
--- 1. Create the function that performs the update for a specific ID
+-- Create the function that performs the update for a specific ID
 CREATE OR REPLACE FUNCTION rebuild_media_item_search_vector(target_id VARCHAR(10))
     RETURNS VOID AS
 $$
@@ -14,12 +14,6 @@ BEGIN
                              setweight(to_tsvector('english', mi.filename), 'B') ||
                              setweight(to_tsvector('english', coalesce(l.admin2, '')), 'B') ||
                              setweight(to_tsvector('english', coalesce(w.condition, '')), 'B') ||
-                             setweight(to_tsvector('english', coalesce(class_agg.ocr_text, '')), 'B') ||
-                             setweight(to_tsvector('english', coalesce(class_agg.event_type, '')), 'B') ||
-                             setweight(to_tsvector('english', coalesce(class_agg.setting, '')), 'B') ||
-                             setweight(to_tsvector('english', coalesce(class_agg.search_term, '')), 'B') ||
-                             setweight(to_tsvector('english', coalesce(class_agg.landmark_name, '')), 'B') ||
-                             setweight(to_tsvector('english', coalesce(class_agg.caption, '')), 'B') ||
                              -- LOWER CONFIDENCE ('C' & 'D')
                              setweight(to_tsvector('english', to_char(mi.taken_at_local, 'YYYY Month Day')), 'C') ||
                              setweight(to_tsvector('english', CASE WHEN mi.is_video THEN 'video' ELSE 'photo' END), 'D')
@@ -42,7 +36,7 @@ END;
 $$
     LANGUAGE plpgsql;
 
--- 2. Trigger function to call the rebuilder
+-- Trigger function to call the rebuilder
 CREATE OR REPLACE FUNCTION tg_rebuild_search_vector()
     RETURNS TRIGGER AS
 $$
@@ -71,7 +65,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- 3. Apply triggers to tables
+-- Apply triggers to tables
 CREATE TRIGGER trg_mi_search_update
     AFTER INSERT OR UPDATE OF relative_path, taken_at_local
     ON media_item
