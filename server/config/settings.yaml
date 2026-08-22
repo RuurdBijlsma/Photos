@@ -158,4 +158,4 @@ scaler:
       estimated_ram_mb: 1000
       max_workers: 2
       excluded_jobs:
-        - "ingest_thumbnails" # Needs worker limit
+        - "ingest_thumbnails"
