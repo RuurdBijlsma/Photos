@@ -607,7 +607,9 @@ useDetailTitle(mediaDetailTitle, { fallback: 'Photo' })
               <v-btn rounded="xl" :icon="MdiDotsHorizontal" variant="plain" v-bind="props" />
             </template>
             <v-list>
-              <v-list-item v-if="id" @click="mediaItemStore.reprocessMediaItem(id)">Reprocess item</v-list-item>
+              <v-list-item v-if="id" @click="mediaItemStore.reprocessMediaItem(id)"
+                >Reprocess item</v-list-item
+              >
               <v-list-item :to="`/search?mode=similar&ids=${id}`">Find similar images</v-list-item>
               <v-list-item v-if="id" @click="profileStore.setProfilePic(id)">
                 Set as profile picture
