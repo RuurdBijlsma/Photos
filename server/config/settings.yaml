@@ -12,6 +12,9 @@ ingest:
     analyze_image_size: 720
     theme_generation:
       variant: Vibrant
+    onnx:
+      inter_threads: 1
+      intra_threads: 4
 
   file_detection:
     video_extensions:

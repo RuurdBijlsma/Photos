@@ -35,17 +35,13 @@ impl WorkerModels {
         settings: &AppSettings,
         excluded_job_types: &[JobType],
     ) -> Result<Self> {
-        let embedder_model_id = &settings.ingest.analyzer.search.embedder_model_id;
-
         let media_analyzer = Arc::new(MediaAnalyzer::builder().build().await?);
 
         // Load visual_analyzer IF the worker CAN run IngestAnalysis
         let visual_analyzer = if excluded_job_types.contains(&JobType::IngestAnalysis) {
             None
         } else {
-            Some(Arc::new(
-                VisualAnalyzer::new(embedder_model_id, &settings.ingest.hf_cache_root).await?,
-            ))
+            Some(Arc::new(VisualAnalyzer::new(&settings.ingest).await?))
         };
 
         // Load text_embedder IF the worker CAN run ClusterPhotos
@@ -53,10 +49,13 @@ impl WorkerModels {
             None
         } else {
             info!("Loading CLIP text embedder...");
-            let embedder = TextEmbedder::from_hf(embedder_model_id)
-                .cache_dir(&settings.ingest.hf_cache_root)
-                .build()
-                .await?;
+            let embedder =
+                TextEmbedder::from_hf(&settings.ingest.analyzer.search.embedder_model_id)
+                    .cache_dir(&settings.ingest.hf_cache_root)
+                    .with_inter_threads(settings.ingest.analyzer.onnx.inter_threads)
+                    .with_intra_threads(settings.ingest.analyzer.onnx.intra_threads)
+                    .build()
+                    .await?;
             Some(Arc::new(embedder))
         };
 

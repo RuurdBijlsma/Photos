@@ -83,12 +83,16 @@ async fn load_embedders(
     info!("Loading CLIP text embedder...");
     let text_embedder = TextEmbedder::from_hf(model_id)
         .cache_dir(cache_dir)
+        .with_inter_threads(settings.ingest.analyzer.onnx.inter_threads)
+        .with_intra_threads(settings.ingest.analyzer.onnx.intra_threads)
         .build()
         .await?;
 
     info!("Loading CLIP vision embedder...");
     let vision_embedder = VisionEmbedder::from_hf(model_id)
         .cache_dir(cache_dir)
+        .with_inter_threads(settings.ingest.analyzer.onnx.inter_threads)
+        .with_intra_threads(settings.ingest.analyzer.onnx.intra_threads)
         .build()
         .await?;
 

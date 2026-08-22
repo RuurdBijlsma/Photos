@@ -1,7 +1,7 @@
 use crate::color_data::get_color_data;
 use crate::convert_media_file_sync;
 use crate::quality_measure::get_quality_measurement;
-use app_state::AnalyzerSettings;
+use app_state::{AnalyzerSettings, IngestSettings};
 use color_eyre::eyre::eyre;
 use common_types::ml_analysis::MLFastAnalysis;
 use face_id::analyzer::FaceAnalyzer;
@@ -20,22 +20,28 @@ pub struct VisualAnalyzer {
 
 impl VisualAnalyzer {
     /// Creates a new instance of the `VisualAnalyzer`.
-    pub async fn new(embedder_model_id: &str, cache_folder: &Path) -> color_eyre::Result<Self> {
+    pub async fn new(settings: &IngestSettings) -> color_eyre::Result<Self> {
         info!("Loading CLIP vision embedder...");
-        let embedder = VisionEmbedder::from_hf(embedder_model_id)
-            .cache_dir(cache_folder)
+        let embedder = VisionEmbedder::from_hf(&settings.analyzer.search.embedder_model_id)
+            .cache_dir(&settings.hf_cache_root)
+            .with_inter_threads(settings.analyzer.onnx.inter_threads)
+            .with_intra_threads(settings.analyzer.onnx.intra_threads)
             .build()
             .await?;
         info!("Loading Face Analyzer model...");
         let face_analyzer = FaceAnalyzer::from_hf()
-            .cache_dir(cache_folder)
+            .cache_dir(&settings.hf_cache_root)
+            .with_inter_threads(settings.analyzer.onnx.inter_threads)
+            .with_intra_threads(settings.analyzer.onnx.intra_threads)
             .build()
             .await?;
         info!("Loading Object Detector model...");
         let object_detector = ObjectDetector::from_hf(DetectorType::PromptFree)
-            .cache_dir(cache_folder)
+            .cache_dir(&settings.hf_cache_root)
             .scale(ModelScale::Large)
             .include_mask(false)
+            .with_inter_threads(settings.analyzer.onnx.inter_threads)
+            .with_intra_threads(settings.analyzer.onnx.intra_threads)
             .build()
             .await?;
         Ok(Self {

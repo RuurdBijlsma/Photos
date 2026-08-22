@@ -30,6 +30,13 @@ pub struct AnalyzerSettings {
     pub analyze_image_size: u64,
     pub theme_generation: ThemeSettings,
     pub search: SearchSettings,
+    pub onnx: OnnxSettings,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct OnnxSettings {
+    pub intra_threads: usize,
+    pub inter_threads: usize,
 }
 
 #[derive(Debug, Deserialize, Clone)]

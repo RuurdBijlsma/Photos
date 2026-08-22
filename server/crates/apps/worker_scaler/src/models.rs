@@ -83,11 +83,9 @@ impl ModelRegistry {
             return Ok(analyzer);
         }
 
-        let embedder_model_id = &self.settings.ingest.analyzer.search.embedder_model_id;
-        let cache_folder = &self.settings.ingest.hf_cache_root;
-
         info!("Loading VisualAnalyzer...");
-        let analyzer = Arc::new(VisualAnalyzer::new(embedder_model_id, cache_folder).await?);
+        let analyzer =
+            Arc::new(VisualAnalyzer::new(&self.settings.ingest).await?);
         self.visual_analyzer.set(analyzer.clone());
         Ok(analyzer)
     }
@@ -98,11 +96,12 @@ impl ModelRegistry {
         }
 
         let embedder_model_id = &self.settings.ingest.analyzer.search.embedder_model_id;
-        let cache_folder = &self.settings.ingest.hf_cache_root;
 
         info!("Loading CLIP text embedder...");
         let embedder = TextEmbedder::from_hf(embedder_model_id)
-            .cache_dir(cache_folder)
+            .cache_dir(&self.settings.ingest.hf_cache_root)
+            .with_inter_threads(self.settings.ingest.analyzer.onnx.inter_threads)
+            .with_intra_threads(self.settings.ingest.analyzer.onnx.intra_threads)
             .build()
             .await?;
         let embedder = Arc::new(embedder);
