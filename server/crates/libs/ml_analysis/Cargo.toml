@@ -6,7 +6,6 @@ edition = "2024"
 [dependencies]
 app_state = { path = "../../libs/app_state" }
 common_types = { path = "../common_types" }
-language_model = { path = "../language_model" }
 serde_json = "1.0"
 serde = { version = "1.0.228", features = ["derive"] }
 image = { version = "0.25.8" }

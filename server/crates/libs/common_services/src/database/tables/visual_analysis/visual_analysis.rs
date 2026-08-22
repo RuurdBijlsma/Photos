@@ -1,9 +1,7 @@
-use crate::database::visual_analysis::caption_data::ClassificationData;
 use crate::database::visual_analysis::color_data::ColorData;
 use crate::database::visual_analysis::face::{CreateFace, Face};
 use crate::database::visual_analysis::measured_quality::MeasuredQuality;
 use crate::database::visual_analysis::object::Object;
-use crate::database::visual_analysis::quality_judge::QualityJudge;
 use chrono::{DateTime, Utc};
 use common_types::ml_analysis::MLFastAnalysis;
 use pgvector::Vector;
@@ -49,6 +47,4 @@ pub struct ReadVisualAnalysis {
     pub objects: Vec<Object>,
     pub colors: ColorData,
     pub measured_quality: MeasuredQuality,
-    pub quality_judge: Option<QualityJudge>,
-    pub classification: Option<ClassificationData>,
 }

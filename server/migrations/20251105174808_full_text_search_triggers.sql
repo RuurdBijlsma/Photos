@@ -28,18 +28,6 @@ BEGIN
                                   LEFT JOIN location l ON g.location_id = l.id
                                   LEFT JOIN weather w ON mi.id = w.media_item_id
 
-                             -- Aggregate classification data into one row per media_item
-                                  LEFT JOIN (SELECT va.media_item_id,
-                                                    string_agg(c.ocr_text, ' ')      as ocr_text,
-                                                    string_agg(c.event_type, ' ')    as event_type,
-                                                    string_agg(c.setting, ' ')       as setting,
-                                                    string_agg(c.search_term, ' ')   as search_term,
-                                                    string_agg(c.landmark_name, ' ') as landmark_name,
-                                                    string_agg(c.caption, ' ')       as caption
-                                             FROM visual_analysis va
-                                                      JOIN classification c ON va.id = c.visual_analysis_id
-                                             GROUP BY va.media_item_id) class_agg ON mi.id = class_agg.media_item_id
-
                              -- Faces aggregation
                                   LEFT JOIN (SELECT va_inner.media_item_id, string_agg(DISTINCT pers.name, ' ') as names
                                              FROM face f
@@ -74,11 +62,6 @@ BEGIN
         PERFORM rebuild_media_item_search_vector(NEW.id);
     ELSIF TG_TABLE_NAME = 'gps' OR TG_TABLE_NAME = 'weather' OR TG_TABLE_NAME = 'visual_analysis' THEN
         PERFORM rebuild_media_item_search_vector(NEW.media_item_id);
-    ELSIF TG_TABLE_NAME = 'classification' THEN
-        -- Link back via visual_analysis
-        PERFORM rebuild_media_item_search_vector((SELECT media_item_id
-                                                  FROM visual_analysis
-                                                  WHERE id = NEW.visual_analysis_id));
     ELSIF TG_TABLE_NAME = 'face' THEN
         PERFORM rebuild_media_item_search_vector((SELECT media_item_id
                                                   FROM visual_analysis
@@ -107,11 +90,6 @@ EXECUTE FUNCTION tg_rebuild_search_vector();
 CREATE TRIGGER trg_va_search_update
     AFTER INSERT OR UPDATE
     ON visual_analysis
-    FOR EACH ROW
-EXECUTE FUNCTION tg_rebuild_search_vector();
-CREATE TRIGGER trg_classification_search_update
-    AFTER INSERT OR UPDATE
-    ON classification
     FOR EACH ROW
 EXECUTE FUNCTION tg_rebuild_search_vector();
 CREATE TRIGGER trg_face_search_update

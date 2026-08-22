@@ -194,7 +194,7 @@ async fn cancel_ingest_analysis_jobs(
         WHERE
             relative_path = $1
             AND status IN ('queued', 'running')
-            AND job_type IN ('ingest_metadata', 'ingest_thumbnails', 'ingest_analysis', 'ingest_llm')
+            AND job_type IN ('ingest_metadata', 'ingest_thumbnails', 'ingest_analysis')
         "#,
         relative_path
     )

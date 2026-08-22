@@ -495,17 +495,6 @@ pub async fn get_search_suggestions(
     let suggestions = sqlx::query!(
         r#"
         WITH matched_terms AS (
-            (SELECT c.search_term as suggestion, COUNT(DISTINCT va.media_item_id) as photo_count, 'SEARCH' as "type!", NULL as "id"
-            FROM classification c
-            JOIN visual_analysis va ON c.visual_analysis_id = va.id
-            WHERE va.user_id = $1
-              AND c.search_term ILIKE $2
-              AND c.search_term != ''
-            GROUP BY c.search_term
-            LIMIT $3 * 2)
-
-            UNION ALL
-
             (SELECT p.name as suggestion, COUNT(DISTINCT va.media_item_id) as photo_count, 'PERSON' as "type!", p.id::text as "id"
             FROM person p
             JOIN face_cluster fc ON fc.person_id = p.id
@@ -618,17 +607,6 @@ pub async fn get_random_search_suggestion(
     let rows = sqlx::query!(
         r#"
         WITH matched_terms AS (
-            (SELECT c.search_term as suggestion
-            FROM classification c
-            JOIN visual_analysis va ON c.visual_analysis_id = va.id
-            WHERE va.user_id = $1
-              AND c.search_term != ''
-            GROUP BY c.search_term
-            ORDER BY COUNT(DISTINCT va.media_item_id) DESC
-            LIMIT 100)
-
-            UNION ALL
-
             (SELECT p.name as suggestion
             FROM person p
             JOIN face_cluster fc ON fc.person_id = p.id

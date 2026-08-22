@@ -114,17 +114,9 @@ impl MediaItemStore {
                             SELECT to_jsonb(qd)
                             FROM measured_quality qd WHERE qd.visual_analysis_id = va.id
                         ),
-                        'quality_judge', (
-                            SELECT to_jsonb(qj)
-                            FROM quality_judge qj WHERE qj.visual_analysis_id = va.id
-                        ),
                         'colors', (
                             SELECT to_jsonb(cld)
                             FROM color cld WHERE cld.visual_analysis_id = va.id
-                        ),
-                        'classification', (
-                            SELECT to_jsonb(cpd)
-                            FROM classification cpd WHERE cpd.visual_analysis_id = va.id
                         ),
                         'faces', (
                             SELECT COALESCE(

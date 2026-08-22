@@ -4,7 +4,6 @@ ingest:
   enable_cache: false
 
   analyzer:
-    llm_base_url: "http://localhost:8080"
     search:
       embedder_model_id: RuteNL/MobileCLIP2-S3-OpenCLIP-ONNX
       semantic_score_threshold: 0.8

@@ -39,7 +39,7 @@ impl WorkerModels {
 
         let media_analyzer = Arc::new(MediaAnalyzer::builder().build().await?);
 
-        // Load visual_analyzer IF the worker CAN run IngestLlm OR IngestAnalysis
+        // Load visual_analyzer IF the worker CAN run IngestAnalysis
         let visual_analyzer = if excluded_job_types.contains(&JobType::IngestAnalysis) {
             None
         } else {

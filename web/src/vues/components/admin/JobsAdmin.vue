@@ -251,7 +251,6 @@ watch(
                   'ingest_metadata',
                   'ingest_thumbnails',
                   'ingest_analysis',
-                  'ingest_llm',
                   'remove',
                   'scan',
                   'clean_db',

@@ -11,7 +11,6 @@ export interface IngestOverviewResponse {
   metadata: IngestJobCounts
   thumbnails: IngestJobCounts
   analysis: IngestJobCounts
-  llm: IngestJobCounts
 }
 
 export interface RetryJobPayload {
