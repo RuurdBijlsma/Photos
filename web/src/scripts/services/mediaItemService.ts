@@ -98,7 +98,7 @@ const mediaItemService = {
 
   reprocess(id: string): Promise<AxiosResponse<void>> {
     return apiClient.post<void>(`/photos/${id}/reprocess`)
-  }
+  },
 }
 
 export default mediaItemService
