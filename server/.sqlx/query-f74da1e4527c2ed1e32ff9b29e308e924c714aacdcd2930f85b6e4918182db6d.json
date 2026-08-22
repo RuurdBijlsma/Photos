@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        WITH\n        -- Collect all visual analyses and nested data\n        visual_analyses AS (\n            SELECT\n                va.media_item_id,\n                jsonb_agg(\n                    jsonb_build_object(\n                        'id', va.id,\n                        'created_at', va.created_at,\n                        'percentage', va.percentage,\n                        'measured_quality', (\n                            SELECT to_jsonb(qd)\n                            FROM measured_quality qd WHERE qd.visual_analysis_id = va.id\n                        ),\n                        'quality_judge', (\n                            SELECT to_jsonb(qj)\n                            FROM quality_judge qj WHERE qj.visual_analysis_id = va.id\n                        ),\n                        'colors', (\n                            SELECT to_jsonb(cld)\n                            FROM color cld WHERE cld.visual_analysis_id = va.id\n                        ),\n                        'classification', (\n                            SELECT to_jsonb(cpd)\n                            FROM classification cpd WHERE cpd.visual_analysis_id = va.id\n                        ),\n                        'faces', (\n                            SELECT COALESCE(\n                                jsonb_agg(to_jsonb(f)),\n                                '[]'::jsonb\n                            ) FROM face f WHERE f.visual_analysis_id = va.id\n                        ),\n                        'objects', (\n                            SELECT COALESCE(\n                                jsonb_agg(to_jsonb(o)),\n                                '[]'::jsonb\n                            ) FROM object o WHERE o.visual_analysis_id = va.id\n                        )\n                    )\n                    ORDER BY va.created_at DESC\n                ) AS data\n            FROM visual_analysis va\n            GROUP BY va.media_item_id\n        )\n\n        SELECT\n            mi.id,\n            mi.user_id,\n            mi.hash,\n            mi.filename,\n            mi.relative_path,\n            mi.created_at,\n            mi.updated_at,\n            mi.width,\n            mi.height,\n            mi.orientation,\n            mi.is_video,\n            mi.duration_ms,\n            mi.taken_at_local,\n            mi.taken_at_utc,\n            mi.og_taken_at_local,\n            mi.timezone_name,\n            mi.timezone_offset_seconds,\n            mi.og_timezone_offset_seconds,\n            mi.use_panorama_viewer,\n            mi.has_thumbnails,\n            mi.user_caption,\n\n            COALESCE(va.data, '[]'::jsonb) AS \"visual_analyses!: Json<Vec<ReadVisualAnalysis>>\",\n\n            (SELECT to_jsonb(g)\n                    || jsonb_build_object('location',\n                        (SELECT to_jsonb(l.*) FROM location l WHERE l.id = g.location_id))\n                FROM gps g WHERE g.media_item_id = mi.id\n            ) AS \"gps: Json<Gps>\",\n\n            (SELECT to_jsonb(td) FROM time td WHERE td.media_item_id = mi.id)\n                AS \"time!: Json<TimeDetails>\",\n\n            (SELECT to_jsonb(w) FROM weather w WHERE w.media_item_id = mi.id)\n                AS \"weather: Json<Weather>\",\n\n            (SELECT to_jsonb(d) FROM media_features d WHERE d.media_item_id = mi.id)\n                AS \"media_features!: Json<ReadMediaFeatures>\",\n\n            (SELECT to_jsonb(cd) FROM camera_settings cd WHERE cd.media_item_id = mi.id)\n                AS \"camera_settings!: Json<CameraSettings>\",\n\n            (SELECT to_jsonb(p.config) FROM panorama_config p WHERE p.media_item_id = mi.id)\n                AS \"panorama_config: Json<serde_json::Value>\"\n\n        FROM media_item mi\n        LEFT JOIN visual_analyses va ON mi.id = va.media_item_id\n        WHERE mi.id = $1 AND mi.deleted = false;\n        ",
+  "query": "\n        WITH\n        -- Collect all visual analyses and nested data\n        visual_analyses AS (\n            SELECT\n                va.media_item_id,\n                jsonb_agg(\n                    jsonb_build_object(\n                        'id', va.id,\n                        'created_at', va.created_at,\n                        'percentage', va.percentage,\n                        'measured_quality', (\n                            SELECT to_jsonb(qd)\n                            FROM measured_quality qd WHERE qd.visual_analysis_id = va.id\n                        ),\n                        'colors', (\n                            SELECT to_jsonb(cld)\n                            FROM color cld WHERE cld.visual_analysis_id = va.id\n                        ),\n                        'faces', (\n                            SELECT COALESCE(\n                                jsonb_agg(to_jsonb(f)),\n                                '[]'::jsonb\n                            ) FROM face f WHERE f.visual_analysis_id = va.id\n                        ),\n                        'objects', (\n                            SELECT COALESCE(\n                                jsonb_agg(to_jsonb(o)),\n                                '[]'::jsonb\n                            ) FROM object o WHERE o.visual_analysis_id = va.id\n                        )\n                    )\n                    ORDER BY va.created_at DESC\n                ) AS data\n            FROM visual_analysis va\n            GROUP BY va.media_item_id\n        )\n\n        SELECT\n            mi.id,\n            mi.user_id,\n            mi.hash,\n            mi.filename,\n            mi.relative_path,\n            mi.created_at,\n            mi.updated_at,\n            mi.missing_since,\n            mi.width,\n            mi.height,\n            mi.orientation,\n            mi.is_video,\n            mi.duration_ms,\n            mi.taken_at_local,\n            mi.taken_at_utc,\n            mi.og_taken_at_local,\n            mi.timezone_name,\n            mi.timezone_offset_seconds,\n            mi.og_timezone_offset_seconds,\n            mi.use_panorama_viewer,\n            mi.has_thumbnails,\n            mi.user_caption,\n\n            COALESCE(va.data, '[]'::jsonb) AS \"visual_analyses!: Json<Vec<ReadVisualAnalysis>>\",\n\n            (SELECT to_jsonb(g)\n                    || jsonb_build_object('location',\n                        (SELECT to_jsonb(l.*) FROM location l WHERE l.id = g.location_id))\n                FROM gps g WHERE g.media_item_id = mi.id\n            ) AS \"gps: Json<Gps>\",\n\n            (SELECT to_jsonb(td) FROM time td WHERE td.media_item_id = mi.id)\n                AS \"time!: Json<TimeDetails>\",\n\n            (SELECT to_jsonb(w) FROM weather w WHERE w.media_item_id = mi.id)\n                AS \"weather: Json<Weather>\",\n\n            (SELECT to_jsonb(d) FROM media_features d WHERE d.media_item_id = mi.id)\n                AS \"media_features!: Json<ReadMediaFeatures>\",\n\n            (SELECT to_jsonb(cd) FROM camera_settings cd WHERE cd.media_item_id = mi.id)\n                AS \"camera_settings!: Json<CameraSettings>\",\n\n            (SELECT to_jsonb(p.config) FROM panorama_config p WHERE p.media_item_id = mi.id)\n                AS \"panorama_config: Json<serde_json::Value>\"\n\n        FROM media_item mi\n        LEFT JOIN visual_analyses va ON mi.id = va.media_item_id\n        WHERE mi.id = $1 AND mi.deleted = false;\n        ",
   "describe": {
     "columns": [
       {
@@ -82,6 +82,17 @@
       },
       {
         "ordinal": 7,
+        "name": "missing_since",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "media_item",
+            "name": "missing_since"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
         "name": "width",
         "type_info": "Int4",
         "origin": {
@@ -92,7 +103,7 @@
         }
       },
       {
-        "ordinal": 8,
+        "ordinal": 9,
         "name": "height",
         "type_info": "Int4",
         "origin": {
@@ -103,7 +114,7 @@
         }
       },
       {
-        "ordinal": 9,
+        "ordinal": 10,
         "name": "orientation",
         "type_info": "Int4",
         "origin": {
@@ -114,7 +125,7 @@
         }
       },
       {
-        "ordinal": 10,
+        "ordinal": 11,
         "name": "is_video",
         "type_info": "Bool",
         "origin": {
@@ -125,7 +136,7 @@
         }
       },
       {
-        "ordinal": 11,
+        "ordinal": 12,
         "name": "duration_ms",
         "type_info": "Int8",
         "origin": {
@@ -136,7 +147,7 @@
         }
       },
       {
-        "ordinal": 12,
+        "ordinal": 13,
         "name": "taken_at_local",
         "type_info": "Timestamp",
         "origin": {
@@ -147,7 +158,7 @@
         }
       },
       {
-        "ordinal": 13,
+        "ordinal": 14,
         "name": "taken_at_utc",
         "type_info": "Timestamptz",
         "origin": {
@@ -158,7 +169,7 @@
         }
       },
       {
-        "ordinal": 14,
+        "ordinal": 15,
         "name": "og_taken_at_local",
         "type_info": "Timestamp",
         "origin": {
@@ -169,7 +180,7 @@
         }
       },
       {
-        "ordinal": 15,
+        "ordinal": 16,
         "name": "timezone_name",
         "type_info": "Text",
         "origin": {
@@ -180,7 +191,7 @@
         }
       },
       {
-        "ordinal": 16,
+        "ordinal": 17,
         "name": "timezone_offset_seconds",
         "type_info": "Int4",
         "origin": {
@@ -191,7 +202,7 @@
         }
       },
       {
-        "ordinal": 17,
+        "ordinal": 18,
         "name": "og_timezone_offset_seconds",
         "type_info": "Int4",
         "origin": {
@@ -202,7 +213,7 @@
         }
       },
       {
-        "ordinal": 18,
+        "ordinal": 19,
         "name": "use_panorama_viewer",
         "type_info": "Bool",
         "origin": {
@@ -213,7 +224,7 @@
         }
       },
       {
-        "ordinal": 19,
+        "ordinal": 20,
         "name": "has_thumbnails",
         "type_info": "Bool",
         "origin": {
@@ -224,7 +235,7 @@
         }
       },
       {
-        "ordinal": 20,
+        "ordinal": 21,
         "name": "user_caption",
         "type_info": "Text",
         "origin": {
@@ -235,43 +246,43 @@
         }
       },
       {
-        "ordinal": 21,
+        "ordinal": 22,
         "name": "visual_analyses!: Json<Vec<ReadVisualAnalysis>>",
         "type_info": "Jsonb",
         "origin": "Expression"
       },
       {
-        "ordinal": 22,
+        "ordinal": 23,
         "name": "gps: Json<Gps>",
         "type_info": "Jsonb",
         "origin": "Expression"
       },
       {
-        "ordinal": 23,
+        "ordinal": 24,
         "name": "time!: Json<TimeDetails>",
         "type_info": "Jsonb",
         "origin": "Expression"
       },
       {
-        "ordinal": 24,
+        "ordinal": 25,
         "name": "weather: Json<Weather>",
         "type_info": "Jsonb",
         "origin": "Expression"
       },
       {
-        "ordinal": 25,
+        "ordinal": 26,
         "name": "media_features!: Json<ReadMediaFeatures>",
         "type_info": "Jsonb",
         "origin": "Expression"
       },
       {
-        "ordinal": 26,
+        "ordinal": 27,
         "name": "camera_settings!: Json<CameraSettings>",
         "type_info": "Jsonb",
         "origin": "Expression"
       },
       {
-        "ordinal": 27,
+        "ordinal": 28,
         "name": "panorama_config: Json<serde_json::Value>",
         "type_info": "Jsonb",
         "origin": "Expression"
@@ -290,6 +301,7 @@
       false,
       false,
       false,
+      true,
       false,
       false,
       false,
@@ -313,5 +325,5 @@
       null
     ]
   },
-  "hash": "3e96ecc11dec65a2a1556e981db939e7dd107d282df1b568a8840c8fcf1d2763"
+  "hash": "f74da1e4527c2ed1e32ff9b29e308e924c714aacdcd2930f85b6e4918182db6d"
 }

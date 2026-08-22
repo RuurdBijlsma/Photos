@@ -1,9 +1,9 @@
 use crate::color_data::get_color_data;
+use crate::convert_media_file_sync;
 use crate::quality_measure::get_quality_measurement;
-use crate::{convert_media_file_sync};
 use app_state::AnalyzerSettings;
 use color_eyre::eyre::eyre;
-use common_types::ml_analysis::{MLFastAnalysis};
+use common_types::ml_analysis::MLFastAnalysis;
 use face_id::analyzer::FaceAnalyzer;
 use object_detector::{DetectorType, ModelScale, ObjectDetector};
 use open_clip_inference::VisionEmbedder;

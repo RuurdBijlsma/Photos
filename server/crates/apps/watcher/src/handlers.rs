@@ -15,8 +15,14 @@ fn is_allowed_file(path: &Path, settings: &IngestSettings) -> bool {
     let ext_lower = ext.to_lowercase();
     let detection = &settings.file_detection;
 
-    detection.photo_extensions.iter().any(|e| e.eq_ignore_ascii_case(&ext_lower))
-        || detection.video_extensions.iter().any(|e| e.eq_ignore_ascii_case(&ext_lower))
+    detection
+        .photo_extensions
+        .iter()
+        .any(|e| e.eq_ignore_ascii_case(&ext_lower))
+        || detection
+            .video_extensions
+            .iter()
+            .any(|e| e.eq_ignore_ascii_case(&ext_lower))
 }
 
 pub async fn handle_create(

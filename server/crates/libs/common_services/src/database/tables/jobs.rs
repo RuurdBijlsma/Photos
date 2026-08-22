@@ -77,10 +77,9 @@ impl JobType {
     #[must_use]
     pub const fn scope(&self) -> JobScope {
         match self {
-            Self::IngestMetadata
-            | Self::IngestThumbnails
-            | Self::IngestAnalysis
-            | Self::Remove => JobScope::Path,
+            Self::IngestMetadata | Self::IngestThumbnails | Self::IngestAnalysis | Self::Remove => {
+                JobScope::Path
+            }
 
             Self::Scan
             | Self::HandleWebUpload

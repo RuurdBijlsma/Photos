@@ -12,9 +12,7 @@ import { useDelayedBoolean } from '@/scripts/composables/useDelayedBoolean.ts'
 const missingMediaStore = useMissingMediaStore()
 
 const flickerLoad = useDelayedBoolean(() => missingMediaStore.loading, 150)
-const showLoading = computed(
-  () => flickerLoad.value && missingMediaStore.missingItems.length === 0,
-)
+const showLoading = computed(() => flickerLoad.value && missingMediaStore.missingItems.length === 0)
 
 onMounted(() => {
   missingMediaStore.fetchMissing()

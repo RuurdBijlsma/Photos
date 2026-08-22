@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT\n            id,\n            relative_path,\n            user_id,\n            job_type AS \"job_type: JobType\",\n            payload,\n            priority,\n            status AS \"status: JobStatus\",\n            attempts,\n            dependency_attempts,\n            max_attempts,\n            owner,\n            started_at,\n            finished_at,\n            created_at,\n            scheduled_at,\n            last_heartbeat,\n            last_error\n        FROM jobs\n        WHERE user_id = $1\n          AND job_type IN ('ingest_metadata', 'ingest_thumbnails', 'ingest_analysis', 'ingest_llm')\n          AND (\n              (status = 'running'::job_status AND last_heartbeat >= NOW() - INTERVAL '1 minute 30 seconds')\n              OR (status = 'done'::job_status AND finished_at >= NOW() - INTERVAL '5 seconds')\n          )\n        ORDER BY started_at DESC NULLS LAST, finished_at DESC NULLS LAST\n        ",
+  "query": "\n        SELECT\n            id,\n            relative_path,\n            user_id,\n            job_type AS \"job_type: JobType\",\n            payload,\n            priority,\n            status AS \"status: JobStatus\",\n            attempts,\n            dependency_attempts,\n            max_attempts,\n            owner,\n            started_at,\n            finished_at,\n            created_at,\n            scheduled_at,\n            last_heartbeat,\n            last_error\n        FROM jobs\n        WHERE user_id = $1\n          AND status = 'failed'::job_status\n          AND job_type IN ('ingest_metadata', 'ingest_thumbnails', 'ingest_analysis')\n        ORDER BY finished_at DESC NULLS LAST\n        ",
   "describe": {
     "columns": [
       {
@@ -47,7 +47,6 @@
                 "ingest_metadata",
                 "ingest_thumbnails",
                 "ingest_analysis",
-                "ingest_llm",
                 "remove",
                 "scan",
                 "clean_db",
@@ -252,5 +251,5 @@
       true
     ]
   },
-  "hash": "86f5b162bbd16218713c83d81b8f84212c615d5cb580220c4c268333e9235243"
+  "hash": "4a079b1abed830aa9bcc2b73ff80fde4555f4db07b327b063933223af546068f"
 }

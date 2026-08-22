@@ -1,0 +1,104 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            mi.id AS \"id!\",\n            mi.is_video AS \"is_video!\",\n            mi.filename AS \"filename!\",\n            mi.has_thumbnails AS \"has_thumbnails!\",\n            mi.duration_ms::INT AS \"duration_ms\",\n            (mi.width::REAL / mi.height::REAL) AS \"ratio!\",\n            mf.size_bytes AS \"size_bytes!\",\n            mi.taken_at_local::TEXT AS \"taken_at_local!\",\n            NULL::REAL AS \"weighted_score\"\n        FROM media_item mi\n        JOIN media_features mf ON mf.media_item_id = mi.id\n        WHERE mi.user_id = $1\n          AND mi.deleted = false\n          AND mi.missing_since IS NOT NULL\n        ORDER BY mi.missing_since DESC\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id!",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "media_item",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "is_video!",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "media_item",
+            "name": "is_video"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "filename!",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "media_item",
+            "name": "filename"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "has_thumbnails!",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "media_item",
+            "name": "has_thumbnails"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "duration_ms",
+        "type_info": "Int4",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 5,
+        "name": "ratio!",
+        "type_info": "Float4",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 6,
+        "name": "size_bytes!",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "media_features",
+            "name": "size_bytes"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "taken_at_local!",
+        "type_info": "Text",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 8,
+        "name": "weighted_score",
+        "type_info": "Float4",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      null,
+      null,
+      false,
+      null,
+      null
+    ]
+  },
+  "hash": "ecd2c626d43b5a6700fcb41a1f66126da70f670ac9568b60989f58b1a2d5da74"
+}

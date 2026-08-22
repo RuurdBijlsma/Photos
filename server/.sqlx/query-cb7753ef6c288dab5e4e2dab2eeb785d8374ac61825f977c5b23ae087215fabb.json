@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                DELETE FROM media_item\n                WHERE user_id = $1\n                  AND id = ANY($2)\n                  AND deleted = false\n                  AND missing_since IS NOT NULL\n                RETURNING id\n                ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "media_item",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4",
+        "TextArray"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "cb7753ef6c288dab5e4e2dab2eeb785d8374ac61825f977c5b23ae087215fabb"
+}

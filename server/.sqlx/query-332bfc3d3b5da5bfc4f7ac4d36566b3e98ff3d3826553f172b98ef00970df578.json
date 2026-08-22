@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE media_item\n            SET missing_since = NOW()\n            WHERE relative_path = ANY($1) AND missing_since IS NULL\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "TextArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "332bfc3d3b5da5bfc4f7ac4d36566b3e98ff3d3826553f172b98ef00970df578"
+}

@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT relative_path FROM media_item WHERE user_id = $1",
+  "query": "\n        SELECT relative_path, (missing_since IS NOT NULL) AS \"is_missing!\"\n        FROM media_item\n        WHERE user_id = $1\n        ",
   "describe": {
     "columns": [
       {
@@ -13,6 +13,12 @@
             "name": "relative_path"
           }
         }
+      },
+      {
+        "ordinal": 1,
+        "name": "is_missing!",
+        "type_info": "Bool",
+        "origin": "Expression"
       }
     ],
     "parameters": {
@@ -21,8 +27,9 @@
       ]
     },
     "nullable": [
-      false
+      false,
+      null
     ]
   },
-  "hash": "052f75b7e77eb043143ff24019218e4cb3983195fe3bf7edfd673738fe88f7e4"
+  "hash": "d1623d631fb23cfbeeb73950301a9d180fcb5b5cc238ea26a6a5dd68ec554372"
 }
