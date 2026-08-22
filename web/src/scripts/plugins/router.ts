@@ -189,6 +189,13 @@ const router = createRouter({
           name: 'settings',
           meta: { title: 'Settings' },
           component: () => import('@/vues/views/main/SettingsView.vue'),
+          children: [
+            {
+              path: 'view/:mediaId',
+              name: 'view-photo-settings',
+              component: ViewPhoto,
+            },
+          ],
         },
         {
           path: 'activity',

@@ -188,3 +188,87 @@ pub async fn get_blurry_storage_items(
     let total_size = items.iter().map(|r| r.size_bytes).sum::<i64>();
     Ok(StorageReviewResponse { items, total_size })
 }
+
+pub async fn get_missing_storage_items(
+    pool: &PgPool,
+    user_id: i32,
+) -> Result<StorageReviewResponse, AppError> {
+    let items = sqlx::query_as!(
+        StorageReviewItem,
+        r#"
+        SELECT
+            mi.id AS "id!",
+            mi.is_video AS "is_video!",
+            mi.filename AS "filename!",
+            mi.has_thumbnails AS "has_thumbnails!",
+            mi.duration_ms::INT AS "duration_ms",
+            (mi.width::REAL / mi.height::REAL) AS "ratio!",
+            mf.size_bytes AS "size_bytes!",
+            mi.taken_at_local::TEXT AS "taken_at_local!",
+            NULL::REAL AS "weighted_score"
+        FROM media_item mi
+        JOIN media_features mf ON mf.media_item_id = mi.id
+        WHERE mi.user_id = $1
+          AND mi.deleted = false
+          AND mi.missing_since IS NOT NULL
+        ORDER BY mi.missing_since DESC
+        "#,
+        user_id,
+    )
+    .fetch_all(pool)
+    .await?;
+
+    let total_size = items.iter().map(|r| r.size_bytes).sum::<i64>();
+    Ok(StorageReviewResponse { items, total_size })
+}
+
+pub async fn prune_missing_items(
+    pool: &PgPool,
+    settings: &IngestSettings,
+    user_id: i32,
+    ids: Option<&[String]>,
+) -> Result<usize, AppError> {
+    let deleted_ids: Vec<String> = match ids {
+        Some(ids) => {
+            sqlx::query_scalar!(
+                r#"
+                DELETE FROM media_item
+                WHERE user_id = $1
+                  AND id = ANY($2)
+                  AND deleted = false
+                  AND missing_since IS NOT NULL
+                RETURNING id
+                "#,
+                user_id,
+                ids
+            )
+            .fetch_all(pool)
+            .await?
+        }
+        None => {
+            sqlx::query_scalar!(
+                r#"
+                DELETE FROM media_item
+                WHERE user_id = $1
+                  AND deleted = false
+                  AND missing_since IS NOT NULL
+                RETURNING id
+                "#,
+                user_id
+            )
+            .fetch_all(pool)
+            .await?
+        }
+    };
+
+    let count = deleted_ids.len();
+
+    for id in deleted_ids {
+        let thumb_dir = settings.thumbnails_root.join(id);
+        if thumb_dir.exists() {
+            let _ = tokio::fs::remove_dir_all(thumb_dir).await;
+        }
+    }
+
+    Ok(count)
+}

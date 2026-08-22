@@ -19,7 +19,7 @@ pub async fn get_user_ingest_overview(
             COUNT(*)::bigint AS "count!"
         FROM jobs
         WHERE user_id = $1
-          AND job_type IN ('ingest_metadata', 'ingest_thumbnails', 'ingest_analysis', 'ingest_llm')
+          AND job_type IN ('ingest_metadata', 'ingest_thumbnails', 'ingest_analysis')
         GROUP BY job_type, status
         "#,
         user_id
@@ -34,7 +34,6 @@ pub async fn get_user_ingest_overview(
             JobType::IngestMetadata => &mut overview.metadata,
             JobType::IngestThumbnails => &mut overview.thumbnails,
             JobType::IngestAnalysis => &mut overview.analysis,
-            JobType::IngestLlm => &mut overview.llm,
             _ => continue,
         };
 
@@ -85,7 +84,7 @@ pub async fn get_running_ingest_jobs(
             last_error
         FROM jobs
         WHERE user_id = $1
-          AND job_type IN ('ingest_metadata', 'ingest_thumbnails', 'ingest_analysis', 'ingest_llm')
+          AND job_type IN ('ingest_metadata', 'ingest_thumbnails', 'ingest_analysis')
           AND (
               (status = 'running'::job_status AND last_heartbeat >= NOW() - INTERVAL '1 minute 30 seconds')
               OR (status = 'done'::job_status AND finished_at >= NOW() - INTERVAL '5 seconds')
@@ -126,7 +125,7 @@ pub async fn get_failed_ingest_jobs(pool: &PgPool, user_id: i32) -> Result<Vec<J
         FROM jobs
         WHERE user_id = $1
           AND status = 'failed'::job_status
-          AND job_type IN ('ingest_metadata', 'ingest_thumbnails', 'ingest_analysis', 'ingest_llm')
+          AND job_type IN ('ingest_metadata', 'ingest_thumbnails', 'ingest_analysis')
         ORDER BY finished_at DESC NULLS LAST
         "#,
         user_id
@@ -152,7 +151,7 @@ pub async fn retry_user_job(pool: &PgPool, job_id: i64, user_id: i32) -> Result<
         WHERE id = $1
           AND user_id = $2
           AND status IN ('failed'::job_status, 'done'::job_status, 'cancelled'::job_status)
-          AND job_type IN ('ingest_metadata', 'ingest_thumbnails', 'ingest_analysis', 'ingest_llm')
+          AND job_type IN ('ingest_metadata', 'ingest_thumbnails', 'ingest_analysis')
         "#,
         job_id,
         user_id

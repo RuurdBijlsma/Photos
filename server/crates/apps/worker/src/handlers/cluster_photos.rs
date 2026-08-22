@@ -356,7 +356,7 @@ pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
     let text_embedder = context
         .text_embedder
         .clone()
-        .ok_or_else(|| eyre!("No visual_analyzer on worker that picked up ingest_llm job"))?;
+        .ok_or_else(|| eyre!("No text_embedder on worker that picked up cluster_photos job"))?;
     load_tag_embeddings(
         &context.pool,
         &text_embedder,

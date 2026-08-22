@@ -114,17 +114,9 @@ impl MediaItemStore {
                             SELECT to_jsonb(qd)
                             FROM measured_quality qd WHERE qd.visual_analysis_id = va.id
                         ),
-                        'quality_judge', (
-                            SELECT to_jsonb(qj)
-                            FROM quality_judge qj WHERE qj.visual_analysis_id = va.id
-                        ),
                         'colors', (
                             SELECT to_jsonb(cld)
                             FROM color cld WHERE cld.visual_analysis_id = va.id
-                        ),
-                        'classification', (
-                            SELECT to_jsonb(cpd)
-                            FROM classification cpd WHERE cpd.visual_analysis_id = va.id
                         ),
                         'faces', (
                             SELECT COALESCE(
@@ -153,6 +145,7 @@ impl MediaItemStore {
             mi.relative_path,
             mi.created_at,
             mi.updated_at,
+            mi.missing_since,
             mi.width,
             mi.height,
             mi.orientation,
@@ -502,15 +495,33 @@ impl MediaItemStore {
         .await?)
     }
 
-    /// Deletes multiple media items by their relative paths.
-    pub async fn delete_by_relative_paths(
+    /// Marks multiple media items as missing by setting their `missing_since` timestamp.
+    pub async fn mark_relative_paths_as_missing(
         executor: impl Executor<'_, Database = Postgres>,
         relative_paths: &[String],
     ) -> Result<PgQueryResult, DbError> {
         Ok(sqlx::query!(
             r#"
-            DELETE FROM media_item
-            WHERE relative_path = ANY($1)
+            UPDATE media_item
+            SET missing_since = NOW()
+            WHERE relative_path = ANY($1) AND missing_since IS NULL
+            "#,
+            relative_paths
+        )
+        .execute(executor)
+        .await?)
+    }
+
+    /// Clears the `missing_since` timestamp for multiple media items when they reappear on disk.
+    pub async fn unmark_relative_paths_as_missing(
+        executor: impl Executor<'_, Database = Postgres>,
+        relative_paths: &[String],
+    ) -> Result<PgQueryResult, DbError> {
+        Ok(sqlx::query!(
+            r#"
+            UPDATE media_item
+            SET missing_since = NULL
+            WHERE relative_path = ANY($1) AND missing_since IS NOT NULL
             "#,
             relative_paths
         )

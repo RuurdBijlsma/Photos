@@ -62,7 +62,6 @@ pub async fn get_system_stats(
 }
 
 /// Checks whether the user has active ingest tasks scheduled or actively running.
-/// -- removed `ingest_llm` from this list
 pub async fn is_user_ingesting(pool: &PgPool, user_id: i32) -> Result<bool, AppError> {
     let exists = sqlx::query_scalar!(
         r#"

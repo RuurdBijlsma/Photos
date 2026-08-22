@@ -110,6 +110,7 @@ export interface SharedMediaItem {
   duration_ms: number | null
   taken_at_local: string // NaiveDateTime
   taken_at_utc: string | null // DateTime<Utc>
+  missing_since?: null
   timezone_name: string | null
   timezone_offset_seconds: number | null
   panorama_config: PannellumConfig

@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT (missing_since IS NOT NULL) AS \"is_missing!\"\n        FROM media_item\n        WHERE relative_path = $1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "is_missing!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "7ba02c9ae06a7c3a619fd839b7b44caf01d7ce3f76aefb2bf46906316763e5b4"
+}

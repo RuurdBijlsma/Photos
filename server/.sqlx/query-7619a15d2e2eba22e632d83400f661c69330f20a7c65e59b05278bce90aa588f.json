@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        WITH matched_terms AS (\n            (SELECT p.name as suggestion\n            FROM person p\n            JOIN face_cluster fc ON fc.person_id = p.id\n            JOIN face f ON f.face_cluster_id = fc.id\n            JOIN visual_analysis va ON f.visual_analysis_id = va.id\n            WHERE p.user_id = $1\n              AND p.name != ''\n            GROUP BY p.name\n            ORDER BY COUNT(DISTINCT va.media_item_id) DESC\n            LIMIT 100)\n\n            UNION ALL\n\n            (SELECT val as suggestion\n            FROM (\n                (SELECT l.name as val, COUNT(mi.id) as cnt\n                FROM location l\n                JOIN gps g ON g.location_id = l.id\n                JOIN media_item mi ON g.media_item_id = mi.id\n                WHERE mi.user_id = $1 AND mi.deleted = false AND l.name != ''\n                GROUP BY l.name\n                LIMIT 100)\n                UNION ALL\n                (SELECT l.admin1 as val, COUNT(mi.id) as cnt\n                FROM location l\n                JOIN gps g ON g.location_id = l.id\n                JOIN media_item mi ON g.media_item_id = mi.id\n                WHERE mi.user_id = $1 AND mi.deleted = false AND l.admin1 != ''\n                GROUP BY l.admin1\n                LIMIT 100)\n                UNION ALL\n                (SELECT l.country_name as val, COUNT(mi.id) as cnt\n                FROM location l\n                JOIN gps g ON g.location_id = l.id\n                JOIN media_item mi ON g.media_item_id = mi.id\n                WHERE mi.user_id = $1 AND mi.deleted = false AND l.country_name != ''\n                GROUP BY l.country_name\n                LIMIT 100)\n            ) locs\n            ORDER BY cnt DESC\n            LIMIT 100)\n\n            UNION ALL\n\n            (SELECT a.name as suggestion\n            FROM album a\n            LEFT JOIN album_collaborator ac ON a.id = ac.album_id AND ac.user_id = $1\n            JOIN album_media_item am ON a.id = am.album_id\n            WHERE (a.owner_id = $1 OR ac.user_id IS NOT NULL)\n              AND a.name != ''\n            GROUP BY a.name, a.id\n            ORDER BY COUNT(DISTINCT am.media_item_id) DESC\n            LIMIT 100)\n\n            UNION ALL\n\n            (SELECT o.tag as suggestion\n            FROM object o\n            JOIN visual_analysis va ON o.visual_analysis_id = va.id\n            WHERE va.user_id = $1\n              AND o.tag != ''\n            GROUP BY o.tag\n            ORDER BY RANDOM()\n            LIMIT 100)\n        )\n        SELECT suggestion as \"suggestion!\"\n        FROM matched_terms\n        ORDER BY RANDOM()\n        -- `LIMIT 500` because I get like 95%/5% ratio of locations/objects otherwise\n        -- I think Postgres is optimizing something away if I `LIMIT 1`\n        -- This endpoint doesn't have to be fast anyway\n        LIMIT 500\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "suggestion!",
+        "type_info": "Text",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "7619a15d2e2eba22e632d83400f661c69330f20a7c65e59b05278bce90aa588f"
+}

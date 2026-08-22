@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { computed, shallowRef } from 'vue'
+import { computed, ref, shallowRef } from 'vue'
 import type {
   FullMediaItem,
   MediaItemAlbumRef,
@@ -12,10 +12,12 @@ import type { UpdateMediaItemRequest } from '@/scripts/types/api/mediaItem.ts'
 import albumService from '@/scripts/services/albumService.ts'
 import type { SharedMediaItem } from '@/scripts/types/api/album.ts'
 import { useAuthStore } from '@/scripts/stores/authStore.ts'
+import { useRefreshStore } from '@/scripts/stores/refreshStore.ts'
 
 export const useMediaItemStore = defineStore('mediaItem', () => {
   const snackbarStore = useSnackbarsStore()
   const authStore = useAuthStore()
+  const refreshStore = useRefreshStore()
 
   const mediaItems = shallowRef(new Map<string, FullMediaItem>())
   const mediaItemAlbums = shallowRef(new Map<string, MediaItemAlbumRef[]>())
@@ -29,6 +31,7 @@ export const useMediaItemStore = defineStore('mediaItem', () => {
       return sharedMediaItems.value
     }
   })
+  const reprocessLoading = ref(false)
 
   async function updateMediaItem(mediaItemId: string, itemDetails: UpdateMediaItemRequest) {
     try {
@@ -87,11 +90,27 @@ export const useMediaItemStore = defineStore('mediaItem', () => {
     return mediaItemAlbums.value.get(id)
   }
 
+  async function reprocessMediaItem(id: string) {
+    reprocessLoading.value = true
+    try {
+      const result = await mediaItemService.reprocess(id)
+      refreshStore.counter++
+      console.log('reprocess result', result)
+      snackbarStore.success('Reprocessing...')
+    } catch (e) {
+      snackbarStore.error("Couldn't reprocess media item", e)
+    } finally {
+      reprocessLoading.value = false
+    }
+  }
+
   return {
     mediaItems,
     mediaItemAlbums,
     sharedMediaItems,
+    reprocessLoading,
 
+    reprocessMediaItem,
     fetchSharedMediaItem,
     fetchMediaItem,
     updateMediaItem,

@@ -4,7 +4,6 @@ ingest:
   enable_cache: true
 
   analyzer:
-    llm_base_url: "http://localhost:8080"
     search:
       embedder_model_id: RuteNL/MobileCLIP2-S3-OpenCLIP-ONNX
       semantic_score_threshold: 0.8
@@ -141,27 +140,19 @@ scaler:
       estimated_ram_mb: 100
       max_workers: 5
       excluded_jobs:
-        - "ingest_thumbnails"
-        - "ingest_analysis"
-        - "ingest_llm"
-        - "cluster_faces"
-        - "cluster_photos"
-    medium:
+        - "ingest_thumbnails" # Needs worker limit
+        - "ingest_analysis" # Needs VisualAnalysis (CLIP visual embedder, face models, object detection models)
+        - "cluster_photos" # Needs CLIP text embedder model
+    thumbnails:
       priority: 2
-      estimated_ram_mb: 500
+      estimated_ram_mb: 1000
       max_workers: 2
       excluded_jobs:
-        - "ingest_llm"
-        - "ingest_thumbnails"
+        - "ingest_analysis"
         - "cluster_photos"
-    heavy:
+    ml:
       priority: 3
       estimated_ram_mb: 1000
       max_workers: 2
       excluded_jobs:
-        - "ingest_llm"
-    llm:
-      priority: 4
-      estimated_ram_mb: 6000
-      max_workers: 0
-      excluded_jobs: []
+        - "ingest_thumbnails" # Needs worker limit

@@ -33,7 +33,6 @@ pub enum JobType {
     IngestMetadata,
     IngestThumbnails,
     IngestAnalysis,
-    IngestLlm,
     Remove,
     Scan,
     CleanDb,
@@ -72,18 +71,15 @@ impl JobType {
             | Self::SyncThumbnails => 50,
             Self::UpdateGlobalCentroid | Self::CalcSystemStats => 60,
             Self::GenerateDailyCards => 80,
-            Self::IngestLlm => 100_000,
         }
     }
 
     #[must_use]
     pub const fn scope(&self) -> JobScope {
         match self {
-            Self::IngestMetadata
-            | Self::IngestThumbnails
-            | Self::IngestAnalysis
-            | Self::IngestLlm
-            | Self::Remove => JobScope::Path,
+            Self::IngestMetadata | Self::IngestThumbnails | Self::IngestAnalysis | Self::Remove => {
+                JobScope::Path
+            }
 
             Self::Scan
             | Self::HandleWebUpload
@@ -114,13 +110,6 @@ impl JobType {
                     95
                 } else {
                     90
-                }
-            }
-            Self::IngestLlm => {
-                if is_video {
-                    250
-                } else {
-                    240
                 }
             }
             Self::Remove => 0,

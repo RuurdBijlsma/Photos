@@ -89,6 +89,7 @@ CREATE TABLE media_item
     user_caption               TEXT,
     -- Other
     deleted                    BOOLEAN     NOT NULL DEFAULT false,
+    missing_since              TIMESTAMPTZ,
     search_vector              TSVECTOR,
     CONSTRAINT width_positive CHECK (width > 0),
     CONSTRAINT height_positive CHECK (height > 0)
@@ -230,3 +231,7 @@ CREATE INDEX idx_camera_settings_normalized_make_model
                         LOWER(TRIM(camera_make)),
                         LOWER(REGEXP_REPLACE(TRIM(camera_model), '\s*\(.*\)$', '', 'i'))
         );
+
+-- For missing since
+CREATE INDEX idx_media_item_missing ON media_item (user_id, missing_since)
+    WHERE missing_since IS NOT NULL;

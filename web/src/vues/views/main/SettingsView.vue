@@ -5,6 +5,7 @@ import InterfaceSettings from '@/vues/components/settings/InterfaceSettings.vue'
 import { DEFAULT_BG_URL, useBackgroundStore } from '@/scripts/stores/backgroundStore.ts'
 import BackupSettings from '@/vues/components/settings/BackupSettings.vue'
 import UploadSettings from '@/vues/components/settings/UploadSettings.vue'
+import MissingMediaSettings from '@/vues/components/settings/MissingMediaSettings.vue'
 
 const backgroundStore = useBackgroundStore()
 </script>
@@ -48,8 +49,14 @@ const backgroundStore = useBackgroundStore()
 
       <upload-settings class="mb-6" />
 
-      <backup-settings />
+      <backup-settings class="mb-6" />
+
+      <missing-media-settings />
     </div>
+
+    <teleport to="body">
+      <router-view />
+    </teleport>
   </main-layout-container>
 </template>
 

@@ -17,6 +17,7 @@
     "lint:eslint": "eslint . --fix",
     "lint:format": "prettier --write src/",
     "lint:build": "run-s build",
+    "lint:lock-check": "npm ci --dry-run",
     "lint": "run-s lint:*",
     "prettier:check": "prettier --check src/",
     "proto:gen": "protoc --plugin=protoc-gen-ts_proto=.\\node_modules\\.bin\\protoc-gen-ts_proto.cmd --ts_proto_out=./src/scripts/types/generated --ts_proto_opt=esModuleInterop=true --proto_path=./src/proto src/proto/timeline.proto"

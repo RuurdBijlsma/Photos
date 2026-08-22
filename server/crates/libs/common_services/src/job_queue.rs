@@ -142,10 +142,7 @@ pub async fn per_job_logic(
 ) -> Result<()> {
     match job_type {
         JobType::Remove => cancel_ingest_analysis_jobs(tx, relative_path).await?,
-        JobType::IngestMetadata
-        | JobType::IngestThumbnails
-        | JobType::IngestAnalysis
-        | JobType::IngestLlm => {
+        JobType::IngestMetadata | JobType::IngestThumbnails | JobType::IngestAnalysis => {
             cancel_remove_jobs(tx, relative_path).await?;
         }
         _ => (),
@@ -197,7 +194,7 @@ async fn cancel_ingest_analysis_jobs(
         WHERE
             relative_path = $1
             AND status IN ('queued', 'running')
-            AND job_type IN ('ingest_metadata', 'ingest_thumbnails', 'ingest_analysis', 'ingest_llm')
+            AND job_type IN ('ingest_metadata', 'ingest_thumbnails', 'ingest_analysis')
         "#,
         relative_path
     )

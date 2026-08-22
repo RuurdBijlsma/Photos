@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import MdiAlertCircleOutline from '~icons/mdi/alert-circle-outline'
 import MdiCheckboxBlankCircleOutline from '~icons/mdi/checkbox-blank-circle-outline'
 import MdiCheckCircle from '~icons/mdi/check-circle'
 import MdiChevronLeft from '~icons/mdi/chevron-left'
@@ -37,13 +38,16 @@ import { useAuthStore } from '@/scripts/stores/authStore.ts'
 import { useTheme } from 'vuetify/framework'
 import { useDownloadStore } from '@/scripts/stores/downloadStore.ts'
 import { useBinStore } from '@/scripts/stores/binStore.ts'
+import { useMissingMediaStore } from '@/scripts/stores/missingMediaStore.ts'
 import { useProfileStore } from '@/scripts/stores/profileStore.ts'
+import storageService from '@/scripts/services/storageService.ts'
 import AddToAlbumCard from '@/vues/components/timeline/timeline-components/AddToAlbumCard.vue'
 import { useUiHider } from '@/scripts/composables/useUiHider.ts'
 import { navigatorShare } from '@/scripts/sharing.ts'
 import PhotoGallery from '@/vues/components/viewer/components/PhotoGallery.vue'
 import { useEventListener, useStorage } from '@vueuse/core'
 import { useDetailTitle } from '@/scripts/composables/usePageTitle.ts'
+import { useSnackbarsStore } from '@/scripts/stores/snackbarStore.ts'
 
 const props = withDefaults(
   defineProps<{
@@ -69,6 +73,8 @@ const viewPhotoStore = useViewPhotoStore()
 const dialogs = useDialogStore()
 const authStore = useAuthStore()
 const binStore = useBinStore()
+const missingMediaStore = useMissingMediaStore()
+const snackbarStore = useSnackbarsStore()
 const profileStore = useProfileStore()
 
 const showRightButton = ref(false)
@@ -196,6 +202,8 @@ const isVideo = computed<boolean>(
   () => fullImage.value?.is_video ?? timelineItem.value?.isVideo ?? false,
 )
 
+const isMissing = computed<boolean>(() => !!fullImage.value?.missing_since)
+
 const rotation = computed(() => (id.value ? (viewPhotoStore.rotatedPhotos.get(id.value) ?? 0) : 0))
 
 const currentItemRatio = computed(() => {
@@ -291,6 +299,38 @@ async function moveToBin() {
     changeMediaItem(onDeleteMoveToId)
   } else {
     await router.push(parentLocation.value)
+  }
+}
+
+async function handleMissingItemAction(mediaId: string) {
+  const confirmed = await dialogs.confirm({
+    title: 'File missing from disk',
+    description:
+      'The source file for this media item cannot be found on disk (e.g. external drive disconnected or file was removed). Its metadata and thumbnail are still stored in the database.<br><br>Would you like to delete this item from the database?',
+    icon: MdiAlertCircleOutline,
+    color: 'error',
+    confirmText: 'Remove from database',
+    cancelText: 'Keep',
+  })
+
+  if (!confirmed) return
+
+  const onDeleteMoveToId = nextId.value ?? prevId.value
+  try {
+    await storageService.pruneMissingItems([mediaId])
+    snackbarStore.enqueue({
+      message: 'Item removed from database',
+      icon: MdiTrashCanOutline,
+    })
+    mediaItemStore.mediaItems.delete(mediaId)
+    missingMediaStore.removeItem(mediaId)
+    if (onDeleteMoveToId) {
+      changeMediaItem(onDeleteMoveToId)
+    } else {
+      await router.push(parentLocation.value)
+    }
+  } catch (e) {
+    snackbarStore.error('Failed to delete missing item', e)
   }
 }
 
@@ -503,6 +543,7 @@ useDetailTitle(mediaDetailTitle, { fallback: 'Photo' })
         <template v-if="authStore.isAuthenticated">
           <v-btn
             v-if="
+              !isMissing &&
               fullImage &&
               !isVideo &&
               !fullImage.use_panorama_viewer &&
@@ -531,7 +572,21 @@ useDetailTitle(mediaDetailTitle, { fallback: 'Photo' })
           />
           <v-btn
             rounded="xl"
-            v-if="id"
+            v-if="isMissing && id"
+            :icon="MdiAlertCircleOutline"
+            variant="plain"
+            color="warning"
+            @click="handleMissingItemAction(id)"
+            v-tooltip="{
+              text: 'File is missing from disk',
+              location: 'bottom',
+              attach: true,
+              width: 180,
+            }"
+          />
+          <v-btn
+            rounded="xl"
+            v-else-if="id"
             :loading="downloadStore.downloadingIds.has(id)"
             @click="downloadStore.downloadItem(id)"
             :icon="MdiCloudDownloadOutline"
@@ -552,6 +607,9 @@ useDetailTitle(mediaDetailTitle, { fallback: 'Photo' })
               <v-btn rounded="xl" :icon="MdiDotsHorizontal" variant="plain" v-bind="props" />
             </template>
             <v-list>
+              <v-list-item v-if="id" @click="mediaItemStore.reprocessMediaItem(id)"
+                >Reprocess item</v-list-item
+              >
               <v-list-item :to="`/search?mode=similar&ids=${id}`">Find similar images</v-list-item>
               <v-list-item v-if="id" @click="profileStore.setProfilePic(id)">
                 Set as profile picture

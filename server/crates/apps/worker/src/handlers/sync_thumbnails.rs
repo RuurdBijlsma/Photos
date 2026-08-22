@@ -57,7 +57,13 @@ async fn sync_thumbnails(pool: &PgPool, settings: &IngestSettings) -> Result<()>
 
     let to_delete: Vec<_> = thumb_ids.difference(&db_ids).cloned().collect();
     for id in to_delete {
-        fs::remove_dir_all(thumbnails_root.join(id)).await?;
+        let path_to_remove = thumbnails_root.join(id);
+        if let Err(e) = fs::remove_dir_all(&path_to_remove).await {
+            warn!(
+                "Couldn't remove dir {:?} in `sync_thumbnails` job: {:?}",
+                &path_to_remove, e
+            );
+        }
     }
 
     let db_items_missing_thumbnails = db_ids.difference(&thumb_ids).cloned().collect::<Vec<_>>();

@@ -1,4 +1,4 @@
-use crate::handlers::{handle_create, handle_remove};
+use crate::handlers::handle_create;
 use app_state::IngestSettings;
 use app_state::constants::ALBUM_IMPORT_FOLDER;
 use color_eyre::eyre::Result;
@@ -92,7 +92,6 @@ async fn process_event(pool: &PgPool, settings: &IngestSettings, event: Event) -
 
     if let Err(e) = match event.kind {
         EventKind::Create(_) => handle_create(pool, settings, path).await,
-        EventKind::Remove(_) => handle_remove(pool, settings, path).await,
         _ => Ok(()),
     } {
         warn!("Error handling file event for {:?}: {:?}", path, e);

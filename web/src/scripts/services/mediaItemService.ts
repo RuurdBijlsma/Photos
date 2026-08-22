@@ -95,6 +95,10 @@ const mediaItemService = {
   async getPanoConfig(id: string): Promise<AxiosResponse<PannellumConfig>> {
     return apiClient.get<PannellumConfig>(`/photos/${id}/pano-config`)
   },
+
+  reprocess(id: string): Promise<AxiosResponse<void>> {
+    return apiClient.post<void>(`/photos/${id}/reprocess`)
+  },
 }
 
 export default mediaItemService

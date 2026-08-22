@@ -76,7 +76,6 @@ pub struct IngestOverviewResponse {
     pub metadata: IngestJobCounts,
     pub thumbnails: IngestJobCounts,
     pub analysis: IngestJobCounts,
-    pub llm: IngestJobCounts,
 }
 
 #[derive(Deserialize, Debug, Clone)]

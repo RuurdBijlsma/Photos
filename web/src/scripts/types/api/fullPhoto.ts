@@ -1,58 +1,6 @@
 import type { Theme } from '@/scripts/types/themeColor.ts'
 import type { PannellumConfig } from '@/scripts/types/api/pannellumConfig.ts'
 
-export interface QualityScore {
-  exposure: number
-  contrast: number
-  sharpness: number
-  color_accuracy: number
-  composition: number
-  subject_clarity: number
-  visual_impact: number
-  creativity: number
-  color_harmony: number
-  storytelling: number
-  style_suitability: number
-  weighted_score: number
-  measured_blurriness: number
-  measured_noisiness: number
-  measured_exposure: number
-  measured_weighted_score: number
-}
-
-export interface ClassificationData {
-  caption: string
-  main_subject: string
-  setting: string
-  search_term: string
-  contains_pets: boolean
-  contains_vehicle: boolean
-  contains_landmarks: boolean
-  contains_people: boolean
-  contains_animals: boolean
-  contains_text: boolean
-  is_indoor: boolean
-  is_food: boolean
-  is_drink: boolean
-  is_event: boolean
-  is_document: boolean
-  is_landscape: boolean
-  is_cityscape: boolean
-  is_activity: boolean
-  ocr_text?: string
-  animal_type?: string
-  food_name?: string
-  drink_name?: string
-  vehicle_type?: string
-  event_type?: string
-  landmark_name?: string
-  document_type?: string
-  people_count?: number
-  people_mood?: string
-  photo_type?: string
-  activity_description?: string
-}
-
 export interface Face {
   position_x: number
   position_y: number
@@ -77,8 +25,6 @@ export interface VisualAnalysis {
   created_at: string
   faces: Face[]
   colors?: ColorData
-  quality?: QualityScore
-  classification?: ClassificationData
 }
 
 export interface TimeDetails {
@@ -177,6 +123,7 @@ export interface FullMediaItem {
   relative_path: string
   created_at: string
   updated_at: string
+  missing_since?: string | null
   width: number
   height: number
   orientation: number

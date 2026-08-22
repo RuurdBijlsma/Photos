@@ -44,15 +44,6 @@ async fn main() -> color_eyre::Result<()> {
     .await?;
     println!("VisualAnalyzer::new {:?}\n", now.elapsed());
 
-    let now = Instant::now();
-    let response = analyzer
-        .llm_client
-        .chat("In one sentence, what's your favourite painting?")
-        .call()
-        .await?;
-    println!("chat response {response:?}");
-    println!("analyzer.llm_chat {:?}\n", now.elapsed());
-
     let images = vec![
         Path::new("media_dir/rutenl/cat-pet.jpg"),
         Path::new("media_dir/rutenl/ocr-bug.jpg"),
