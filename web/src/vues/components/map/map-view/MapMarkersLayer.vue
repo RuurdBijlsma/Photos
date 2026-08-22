@@ -12,6 +12,8 @@ import {
 import { MapMediaPopupController } from '@/scripts/mapUtils/mapPopup.ts'
 import { useDebounceFn } from '@vueuse/core'
 import { useRoute, useRouter } from 'vue-router'
+import { useTheme } from 'vuetify/framework'
+import { useSettingStore } from '@/scripts/stores/settingsStore.ts'
 
 export interface EmitMarkerSelected {
   key: string

@@ -64,7 +64,6 @@ impl<T> ModelSlot<T> {
 /// Manages shared ML model instances in `worker_scaler`.
 pub struct ModelRegistry {
     settings: AppSettings,
-    media_analyzer: ModelSlot<MediaAnalyzer>,
     visual_analyzer: ModelSlot<VisualAnalyzer>,
     text_embedder: ModelSlot<TextEmbedder>,
 }
@@ -74,21 +73,9 @@ impl ModelRegistry {
     pub fn new(settings: AppSettings, idle_timeout: Duration) -> Self {
         Self {
             settings,
-            media_analyzer: ModelSlot::new("MediaAnalyzer", idle_timeout),
             visual_analyzer: ModelSlot::new("VisualAnalyzer", idle_timeout),
             text_embedder: ModelSlot::new("TextEmbedder", idle_timeout),
         }
-    }
-
-    pub async fn get_or_load_media_analyzer(&mut self) -> Result<Arc<MediaAnalyzer>> {
-        if let Some(analyzer) = self.media_analyzer.get() {
-            return Ok(analyzer);
-        }
-
-        info!("Loading MediaAnalyzer...");
-        let analyzer = Arc::new(MediaAnalyzer::builder().build().await?);
-        self.media_analyzer.set(analyzer.clone());
-        Ok(analyzer)
     }
 
     pub async fn get_or_load_visual_analyzer(&mut self) -> Result<Arc<VisualAnalyzer>> {
@@ -128,8 +115,6 @@ impl ModelRegistry {
         &mut self,
         excluded_jobs: &[JobType],
     ) -> Result<WorkerModels> {
-        let media_analyzer = self.get_or_load_media_analyzer().await?;
-
         let visual_analyzer = if !excluded_jobs.contains(&JobType::IngestLlm)
             || !excluded_jobs.contains(&JobType::IngestAnalysis)
         {
@@ -143,6 +128,7 @@ impl ModelRegistry {
         } else {
             Some(self.get_or_load_text_embedder().await?)
         };
+        let media_analyzer = Arc::new(MediaAnalyzer::builder().build().await?);
 
         Ok(WorkerModels::new(
             media_analyzer,
@@ -153,7 +139,6 @@ impl ModelRegistry {
 
     /// Checks for models unused by workers and unloads them if idle for too long
     pub fn cleanup_idle_models(&mut self) {
-        self.media_analyzer.cleanup_idle();
         self.visual_analyzer.cleanup_idle();
         self.text_embedder.cleanup_idle();
     }

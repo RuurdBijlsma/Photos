@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import type { GeoJSONSource, Map as LibreMap, MapMouseEvent, MapSourceDataEvent } from 'maplibre-gl'
 import type * as GeoJSON from 'geojson'
 import type { MapPhotosResponse, SimpleTimelineItem } from '@/scripts/types/generated/timeline.ts'
@@ -7,6 +7,8 @@ import { createPhotosGeoJson, getItemFromProperties } from '@/scripts/mapUtils/m
 import { MapMediaPopupController } from '@/scripts/mapUtils/mapPopup.ts'
 import { useDebounceFn } from '@vueuse/core'
 import { useRoute, useRouter } from 'vue-router'
+import { useTheme } from 'vuetify/framework'
+import { useSettingStore } from '@/scripts/stores/settingsStore.ts'
 
 const props = defineProps<{
   map: LibreMap
@@ -19,10 +21,16 @@ const emit = defineEmits<{
 
 const route = useRoute()
 const router = useRouter()
+const theme = useTheme()
+const settings = useSettingStore()
 
 const popupController = new MapMediaPopupController()
 const currentVisibleIds = new Set<string>()
 const visibleItems = ref<SimpleTimelineItem[]>([])
+const mapTheme = computed(() =>
+  settings.lightPhotoViewerMap || !theme.current.value.dark ? 'light' : 'dark',
+)
+const primaryColor = computed(() => String(theme.themes.value[mapTheme.value].colors.primary))
 
 function addDotsLayer(loadedMap: LibreMap) {
   loadedMap.addLayer({
@@ -31,7 +39,7 @@ function addDotsLayer(loadedMap: LibreMap) {
     source: 'photos-dots',
     paint: {
       'circle-radius': ['interpolate', ['linear'], ['zoom'], 1, 4, 8, 5, 13, 7, 16, 9],
-      'circle-color': 'rgb(80, 30, 120)',
+      'circle-color': primaryColor.value,
       'circle-stroke-color': '#ffffff',
       'circle-stroke-width': 1.5,
       'circle-opacity': 0.85,
