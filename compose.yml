@@ -39,10 +39,6 @@ services:
     volumes:
       - ${MEDIA_LOCATION}:/media
       - ${APP_DATA_LOCATION:-app_data}:/app_data
-    networks:
-      default:
-        aliases:
-          - api
     healthcheck:
       test: [ "CMD-SHELL", "curl -f http://localhost:5272/api/health || exit 1" ]
       interval: 15s
