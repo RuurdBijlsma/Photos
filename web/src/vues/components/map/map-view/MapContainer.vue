@@ -216,6 +216,7 @@ defineExpose({
         :map-style="currentStyle"
         class="map-instance"
         :map-options="mapOptions"
+        show-compass
         @load="handleMapLoad"
       />
       <div v-else class="map-loading">
