@@ -17,7 +17,6 @@
 * on login redirect to where you were
 * don't allow user to go to /onboarding if onboarding is done already.
 * --- HIGH PRIO ---
-* preload 1440p thumbnail on grid item hover
 * When no user exists and user visits login page -> redirect to register?admin=true and show messaging to create admin
   account
 * door alle requests kijken op verse page load om te zien of ze allemaal relevant zijn (ik zag thunder icon geladen worden op timeline page load)
@@ -30,8 +29,6 @@
 * duplicate photo remover tool
 * better error if exiftool isnt there (worker wont work then)
 * apply rotation immidiately when going next/prev to other media item.
-# HIGH PRIO
-* onnxruntime::Initializer::Initializer [ONNXRuntimeError] : 1 : FAIL : open file visual.onnx.data fail, errcode = 32 - The process cannot access the file because it is being used by another process.
 
 # INFRASTRUCTURE:
 
