@@ -33,7 +33,7 @@ pub struct Scaler {
 
 impl Scaler {
     #[must_use]
-    pub fn new(pool: PgPool, settings: AppSettings, model_provider: Arc<ModelProvider>) -> Self {
+    pub const fn new(pool: PgPool, settings: AppSettings, model_provider: Arc<ModelProvider>) -> Self {
         Self {
             pool,
             settings,

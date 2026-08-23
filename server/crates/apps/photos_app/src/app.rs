@@ -10,7 +10,8 @@ use tokio::task::JoinHandle;
 use tracing::info;
 
 #[derive(Parser, Debug, Clone, Default)]
-#[command(version, about = "Ruurd Photos Monolith Server", long_about = None)]
+#[command(version, about = "Ruurd Photos Server", long_about = None)]
+#[allow(clippy::struct_excessive_bools)]
 pub struct AppOptions {
     /// Disable the API web server
     #[clap(long, default_value_t = false)]
@@ -42,7 +43,9 @@ pub async fn run_app(
     let mut handles: Vec<JoinHandle<Result<()>>> = Vec::new();
 
     // 1. API Server & Task Scheduler
-    if !options.no_api {
+    if options.no_api {
+        info!("ℹ️ API server is disabled by --no-api");
+    } else {
         let pool = pool.clone();
         let settings = settings.clone();
         let model_provider = model_provider.clone();
@@ -60,12 +63,12 @@ pub async fn run_app(
                 .await
                 .map_err(|e| eyre!("API server failed: {e}"))
         }));
-    } else {
-        info!("ℹ️ API server is disabled by --no-api");
     }
 
     // 2. Worker Scaler & Queue Consumer
-    if !options.no_scaler {
+    if options.no_scaler {
+        info!("ℹ️ Worker scaler is disabled by --no-scaler");
+    } else {
         let pool = pool.clone();
         let settings = settings.clone();
         let model_provider = model_provider.clone();
@@ -76,12 +79,12 @@ pub async fn run_app(
                 .await
                 .map_err(|e| eyre!("Worker scaler failed: {e}"))
         }));
-    } else {
-        info!("ℹ️ Worker scaler is disabled by --no-scaler");
     }
 
     // 3. File System Watcher
-    if !options.no_watcher {
+    if options.no_watcher {
+        info!("ℹ️ File watcher is disabled by --no-watcher");
+    } else {
         let pool = pool.clone();
         let ingest_settings = settings.ingest.clone();
         let shutdown_rx = shutdown_rx.clone();
@@ -91,8 +94,6 @@ pub async fn run_app(
                 .await
                 .map_err(|e| eyre!("File watcher failed: {e}"))
         }));
-    } else {
-        info!("ℹ️ File watcher is disabled by --no-watcher");
     }
 
     // Await all subsystems until graceful termination

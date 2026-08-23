@@ -1,4 +1,5 @@
 use core::fmt;
+use std::future::Future;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::Mutex;
@@ -19,13 +20,13 @@ impl<T> fmt::Debug for ModelSlot<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("ModelSlot")
             .field("name", &self.name)
-            .field("inner", &"<model_slot_innter>")
+            .field("inner", &"<model_slot_inner>")
             .field("idle_timeout", &self.idle_timeout)
             .finish()
     }
 }
 
-impl<T> ModelSlot<T> {
+impl<T: Send + Sync> ModelSlot<T> {
     #[must_use]
     pub fn new(name: &str, idle_timeout: Duration) -> Self {
         Self {
@@ -40,8 +41,8 @@ impl<T> ModelSlot<T> {
 
     pub async fn get_or_load<F, Fut>(&self, loader: F) -> color_eyre::Result<Arc<T>>
     where
-        F: FnOnce() -> Fut,
-        Fut: std::future::Future<Output = color_eyre::Result<Arc<T>>>,
+        F: FnOnce() -> Fut + Send,
+        Fut: Future<Output = color_eyre::Result<Arc<T>>> + Send,
     {
         let mut guard = self.inner.lock().await;
         if let Some(arc) = guard.instance.clone() {
@@ -52,6 +53,8 @@ impl<T> ModelSlot<T> {
         let arc = loader().await?;
         guard.instance = Some(arc.clone());
         guard.idle_since = None;
+        drop(guard);
+
         Ok(arc)
     }
 

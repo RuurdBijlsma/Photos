@@ -69,7 +69,7 @@ impl TestContext {
         let assets_source_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("assets/media_dir");
         copy_dir_recursive(&assets_source_path, media_dir.path())?;
 
-        // 3. Spawn photos_app monolith as background task
+        // 3. Spawn photos_app as background task
         let (app_handle, shutdown_tx) = Self::spawn_services(&main_pool, &settings);
 
         // 4. Wait for the API to be ready to accept traffic (with cookie store enabled)
@@ -90,7 +90,7 @@ impl TestContext {
         })
     }
 
-    /// Spawns the unified `photos_app` monolith.
+    /// Spawns the unified `photos_app`.
     fn spawn_services(
         pool: &PgPool,
         settings: &AppSettings,
