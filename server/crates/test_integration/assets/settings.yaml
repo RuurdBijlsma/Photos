@@ -12,6 +12,9 @@ ingest:
     analyze_image_size: 360
     theme_generation:
       variant: Vibrant
+    onnx:
+      inter_threads: 1
+      intra_threads: 4
 
   file_detection:
     video_extensions:
@@ -133,7 +136,7 @@ scaler:
   quick_tick_interval_secs: 1
   system_memory_buffer_percentage: 5.0
   system_memory_buffer_maximum_mb: 1000
-  unload_models_timeout_secs: 30
+  unload_models_timeout_secs: 60
   profiles:
     light:
       priority: 1
@@ -155,4 +158,4 @@ scaler:
       estimated_ram_mb: 1000
       max_workers: 2
       excluded_jobs:
-        - "ingest_thumbnails" # Needs worker limit
+        - "ingest_thumbnails"

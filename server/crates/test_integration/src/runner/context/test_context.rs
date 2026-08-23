@@ -6,15 +6,18 @@ use app_state::{
     load_settings_from_path,
 };
 use color_eyre::eyre::{Result, eyre};
+use model_provider::ModelProvider;
+use photos_app::{AppOptions, run_app};
 use reqwest::Client;
 use sqlx::PgPool;
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::time::Duration;
 use tempfile::TempDir;
+use tokio::sync::watch;
 use tokio::task::JoinHandle;
 use tokio::time::sleep;
 use tracing::{error, info, warn};
-use watcher::watcher::create_watcher;
 
 pub fn init_test_constants(constants: AppConstants) {
     if CONSTANTS.set(constants).is_err() {
@@ -37,9 +40,8 @@ pub struct TestContext {
     management_pool: PgPool,
     media_dir: TempDir,
     thumbnail_dir: TempDir,
-    api_handle: JoinHandle<()>,
-    scaler_handle: JoinHandle<()>,
-    watcher_handle: JoinHandle<()>,
+    app_handle: JoinHandle<()>,
+    shutdown_tx: watch::Sender<bool>,
 }
 
 impl TestContext {
@@ -67,9 +69,8 @@ impl TestContext {
         let assets_source_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("assets/media_dir");
         copy_dir_recursive(&assets_source_path, media_dir.path())?;
 
-        // 3. Spawn application components as background tasks
-        let (api_handle, scaler_handle, watcher_handle) =
-            Self::spawn_services(&main_pool, &settings);
+        // 3. Spawn photos_app monolith as background task
+        let (app_handle, shutdown_tx) = Self::spawn_services(&main_pool, &settings);
 
         // 4. Wait for the API to be ready to accept traffic (with cookie store enabled)
         let http_client = Client::builder().cookie_store(true).build()?;
@@ -84,49 +85,38 @@ impl TestContext {
             management_pool,
             media_dir,
             thumbnail_dir,
-            api_handle,
-            scaler_handle,
-            watcher_handle,
+            app_handle,
+            shutdown_tx,
         })
     }
 
-    /// Spawns the API, worker scaler, and watcher services as background tokio tasks.
+    /// Spawns the unified `photos_app` monolith.
     fn spawn_services(
         pool: &PgPool,
         settings: &AppSettings,
-    ) -> (JoinHandle<()>, JoinHandle<()>, JoinHandle<()>) {
-        // Spawn API server
-        let api_pool = pool.clone();
-        let api_settings = settings.clone();
-        let api_handle = tokio::spawn(async move {
-            if let Err(e) = api::serve(api_pool, api_settings, false).await {
-                error!("API server failed: {}", e);
+    ) -> (JoinHandle<()>, watch::Sender<bool>) {
+        let (shutdown_tx, shutdown_rx) = watch::channel(false);
+        let pool = pool.clone();
+        let settings = settings.clone();
+        let model_provider = Arc::new(ModelProvider::new(
+            settings.clone(),
+            settings.scaler.unload_models_timeout,
+        ));
+
+        let options = AppOptions {
+            no_api: false,
+            no_scaler: false,
+            no_watcher: false,
+            no_scheduler: true, // Disable scheduled background crons during integration testing
+        };
+
+        let app_handle = tokio::spawn(async move {
+            if let Err(e) = run_app(pool, settings, model_provider, options, shutdown_rx).await {
+                error!("Photos app failed: {}", e);
             }
         });
 
-        // Spawn Worker Scaler
-        let scaler_pool = pool.clone();
-        let scaler_settings = settings.clone();
-        let scaler_handle = tokio::spawn(async move {
-            let (_shutdown_tx, shutdown_rx) = tokio::sync::watch::channel(false);
-            if let Err(e) =
-                worker_scaler::start_scaler(scaler_pool, scaler_settings, shutdown_rx).await
-            {
-                error!("Worker Scaler failed: {}", e);
-            }
-        });
-
-        // Spawn Watcher
-        let watcher_pool = pool.clone();
-        let watcher_settings = settings.ingest.clone();
-        let watcher_handle = tokio::spawn(async move {
-            let (_shutdown_tx, shutdown_rx) = tokio::sync::watch::channel(false);
-            if let Err(e) = create_watcher(&watcher_pool, &watcher_settings, shutdown_rx).await {
-                error!("Watcher failed: {}", e);
-            }
-        });
-
-        (api_handle, scaler_handle, watcher_handle)
+        (app_handle, shutdown_tx)
     }
 
     /// Polls the `/health` endpoint until it receives a successful response or times out.
@@ -159,10 +149,9 @@ impl TestContext {
 
 impl Drop for TestContext {
     fn drop(&mut self) {
-        // Abort background tasks
-        self.api_handle.abort();
-        self.scaler_handle.abort();
-        self.watcher_handle.abort();
+        // Signal graceful shutdown and abort handle
+        let _ = self.shutdown_tx.send(true);
+        self.app_handle.abort();
 
         // Drop the test database
         let db_name = self.db_name.clone();
