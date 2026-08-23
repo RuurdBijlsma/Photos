@@ -165,16 +165,23 @@ watch(
 
 .maplibregl-ctrl-group:has(.maplibregl-ctrl-compass):hover {
   transform: scale(1.02);
-  background-color: #fff !important;
+  background-color: #ffffff !important;
 }
 
-.maplibregl-ctrl-group button.maplibregl-ctrl-compass {
+/* Ensure the inner button never changes color on hover/focus */
+.maplibregl-ctrl-group button.maplibregl-ctrl-compass,
+.maplibregl-ctrl-group button.maplibregl-ctrl-compass:hover,
+.maplibregl-ctrl-group button.maplibregl-ctrl-compass:focus,
+.maplibregl-ctrl-group button.maplibregl-ctrl-compass:active {
   width: 42px !important;
   height: 42px !important;
   border-radius: 50% !important;
   display: flex !important;
   align-items: center;
   justify-content: center;
+  background-color: transparent !important;
+  outline: none !important;
+  box-shadow: none !important;
 }
 
 /* Make the needle larger & always visible */
