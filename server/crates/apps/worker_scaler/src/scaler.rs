@@ -33,7 +33,11 @@ pub struct Scaler {
 
 impl Scaler {
     #[must_use]
-    pub const fn new(pool: PgPool, settings: AppSettings, model_provider: Arc<ModelProvider>) -> Self {
+    pub const fn new(
+        pool: PgPool,
+        settings: AppSettings,
+        model_provider: Arc<ModelProvider>,
+    ) -> Self {
         Self {
             pool,
             settings,
@@ -123,8 +127,8 @@ impl Scaler {
                 demand.iter().any(|(&job_type, &count)| {
                     count > 0
                         && !profile.excluded_jobs.iter().any(|excluded| {
-                        JobType::parse_from_str(excluded).ok() == Some(job_type)
-                    })
+                            JobType::parse_from_str(excluded).ok() == Some(job_type)
+                        })
                 })
             })
             .max_by_key(|profile| profile.priority);
@@ -198,11 +202,7 @@ impl Scaler {
 
         let media_analyzer = Arc::new(MediaAnalyzer::builder().build().await?);
 
-        let worker_models = WorkerModels::new(
-            media_analyzer,
-            visual_analyzer,
-            text_embedder,
-        );
+        let worker_models = WorkerModels::new(media_analyzer, visual_analyzer, text_embedder);
 
         let worker_id_clone = worker_id.clone();
         let handle = tokio::spawn(async move {
@@ -215,7 +215,7 @@ impl Scaler {
                 true,
                 shutdown_rx,
             )
-                .await
+            .await
         });
 
         self.active_workers.push(ActiveWorker {

@@ -60,8 +60,8 @@ pub async fn run_app(
                 run_task_scheduler,
                 shutdown_rx,
             )
-                .await
-                .map_err(|e| eyre!("API server failed: {e}"))
+            .await
+            .map_err(|e| eyre!("API server failed: {e}"))
         }));
     }
 

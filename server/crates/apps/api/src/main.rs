@@ -29,7 +29,7 @@ async fn main() -> Result<()> {
         !Args::parse().no_scheduler,
         shutdown_rx,
     )
-        .await?;
+    .await?;
 
     Ok(())
 }

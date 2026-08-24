@@ -1,8 +1,5 @@
 #![deny(clippy::unwrap_used)]
-#![allow(
-    clippy::missing_errors_doc,
-    clippy::missing_panics_doc
-)]
+#![allow(clippy::missing_errors_doc, clippy::missing_panics_doc)]
 extern crate core;
 
 pub mod model_slot;
@@ -46,8 +43,7 @@ impl ModelProvider {
     pub async fn get_or_load_text_embedder(&self) -> Result<Arc<TextEmbedder>> {
         self.text_embedder
             .get_or_load(|| async {
-                let embedder_model_id =
-                    &self.settings.ingest.analyzer.search.embedder_model_id;
+                let embedder_model_id = &self.settings.ingest.analyzer.search.embedder_model_id;
 
                 info!("Loading CLIP text embedder...");
                 let embedder = TextEmbedder::from_hf(embedder_model_id)
