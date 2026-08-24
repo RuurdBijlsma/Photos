@@ -5,6 +5,7 @@ target/
 app_data/
 media_dir/
 thumbnails/
+bruno/
 
 # Git history & environment files
 .git/
@@ -15,3 +16,6 @@ thumbnails/
 # IDE & OS files
 .idea/
 .vscode/
+
+crates/test_integration/assets
+crates/test_integration/app_data
