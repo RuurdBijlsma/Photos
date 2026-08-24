@@ -1,7 +1,7 @@
 # ==========================================
 # 1. Chef Planner Stage
 # ==========================================
-FROM rust:1.97.1-slim-trixie AS planner
+FROM rust:1.98.0-slim-trixie AS planner
 WORKDIR /app
 RUN cargo install cargo-chef
 
@@ -11,7 +11,7 @@ RUN cargo chef prepare --recipe-path recipe.json
 # ==========================================
 # 2. Application Build Stage
 # ==========================================
-FROM rust:1.97.1-slim-trixie AS builder
+FROM rust:1.98.0-slim-trixie AS builder
 WORKDIR /app
 
 # Install native build tools and HEIF codec dependencies
