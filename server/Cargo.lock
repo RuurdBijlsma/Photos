@@ -217,6 +217,8 @@ dependencies = [
  "jsonwebtoken",
  "material-color-utils",
  "mime_guess",
+ "ml_analysis",
+ "model_provider",
  "open_clip_inference",
  "reqwest 0.13.4",
  "serde",
@@ -4583,6 +4585,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "model_provider"
+version = "0.1.0"
+dependencies = [
+ "app_state",
+ "color-eyre",
+ "ml_analysis",
+ "open_clip_inference",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "moka"
 version = "0.12.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5679,6 +5693,23 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c6fd9027e2d9319be6349febd1db4e8d02aa544921200c9b777720ac34a3aa89"
 dependencies = [
  "siphasher",
+]
+
+[[package]]
+name = "photos_app"
+version = "0.1.0"
+dependencies = [
+ "api",
+ "app_state",
+ "clap",
+ "color-eyre",
+ "common_services",
+ "model_provider",
+ "sqlx",
+ "tokio",
+ "tracing",
+ "watcher",
+ "worker_scaler",
 ]
 
 [[package]]
@@ -8522,7 +8553,6 @@ dependencies = [
 name = "test_integration"
 version = "0.1.0"
 dependencies = [
- "api",
  "app_state",
  "chrono",
  "color-eyre",
@@ -8531,6 +8561,8 @@ dependencies = [
  "common_types",
  "futures-util",
  "material-color-utils",
+ "model_provider",
+ "photos_app",
  "prost",
  "reqwest 0.13.4",
  "serde_json",
@@ -8542,9 +8574,6 @@ dependencies = [
  "tracing-subscriber",
  "url",
  "walkdir",
- "watcher",
- "worker",
- "worker_scaler",
 ]
 
 [[package]]
@@ -10474,8 +10503,7 @@ dependencies = [
  "color-eyre",
  "common_services",
  "media_analyzer",
- "ml_analysis",
- "open_clip_inference",
+ "model_provider",
  "ort",
  "serde",
  "serde_json",

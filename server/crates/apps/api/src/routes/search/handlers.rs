@@ -34,7 +34,7 @@ pub async fn get_search_results(
     let items = search_media(
         user.id,
         &context.pool,
-        context.text_embedder,
+        context.model_provider.get_or_load_text_embedder().await?,
         params.clone().query,
         to_search_config(&context.settings.ingest.analyzer.search, params),
     )
@@ -129,8 +129,8 @@ pub async fn get_search_by_image_results(
     let items = search_by_image(
         user.id,
         &context.pool,
-        context.text_embedder,
-        context.vision_embedder,
+        context.model_provider.get_or_load_text_embedder().await?,
+        context.model_provider.get_or_load_vision_embedder().await?,
         params.clone().query,
         VisionQuery::Raw(SearchImage {
             image: Some(img),
@@ -156,8 +156,8 @@ pub async fn get_search_by_image_uuid(
     let items = search_by_image(
         user.id,
         &context.pool,
-        context.text_embedder,
-        context.vision_embedder,
+        context.model_provider.get_or_load_text_embedder().await?,
+        context.model_provider.get_or_load_vision_embedder().await?,
         params.clone().query,
         VisionQuery::Raw(SearchImage {
             image: None,
@@ -188,8 +188,8 @@ pub async fn get_search_by_media_items(
     let items = search_by_media_items(
         user.id,
         &context.pool,
-        context.text_embedder,
-        context.vision_embedder,
+        context.model_provider.get_or_load_text_embedder().await?,
+        context.model_provider.get_or_load_vision_embedder().await?,
         params.clone().query,
         to_search_config(&context.settings.ingest.analyzer.search, params),
         &media_item_ids,

@@ -48,10 +48,10 @@ RUN cargo install cargo-chef
 COPY --from=planner /app/recipe.json recipe.json
 RUN cargo chef cook --profile release-docker --recipe-path recipe.json
 
-# Copy source code and build final binaries
+# Copy source code and build final binary
 COPY . .
 ENV SQLX_OFFLINE=true
-RUN cargo build --profile release-docker --bin api --bin worker_scaler --bin watcher
+RUN cargo build --profile release-docker --bin photos_app
 
 # ==========================================
 # 3. Runtime Stage
@@ -76,10 +76,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY --from=builder /usr/local/lib/libheif* /usr/local/lib/
 RUN ldconfig
 
-# Copy compiled Rust binaries
-COPY --from=builder /app/target/release-docker/api /usr/local/bin/photos-api
-COPY --from=builder /app/target/release-docker/worker_scaler /usr/local/bin/photos-scaler
-COPY --from=builder /app/target/release-docker/watcher /usr/local/bin/photos-watcher
+# Copy compiled Rust binary
+COPY --from=builder /app/target/release-docker/photos_app /usr/local/bin/photos_app
 
 # Copy config and assets to /app
 COPY config/settings.yaml /app/config/settings.yaml
@@ -89,4 +87,4 @@ COPY assets /app/assets
 
 EXPOSE 5272
 
-CMD ["photos-api"]
+CMD ["photos_app"]
