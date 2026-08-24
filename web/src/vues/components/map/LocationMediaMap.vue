@@ -3,7 +3,7 @@ import { computed, ref, watch } from 'vue'
 import BaseMap, { type StyleName } from '@/vues/components/map/BaseMap.vue'
 import type { LocationMediaItem } from '@/scripts/types/generated/timeline.ts'
 import { useStorage } from '@vueuse/core'
-import { LngLatBounds, Map as LibreMap, NavigationControl } from 'maplibre-gl'
+import { LngLatBounds, Map as LibreMap } from 'maplibre-gl'
 import type * as GeoJSON from 'geojson'
 
 const props = defineProps<{
@@ -68,15 +68,6 @@ const mapOptions = computed(() => {
 
 function handleMapLoad(map: LibreMap) {
   mapInstance.value = map
-
-  // Add standard built-in +/- zoom controls in the bottom right
-  map.addControl(
-    new NavigationControl({
-      showCompass: false,
-      showZoom: true,
-    }),
-    'bottom-right',
-  )
 
   setupMapResources()
 }
@@ -180,6 +171,7 @@ watch(
 <template>
   <div v-if="hasCoordinates" class="location-media-map-container">
     <base-map
+      show-zoom-buttons
       class="location-media-map"
       :map-style="mapStyle"
       :map-options="mapOptions"

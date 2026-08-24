@@ -1,16 +1,3 @@
-x-backend-common: &backend-common
-  image: ghcr.io/ruurdbijlsma/photos-server:latest
-  restart: always
-  environment: &backend-env
-    DATABASE_URL: postgresql://${DB_USER:-photos_user}:${DB_PASSWORD:-dev-password}@database:5432/${DB_NAME:-photos}
-    APP__SECRETS__JWT: ${JWT_SECRET:-change_me_in_production}
-    APP__INGEST__MEDIA_FOLDER: /media
-    APP__INGEST__APP_DATA_FOLDER: /app_data
-    APP__CONSTANTS__FALLBACK_TIMEZONE: ${TZ:-Europe/Amsterdam}
-  volumes:
-    - ${MEDIA_LOCATION}:/media
-    - ${APP_DATA_LOCATION:-app_data}:/app_data
-
 services:
   database:
     image: pgvector/pgvector:pg18
@@ -28,40 +15,31 @@ services:
       timeout: 5s
       retries: 5
 
-  api:
-    <<: *backend-common
-    container_name: photos_api
-    command: [ "photos-api" ]
+  backend:
+    image: ghcr.io/ruurdbijlsma/photos-server:latest
+    container_name: photos_backend
+    restart: always
     depends_on:
       database:
         condition: service_healthy
     environment:
-      <<: *backend-env
+      DATABASE_URL: postgresql://${DB_USER:-photos_user}:${DB_PASSWORD:-dev-password}@database:5432/${DB_NAME:-photos}
+      APP__SECRETS__JWT: ${JWT_SECRET:-change_me_in_production}
+      APP__INGEST__MEDIA_FOLDER: /media
+      APP__INGEST__APP_DATA_FOLDER: /app_data
+      APP__CONSTANTS__FALLBACK_TIMEZONE: ${TZ:-Europe/Amsterdam}
       APP__API__HOST: "0.0.0.0"
       APP__API__PORT: "5272"
       APP__API__SERVE_STATIC_ASSETS: "false"
+    volumes:
+      - ${MEDIA_LOCATION}:/media
+      - ${APP_DATA_LOCATION:-app_data}:/app_data
     healthcheck:
       test: [ "CMD-SHELL", "curl -f http://localhost:5272/api/health || exit 1" ]
       interval: 15s
       timeout: 5s
       retries: 3
       start_period: 60s
-
-  scaler:
-    <<: *backend-common
-    container_name: photos_scaler
-    command: [ "photos-scaler" ]
-    depends_on:
-      database:
-        condition: service_healthy
-
-  watcher:
-    <<: *backend-common
-    container_name: photos_watcher
-    command: [ "photos-watcher" ]
-    depends_on:
-      database:
-        condition: service_healthy
 
   web:
     image: ghcr.io/ruurdbijlsma/photos-web:latest
@@ -72,7 +50,7 @@ services:
     volumes:
       - ${APP_DATA_LOCATION:-app_data}:/app_data:ro
     depends_on:
-      api:
+      backend:
         condition: service_healthy
 
 volumes:

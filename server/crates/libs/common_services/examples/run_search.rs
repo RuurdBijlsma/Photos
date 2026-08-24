@@ -25,6 +25,8 @@ async fn main() -> color_eyre::Result<()> {
         .expect("no such user");
     let embedder = TextEmbedder::from_hf(&settings.ingest.analyzer.search.embedder_model_id)
         .cache_dir(&settings.ingest.hf_cache_root)
+        .with_inter_threads(settings.ingest.analyzer.onnx.inter_threads)
+        .with_intra_threads(settings.ingest.analyzer.onnx.intra_threads)
         .build()
         .await?;
 

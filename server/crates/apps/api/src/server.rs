@@ -6,10 +6,9 @@ use app_state::constants::HOSTED_FOLDER;
 use axum::Router;
 use axum::routing::get_service;
 use color_eyre::Result;
-use common_services::graceful_exit::wait_for_kill_signal;
 use common_services::s2s_client::S2SClient;
 use http::{HeaderValue, header};
-use open_clip_inference::{TextEmbedder, VisionEmbedder};
+use model_provider::ModelProvider;
 use reqwest::Client;
 use sqlx::PgPool;
 use std::convert::Infallible;
@@ -17,6 +16,7 @@ use std::iter::once;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tasks::task_runner::init_task_scheduler;
+use tokio::sync::watch;
 use tower_http::compression::CompressionLayer;
 use tower_http::cors::CorsLayer;
 use tower_http::sensitive_headers::SetSensitiveRequestHeadersLayer;
@@ -25,20 +25,23 @@ use tower_http::set_header::SetResponseHeaderLayer;
 use tower_http::trace::TraceLayer;
 use tracing::info;
 
-pub async fn serve(pool: PgPool, settings: AppSettings, run_task_scheduler: bool) -> Result<()> {
+pub async fn serve(
+    pool: PgPool,
+    settings: AppSettings,
+    model_provider: Arc<ModelProvider>,
+    run_task_scheduler: bool,
+    mut shutdown_rx: watch::Receiver<bool>,
+) -> Result<()> {
     if run_task_scheduler {
         init_task_scheduler(&pool, &settings)?;
     }
 
-    let (text_embedder, vision_embedder) = load_embedders(&settings).await?;
-
-    info!("🚀 Initializing server...");
+    info!("🍦 Initializing server...");
     let api_state = ApiContext {
         pool: pool.clone(),
         s2s_client: S2SClient::new(Client::new()),
         settings: settings.clone(),
-        text_embedder,
-        vision_embedder,
+        model_provider,
     };
 
     let cors = get_cors(&settings.api.allowed_origins);
@@ -64,35 +67,23 @@ pub async fn serve(pool: PgPool, settings: AppSettings, run_task_scheduler: bool
     info!("📚 Docs available at http://{listen_address}/docs");
     info!("✅ Server listening on http://{listen_address}");
 
+    let graceful_shutdown = async move {
+        while !*shutdown_rx.borrow_and_update() {
+            if shutdown_rx.changed().await.is_err() {
+                break;
+            }
+        }
+        info!("🛑 API server received shutdown signal.");
+    };
+
     axum::serve(
         listener,
         app.into_make_service_with_connect_info::<SocketAddr>(),
     )
-    .with_graceful_shutdown(wait_for_kill_signal())
+    .with_graceful_shutdown(graceful_shutdown)
     .await?;
 
     Ok(())
-}
-
-async fn load_embedders(
-    settings: &AppSettings,
-) -> Result<(Arc<TextEmbedder>, Arc<VisionEmbedder>)> {
-    let model_id = &settings.ingest.analyzer.search.embedder_model_id;
-    let cache_dir = &settings.ingest.hf_cache_root;
-
-    info!("Loading CLIP text embedder...");
-    let text_embedder = TextEmbedder::from_hf(model_id)
-        .cache_dir(cache_dir)
-        .build()
-        .await?;
-
-    info!("Loading CLIP vision embedder...");
-    let vision_embedder = VisionEmbedder::from_hf(model_id)
-        .cache_dir(cache_dir)
-        .build()
-        .await?;
-
-    Ok((Arc::new(text_embedder), Arc::new(vision_embedder)))
 }
 
 /// Attaches static asset serving routes (`/thumbnails` and `/hosted`) onto the router.

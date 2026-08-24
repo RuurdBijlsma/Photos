@@ -1,5 +1,5 @@
 ingest:
-  media_folder: C:\Users\Ruurd\Pictures\media_dir
+  media_folder: C:\Users\Ruurd\Pictures\small_media_dir
   app_data_folder: ../app_data
   enable_cache: true
 
@@ -12,6 +12,9 @@ ingest:
     analyze_image_size: 720
     theme_generation:
       variant: Vibrant
+    onnx:
+      inter_threads: 1
+      intra_threads: 4
 
   file_detection:
     video_extensions:
@@ -133,7 +136,7 @@ scaler:
   quick_tick_interval_secs: 3
   system_memory_buffer_percentage: 5.0
   system_memory_buffer_maximum_mb: 1000
-  unload_models_timeout_secs: 30
+  unload_models_timeout_secs: 57600 # 16 hours
   profiles:
     light:
       priority: 1
@@ -155,4 +158,4 @@ scaler:
       estimated_ram_mb: 1000
       max_workers: 2
       excluded_jobs:
-        - "ingest_thumbnails" # Needs worker limit
+        - "ingest_thumbnails"

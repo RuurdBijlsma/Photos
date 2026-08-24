@@ -6,10 +6,9 @@ edition = "2024"
 [dependencies]
 app_state = { path = "../../libs/app_state" }
 common_services = { path = "../../libs/common_services" }
+model_provider = { path = "../../libs/model_provider" }
 worker = { path = "../worker" }
 media_analyzer = "0.10.4"
-ml_analysis = { path = "../../libs/ml_analysis" }
-open_clip_inference = { version = "0.4.2" }
 sqlx = { version = "0.9.0", features = ["runtime-tokio", "tls-native-tls", "postgres", "chrono", "macros", "json"] }
 tokio = { version = "1.47.1", features = ["full"] }
 color-eyre = "0.6.5"
@@ -24,7 +23,6 @@ ort = { version = "2.0.0-rc.12" }
 load-dynamic = [
     "worker/load-dynamic",
     "common_services/load-dynamic",
-    "ml_analysis/load-dynamic",
-    "open_clip_inference/load-dynamic",
+    "model_provider/load-dynamic",
     "ort/load-dynamic"
 ]

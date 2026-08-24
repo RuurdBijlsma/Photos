@@ -567,7 +567,7 @@ useRefreshFunction(() => {
               </v-list>
             </v-menu>
           </div>
-          <p v-if="formattedDates" class="album-dates">
+          <p class="album-dates">
             <template v-if="sortModeIcon">
               <v-btn
                 density="compact"
@@ -609,7 +609,7 @@ useRefreshFunction(() => {
               </v-btn>
               <span>•</span>
             </template>
-            <span>
+            <span v-if="formattedDates">
               {{ formattedDates }}
             </span>
           </p>

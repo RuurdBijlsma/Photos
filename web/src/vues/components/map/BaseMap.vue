@@ -3,6 +3,7 @@ import { onMounted, onUnmounted, ref, watch } from 'vue'
 import {
   Map as LibreMap,
   type MapOptions,
+  NavigationControl,
   setWorkerUrl,
   type StyleSpecification,
 } from 'maplibre-gl'
@@ -17,9 +18,13 @@ const props = withDefaults(
   defineProps<{
     mapStyle?: StyleName
     mapOptions: MapOptionsWithoutContainer
+    showCompass?: boolean
+    showZoomButtons?: boolean
   }>(),
   {
     mapStyle: 'LIBERTY',
+    showCompass: false,
+    showZoomButtons: false,
     mapOptions: () => ({
       center: { lon: 0, lat: 0 },
       zoom: 2,
@@ -77,6 +82,17 @@ onMounted(() => {
     style: styles[props.mapStyle] as unknown as StyleSpecification,
   })
 
+  if (props.showCompass || props.showZoomButtons) {
+    map.addControl(
+      new NavigationControl({
+        showCompass: props.showCompass,
+        showZoom: props.showZoomButtons,
+        visualizePitch: true,
+      }),
+      'bottom-right',
+    )
+  }
+
   map.on('load', () => {
     emit('load', map)
   })
@@ -131,3 +147,57 @@ watch(
 <template>
   <div ref="mapContainer"></div>
 </template>
+
+<style>
+/* --- Custom Rounded Compass with Red North Arrow --- */
+
+.maplibregl-ctrl-group:has(.maplibregl-ctrl-compass) {
+  border-radius: 50% !important;
+  overflow: hidden;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25) !important;
+  background-color: rgba(255, 255, 255, 0.9) !important;
+  backdrop-filter: blur(8px) !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.maplibregl-ctrl-group:has(.maplibregl-ctrl-compass):hover {
+  transform: scale(1.02);
+  background-color: #ffffff !important;
+}
+
+/* Ensure the inner button never changes color on hover/focus */
+.maplibregl-ctrl-group button.maplibregl-ctrl-compass,
+.maplibregl-ctrl-group button.maplibregl-ctrl-compass:hover,
+.maplibregl-ctrl-group button.maplibregl-ctrl-compass:focus,
+.maplibregl-ctrl-group button.maplibregl-ctrl-compass:active {
+  width: 42px !important;
+  height: 42px !important;
+  border-radius: 50% !important;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  background-color: transparent !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* Make the needle larger & always visible */
+.maplibregl-ctrl button.maplibregl-ctrl-compass .maplibregl-ctrl-icon {
+  width: 32px !important;
+  height: 32px !important;
+  background-size: contain !important;
+  background-position: center !important;
+  background-repeat: no-repeat !important;
+
+  /* Custom 2-color SVG needle: Red for North (#ef4444) and Slate Gray for South (#94a3b8) */
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 29 29'%3E%3Cpath d='M10.5 14.5 L14.5 1.5 L18.5 14.5 Z' fill='%23ef4444'/%3E%3Cpath d='M10.5 14.5 L14.5 27.5 L18.5 14.5 Z' fill='%2394a3b8'/%3E%3C/svg%3E") !important;
+}
+
+/* Keep the compass button visible even when facing directly North (bearing = 0) */
+.maplibregl-ctrl-compass {
+  display: flex !important;
+}
+</style>

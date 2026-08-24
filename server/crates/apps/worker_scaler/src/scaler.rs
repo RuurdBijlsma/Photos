@@ -1,14 +1,17 @@
 use crate::demand::get_demand;
-use crate::models::ModelRegistry;
 use crate::telemetry::Telemetry;
 use app_state::{AppSettings, ProfileSettings};
 use color_eyre::Result;
 use common_services::database::jobs::JobType;
+use media_analyzer::MediaAnalyzer;
+use model_provider::ModelProvider;
 use sqlx::PgPool;
+use std::sync::Arc;
 use std::time::Instant;
 use tokio::sync::watch;
 use tokio::task::JoinHandle;
 use tracing::{Instrument, error, info, info_span, warn};
+use worker::models::WorkerModels;
 use worker::worker::create_worker;
 
 pub struct ActiveWorker {
@@ -22,7 +25,7 @@ pub struct ActiveWorker {
 pub struct Scaler {
     pool: PgPool,
     settings: AppSettings,
-    models: ModelRegistry,
+    model_provider: Arc<ModelProvider>,
     active_workers: Vec<ActiveWorker>,
     last_spawn_time: Option<Instant>,
     worker_counter: u64,
@@ -30,12 +33,15 @@ pub struct Scaler {
 
 impl Scaler {
     #[must_use]
-    pub fn new(pool: PgPool, settings: AppSettings) -> Self {
-        let models = ModelRegistry::new(settings.clone(), settings.scaler.unload_models_timeout);
+    pub const fn new(
+        pool: PgPool,
+        settings: AppSettings,
+        model_provider: Arc<ModelProvider>,
+    ) -> Self {
         Self {
             pool,
             settings,
-            models,
+            model_provider,
             active_workers: Vec::new(),
             last_spawn_time: None,
             worker_counter: 0,
@@ -80,7 +86,7 @@ impl Scaler {
     /// Performs a tick and returns `true` if the system is completely idle.
     async fn tick(&mut self) -> Result<bool> {
         self.clean_up_sleeping_workers();
-        self.models.cleanup_idle_models();
+        self.model_provider.cleanup_idle_models().await;
         let demand = get_demand(&self.pool).await?;
         let telemetry = Telemetry::fetch();
 
@@ -102,10 +108,6 @@ impl Scaler {
             return Ok(is_idle);
         }
 
-        // Find the most capable candidate profile that:
-        // 1. Is allowed by max_workers limits
-        // 2. Fits within available memory headroom
-        // 3. Can pick up at least one job type currently in demand
         let best_profile = self
             .settings
             .scaler
@@ -186,7 +188,21 @@ impl Scaler {
             .filter_map(|job_str| JobType::parse_from_str(job_str).ok())
             .collect();
 
-        let models = self.models.prepare_models_for_jobs(&excluded_jobs).await?;
+        let visual_analyzer = if excluded_jobs.contains(&JobType::IngestAnalysis) {
+            None
+        } else {
+            Some(self.model_provider.get_or_load_visual_analyzer().await?)
+        };
+
+        let text_embedder = if excluded_jobs.contains(&JobType::ClusterPhotos) {
+            None
+        } else {
+            Some(self.model_provider.get_or_load_text_embedder().await?)
+        };
+
+        let media_analyzer = Arc::new(MediaAnalyzer::builder().build().await?);
+
+        let worker_models = WorkerModels::new(media_analyzer, visual_analyzer, text_embedder);
 
         let worker_id_clone = worker_id.clone();
         let handle = tokio::spawn(async move {
@@ -195,7 +211,7 @@ impl Scaler {
                 settings,
                 worker_id_clone,
                 excluded_jobs,
-                models,
+                worker_models,
                 true,
                 shutdown_rx,
             )
@@ -215,7 +231,6 @@ impl Scaler {
     }
 
     fn scale_down(&self) {
-        // Order profiles by priority ASC for scale-down (lowest priority scale-down first)
         let mut profiles = self.settings.scaler.profiles.clone();
         profiles.sort_by_key(|a| a.priority);
 
