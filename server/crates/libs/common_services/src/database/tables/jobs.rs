@@ -97,7 +97,13 @@ impl JobType {
     #[must_use]
     pub const fn get_priority(&self, is_video: bool) -> i32 {
         match self {
-            Self::IngestMetadata => 50,
+            Self::IngestMetadata => {
+                if is_video {
+                    55
+                } else {
+                    50
+                }
+            }
             Self::IngestThumbnails => {
                 if is_video {
                     65
