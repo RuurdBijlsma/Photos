@@ -1,11 +1,22 @@
 use crate::api::app_error::AppError;
-use crate::api::system::interfaces::{DiskStats, SystemStats};
+use crate::api::system::interfaces::{DiskStats, PublicSystemStats, SystemStats};
 use crate::api::system::storage_helpers::{
     ARE_SAME_DRIVE, are_on_same_drive, get_single_disk_info,
 };
 use app_state::{IngestSettings, constants};
 use sqlx::PgPool;
 use tokio::task;
+
+pub async fn get_public_system_stats(
+    pool: &PgPool,
+) -> Result<PublicSystemStats, AppError> {
+    let has_users = sqlx::query_scalar!("SELECT 1 FROM app_user")
+        .fetch_optional(pool)
+        .await?
+        .flatten()
+        .is_some();
+    Ok(PublicSystemStats { has_users })
+}
 
 pub async fn get_system_stats(
     pool: &PgPool,

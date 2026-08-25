@@ -6,7 +6,7 @@ use color_eyre::eyre::Result;
 use serde::{Deserialize, Serialize};
 use serde_json::to_value;
 use sqlx::{PgPool, PgTransaction};
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct IngestMetadataPayload {
