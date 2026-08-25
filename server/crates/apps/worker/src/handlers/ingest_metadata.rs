@@ -2,6 +2,7 @@ use crate::context::WorkerContext;
 use crate::handlers::JobResult;
 use crate::handlers::common::cache::ingest_cache::{get_ingest_cache, write_ingest_cache};
 use crate::handlers::common::remote_user::get_or_create_remote_user;
+use crate::handlers::common::utils::result_if_source_missing;
 use crate::jobs::management::is_job_cancelled;
 use color_eyre::eyre::Context;
 use color_eyre::{Result, eyre::eyre};
@@ -28,8 +29,8 @@ pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
         .ok_or_else(|| eyre!("Ingest job has no associated user_id"))?;
     let media_root = &context.settings.ingest.media_root;
     let file_path = media_root.join(relative_path);
-    if !file_path.exists() {
-        return Ok(JobResult::Cancelled);
+    if let Some(result) = result_if_source_missing(&context.pool, media_root, &file_path).await? {
+        return Ok(result);
     }
     let file_hash = hash_file(&file_path)?;
     let media_info = get_media_info(context, &file_path, &file_hash).await?;
@@ -39,8 +40,11 @@ pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
     } else {
         None
     };
-    if !file_path.exists() || is_job_cancelled(&context.pool, job.id).await? {
+    if is_job_cancelled(&context.pool, job.id).await? {
         return Ok(JobResult::Cancelled);
+    }
+    if let Some(result) = result_if_source_missing(&context.pool, media_root, &file_path).await? {
+        return Ok(result);
     }
     store_media_item(&context.pool, user_id, relative_path, media_info, payload).await?;
     Ok(JobResult::Done)

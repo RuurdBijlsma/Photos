@@ -47,12 +47,14 @@ pub async fn retry_job_handler(
 
 // -- user level jobs handlers
 
-#[instrument(skip(pool, user), err(Debug))]
+#[instrument(skip(context, user), err(Debug))]
 pub async fn ingest_overview_handler(
-    State(pool): State<PgPool>,
+    State(context): State<ApiContext>,
     Extension(user): Extension<ApiUser>,
 ) -> Result<Json<IngestOverviewResponse>, AppError> {
-    let overview = get_user_ingest_overview(&pool, user.id).await?;
+    let overview =
+        get_user_ingest_overview(&context.pool, user.id, &context.settings.ingest.media_root)
+            .await?;
     Ok(Json(overview))
 }
 

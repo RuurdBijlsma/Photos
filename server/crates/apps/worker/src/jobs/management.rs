@@ -111,6 +111,9 @@ pub async fn update_job_on_completion(pool: &PgPool, job: &Job, result: JobResul
             let delay = backoff_seconds(job.dependency_attempts);
             dependency_reschedule_job(pool, job.id, delay).await
         }
+        JobResult::StorageUnavailable(reason) => {
+            reschedule_storage_unavailable(pool, job.id, &reason).await
+        }
     }
 }
 
@@ -175,6 +178,25 @@ async fn reschedule_for_retry(
     )
         .execute(pool)
         .await?;
+    Ok(())
+}
+
+/// Requeues a job because the media folder looks unmounted. Does not consume attempts.
+async fn reschedule_storage_unavailable(
+    pool: &PgPool,
+    job_id: i64,
+    last_error: &str,
+) -> Result<()> {
+    warn!("Media folder unavailable for job {job_id}. Requeueing in 1180s: {last_error}");
+    let scheduled_at = Utc::now() + Duration::seconds(180);
+    sqlx::query!(
+        "UPDATE jobs SET status = 'queued', scheduled_at = $2, owner = NULL, started_at = NULL, last_error = $3 WHERE id = $1",
+        job_id,
+        scheduled_at,
+        last_error
+    )
+    .execute(pool)
+    .await?;
     Ok(())
 }
 

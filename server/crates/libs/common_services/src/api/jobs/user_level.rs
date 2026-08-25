@@ -3,13 +3,17 @@ use crate::api::jobs::interfaces::{
     IngestOverviewResponse, JobInfo, PaginatedJobsResponse, UserJobsQuery,
 };
 use crate::database::jobs::{JobStatus, JobType};
+use crate::media_mount::MediaFolderStatus;
+use crate::media_mount::media_mount_status;
 use sqlx::{PgPool, Postgres, QueryBuilder};
+use std::path::Path;
 
 /// Retrieves the counts of queued, running, failed, completed, and cancelled ingest jobs.
 /// Leverages the cleanDB job routine to only count recently relevant records.
 pub async fn get_user_ingest_overview(
     pool: &PgPool,
     user_id: i32,
+    media_root: &Path,
 ) -> Result<IngestOverviewResponse, AppError> {
     let rows = sqlx::query!(
         r#"
@@ -27,7 +31,11 @@ pub async fn get_user_ingest_overview(
     .fetch_all(pool)
     .await?;
 
-    let mut overview = IngestOverviewResponse::default();
+    let media_folder: MediaFolderStatus = media_mount_status(pool, media_root).await?.into();
+    let mut overview = IngestOverviewResponse {
+        media_folder,
+        ..Default::default()
+    };
 
     for row in rows {
         let counts = match row.job_type {

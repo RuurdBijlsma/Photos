@@ -16,5 +16,6 @@ pub mod caching;
 pub mod database;
 pub mod graceful_exit;
 pub mod job_queue;
+pub mod media_mount;
 pub mod s2s_client;
 pub mod utils;

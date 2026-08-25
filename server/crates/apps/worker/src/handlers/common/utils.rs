@@ -1,5 +1,32 @@
 use crate::context::WorkerContext;
+use crate::handlers::JobResult;
+use color_eyre::Result;
+use common_services::media_mount::{MediaMountStatus, media_mount_status};
+use sqlx::PgPool;
 use std::path::{Path, PathBuf};
+
+/// If the source file is missing, cancel only when the media folder still looks mounted.
+pub async fn result_if_source_missing(
+    pool: &PgPool,
+    media_root: &Path,
+    file_path: &Path,
+) -> Result<Option<JobResult>> {
+    if file_path.exists() {
+        return Ok(None);
+    }
+    match media_mount_status(pool, media_root).await? {
+        MediaMountStatus::Available => Ok(Some(JobResult::Cancelled)),
+        MediaMountStatus::Unavailable { reason } => Ok(Some(JobResult::StorageUnavailable(reason))),
+    }
+}
+
+/// Returns `StorageUnavailable` when the media folder looks unmounted.
+pub async fn require_media_mounted(pool: &PgPool, media_root: &Path) -> Result<Option<JobResult>> {
+    match media_mount_status(pool, media_root).await? {
+        MediaMountStatus::Available => Ok(None),
+        MediaMountStatus::Unavailable { reason } => Ok(Some(JobResult::StorageUnavailable(reason))),
+    }
+}
 
 /// Determines which thumbnail files should be sent to the ML analyzer.
 #[must_use]

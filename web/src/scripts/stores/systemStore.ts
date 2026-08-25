@@ -10,6 +10,8 @@ const DEFAULT_SYSTEM_STATS: SystemStats = {
   allowFileDeletion: true,
   allowFileModifications: true,
   isIngesting: false,
+  mediaFolderAvailable: true,
+  mediaFolderError: null,
   disk: {
     areSameDrive: true,
     mediaDrive: {

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import MdiAlertCircleOutline from '~icons/mdi/alert-circle-outline'
 import MdiArrowRight from '~icons/mdi/arrow-right'
 import MdiFileImageOutline from '~icons/mdi/file-image-outline'
 import MdiImageOutline from '~icons/mdi/image-outline'
@@ -7,6 +8,7 @@ import MdiSearchWeb from '~icons/mdi/search-web'
 import MdiSwapVertical from '~icons/mdi/swap-vertical'
 import { onMounted, onUnmounted, computed } from 'vue'
 import { useIngestJobsStore } from '@/scripts/stores/ingestJobsStore.ts'
+import { useSystemStore } from '@/scripts/stores/systemStore.ts'
 import IngestPipelineRow from '@/vues/components/activity/IngestPipelineRow.vue'
 import RunningJobPill from '@/vues/components/activity/RunningJobPill.vue'
 
@@ -15,6 +17,19 @@ const emit = defineEmits<{
 }>()
 
 const ingestStore = useIngestJobsStore()
+const systemStore = useSystemStore()
+
+const mediaFolderUnavailable = computed(
+  () =>
+    ingestStore.overview?.mediaFolder?.available === false ||
+    systemStore.stats.mediaFolderAvailable === false,
+)
+const mediaFolderError = computed(
+  () =>
+    ingestStore.overview?.mediaFolder?.reason ||
+    systemStore.stats.mediaFolderError ||
+    'The media folder looks unmounted or empty. Ingest is paused until it is available again.',
+)
 
 onMounted(() => {
   ingestStore.startPolling(false)
@@ -74,7 +89,9 @@ const filteredCategoryProgress = computed(() => {
   <div class="overlay-container">
     <div class="ingest-card">
       <div class="ingest-header">
-        <span class="font-weight-bold">Importing photos and videos...</span>
+        <span class="font-weight-bold">{{
+          mediaFolderUnavailable ? 'Media folder unavailable' : 'Importing photos and videos...'
+        }}</span>
         <v-btn
           :icon="MdiRefresh"
           variant="text"
@@ -84,6 +101,17 @@ const filteredCategoryProgress = computed(() => {
           :loading="ingestStore.isOverviewLoading || ingestStore.isRunningLoading"
         />
       </div>
+
+      <v-alert
+        v-if="mediaFolderUnavailable"
+        type="error"
+        variant="tonal"
+        density="compact"
+        class="mb-3"
+        :icon="MdiAlertCircleOutline"
+      >
+        {{ mediaFolderError }}
+      </v-alert>
 
       <div class="progress-section">
         <IngestPipelineRow

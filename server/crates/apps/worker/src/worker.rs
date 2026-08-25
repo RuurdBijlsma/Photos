@@ -1,5 +1,5 @@
 use crate::context::WorkerContext;
-use crate::handlers::handle_job;
+use crate::handlers::{JobResult, handle_job};
 use crate::jobs::management::{claim_next_job, update_job_on_completion, update_job_on_failure};
 use crate::models::WorkerModels;
 use app_state::AppSettings;
@@ -7,7 +7,8 @@ use color_eyre::Result;
 use common_services::database::jobs::JobType;
 use sqlx::PgPool;
 use std::time::Duration;
-use tracing::{Instrument, info, info_span};
+use tracing::{Instrument, info, info_span, warn};
+use common_services::alert;
 
 #[allow(clippy::large_futures)]
 pub async fn create_worker(
@@ -61,9 +62,22 @@ pub async fn run_worker_loop(
 
             let job_result = handle_job(context, &job).await;
 
+            let storage_unavailable = matches!(&job_result, Ok(JobResult::StorageUnavailable(_)));
+
             match job_result {
                 Ok(result) => update_job_on_completion(&context.pool, &job, result).await?,
                 Err(e) => update_job_on_failure(&context.pool, &job, &e).await?,
+            }
+
+            if storage_unavailable {
+                alert!("Mounted folder is unavailable");
+                tokio::select! {
+                    () = tokio::time::sleep(Duration::from_secs(60)) => {}
+                    _ = shutdown_rx.changed() => {
+                        info!("Shutdown signal received while waiting for media folder. Exiting worker loop.");
+                        break;
+                    }
+                }
             }
         } else {
             sleepiness += 1;

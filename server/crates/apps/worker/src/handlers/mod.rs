@@ -28,6 +28,7 @@ pub enum JobResult {
     Done,
     Cancelled,
     DependencyReschedule,
+    StorageUnavailable(String),
 }
 
 /// Dispatches a job to its corresponding handler and manages its lifecycle.

@@ -1,4 +1,5 @@
 use crate::database::jobs::{JobStatus, JobType};
+use crate::media_mount::MediaFolderStatus;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -76,6 +77,7 @@ pub struct IngestOverviewResponse {
     pub metadata: IngestJobCounts,
     pub thumbnails: IngestJobCounts,
     pub analysis: IngestJobCounts,
+    pub media_folder: MediaFolderStatus,
 }
 
 #[derive(Deserialize, Debug, Clone)]

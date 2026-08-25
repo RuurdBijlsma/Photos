@@ -17,6 +17,8 @@ export interface SystemStats {
   allowFileDeletion: boolean
   disk: DiskStats
   isIngesting: boolean
+  mediaFolderAvailable?: boolean
+  mediaFolderError?: string | null
 }
 
 export interface PublicSystemStats {
