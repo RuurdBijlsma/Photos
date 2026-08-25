@@ -18,3 +18,7 @@ export interface SystemStats {
   disk: DiskStats
   isIngesting: boolean
 }
+
+export interface PublicSystemStats {
+  hasUsers: boolean
+}

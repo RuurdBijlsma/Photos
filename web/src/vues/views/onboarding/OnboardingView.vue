@@ -16,10 +16,10 @@ const route = useRoute()
 const adminStore = useAdminStore()
 const authStore = useAuthStore()
 const pickFolderStore = usePickFolderStore()
-const isLoading = ref(false)
+const startProcessingLoading = ref(false)
 
 async function startProcessing() {
-  isLoading.value = true
+  startProcessingLoading.value = true
   try {
     if (authStore.user) {
       const userFolder = pickFolderStore.viewedFolder.join('/')
@@ -28,7 +28,7 @@ async function startProcessing() {
     console.log('Pushing ', { name: 'timeline' })
     await router.push({ name: 'timeline', query: { onboarding: 'true' } })
   } finally {
-    isLoading.value = false
+    startProcessingLoading.value = false
   }
 }
 
@@ -121,6 +121,7 @@ setStepFromRoute()
             variant="flat"
             rounded
             v-else
+            :loading="startProcessingLoading"
             @click="startProcessing"
             >Start processing</v-btn
           >

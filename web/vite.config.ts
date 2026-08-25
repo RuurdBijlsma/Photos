@@ -1,6 +1,6 @@
 import { fileURLToPath, URL } from 'node:url'
 
-import { defineConfig } from 'vite'
+import { defineConfig, type Plugin } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import vueJsx from '@vitejs/plugin-vue-jsx'
 import vueDevTools from 'vite-plugin-vue-devtools'
@@ -9,6 +9,32 @@ import { VitePWA } from 'vite-plugin-pwa'
 import Icons from 'unplugin-icons/vite'
 
 const repoName = 'Photos'
+
+const BACKEND_DELAY_MS = 1500
+
+// todo: remove delay
+function throttleBackendPlugin(delayMs: number): Plugin {
+  return {
+    name: 'throttle-backend-requests',
+    configureServer(server) {
+      if (delayMs <= 0) return
+
+      server.middlewares.use((req, _res, next) => {
+        // Only throttle proxied backend requests
+        const isBackend =
+          req.url?.startsWith('/api') ||
+          req.url?.startsWith('/thumbnails') ||
+          req.url?.startsWith('/hosted')
+
+        if (isBackend) {
+          setTimeout(next, delayMs)
+        } else {
+          next()
+        }
+      })
+    },
+  }
+}
 
 const proxyConfig = {
   '/api': {
@@ -40,16 +66,17 @@ export default defineConfig({
     vue(),
     vueJsx(),
     vueDevTools(),
+    throttleBackendPlugin(BACKEND_DELAY_MS),
     vuetify({ autoImport: { labs: true } }),
     Icons({
       compiler: 'vue3',
     }),
     VitePWA({
-      registerType: 'prompt', // Prompt users before updating (allows showing a reload notification)
+      registerType: 'prompt',
       injectRegister: 'auto',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'favicon.svg'],
       workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg}'], // Files to cache for offline use
+        globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
       },
       manifest: {
         name: 'Ruurd Photos',
