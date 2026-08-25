@@ -270,8 +270,8 @@ useRefreshFunction(() => loadProfile())
                 <v-divider />
                 <v-card-text>
                   To edit your profile picture, select one image, and click 'Set as profile picture'
-                  in the selection overlay. Or you can have the server automatically find a profile
-                  picture.
+                  in the selection overlay. Or you can automatically set a profile picture if you're
+                  feeling lucky.
                 </v-card-text>
                 <v-card-actions>
                   <v-spacer />
