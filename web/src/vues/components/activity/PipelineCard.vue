@@ -25,9 +25,7 @@ const props = withDefaults(
 const MINIMUM_TO_SHOW_ETA = 5
 
 const showMetrics = computed(() => {
-  return (
-    props.toGo > MINIMUM_TO_SHOW_ETA && props.itemsPerSecond !== null && props.itemsPerSecond > 0
-  )
+  return props.toGo > MINIMUM_TO_SHOW_ETA && props.itemsPerSecond !== null
 })
 
 const formattedEta = computed(() => {
@@ -41,7 +39,14 @@ const formattedSpeed = computed(() => {
   if (props.itemsPerSecond >= 10) {
     return `${Math.round(props.itemsPerSecond)} items/s`
   }
-  return `${props.itemsPerSecond.toFixed(1)} items/s`
+  if (props.itemsPerSecond >= 1) {
+    return `${props.itemsPerSecond.toFixed(1)} items/s`
+  }
+  const secondsPerItem = 1 / props.itemsPerSecond
+  if (secondsPerItem >= 10) {
+    return `${Math.round(secondsPerItem)} s/item`
+  }
+  return `${Math.round(10 / props.itemsPerSecond) / 10} s/item`
 })
 </script>
 

@@ -242,7 +242,7 @@ export class ProcessingRateTracker {
   private history: { timestamp: number; completed: number }[] = []
   private windowMs: number
 
-  constructor(windowMs = 20000) {
+  constructor(windowMs = 60000) {
     this.windowMs = windowMs
   }
 
