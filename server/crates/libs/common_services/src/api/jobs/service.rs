@@ -146,7 +146,9 @@ pub async fn retry_cancelled_jobs(pool: &PgPool) -> Result<i64, AppError> {
         UPDATE jobs
         SET status = 'queued'::job_status,
             attempts = 0,
+            dependency_attempts = 0,
             scheduled_at = NOW(),
+            last_heartbeat = NOW(),
             finished_at = NULL,
             started_at = NULL,
             last_error = NULL,
@@ -163,7 +165,7 @@ pub async fn retry_cancelled_jobs(pool: &PgPool) -> Result<i64, AppError> {
               AND c.job_type IN ('ingest_metadata'::job_type, 'ingest_thumbnails'::job_type, 'ingest_analysis'::job_type)
               AND NOT EXISTS (
                   SELECT 1 FROM jobs a
-                  WHERE a.status IN ('queued', 'running')
+                  WHERE a.status IN ('queued'::job_status, 'running'::job_status)
                     AND a.job_type = c.job_type
                     AND coalesce(a.user_id, -1) = coalesce(c.user_id, -1)
                     AND coalesce(md5(a.payload::text), '') = coalesce(md5(c.payload::text), '')
@@ -177,8 +179,8 @@ pub async fn retry_cancelled_jobs(pool: &PgPool) -> Result<i64, AppError> {
         )
         "#,
     )
-    .execute(pool)
-    .await?;
+        .execute(pool)
+        .await?;
 
     Ok(result.rows_affected() as i64)
 }
