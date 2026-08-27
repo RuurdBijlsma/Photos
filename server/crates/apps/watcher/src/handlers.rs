@@ -14,7 +14,7 @@ fn is_allowed_file(path: &Path, settings: &IngestSettings) -> bool {
     };
     let ext_lower = ext.to_lowercase();
     let detection = &settings.file_detection;
-    let has_bytes = path.metadata().map_or(false, |m| m.len() > 0);
+    let has_bytes = path.metadata().is_ok_and(|m| m.len() > 0);
 
     has_bytes
         && detection

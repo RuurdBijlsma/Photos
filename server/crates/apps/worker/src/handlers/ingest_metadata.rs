@@ -32,7 +32,10 @@ pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
     if let Some(result) = result_if_source_missing(&context.pool, media_root, &file_path).await? {
         return Ok(result);
     }
-    if tokio::fs::metadata(&file_path).await.map_or(true, |m| m.len() == 0) {
+    if tokio::fs::metadata(&file_path)
+        .await
+        .map_or(true, |m| m.len() == 0)
+    {
         warn!("File is 0 bytes: {relative_path}. Cancelling ingest job.");
         return Ok(JobResult::Cancelled);
     }
