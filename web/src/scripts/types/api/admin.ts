@@ -100,3 +100,7 @@ export interface PaginatedJobsResponse {
   limit: number
   offset: number
 }
+
+export interface BulkRetryResponse {
+  affected: number
+}

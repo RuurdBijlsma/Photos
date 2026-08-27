@@ -2,7 +2,8 @@ use crate::api_state::ApiContext;
 use crate::jobs::handlers::{
     cancel_job_handler, get_failed_ingest_jobs_handler, get_running_ingest_jobs_handler,
     get_user_ingest_jobs_handler, ingest_overview_handler, job_summary_handler,
-    retry_ingest_job_handler, retry_job_handler, scan_user_media_handler,
+    retry_cancelled_jobs_handler, retry_ingest_job_handler, retry_job_handler,
+    scan_user_media_handler,
 };
 use axum::{
     Router,
@@ -14,6 +15,7 @@ pub fn jobs_admin_router() -> Router<ApiContext> {
         .route("/jobs", get(job_summary_handler))
         .route("/jobs/{id}/cancel", post(cancel_job_handler))
         .route("/jobs/{id}/retry", post(retry_job_handler))
+        .route("/jobs/retry-cancelled", post(retry_cancelled_jobs_handler))
 }
 
 pub fn jobs_protected_router() -> Router<ApiContext> {

@@ -85,3 +85,9 @@ pub struct IngestOverviewResponse {
 pub struct RetryJobPayload {
     pub id: i64,
 }
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct BulkRetryResponse {
+    pub affected: i64,
+}

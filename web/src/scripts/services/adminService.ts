@@ -1,6 +1,7 @@
 import type { AxiosResponse } from 'axios'
 import apiClient from './api.ts'
 import type {
+  BulkRetryResponse,
   DiskResponse,
   MakeFolderBody,
   MediaSampleResponse,
@@ -93,6 +94,13 @@ const adminService = {
    */
   retryJob(jobId: number): Promise<AxiosResponse<void>> {
     return apiClient.post<void>(`/jobs/${jobId}/retry`)
+  },
+
+  /**
+   * Bulk retry all cancelled ingest jobs, re-queuing them.
+   */
+  retryCancelledJobs(): Promise<AxiosResponse<BulkRetryResponse>> {
+    return apiClient.post<BulkRetryResponse>('/jobs/retry-cancelled')
   },
 }
 

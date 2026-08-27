@@ -94,6 +94,17 @@ export const useAdminStore = defineStore('admin', () => {
     }
   }
 
+  async function retryCancelledJobs(): Promise<number> {
+    try {
+      const response = await adminService.retryCancelledJobs()
+      snackbarStore.success(`${response.data.affected} cancelled jobs re-queued`)
+      return response.data.affected
+    } catch (error) {
+      snackbarStore.error('Failed to retry cancelled jobs', error)
+      throw error
+    }
+  }
+
   // --- USER ADMINISTRATION ACTIONS ---
 
   async function fetchUsers() {
@@ -161,5 +172,6 @@ export const useAdminStore = defineStore('admin', () => {
     fetchJobs,
     cancelJob,
     retryJob,
+    retryCancelledJobs,
   }
 })
