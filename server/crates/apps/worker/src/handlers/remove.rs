@@ -1,6 +1,6 @@
 use crate::context::WorkerContext;
 use crate::handlers::JobResult;
-use crate::handlers::common::utils::require_media_mounted;
+use crate::handlers::common::utils::require_media_mounted_fresh;
 use color_eyre::Result;
 use color_eyre::eyre::eyre;
 use common_services::api::photos::removal::delete_item_and_thumbnails;
@@ -22,8 +22,12 @@ pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
         // Soft delete: keep the original file and thumbnails.
         MediaItemStore::soft_delete_by_relative_path(&context.pool, relative_path).await?;
     } else {
-        if let Some(result) = require_media_mounted(&context.pool, media_root).await? {
+        if let Some(result) = require_media_mounted_fresh(&context.pool, media_root).await? {
             return Ok(result);
+        }
+        if file_path.exists() {
+            MediaItemStore::soft_delete_by_relative_path(&context.pool, relative_path).await?;
+            return Ok(JobResult::Done);
         }
         let thumbnail_root = &context.settings.ingest.thumbnails_root;
         // Hard delete: file is already gone, clean up DB and thumbnails.

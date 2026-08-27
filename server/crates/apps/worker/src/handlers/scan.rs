@@ -1,11 +1,13 @@
 use crate::context::WorkerContext;
 use crate::handlers::JobResult;
+use crate::handlers::common::utils::require_media_mounted;
 use app_state::{IngestSettings, MakeRelativePath};
 use color_eyre::eyre::Result;
 use common_services::database::jobs::{Job, JobType};
 use common_services::database::media_item_store::MediaItemStore;
 use common_services::database::user_store::UserStore;
 use common_services::job_queue::{bulk_enqueue_full_ingest, enqueue_job};
+use common_services::media_mount::invalidate_mount_cache;
 use sqlx::PgPool;
 use std::collections::HashSet;
 use std::path::Path;
@@ -113,6 +115,7 @@ pub async fn sync_user_files_to_db(
             db_all_paths.len(),
             user_id
         );
+        invalidate_mount_cache(&settings.media_root).await;
         return Ok(());
     }
 
@@ -182,6 +185,11 @@ pub async fn run_scan(pool: &PgPool, settings: &IngestSettings) -> Result<()> {
 
 /// Triggers a full scan to synchronise the filesystem and database.
 pub async fn handle(context: &WorkerContext, _job: &Job) -> Result<JobResult> {
+    if let Some(result) =
+        require_media_mounted(&context.pool, &context.settings.ingest.media_root).await?
+    {
+        return Ok(result);
+    }
     run_scan(&context.pool, &context.settings.ingest).await?;
     Ok(JobResult::Done)
 }

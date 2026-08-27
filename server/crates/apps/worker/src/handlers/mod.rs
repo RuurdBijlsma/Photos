@@ -28,6 +28,7 @@ pub enum JobResult {
     Done,
     Cancelled,
     DependencyReschedule,
+    FileNotFound,
     StorageUnavailable(String),
 }
 

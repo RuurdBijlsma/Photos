@@ -201,6 +201,33 @@ pub async fn media_mount_status(
         .await)
 }
 
+/// Uncached / fresh check that the media root looks mounted.
+///
+/// Bypasses the cache, computes the latest status directly, and updates the cache
+/// so that subsequent queries immediately see the new state.
+pub async fn media_mount_status_fresh(
+    pool: &PgPool,
+    media_root: &Path,
+) -> color_eyre::Result<MediaMountStatus> {
+    let status = match compute_media_mount_status(pool, media_root).await {
+        Ok(status) => status,
+        Err(e) => MediaMountStatus::Unavailable {
+            reason: format!("Could not check media folder mount: {e}"),
+        },
+    };
+    get_mount_cache()
+        .insert(media_root.to_path_buf(), status.clone())
+        .await;
+    Ok(status)
+}
+
+/// Evicts the cached mount status for `media_root`.
+pub async fn invalidate_mount_cache(media_root: &Path) {
+    get_mount_cache()
+        .invalidate(&media_root.to_path_buf())
+        .await;
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -255,5 +282,20 @@ mod tests {
         let dir = tempdir().expect("temp dir");
         let status = status_from_probe(dir.path(), MediaRootProbe::HasContent, true);
         assert!(status.is_available());
+    }
+
+    #[tokio::test]
+    async fn cache_invalidation_works() {
+        let dir = tempdir().expect("temp dir");
+        let path = dir.path().to_path_buf();
+        get_mount_cache()
+            .insert(path.clone(), MediaMountStatus::Available)
+            .await;
+        assert_eq!(
+            get_mount_cache().get(&path).await,
+            Some(MediaMountStatus::Available)
+        );
+        invalidate_mount_cache(&path).await;
+        assert_eq!(get_mount_cache().get(&path).await, None);
     }
 }

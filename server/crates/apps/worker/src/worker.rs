@@ -4,11 +4,11 @@ use crate::jobs::management::{claim_next_job, update_job_on_completion, update_j
 use crate::models::WorkerModels;
 use app_state::AppSettings;
 use color_eyre::Result;
+use common_services::alert;
 use common_services::database::jobs::JobType;
 use sqlx::PgPool;
 use std::time::Duration;
 use tracing::{Instrument, info, info_span, warn};
-use common_services::alert;
 
 #[allow(clippy::large_futures)]
 pub async fn create_worker(
