@@ -483,7 +483,7 @@ useDetailTitle(mediaDetailTitle, { fallback: 'Photo' })
       </div>
       <div class="right-buttons">
         <v-btn
-          v-if="settings.playMotionPhotos && fullImage?.media_features?.is_motion_photo"
+          v-if="settings.playMotionPhotos && fullImage?.media_features?.is_motion_photo && fullImage.has_thumbnails"
           rounded="xl"
           :icon="MdiMotionPlayOutline"
           variant="plain"
