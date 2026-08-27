@@ -13,6 +13,7 @@ import type { FullMediaItem } from '@/scripts/types/api/fullPhoto.ts'
 import type { PannellumConfig } from '@/scripts/types/api/pannellumConfig.ts'
 import { useAuthStore } from '@/scripts/stores/authStore.ts'
 import { isMimeTypeSupported } from '@/scripts/utils.ts'
+import { useDelayedBoolean } from '@/scripts/composables/useDelayedBoolean.ts'
 
 const PanoramaViewer = defineAsyncComponent(
   () => import('@/vues/components/viewer/components/PanoramaViewer.vue'),
@@ -45,6 +46,7 @@ const scale = ref(1)
 const translateX = ref(0)
 const translateY = ref(0)
 const thumbErrored = ref(false)
+const isThumbLoaded = ref(false)
 const containerRef = ref<HTMLElement | null>(null)
 const { width: containerWidth, height: containerHeight } = useElementSize(containerRef)
 const thumbRef = ref<HTMLImageElement | null>(null)
@@ -86,6 +88,10 @@ const pixelCount = computed(() => {
 const fullResUrl = ref<string | null>(null)
 const fullResLoaded = ref(false)
 const isLoadingFull = ref(false)
+
+// Track loading state for delayed blanking (swaps fast path without flicker, unloads on slow path)
+const isPendingLoad = computed(() => !isThumbLoaded.value && !fullResLoaded.value)
+const showBlank = useDelayedBoolean(isPendingLoad, 100)
 
 let currentAbortController: AbortController | null = null
 
@@ -164,6 +170,11 @@ async function onFullResLoad(e: Event) {
   }
 }
 
+function onThumbLoad() {
+  isThumbLoaded.value = true
+  clampTranslations()
+}
+
 // Motion Photo Settings & Logic
 const showingMotionVideo = ref(false)
 const videoPlayerRef = ref<HTMLVideoElement | null>(null)
@@ -223,6 +234,7 @@ watch(
     translateY.value = 0
     is3DMode.value = false
     thumbErrored.value = false
+    isThumbLoaded.value = false
     showingMotionVideo.value = false
     stopMonitoring()
   },
@@ -334,7 +346,7 @@ const wrapperStyle = computed(() => {
     top: '0px',
     left: '0px',
     transform: `translate3d(${translateX.value}px, ${translateY.value}px, 0) scale(${scale.value}) rotate(${normRot}deg)`,
-    transformOrigin: normRot === 0 ? '0 0' : 'center center', // <-- Fix here
+    transformOrigin: normRot === 0 ? '0 0' : 'center center',
   }
 })
 
@@ -536,7 +548,6 @@ function handlePointerUp(e: PointerEvent) {
       startTransformTimer()
     }
   } else if (activePointers.size === 1) {
-    // Resume dragging with the remaining pointer
     const remaining = Array.from(activePointers.values())[0]
     isDragging = true
     startX = remaining.clientX
@@ -590,6 +601,7 @@ useEventListener(containerRef, 'wheel', handleWheel, { passive: false })
       :style="{
         backgroundImage: `url(${imageUrl})`,
         transform: rotation ? `rotate(${rotation}deg)` : undefined,
+        opacity: isThumbLoaded || fullResLoaded || !showBlank ? 1 : 0,
       }"
     ></div>
 
@@ -620,8 +632,11 @@ useEventListener(containerRef, 'wheel', handleWheel, { passive: false })
           v-if="
             (!thumbErrored || !fullResLoaded) && !viewPhotoStore.hideRotatedThumb.has(mediaItemId)
           "
+          :style="{
+            opacity: isThumbLoaded || fullResLoaded || !showBlank ? 1 : 0,
+          }"
           @error="thumbErrored = true"
-          @load="clampTranslations"
+          @load="onThumbLoad"
           @dragstart.prevent
         />
 
