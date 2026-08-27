@@ -51,7 +51,9 @@ onMounted(init)
             color="primary"
             class="mr-2"
             variant="text"
-            :disabled="pickFolderStore.viewedFolder.length === 0"
+            :disabled="
+              pickFolderStore.viewedFolder.length === 0 || pickFolderStore.listFolderLoading
+            "
             @click="pickFolderStore.truncateViewed(pickFolderStore.viewedFolder.length - 1)"
             density="compact"
             :icon="MdiArrowUp"
@@ -63,14 +65,19 @@ onMounted(init)
             title="Create folder"
             density="compact"
             :icon="MdiFolderPlusOutline"
+            :loading="pickFolderStore.makeFolderLoading"
+            :disabled="pickFolderStore.listFolderLoading"
             @click="promptCreateFolder"
           />
         </div>
-        <div class="current-route-display">
+        <div
+          class="current-route-display"
+          :class="{ 'is-loading': pickFolderStore.listFolderLoading }"
+        >
           <div
             class="route-component route-root"
-            v-ripple
-            @click="pickFolderStore.truncateViewed(0)"
+            v-ripple="!pickFolderStore.listFolderLoading"
+            @click="!pickFolderStore.listFolderLoading && pickFolderStore.truncateViewed(0)"
           >
             Media Root
           </div>
@@ -78,8 +85,10 @@ onMounted(init)
             <v-icon :icon="MdiChevronRight" />
             <div
               class="route-component"
-              v-ripple
-              @click="pickFolderStore.truncateViewed(index + 1)"
+              v-ripple="!pickFolderStore.listFolderLoading"
+              @click="
+                !pickFolderStore.listFolderLoading && pickFolderStore.truncateViewed(index + 1)
+              "
             >
               {{ component }}
             </div>
@@ -97,21 +106,36 @@ onMounted(init)
           />
         </div>
       </div>
+
       <div class="picker-entries mt-5">
+        <!-- Loading State -->
+        <div
+          v-if="pickFolderStore.listFolderLoading"
+          class="d-flex flex-column align-center justify-center fill-height loading-container"
+        >
+          <v-progress-circular indeterminate color="primary" size="32" />
+          <span class="text-caption text-medium-emphasis mt-2">Loading folders...</span>
+        </div>
+
+        <!-- Empty State -->
         <p
-          class="text-caption text-center font-italic"
-          v-if="pickFolderStore.folderList.length === 0"
+          class="text-caption text-center font-italic mt-8"
+          v-else-if="pickFolderStore.folderList.length === 0"
         >
           There are no folders here.
         </p>
-        <v-list-item
-          v-for="folder in pickFolderStore.folderList"
-          :key="folder"
-          class="rounded-xl"
-          @click="pickFolderStore.openFolder(folder)"
-          :prepend-icon="MdiFolderOutline"
-          :title="folder"
-        ></v-list-item>
+
+        <!-- Folder List -->
+        <template v-else>
+          <v-list-item
+            v-for="folder in pickFolderStore.folderList"
+            :key="folder"
+            class="rounded-xl"
+            @click="pickFolderStore.openFolder(folder)"
+            :prepend-icon="MdiFolderOutline"
+            :title="folder"
+          />
+        </template>
       </div>
     </v-card-text>
   </v-card>
@@ -141,6 +165,11 @@ onMounted(init)
   background-color: rgba(0, 0, 0, 0.08);
   overflow-x: auto;
   scroll-behavior: smooth;
+  transition: opacity 0.2s ease;
+}
+
+.current-route-display.is-loading {
+  opacity: 0.7;
 }
 
 .current-route-display::-webkit-scrollbar {
@@ -175,5 +204,9 @@ onMounted(init)
   height: 180px;
   max-height: 340px;
   overflow-y: auto;
+}
+
+.loading-container {
+  min-height: 140px;
 }
 </style>

@@ -1,5 +1,6 @@
 use crate::context::WorkerContext;
 use crate::handlers::JobResult;
+use crate::handlers::common::utils::require_media_mounted;
 use app_state::IngestSettings;
 use color_eyre::Result;
 use color_eyre::eyre::eyre;
@@ -89,6 +90,11 @@ async fn sync_thumbnails(pool: &PgPool, settings: &IngestSettings) -> Result<()>
 }
 
 pub async fn handle(context: &WorkerContext, _job: &Job) -> Result<JobResult> {
+    if let Some(result) =
+        require_media_mounted(&context.pool, &context.settings.ingest.media_root).await?
+    {
+        return Ok(result);
+    }
     sync_thumbnails(&context.pool, &context.settings.ingest).await?;
     Ok(JobResult::Done)
 }

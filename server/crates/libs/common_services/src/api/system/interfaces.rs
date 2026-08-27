@@ -37,4 +37,12 @@ pub struct SystemStats {
     pub allow_file_modifications: bool,
     pub allow_file_deletion: bool,
     pub disk: DiskStats,
+    pub media_folder_available: bool,
+    pub media_folder_error: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct PublicSystemStats {
+    pub has_users: bool,
 }

@@ -14,6 +14,7 @@ import { isAxiosError } from 'axios'
 import FocusLayout from '@/vues/layouts/FocusLayout.vue'
 import AppAlert from '@/vues/components/ui/AppAlert.vue'
 import { useStorage } from '@vueuse/core'
+import systemService from '@/scripts/services/systemService.ts'
 
 const authStore = useAuthStore()
 const snackbarStore = useSnackbarsStore()
@@ -22,8 +23,13 @@ const router = useRouter()
 const emailInput: Ref<null | HTMLElement> = ref(null)
 const form: Ref<null | VForm> = ref(null)
 
-onMounted(() => {
+onMounted(async () => {
   emailInput.value?.focus()
+  systemService.getPublicStats().then((data) => {
+    if (!data.data.hasUsers) {
+      router.push('/register?admin=true')
+    }
+  })
 })
 
 const rules = {

@@ -1,9 +1,9 @@
 use crate::context::WorkerContext;
 use crate::handlers::JobResult;
 use crate::handlers::common::cache::thumbnail_cache::{get_thumbnail_cache, write_thumbnail_cache};
+use crate::handlers::common::utils::result_if_source_missing;
 use crate::jobs::management::is_job_cancelled;
 use color_eyre::{Result, eyre::eyre};
-use common_services::alert;
 use common_services::database::jobs::Job;
 use common_services::database::media_item_store::MediaItemStore;
 use generate_thumbnails::{ThumbnailConfig, generate_thumbnails};
@@ -34,7 +34,14 @@ pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
         warn!("IngestThumbnail was called but no media_item row exists for {relative_path}");
         return Ok(JobResult::Cancelled);
     };
-    if !file_path.exists() {
+    if let Some(result) = result_if_source_missing(&context.pool, media_root, &file_path).await? {
+        return Ok(result);
+    }
+    if tokio::fs::metadata(&file_path)
+        .await
+        .map_or(true, |m| m.len() == 0)
+    {
+        warn!("File is 0 bytes: {relative_path}. Cancelling thumbnail generation.");
         return Ok(JobResult::Cancelled);
     }
     process_thumbnails(
@@ -49,8 +56,11 @@ pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
         },
     )
     .await?;
-    if !file_path.exists() || is_job_cancelled(&context.pool, job.id).await? {
+    if is_job_cancelled(&context.pool, job.id).await? {
         return Ok(JobResult::Cancelled);
+    }
+    if let Some(result) = result_if_source_missing(&context.pool, media_root, &file_path).await? {
+        return Ok(result);
     }
     sqlx::query!(
         r"
@@ -116,7 +126,7 @@ async fn process_thumbnails(
         .await?;
 
         if !result.pano_success {
-            alert!("PANO FAILURE: {}", media_item_id);
+            warn!("PANO FAILURE: {}", media_item_id);
             sqlx::query!(
                 r"
                 UPDATE media_item
@@ -130,7 +140,7 @@ async fn process_thumbnails(
         }
 
         if !result.motion_success {
-            alert!("MOTION FAILURE: {}", media_item_id);
+            warn!("MOTION FAILURE: {}", media_item_id);
             sqlx::query!(
                 r"
                 UPDATE media_features

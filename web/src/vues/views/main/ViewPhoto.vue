@@ -354,11 +354,11 @@ function shareMedia() {
 }
 
 function goNext() {
-  changeMediaItem(nextId.value)
+  if (nextId.value) changeMediaItem(nextId.value)
 }
 
 function goPrev() {
-  changeMediaItem(prevId.value)
+  if (prevId.value) changeMediaItem(prevId.value)
 }
 
 // Pre-fetch
@@ -483,7 +483,11 @@ useDetailTitle(mediaDetailTitle, { fallback: 'Photo' })
       </div>
       <div class="right-buttons">
         <v-btn
-          v-if="settings.playMotionPhotos && fullImage?.media_features?.is_motion_photo"
+          v-if="
+            settings.playMotionPhotos &&
+            fullImage?.media_features?.is_motion_photo &&
+            fullImage.has_thumbnails
+          "
           rounded="xl"
           :icon="MdiMotionPlayOutline"
           variant="plain"

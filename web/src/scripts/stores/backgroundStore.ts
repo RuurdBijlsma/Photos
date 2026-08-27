@@ -10,6 +10,7 @@ import type { ThemeVariant } from '@/scripts/constants.ts'
 import { useThrottleFn } from '@vueuse/core'
 import type { RandomPhotoResponse } from '@/scripts/types/api/photos.ts'
 import etnaUrl from '@/assets/img/etna.jpg'
+import { preloadImageForNextVisit } from '@/scripts/utils.ts'
 
 const BG_CACHE_KEY = 'cachedBackgroundData'
 export const DEFAULT_BG_URL = etnaUrl
@@ -63,6 +64,7 @@ export const useBackgroundStore = defineStore('background', () => {
       const newTheme = photo.theme
 
       if (newTheme) {
+        requestIdleCallback(() => preloadImageForNextVisit(newBgUrl))
         const newCachedData: CachedBackgroundData = {
           url: newBgUrl,
           theme: newTheme,

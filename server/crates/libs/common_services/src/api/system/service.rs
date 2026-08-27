@@ -1,11 +1,21 @@
 use crate::api::app_error::AppError;
-use crate::api::system::interfaces::{DiskStats, SystemStats};
+use crate::api::system::interfaces::{DiskInfo, DiskStats, PublicSystemStats, SystemStats};
 use crate::api::system::storage_helpers::{
     ARE_SAME_DRIVE, are_on_same_drive, get_single_disk_info,
 };
+use crate::media_mount::media_mount_status;
 use app_state::{IngestSettings, constants};
 use sqlx::PgPool;
 use tokio::task;
+
+pub async fn get_public_system_stats(pool: &PgPool) -> Result<PublicSystemStats, AppError> {
+    let has_users = sqlx::query_scalar!("SELECT 1 FROM app_user")
+        .fetch_optional(pool)
+        .await?
+        .flatten()
+        .is_some();
+    Ok(PublicSystemStats { has_users })
+}
 
 pub async fn get_system_stats(
     pool: &PgPool,
@@ -33,7 +43,11 @@ pub async fn get_system_stats(
         let media_drive = if are_same_drive {
             app_data_drive.clone()
         } else {
-            get_single_disk_info(&media_folder)?
+            get_single_disk_info(&media_folder).unwrap_or(DiskInfo {
+                disk_available: 0,
+                disk_used: 0,
+                disk_total: 0,
+            })
         };
 
         Ok::<_, AppError>(DiskStats {
@@ -44,11 +58,13 @@ pub async fn get_system_stats(
     });
 
     let ingesting_task = is_user_ingesting(pool, user_id);
+    let mount_task = media_mount_status(pool, &settings.media_root);
 
-    let (db_res, ingest_res, fs_res) = tokio::try_join!(
+    let (db_res, ingest_res, fs_res, mount_status) = tokio::try_join!(
         async { db_task.await.map_err(AppError::from) },
         ingesting_task,
-        async { fs_task.await.map_err(AppError::from)? }
+        async { fs_task.await.map_err(AppError::from)? },
+        async { mount_task.await.map_err(AppError::from) }
     )?;
 
     Ok(SystemStats {
@@ -58,6 +74,8 @@ pub async fn get_system_stats(
         allow_file_modifications: constants().allow_file_modifications,
         disk: fs_res,
         is_ingesting: ingest_res,
+        media_folder_available: mount_status.is_available(),
+        media_folder_error: mount_status.reason().map(str::to_owned),
     })
 }
 

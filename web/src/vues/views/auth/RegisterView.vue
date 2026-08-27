@@ -89,10 +89,13 @@ async function register() {
         :text="
           route.query.token
             ? `Using ${route.query.token} to create your account.`
-            : `Let's set up your account to get started.`
+            : route.query.admin
+              ? `Please set up your administrator account to get started.`
+              : `Let's set up your account to get started.`
         "
       >
-        <h1 class="nice-h1">Create your account.</h1>
+        <h1 class="nice-h1" v-if="route.query.admin">Create an administrator</h1>
+        <h1 class="nice-h1" v-else>Create your account.</h1>
       </onboarding-layout>
 
       <v-form class="register-form" @submit.prevent="register()" ref="form">

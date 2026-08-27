@@ -37,7 +37,7 @@ use crate::root::router::root_public_router;
 use crate::s2s::router::s2s_public_router;
 use crate::search::router::search_protected_router;
 use crate::storage::router::storage_protected_router;
-use crate::system::router::system_protected_router;
+use crate::system::router::{system_protected_router, system_public_router};
 use crate::theme::router::theme_protected_router;
 use crate::timeline::router::timeline_protected_router;
 use crate::trash::router::trash_protected_router;
@@ -71,6 +71,7 @@ fn public_routes(
         .merge(s2s_public_router())
         .merge(people_public_router())
         .merge(photos_public_router())
+        .merge(system_public_router())
         .merge(upload_public_router(api_state))
 }
 

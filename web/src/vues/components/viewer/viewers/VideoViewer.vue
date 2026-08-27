@@ -16,6 +16,7 @@ import { VIDEO_SIZES } from '@/scripts/constants.ts'
 import { getVideoHeight, toHms, useObjStorage } from '@/scripts/utils.ts'
 import VideoProgressSlider from '@/vues/components/viewer/components/VideoProgressSlider.vue'
 import { useAuthStore } from '@/scripts/stores/authStore.ts'
+import { useDelayedBoolean } from '@/scripts/composables/useDelayedBoolean.ts'
 
 const props = withDefaults(
   defineProps<{
@@ -41,9 +42,14 @@ const fps = computed(() => fullImage.value?.media_features?.video_fps || 30)
 
 // Playback States
 const isPlaying = ref(false)
+const isVideoLoaded = ref(false)
 const currentTime = ref(0)
 const duration = ref(0)
 const bufferedRanges = ref<Array<{ start: number; end: number }>>([])
+
+// Track loading state for delayed blanking (swaps fast path without flicker, unloads on slow path)
+const isPendingLoad = computed(() => !isVideoLoaded.value)
+const showBlank = useDelayedBoolean(isPendingLoad, 100)
 
 // Play/Pause Overlay States
 const overlayAction = ref<'play' | 'pause' | null>(null)
@@ -257,6 +263,14 @@ watch(
   { immediate: true },
 )
 
+// Reset loaded state on media item id changes
+watch(
+  () => props.mediaItemId,
+  () => {
+    isVideoLoaded.value = false
+  },
+)
+
 // Animation loop to ensure smooth, high-precision progress updates during active playback
 let animationFrameId: number | null = null
 
@@ -359,7 +373,6 @@ function adjustVolume(amount: number) {
 // Fullscreen API Handling (Syncs state on browser escape/system fullscreen change)
 function toggleFullscreen() {
   if (!document.fullscreenElement) {
-    console.log('elemental', props.elementalFullscreen, videoContainerEl.value)
     if (props.elementalFullscreen && videoContainerEl.value) {
       videoContainerEl.value.requestFullscreen().catch((err) => {
         console.error('Failed to enter fullscreen mode:', err)
@@ -466,8 +479,12 @@ useEventListener(window, 'keydown', handleKeyDown)
       :src="videoUrl"
       :muted="isMuted"
       :crossorigin="currentQuality === 'source' ? 'use-credentials' : undefined"
+      :style="{
+        opacity: isVideoLoaded || !showBlank ? 1 : 0,
+      }"
       loop
       playsinline
+      @loadeddata="isVideoLoaded = true"
       @loadedmetadata="onLoadedMetadata"
       @timeupdate="onTimeUpdate"
       @progress="onProgress"

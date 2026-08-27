@@ -5,10 +5,12 @@ use axum::{Extension, Json};
 use axum_extra::extract::Query;
 use common_services::api::app_error::AppError;
 use common_services::api::jobs::interfaces::{
-    IngestOverviewResponse, JobInfo, JobsQuery, PaginatedJobsResponse, RetryJobPayload,
-    UserJobsQuery,
+    BulkRetryResponse, IngestOverviewResponse, JobInfo, JobsQuery, PaginatedJobsResponse,
+    RetryJobPayload, UserJobsQuery,
 };
-use common_services::api::jobs::service::{cancel_job, get_job_overview, retry_job};
+use common_services::api::jobs::service::{
+    cancel_job, get_job_overview, retry_cancelled_jobs, retry_job,
+};
 use common_services::api::jobs::user_level::{
     get_failed_ingest_jobs, get_running_ingest_jobs, get_user_ingest_jobs,
     get_user_ingest_overview, retry_user_job,
@@ -45,14 +47,24 @@ pub async fn retry_job_handler(
     Ok(Json(()))
 }
 
+#[instrument(skip(pool), err(Debug))]
+pub async fn retry_cancelled_jobs_handler(
+    State(pool): State<PgPool>,
+) -> Result<Json<BulkRetryResponse>, AppError> {
+    let affected = retry_cancelled_jobs(&pool).await?;
+    Ok(Json(BulkRetryResponse { affected }))
+}
+
 // -- user level jobs handlers
 
-#[instrument(skip(pool, user), err(Debug))]
+#[instrument(skip(context, user), err(Debug))]
 pub async fn ingest_overview_handler(
-    State(pool): State<PgPool>,
+    State(context): State<ApiContext>,
     Extension(user): Extension<ApiUser>,
 ) -> Result<Json<IngestOverviewResponse>, AppError> {
-    let overview = get_user_ingest_overview(&pool, user.id).await?;
+    let overview =
+        get_user_ingest_overview(&context.pool, user.id, &context.settings.ingest.media_root)
+            .await?;
     Ok(Json(overview))
 }
 

@@ -242,7 +242,7 @@ export class ProcessingRateTracker {
   private history: { timestamp: number; completed: number }[] = []
   private windowMs: number
 
-  constructor(windowMs = 20000) {
+  constructor(windowMs = 60000) {
     this.windowMs = windowMs
   }
 
@@ -306,4 +306,20 @@ export function mimeSupportsRotation(mimeType?: string): boolean {
     lower === 'image/png' ||
     lower === 'image/webp'
   )
+}
+
+export function preloadImageForNextVisit(src: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+
+    img.onload = () => resolve()
+    img.onerror = () => reject(new Error(`Failed to cache image: ${src}`))
+
+    img.src = src
+
+    // In case it's already in cache
+    if (img.complete) {
+      resolve()
+    }
+  })
 }

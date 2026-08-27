@@ -36,6 +36,7 @@ export const usePickFolderStore = defineStore('pickFolder', () => {
   }
 
   async function refreshFolders() {
+    listFolderLoading.value = true
     const folder = viewedFolder.value.join('/')
     try {
       const response = await adminService.getFolders(folder)
@@ -43,6 +44,8 @@ export const usePickFolderStore = defineStore('pickFolder', () => {
     } catch (e) {
       await truncateViewed(viewedFolder.value.length - 2)
       snackbarStore.error(`Could not fetch sub-folders for: ${folder}`, e)
+    } finally {
+      listFolderLoading.value = false
     }
     dbRefreshMediaSample()
   }
@@ -122,6 +125,7 @@ export const usePickFolderStore = defineStore('pickFolder', () => {
     openFolder,
     truncateViewed,
     makeFolder,
+    makeFolderLoading,
     mediaSamples,
     mediaSampleLoading,
     samples,

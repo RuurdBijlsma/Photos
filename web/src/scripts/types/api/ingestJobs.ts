@@ -11,6 +11,10 @@ export interface IngestOverviewResponse {
   metadata: IngestJobCounts
   thumbnails: IngestJobCounts
   analysis: IngestJobCounts
+  mediaFolder?: {
+    available: boolean
+    reason?: string
+  }
 }
 
 export interface RetryJobPayload {

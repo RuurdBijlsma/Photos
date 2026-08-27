@@ -2,7 +2,7 @@
 import { computed, onMounted, onUnmounted, ref, watch, shallowRef } from 'vue'
 import { useIngestJobsStore } from '@/scripts/stores/ingestJobsStore.ts'
 import { useUploadStore } from '@/scripts/stores/uploadStore.ts'
-import { useAuthStore } from '@/scripts/stores/authStore.ts'
+import { useSystemStore } from '@/scripts/stores/systemStore.ts'
 import RunningJobPill from '@/vues/components/activity/RunningJobPill.vue'
 import ShowSelectedFolder from '@/vues/components/onboarding/ShowSelectedFolder.vue'
 import type { JobInfo } from '@/scripts/types/api/admin.ts'
@@ -28,10 +28,24 @@ import MdiStop from '~icons/mdi/stop'
 import MdiStopCircleOutline from '~icons/mdi/stop-circle-outline'
 import MdiTrashCanOutline from '~icons/mdi/trash-can-outline'
 import MdiTrayArrowUp from '~icons/mdi/tray-arrow-up'
+import { useAuthStore } from '@/scripts/stores/authStore.ts'
 
 const ingestStore = useIngestJobsStore()
 const uploadStore = useUploadStore()
 const authStore = useAuthStore()
+const systemStore = useSystemStore()
+
+const mediaFolderUnavailable = computed(
+  () =>
+    ingestStore.overview?.mediaFolder?.available === false ||
+    systemStore.stats.mediaFolderAvailable === false,
+)
+const mediaFolderError = computed(
+  () =>
+    ingestStore.overview?.mediaFolder?.reason ||
+    systemStore.stats.mediaFolderError ||
+    'The media folder looks unmounted or empty. Ingest is paused until it is available again.',
+)
 
 // Rate tracking
 const uploadRateTracker = new ProcessingRateTracker()
@@ -392,6 +406,15 @@ onUnmounted(() => {
 
 <template>
   <div class="dashboard-root">
+    <v-alert
+      v-if="mediaFolderUnavailable"
+      type="error"
+      variant="tonal"
+      class="mb-4"
+      :icon="MdiAlertCircleOutline"
+    >
+      {{ mediaFolderError }}
+    </v-alert>
     <!-- Top Pipeline Section -->
     <section class="pipeline-section">
       <div class="pipeline-row">

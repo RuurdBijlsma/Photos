@@ -1,7 +1,7 @@
 use crate::context::WorkerContext;
 use crate::handlers::JobResult;
 use crate::handlers::common::cache::analysis_cache::{get_analysis_cache, write_analysis_cache};
-use crate::handlers::common::utils::get_images_to_analyze;
+use crate::handlers::common::utils::{get_images_to_analyze, result_if_source_missing};
 use crate::jobs::management::is_job_cancelled;
 use color_eyre::eyre::{Result, eyre};
 use common_services::database::jobs::Job;
@@ -24,8 +24,8 @@ pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
     };
     let media_root = &context.settings.ingest.media_root;
     let file_path = media_root.join(relative_path);
-    if !file_path.exists() {
-        return Ok(JobResult::Cancelled);
+    if let Some(result) = result_if_source_missing(&context.pool, media_root, &file_path).await? {
+        return Ok(result);
     }
     if !context
         .settings
@@ -131,8 +131,17 @@ async fn save_results(
     let mut tx = context.pool.begin().await?;
 
     // Check cancellation or file existence one last time inside the transaction
-    if is_job_cancelled(&mut *tx, job_id).await? || !file_path.exists() {
+    if is_job_cancelled(&mut *tx, job_id).await? {
         return Ok(JobResult::Cancelled);
+    }
+    if let Some(result) = result_if_source_missing(
+        &context.pool,
+        &context.settings.ingest.media_root,
+        file_path,
+    )
+    .await?
+    {
+        return Ok(result);
     }
     for analysis in analyses {
         VisualAnalysisStore::create_fast_analysis(

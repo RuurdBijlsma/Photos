@@ -1,6 +1,7 @@
 use crate::context::WorkerContext;
 use crate::handlers::JobResult;
 use crate::handlers::common::remote_user::get_or_create_remote_user;
+use crate::handlers::common::utils::require_media_mounted;
 use app_state::MakeRelativePath;
 use app_state::constants::ALBUM_IMPORT_FOLDER;
 use color_eyre::Result;
@@ -18,6 +19,9 @@ use tokio::fs;
 
 pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
     let media_root = &context.settings.ingest.media_root;
+    if let Some(result) = require_media_mounted(&context.pool, media_root).await? {
+        return Ok(result);
+    }
 
     let payload_value = job
         .payload

@@ -1,5 +1,5 @@
 ingest:
-  media_folder: C:\Users\Ruurd\Pictures\small_media_dir
+  media_folder: C:\Users\Ruurd\Pictures\media_dir
   app_data_folder: ../app_data
   enable_cache: true
 

@@ -6,7 +6,7 @@ use color_eyre::eyre::Result;
 use serde::{Deserialize, Serialize};
 use serde_json::to_value;
 use sqlx::{PgPool, PgTransaction};
-use tracing::{info, warn};
+use tracing::{debug, info};
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct IngestMetadataPayload {
@@ -69,7 +69,7 @@ pub async fn enqueue_job<T: Serialize + Send + Sync>(
     tx.commit().await?;
 
     if result.rows_affected() == 0 {
-        warn!(
+        debug!(
             "Not enqueueing {:?} job {:?}, an active one already exists.",
             job_type, relative_path
         );

@@ -13,11 +13,13 @@ import MdiRefresh from '~icons/mdi/refresh'
 import MdiStopCircleOutline from '~icons/mdi/stop-circle-outline'
 import { ref, onMounted, computed, watch } from 'vue'
 import { useAdminStore } from '@/scripts/stores/adminStore.ts'
+import { useDialogStore } from '@/scripts/stores/dialogStore.ts'
 import type { AdminUserInfo, JobInfo, JobStatus, JobType } from '@/scripts/types/api/admin.ts'
 import ThumbnailImg from '@/vues/components/ui/ThumbnailImg.vue'
 import { useIntervalFn, useStorage } from '@vueuse/core'
 
 const adminStore = useAdminStore()
+const dialogStore = useDialogStore()
 
 // Datatable parameters
 const itemsPerPage = ref(10)
@@ -39,6 +41,7 @@ const searchPath = ref('')
 const errorDialog = ref(false)
 const detailedJob = ref<JobInfo | null>(null)
 const isActionLoading = ref(false)
+const isBulkRetryLoading = ref(false)
 
 // Fetch user records if not already available to map avatars
 onMounted(() => {
@@ -163,6 +166,29 @@ async function handleRetryJob(jobId: number) {
   }
 }
 
+async function handleBulkRetryCancelled() {
+  const confirmed = await dialogStore.confirm({
+    title: 'Retry All Cancelled Jobs',
+    description:
+      'This will re-queue <strong>all cancelled ingest jobs</strong> (metadata, thumbnails, analysis) back to queued status. This may enqueue a large number of jobs.',
+    icon: MdiCached,
+    color: 'warning',
+    confirmText: 'Confirm Retry All',
+  })
+
+  if (!confirmed) return
+
+  isBulkRetryLoading.value = true
+  try {
+    await adminStore.retryCancelledJobs()
+    await loadJobs(tableOptions.value)
+  } catch {
+    // Handled in Pinia Store
+  } finally {
+    isBulkRetryLoading.value = false
+  }
+}
+
 function getStatusColor(status: JobStatus) {
   switch (status) {
     case 'done':
@@ -218,6 +244,16 @@ watch(
           </div>
           <v-spacer />
           <v-btn
+            :prepend-icon="MdiCached"
+            variant="tonal"
+            color="warning"
+            rounded
+            :loading="isBulkRetryLoading"
+            @click="handleBulkRetryCancelled"
+          >
+            Retry All Cancelled
+          </v-btn>
+          <v-btn
             v-if="!autoRefresh"
             :prepend-icon="MdiRefresh"
             variant="tonal"
@@ -226,7 +262,7 @@ watch(
             :loading="adminStore.isJobsLoading"
             @click="loadJobs(tableOptions)"
           >
-            Refresh Queue
+            Refresh
           </v-btn>
           <v-switch
             hide-details

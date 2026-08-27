@@ -1,5 +1,53 @@
 use crate::context::WorkerContext;
+use crate::handlers::JobResult;
+use color_eyre::Result;
+use common_services::media_mount::{
+    MediaMountStatus, media_mount_status, media_mount_status_fresh,
+};
+use sqlx::PgPool;
 use std::path::{Path, PathBuf};
+
+/// If the source file is missing, verify the mount status freshly to avoid stale cache cancellations.
+///
+/// Returns `StorageUnavailable` if the drive is unmounted, or `FileNotFound` (for reschedule) if the drive is mounted but the file is missing.
+pub async fn result_if_source_missing(
+    pool: &PgPool,
+    media_root: &Path,
+    file_path: &Path,
+) -> Result<Option<JobResult>> {
+    if file_path.exists() {
+        return Ok(None);
+    }
+    match media_mount_status_fresh(pool, media_root).await? {
+        MediaMountStatus::Unavailable { reason } => Ok(Some(JobResult::StorageUnavailable(reason))),
+        MediaMountStatus::Available => {
+            if file_path.exists() {
+                Ok(None)
+            } else {
+                Ok(Some(JobResult::FileNotFound))
+            }
+        }
+    }
+}
+
+/// Returns `StorageUnavailable` when the media folder looks unmounted (cached check).
+pub async fn require_media_mounted(pool: &PgPool, media_root: &Path) -> Result<Option<JobResult>> {
+    match media_mount_status(pool, media_root).await? {
+        MediaMountStatus::Available => Ok(None),
+        MediaMountStatus::Unavailable { reason } => Ok(Some(JobResult::StorageUnavailable(reason))),
+    }
+}
+
+/// Returns `StorageUnavailable` when the media folder looks unmounted (fresh/uncached check).
+pub async fn require_media_mounted_fresh(
+    pool: &PgPool,
+    media_root: &Path,
+) -> Result<Option<JobResult>> {
+    match media_mount_status_fresh(pool, media_root).await? {
+        MediaMountStatus::Available => Ok(None),
+        MediaMountStatus::Unavailable { reason } => Ok(Some(JobResult::StorageUnavailable(reason))),
+    }
+}
 
 /// Determines which thumbnail files should be sent to the ML analyzer.
 #[must_use]

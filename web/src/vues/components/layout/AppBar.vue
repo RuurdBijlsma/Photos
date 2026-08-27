@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import MdiAccountCircle from '~icons/mdi/account-circle'
+import MdiAlertCircle from '~icons/mdi/alert-circle'
 import MdiCog from '~icons/mdi/cog'
 import MdiLogin from '~icons/mdi/login'
 import MdiLogout from '~icons/mdi/logout'
 import MdiSecurity from '~icons/mdi/security'
 import MdiSync from '~icons/mdi/sync'
 import MdiUpload from '~icons/mdi/upload'
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import SearchBar from '@/vues/components/ui/SearchBar.vue'
 import { useAuthStore } from '@/scripts/stores/authStore.ts'
 import UserAvatar from '@/vues/components/ui/UserAvatar.vue'
@@ -22,6 +23,9 @@ const systemStore = useSystemStore()
 
 const menuOpen = ref(false)
 const ingestMenuOpen = ref(false)
+
+const mediaFolderAvailable = computed(() => systemStore.stats.mediaFolderAvailable !== false)
+const showIngestMenu = computed(() => systemStore.stats.isIngesting || !mediaFolderAvailable.value)
 
 async function logout() {
   menuOpen.value = false
@@ -39,7 +43,7 @@ async function logout() {
     <div v-if="authStore.isAuthenticated" class="header-buttons">
       <!-- Sync Menu overlay for background ingestion state (hidden when on full activity page) -->
       <v-menu
-        v-if="systemStore.stats.isIngesting"
+        v-if="showIngestMenu"
         v-model="ingestMenuOpen"
         :close-on-content-click="false"
         location="bottom end"
@@ -47,8 +51,19 @@ async function logout() {
         transition="slide-y-transition"
       >
         <template v-slot:activator="{ props }">
-          <v-btn icon v-bind="props" variant="text" color="primary" class="mr-1">
-            <v-icon class="spinning-sync-icon" :icon="MdiSync" />
+          <v-btn
+            icon
+            v-bind="props"
+            variant="text"
+            :color="mediaFolderAvailable ? 'primary' : 'error'"
+            class="mr-1"
+          >
+            <v-icon
+              :class="{
+                'spinning-sync-icon': mediaFolderAvailable && systemStore.stats.isIngesting,
+              }"
+              :icon="mediaFolderAvailable ? MdiSync : MdiAlertCircle"
+            />
           </v-btn>
         </template>
         <ingest-overlay-menu @close-menu="ingestMenuOpen = false" />

@@ -137,3 +137,26 @@ pub async fn retry_job(pool: &PgPool, job_id: i64) -> Result<(), AppError> {
 
     Ok(())
 }
+
+/// Re-queues all cancelled ingest jobs in bulk.
+/// Returns the number of jobs that were re-queued.
+pub async fn retry_cancelled_jobs(pool: &PgPool) -> Result<i64, AppError> {
+    let result = sqlx::query!(
+        r#"
+        UPDATE jobs
+        SET status = 'queued'::job_status,
+            attempts = 0,
+            scheduled_at = NOW(),
+            finished_at = NULL,
+            started_at = NULL,
+            last_error = NULL,
+            owner = NULL
+        WHERE status = 'cancelled'::job_status
+          AND job_type IN ('ingest_metadata'::job_type, 'ingest_thumbnails'::job_type, 'ingest_analysis'::job_type)
+        "#,
+    )
+    .execute(pool)
+    .await?;
+
+    Ok(result.rows_affected() as i64)
+}

@@ -1,5 +1,6 @@
 use crate::context::WorkerContext;
 use crate::handlers::JobResult;
+use crate::handlers::common::utils::require_media_mounted;
 use app_state::MakeRelativePath;
 use app_state::constants::{TUS_UPLOADS_FOLDER, USER_UPLOAD_FOLDER};
 use color_eyre::Result;
@@ -44,6 +45,11 @@ async fn get_unique_filename(dest_folder: &Path, destination_path: &Path) -> Pat
 }
 
 pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
+    if let Some(result) =
+        require_media_mounted(&context.pool, &context.settings.ingest.media_root).await?
+    {
+        return Ok(result);
+    }
     let user_id = job
         .user_id
         .ok_or_else(|| eyre!("HandleWebUpload job is missing a user_id"))?;
