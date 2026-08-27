@@ -21,6 +21,7 @@ export const useTimelineStore = defineStore('timeline', () => {
   const pendingGoToTop = ref(false)
   const allMonthsPreloaded = ref(false)
 
+  const isLoading = ref(false)
   const mediaIdInView = ref<string | null>(null)
   const isInitialized = ref(false)
   const monthRatios = shallowRef<TimelineMonthRatios[]>([])
@@ -182,25 +183,35 @@ export const useTimelineStore = defineStore('timeline', () => {
   }
 
   async function refresh() {
+    isLoading.value = true
     abortMonthPreload()
     allMonthsPreloaded.value = false
-    // Fetch fresh ratios and view-photo ids in parallel.
-    await Promise.all([fetchMonthRatios(), setViewPhotoStoreIds()])
-    const monthsToFetch = monthRatios.value.map((r) => r.monthId)
-    await fetchMediaByMonth(monthsToFetch, false)
+    try {
+      // Fetch fresh ratios and view-photo ids in parallel.
+      await Promise.all([fetchMonthRatios(), setViewPhotoStoreIds()])
+      const monthsToFetch = monthRatios.value.map((r) => r.monthId)
+      await fetchMediaByMonth(monthsToFetch, false)
+    } finally {
+      isLoading.value = false
+    }
   }
 
   async function initialize() {
-    isInitialized.value = true
-    await fetchMonthRatios()
+    isLoading.value = true
+    try {
+      await fetchMonthRatios()
 
-    const MONTHS_PREFETCH_COUNT = 2
-    const monthsToFetch = monthRatios.value
-      .slice(0, MONTHS_PREFETCH_COUNT)
-      .map((m) => m?.monthId)
-      .filter(Boolean)
+      const MONTHS_PREFETCH_COUNT = 2
+      const monthsToFetch = monthRatios.value
+        .slice(0, MONTHS_PREFETCH_COUNT)
+        .map((m) => m?.monthId)
+        .filter(Boolean)
 
-    if (monthsToFetch.length > 0) await fetchMediaByMonth(monthsToFetch)
+      if (monthsToFetch.length > 0) await fetchMediaByMonth(monthsToFetch)
+    } finally {
+      isLoading.value = false
+      isInitialized.value = true
+    }
   }
 
   function scrollToTop() {
@@ -215,6 +226,7 @@ export const useTimelineStore = defineStore('timeline', () => {
     mediaItemIds,
     totalMediaCount,
     isInitialized,
+    isLoading,
     mediaIdInView,
     thumbnailSnackSent,
     pendingGoToTop,

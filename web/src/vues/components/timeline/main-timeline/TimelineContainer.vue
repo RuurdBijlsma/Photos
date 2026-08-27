@@ -36,8 +36,9 @@ const viewPhotoStore = useViewPhotoStore()
 const settings = useSettingStore()
 const cardStore = useDailyCardStore()
 const refreshStore = useRefreshStore()
-const cards = computed(() => cardStore.todayCards)
 
+const isLoading = computed(() => timelineStore.isLoading || !timelineStore.isInitialized)
+const cards = computed(() => cardStore.todayCards)
 const dailyCardsHeight = computed(() => {
   return timelineStore.monthRatios.length > 0 && cards.value && cards.value.length > 0 ? 300 : 0
 })
@@ -783,9 +784,15 @@ if (!timelineStore.isInitialized) timelineStore.initialize()
         <router-view />
       </teleport>
 
-      <!-- Empty state -->
+      <!-- Empty / Loading state -->
       <div v-if="showEmptyState" class="empty-state">
-        <template v-if="isOnboarding">
+        <template v-if="isLoading">
+          <v-icon color="surface-variant" size="200" :icon="MdiImageSyncOutline" />
+          <h2 class="empty-title">Loading photos&hellip;</h2>
+          <p class="empty-subtitle">Fetching your timeline...</p>
+          <v-progress-circular indeterminate color="primary" size="50" class="mt-5" />
+        </template>
+        <template v-else-if="isOnboarding">
           <v-icon color="surface-variant" size="200" :icon="MdiImageSyncOutline" />
           <h2 class="empty-title">Loading your photos&hellip;</h2>
           <p class="empty-subtitle">Your library is being built. This may take a moment...</p>
