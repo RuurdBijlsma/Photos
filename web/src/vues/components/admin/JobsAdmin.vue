@@ -13,11 +13,13 @@ import MdiRefresh from '~icons/mdi/refresh'
 import MdiStopCircleOutline from '~icons/mdi/stop-circle-outline'
 import { ref, onMounted, computed, watch } from 'vue'
 import { useAdminStore } from '@/scripts/stores/adminStore.ts'
+import { useDialogStore } from '@/scripts/stores/dialogStore.ts'
 import type { AdminUserInfo, JobInfo, JobStatus, JobType } from '@/scripts/types/api/admin.ts'
 import ThumbnailImg from '@/vues/components/ui/ThumbnailImg.vue'
 import { useIntervalFn, useStorage } from '@vueuse/core'
 
 const adminStore = useAdminStore()
+const dialogStore = useDialogStore()
 
 // Datatable parameters
 const itemsPerPage = ref(10)
@@ -39,7 +41,6 @@ const searchPath = ref('')
 const errorDialog = ref(false)
 const detailedJob = ref<JobInfo | null>(null)
 const isActionLoading = ref(false)
-const confirmBulkRetryDialog = ref(false)
 const isBulkRetryLoading = ref(false)
 
 // Fetch user records if not already available to map avatars
@@ -166,10 +167,20 @@ async function handleRetryJob(jobId: number) {
 }
 
 async function handleBulkRetryCancelled() {
+  const confirmed = await dialogStore.confirm({
+    title: 'Retry All Cancelled Jobs',
+    description:
+      'This will re-queue <strong>all cancelled ingest jobs</strong> (metadata, thumbnails, analysis) back to queued status. This may enqueue a large number of jobs.',
+    icon: MdiCached,
+    color: 'warning',
+    confirmText: 'Confirm Retry All',
+  })
+
+  if (!confirmed) return
+
   isBulkRetryLoading.value = true
   try {
     await adminStore.retryCancelledJobs()
-    confirmBulkRetryDialog.value = false
     await loadJobs(tableOptions.value)
   } catch {
     // Handled in Pinia Store
@@ -237,7 +248,8 @@ watch(
             variant="tonal"
             color="warning"
             rounded
-            @click="confirmBulkRetryDialog = true"
+            :loading="isBulkRetryLoading"
+            @click="handleBulkRetryCancelled"
           >
             Retry All Cancelled
           </v-btn>
@@ -528,43 +540,6 @@ watch(
 
           <v-spacer />
           <v-btn color="primary" variant="text" rounded @click="closeErrorDetail">Close</v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
-
-    <!-- Modal: Confirm Bulk Retry Cancelled Jobs -->
-    <v-dialog v-model="confirmBulkRetryDialog" max-width="500px">
-      <v-card rounded="xl" color="surface-container-highest" class="border">
-        <v-card-title class="dialog-header d-flex align-center py-4 px-6">
-          <v-icon :icon="MdiCached" color="warning" class="mr-2" />
-          <span class="font-weight-bold">Retry All Cancelled Jobs</span>
-        </v-card-title>
-
-        <v-card-text class="py-4 px-6">
-          This will re-queue <strong>all cancelled ingest jobs</strong> (metadata, thumbnails,
-          analysis) back to queued status. This may enqueue a large number of jobs.
-        </v-card-text>
-
-        <v-card-actions class="px-6 pb-6">
-          <v-spacer />
-          <v-btn
-            variant="text"
-            rounded
-            @click="confirmBulkRetryDialog = false"
-            :disabled="isBulkRetryLoading"
-          >
-            Cancel
-          </v-btn>
-          <v-btn
-            variant="tonal"
-            color="warning"
-            rounded
-            :loading="isBulkRetryLoading"
-            :prepend-icon="MdiCached"
-            @click="handleBulkRetryCancelled"
-          >
-            Confirm Retry All
-          </v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
