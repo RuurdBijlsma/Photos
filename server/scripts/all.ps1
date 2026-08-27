@@ -47,6 +47,10 @@ try {
     Write-Host "`n=== 5. Checking Documentation ===" -ForegroundColor Cyan
     cargo doc --no-deps --document-private-items --all-features
 
+    # - SQLX Update
+    Write-Host "`n=== 4. Update sqlx ===" -ForegroundColor Cyan
+    ./scripts/update_sqlx.ps1
+
     Write-Host "`n=== Success: All checks passed! ===" -ForegroundColor Green
 }
 catch {
