@@ -151,8 +151,30 @@ pub async fn retry_cancelled_jobs(pool: &PgPool) -> Result<i64, AppError> {
             started_at = NULL,
             last_error = NULL,
             owner = NULL
-        WHERE status = 'cancelled'::job_status
-          AND job_type IN ('ingest_metadata'::job_type, 'ingest_thumbnails'::job_type, 'ingest_analysis'::job_type)
+        WHERE id IN (
+            SELECT DISTINCT ON (
+                job_type,
+                coalesce(user_id, -1),
+                coalesce(md5(payload::text), ''),
+                coalesce(relative_path, '')
+            ) id
+            FROM jobs c
+            WHERE c.status = 'cancelled'::job_status
+              AND c.job_type IN ('ingest_metadata'::job_type, 'ingest_thumbnails'::job_type, 'ingest_analysis'::job_type)
+              AND NOT EXISTS (
+                  SELECT 1 FROM jobs a
+                  WHERE a.status IN ('queued', 'running')
+                    AND a.job_type = c.job_type
+                    AND coalesce(a.user_id, -1) = coalesce(c.user_id, -1)
+                    AND coalesce(md5(a.payload::text), '') = coalesce(md5(c.payload::text), '')
+                    AND coalesce(a.relative_path, '') = coalesce(c.relative_path, '')
+              )
+            ORDER BY job_type,
+                     coalesce(user_id, -1),
+                     coalesce(md5(payload::text), ''),
+                     coalesce(relative_path, ''),
+                     created_at DESC
+        )
         "#,
     )
     .execute(pool)
