@@ -8,7 +8,9 @@ use common_services::api::jobs::interfaces::{
     BulkRetryResponse, IngestOverviewResponse, JobInfo, JobsQuery, PaginatedJobsResponse,
     RetryJobPayload, UserJobsQuery,
 };
-use common_services::api::jobs::service::{cancel_job, get_job_overview, retry_cancelled_jobs, retry_job};
+use common_services::api::jobs::service::{
+    cancel_job, get_job_overview, retry_cancelled_jobs, retry_job,
+};
 use common_services::api::jobs::user_level::{
     get_failed_ingest_jobs, get_running_ingest_jobs, get_user_ingest_jobs,
     get_user_ingest_overview, retry_user_job,

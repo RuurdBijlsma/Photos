@@ -17,7 +17,7 @@ use media_analyzer::MediaMetadata;
 use serde_json::from_value;
 use sqlx::PgPool;
 use std::path::Path;
-use tracing::debug;
+use tracing::{debug, warn};
 
 pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
     let relative_path = job
@@ -31,6 +31,10 @@ pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
     let file_path = media_root.join(relative_path);
     if let Some(result) = result_if_source_missing(&context.pool, media_root, &file_path).await? {
         return Ok(result);
+    }
+    if tokio::fs::metadata(&file_path).await.map_or(true, |m| m.len() == 0) {
+        warn!("File is 0 bytes: {relative_path}. Cancelling ingest job.");
+        return Ok(JobResult::Cancelled);
     }
     let file_hash = hash_file(&file_path)?;
     let media_info = get_media_info(context, &file_path, &file_hash).await?;

@@ -14,11 +14,13 @@ fn is_allowed_file(path: &Path, settings: &IngestSettings) -> bool {
     };
     let ext_lower = ext.to_lowercase();
     let detection = &settings.file_detection;
+    let has_bytes = path.metadata().map_or(false, |m| m.len() > 0);
 
-    detection
-        .photo_extensions
-        .iter()
-        .any(|e| e.eq_ignore_ascii_case(&ext_lower))
+    has_bytes
+        && detection
+            .photo_extensions
+            .iter()
+            .any(|e| e.eq_ignore_ascii_case(&ext_lower))
         || detection
             .video_extensions
             .iter()
@@ -50,6 +52,10 @@ async fn handle_file_create(
     settings: &IngestSettings,
     path: &Path,
 ) -> color_eyre::Result<()> {
+    if path.metadata().map_or(true, |m| m.len() == 0) {
+        return Ok(());
+    }
+
     let relative_path = path.make_relative(&settings.media_root)?;
     let user = UserStore::find_user_by_relative_path(pool, &relative_path)
         .await?

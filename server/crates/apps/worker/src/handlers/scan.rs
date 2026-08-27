@@ -21,11 +21,14 @@ fn has_allowed_ext(path: &Path, allowed: &HashSet<&str>) -> bool {
         .is_some_and(|ext| allowed.contains(ext.to_lowercase().as_str()))
 }
 
-/// Recursively finds all media files in a folder that have an allowed extension.
+/// Recursively finds all non-empty media files in a folder that have an allowed extension.
 fn get_media_files(folder: &Path, allowed_exts: &HashSet<&str>) -> Vec<std::path::PathBuf> {
     let mut files = Vec::new();
     for entry in WalkDir::new(folder).into_iter().filter_map(Result::ok) {
-        if entry.file_type().is_file() && has_allowed_ext(entry.path(), allowed_exts) {
+        if entry.file_type().is_file()
+            && entry.metadata().map_or(false, |m| m.len() > 0)
+            && has_allowed_ext(entry.path(), allowed_exts)
+        {
             files.push(entry.into_path());
         }
     }

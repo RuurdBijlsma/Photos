@@ -10,7 +10,7 @@ use common_services::database::media_item_store::MediaItemStore;
 use common_services::database::visual_analysis_store::VisualAnalysisStore;
 use common_types::ml_analysis::MLFastAnalysis;
 use std::path::Path;
-use tracing::{debug, info};
+use tracing::{debug, info, warn};
 
 /// Handles the analysis of a given job.
 ///
