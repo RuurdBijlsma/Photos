@@ -17,9 +17,8 @@
 * on login redirect to where you were
 * don't allow user to go to /onboarding if onboarding is done already.
 * --- HIGH PRIO ---
-* When no user exists and user visits login page -> redirect to register?admin=true and show messaging to create admin
-  account
 * door alle requests kijken op verse page load om te zien of ze allemaal relevant zijn (ik zag thunder icon geladen worden op timeline page load)
+* in failed list op ingest pagina, download knop voor de file toevoegen zodat je kan inspecteren of ie stuk is
 
 # SERVER
 
