@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        WITH last_run AS (\n            SELECT MAX(updated_at) AS last_run_time\n            FROM face_cluster\n            WHERE user_id = $1\n        ),\n        face_count AS (\n            SELECT COUNT(*) AS total_faces\n            FROM face f\n            JOIN visual_analysis va ON f.visual_analysis_id = va.id\n            JOIN media_item mi ON mi.id = va.media_item_id\n            WHERE mi.user_id = $1 AND mi.deleted = false AND va.deleted = false\n        )\n        SELECT\n            CASE\n                WHEN (SELECT total_faces FROM face_count) < $2 THEN FALSE\n                WHEN (SELECT last_run_time FROM last_run) IS NULL THEN TRUE\n                ELSE\n                    EXISTS (\n                        SELECT 1 FROM visual_analysis va\n                        JOIN media_item mi ON mi.id = va.media_item_id\n                        WHERE mi.user_id = $1 AND mi.deleted = false AND va.created_at > (SELECT last_run_time FROM last_run)\n                    )\n                    OR EXISTS (\n                        SELECT 1 FROM media_item mi\n                        WHERE mi.user_id = $1 AND mi.updated_at > (SELECT last_run_time FROM last_run)\n                    )\n            END AS \"needs_run!\"\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "needs_run!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "140d100b38dcb495c1d41e750317f154cadc9bec1512bf0769bb4345e1645b51"
+}

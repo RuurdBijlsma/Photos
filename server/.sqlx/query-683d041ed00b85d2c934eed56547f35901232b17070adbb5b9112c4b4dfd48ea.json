@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT\n               f.id,\n               va.media_item_id,\n               f.embedding as \"embedding!: Vector\",\n               f.position_x,\n               f.position_y,\n               f.width,\n               f.height,\n               va.percentage\n           FROM face f\n           JOIN visual_analysis va ON f.visual_analysis_id = va.id\n           JOIN media_item mi ON mi.id = va.media_item_id\n           WHERE mi.user_id = $1",
+  "query": "SELECT\n               f.id,\n               va.media_item_id,\n               f.embedding as \"embedding!: Vector\",\n               f.position_x,\n               f.position_y,\n               f.width,\n               f.height,\n               va.percentage\n           FROM face f\n           JOIN visual_analysis va ON f.visual_analysis_id = va.id\n           JOIN media_item mi ON mi.id = va.media_item_id\n           WHERE mi.user_id = $1\n             AND mi.deleted = false\n             AND va.deleted = false",
   "describe": {
     "columns": [
       {
@@ -113,5 +113,5 @@
       false
     ]
   },
-  "hash": "40bfe6d397c31e54388c5b7b972a827fed041a2ba84c7bbb8b849b9e6100d487"
+  "hash": "683d041ed00b85d2c934eed56547f35901232b17070adbb5b9112c4b4dfd48ea"
 }

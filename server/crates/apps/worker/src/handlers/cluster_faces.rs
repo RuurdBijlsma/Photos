@@ -309,7 +309,7 @@ async fn cleanup_obsolete(
 }
 
 /// Checks if there have been any updates since the last cluster run.
-/// Prevents spinning if the user has fewer than MIN_ITEMS_TO_CLUSTER faces.
+/// Prevents spinning if the user has fewer than `MIN_ITEMS_TO_CLUSTER` faces.
 async fn needs_clustering(pool: &PgPool, user_id: i32) -> Result<bool> {
     let min_items = MIN_ITEMS_TO_CLUSTER as i64;
     let needs_run = sqlx::query_scalar!(

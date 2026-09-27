@@ -13,7 +13,13 @@ pub async fn get_user_profile_handler(
     Extension(logged_in_user): Extension<ApiUser>,
     Path(target_user_id): Path<i32>,
 ) -> Result<Json<UserProfile>, AppError> {
-    let profile = get_user_profile(&pool, logged_in_user.role, logged_in_user.id, target_user_id).await?;
+    let profile = get_user_profile(
+        &pool,
+        logged_in_user.role,
+        logged_in_user.id,
+        target_user_id,
+    )
+    .await?;
     Ok(Json(profile))
 }
 

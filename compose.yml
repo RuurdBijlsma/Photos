@@ -27,15 +27,17 @@ services:
     depends_on:
       database:
         condition: service_healthy
+    env_file:
+      - .env
     environment:
       DATABASE_URL: postgresql://${DB_USER:-photos_user}:${DB_PASSWORD:-dev-password}@database:5432/${DB_NAME:-photos}
-      APP__SECRETS__JWT: ${JWT_SECRET:-change_me_in_production}
-      APP__INGEST__MEDIA_FOLDER: /media
-      APP__INGEST__APP_DATA_FOLDER: /app_data
-      APP__CONSTANTS__FALLBACK_TIMEZONE: ${TZ:-Europe/Amsterdam}
-      APP__API__HOST: "0.0.0.0"
-      APP__API__PORT: "5272"
-      APP__API__SERVE_STATIC_ASSETS: "false"
+      RP__SECRETS__JWT: ${JWT_SECRET:-change_me_in_production}
+      RP__INGEST__MEDIA_FOLDER: /media
+      RP__INGEST__APP_DATA_FOLDER: /app_data
+      RP__CONSTANTS__FALLBACK_TIMEZONE: ${TZ:-Europe/Amsterdam}
+      RP__API__HOST: "0.0.0.0"
+      RP__API__PORT: "5272"
+      RP__API__SERVE_STATIC_ASSETS: "false"
     volumes:
       - ${MEDIA_LOCATION}:/media
       - ${APP_DATA_LOCATION:-photos_app_data}:/app_data

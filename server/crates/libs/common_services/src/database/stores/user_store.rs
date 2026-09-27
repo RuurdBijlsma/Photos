@@ -1,10 +1,10 @@
-use std::path::Path;
 use crate::database::DbError;
 use crate::database::structs::UpdateUserPayload;
 use crate::database::tables::app_user::{User, UserInvite, UserRole, UserWithPassword};
 use chrono::{DateTime, Utc};
 use sqlx::postgres::PgQueryResult;
 use sqlx::{Executor, Postgres};
+use std::path::Path;
 
 pub struct UserStore;
 
