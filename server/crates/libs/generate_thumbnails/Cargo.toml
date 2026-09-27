@@ -21,6 +21,7 @@ libheif-rs = "2.7.0"
 panorama-tiler = "0.1.2"
 tracing = "0.1.44"
 exiftool = "0.3.1"
+jpegxl-rs = { version = "0.15", default-features = false, features = ["vendored"] }
 
 [dev-dependencies]
 sqlx = { version = "0.9.0", features = ["runtime-tokio", "tls-native-tls", "postgres", "chrono", "macros", "json", "uuid"] }
