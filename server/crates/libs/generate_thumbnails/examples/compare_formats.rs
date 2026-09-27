@@ -14,17 +14,19 @@ use std::path::Path;
 use std::time::Instant;
 
 // =========================================================================
-// Paths & Codec Target Matching
+// Paths & Codec Settings
 // =========================================================================
 const INPUT_IMAGE_PATH: &str = "media_dir/rutenl/sunset.jpg";
 const OUTPUT_DIR_PATH: &str = "test_out/format_comparison";
 
-// JXL distance 1.1 closely matches AVIF Q80 in visual fidelity and file size.
-// (Butteraugli scale: 0.0 = lossless, 1.0 = visually lossless threshold)
-const JXL_BUTTERAUGLI_DISTANCE: f32 = 1.1;
-const JXL_SPEED: EncoderSpeed = EncoderSpeed::Falcon;
+// JXL Maximum Effort Configuration:
+// - Distance 1.6 preserves smooth gradients in the sky without DCT blocking.
+// - Tortoise (effort 9) activates full transform search, Gaborish filtering,
+//   and maximum entropy compression to minimize output byte size.
+const JXL_BUTTERAUGLI_DISTANCE: f32 = 2.4;
+const JXL_SPEED: EncoderSpeed = EncoderSpeed::Tortoise;
 
-// WebP 82 matches AVIF Q80 perceptual quality
+// WebP 82
 const WEBP_QUALITY: f32 = 82.0;
 // =========================================================================
 
@@ -101,7 +103,7 @@ fn main() -> Result<()> {
         Image::from_vec_u8(orig_w, orig_h, rgba_img.into_raw(), PixelType::U8x4)?;
 
     println!("==========================================================================");
-    println!("Codec Comparison (Using settings.yaml config)");
+    println!("Codec Comparison (JXL Max Effort / Quality Mode)");
     println!(
         "Source     : {} ({}x{}, {:.2} KB)",
         input_path.display(),
@@ -144,7 +146,7 @@ fn main() -> Result<()> {
         resizer.resize(&src_image_rgba, &mut dst_rgba, None)?;
         let raw_rgba = dst_rgba.buffer();
 
-        // 1. AVIF (Q80, Speed 4)
+        // 1. AVIF (from settings.yaml: Q80, Speed 4)
         let t0 = Instant::now();
         let avif_bytes = encode_avif(
             raw_rgba,
@@ -166,7 +168,7 @@ fn main() -> Result<()> {
             avif_time
         );
 
-        // 2. JXL (Butteraugli 1.1, Falcon)
+        // 2. JXL (Butteraugli 1.6, Tortoise max-effort)
         let t0 = Instant::now();
         let jxl_bytes = encode_jxl(raw_rgb, target_w, target_h)?;
         let jxl_time = t0.elapsed().as_secs_f64() * 1000.0;
