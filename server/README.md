@@ -13,20 +13,16 @@ and search.
 
 ## Prerequisites
 
-* **CMake**: `winget install Kitware.CMake` [Ubuntu: `sudo apt install cmake`]
-* **C++ Clang Compiler / ClangCL** (Required for JPEG XL compilation):
-  * **Windows**: Visual Studio 2022 / Build Tools with the **C++ Clang Compiler for Windows** and **MSBuild support for LLVM (clang-cl) toolset** individual components installed.
-  * **Ubuntu**: `sudo apt install clang build-essential`
-* **sqlx-cli**: `cargo install sqlx-cli`
-* **Exiftool**: https://exiftool.org/install.html [Ubuntu: `sudo apt install libimage-exiftool-perl`]
-* **Postgres** database set up with `pgvector` installed (docker/podman command available in `./scripts/start_postgres.ps1`).
-* **libheif**:
-  * **Ubuntu**: `sudo apt install libheif1 libheif-dev libde265-0 x265`
-  * **Windows**: See below
+* **nasm**: `winget install -e --id NASM.NASM`
+* **sqlx**: `cargo install sqlx-cli`
+* **Exiftool**: https://exiftool.org/install.html [ubuntu: `sudo apt install libimage-exiftool-perl`]
+* **Rust** to compile the backend
+* **Postgres** database set up with `pgvector` installed, docker/podman command for this available in `./scripts/start_postgres.ps1`.
+* **libheif** Ubuntu: `sudo apt install libheif1 libheif-dev libde265-0 x265`, For Windows, see below
 
 ### libheif - Windows
 
-Install vcpkg:
+install vcpkg:
 
 ```pwsh
 cd C:\
@@ -38,9 +34,9 @@ cd vcpkg
 setx VCPKG_ROOT "C:\src\vcpkg"
 ```
 
-Add vcpkg to your `PATH` environment variable (`C:\src\vcpkg`), then restart your terminal.
+Add vcpkg to PATH env variable. (add `C:\src\vcpkg`), then restart terminal.
 
-Install `libheif` via vcpkg:
+Install libheif via vcpkg:
 
 ```pwsh
 vcpkg integrate install
@@ -59,24 +55,33 @@ git clone https://github.com/RuurdBijlsma/photos-backend.git
 cd photos-backend
 ```
 
-### 3. Set environment variables (.env file or system environment variables)
+### 2.
+
+### 2. Set up `ml_analysis` environment
+
+```bash
+cd crates/libs/ml_analysis/py_ml
+uv sync
+```
+
+### 4. Set environment variables (.env file or env variables)
 
 ```text
 DATABASE_URL=postgres://user:pass@localhost/photos
 APP__AUTH__JWT_SECRET=your123secret
 ```
 
-### 4. Set up database
+### 5. Set up database
 
-*Make sure postgres is running and the environment variables are set.*
+*Make sure postgres is running and the env variables are set*
 
-To apply migrations and set up the schema:
+To apply the migrations, setting up the database structure:
 
 ```bash
 sqlx migrate run
 ```
 
-### 5. (Optional) Configure settings
+### 6. (Optional) Configure settings
 
 Edit `config/settings.yaml` to adjust backend settings.
 
@@ -116,7 +121,8 @@ cargo run -p worker
 
 ### 4. Run the frontend
 
-1. Clone the frontend: [https://github.com/RuurdBijlsma/photos-frontend](https://github.com/RuurdBijlsma/photos-frontend)
+1. Clone the
+   frontend: [https://github.com/RuurdBijlsma/photos-frontend](https://github.com/RuurdBijlsma/photos-frontend)
 2. Follow the frontend instructions to run it
 3. Access the application
 
@@ -128,9 +134,9 @@ If you are using the `load-dynamic` feature and encounter library errors:
 
 1. Download the `onnxruntime` library from [GitHub Releases](https://github.com/microsoft/onnxruntime/releases).
 2. Set the `ORT_DYLIB_PATH` environment variable:
-```shell
-# Linux/macOS
-export ORT_DYLIB_PATH="/path/to/libonnxruntime.so"
-# Windows (PowerShell)
-$env:ORT_DYLIB_PATH = "C:/Apps/onnxruntime/lib/onnxruntime.dll"
-```
+   ```shell
+   # Linux/macOS
+   export ORT_DYLIB_PATH="/path/to/libonnxruntime.so"
+   # Windows (PowerShell)
+   $env:ORT_DYLIB_PATH = "C:/Apps/onnxruntime/lib/onnxruntime.dll"
+   ```
