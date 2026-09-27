@@ -30,6 +30,7 @@
 * duplicate photo remover tool
 * better error if exiftool isnt there (worker wont work then)
 * apply rotation immidiately when going next/prev to other media item.
+* AVI toevoegen aan settings video_extensions
 
 # INFRASTRUCTURE:
 

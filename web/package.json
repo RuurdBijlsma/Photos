@@ -10,6 +10,7 @@
   "scripts": {
     "dev": "vite",
     "build": "run-p lint:type-check \"build-only {@}\" --",
+    "prepreview": "npm run build-only",
     "preview": "vite preview",
     "build-only": "vite build",
     "lint:type-check": "vue-tsc --build",
