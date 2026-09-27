@@ -8,16 +8,17 @@ use sqlx::{Executor, PgPool, Postgres};
 
 pub async fn get_user_profile(
     pool: &PgPool,
+    logged_in_user_role: UserRole,
     logged_in_user_id: i32,
-    user_id: i32,
+    target_user_id: i32,
 ) -> Result<UserProfile, AppError> {
-    let user = UserStore::find_by_id(pool, user_id)
+    let user = UserStore::find_by_id(pool, target_user_id)
         .await?
         .ok_or(AppError::NotFound("user".into()))?;
 
-    let stats = get_user_stats(pool, user_id).await?;
+    let stats = get_user_stats(pool, target_user_id).await?;
 
-    let email = if logged_in_user_id == user_id || user.role == UserRole::Admin {
+    let email = if logged_in_user_id == target_user_id || logged_in_user_role == UserRole::Admin {
         Some(user.email)
     } else {
         None

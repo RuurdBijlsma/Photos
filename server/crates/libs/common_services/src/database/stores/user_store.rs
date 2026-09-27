@@ -1,3 +1,4 @@
+use std::path::Path;
 use crate::database::DbError;
 use crate::database::structs::UpdateUserPayload;
 use crate::database::tables::app_user::{User, UserInvite, UserRole, UserWithPassword};
@@ -232,7 +233,7 @@ impl UserStore {
 
         for user in users {
             if let Some(media_folder) = &user.media_folder
-                && relative_path.starts_with(media_folder)
+                && Path::new(&relative_path).starts_with(media_folder)
                 && media_folder.len() as i32 > max_len
             {
                 max_len = media_folder.len() as i32;

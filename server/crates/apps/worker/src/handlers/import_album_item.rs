@@ -15,6 +15,7 @@ use common_types::ImportAlbumItemPayload;
 use serde_json::from_value;
 use std::path::Path;
 use std::slice;
+use sanitize_filename::sanitize;
 use tokio::fs;
 
 pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
@@ -44,11 +45,11 @@ pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
         .join(ALBUM_IMPORT_FOLDER)
         .join(&sanitized_identity);
     let full_save_dir = media_root.join(&relative_dir);
-    let filename = payload
+    let filename = sanitize(payload
         .remote_relative_path
         .split('/')
         .next_back()
-        .ok_or_else(|| eyre!("Invalid relative path supplied."))?;
+        .ok_or_else(|| eyre!("Invalid relative path supplied."))?);
     let full_save_path = full_save_dir.join(filename);
     let relative_path = full_save_path.make_relative(&context.settings.ingest.media_root)?;
     fs::create_dir_all(&full_save_dir).await?;
