@@ -1,3 +1,8 @@
+#![allow(clippy::similar_names)]
+#![allow(clippy::cast_precision_loss)]
+#![allow(clippy::cast_possible_truncation)]
+#![allow(clippy::cast_sign_loss)]
+
 use color_eyre::Result;
 use fast_image_resize::images::Image;
 use fast_image_resize::{PixelType, Resizer};
@@ -62,8 +67,8 @@ fn main() -> Result<()> {
     println!("JPEG XL Thumbnail Generation POC");
     println!("Input file   : {}", input_path.display());
     println!("Output dir   : {}", output_dir.display());
-    println!("Dimensions   : {}x{}", orig_w, orig_h);
-    println!("Has alpha    : {}", has_alpha);
+    println!("Dimensions   : {orig_w}x{orig_h}");
+    println!("Has alpha    : {has_alpha}");
     println!("Decoded in   : {:?}", decode_start.elapsed());
     println!("====================================================");
 
@@ -93,7 +98,7 @@ fn main() -> Result<()> {
             // Calculate scaled width preserving aspect ratio (rounded to even)
             let mut target_w =
                 ((u64::from(orig_w) * u64::from(target_h)) / u64::from(orig_h)) as u32;
-            if target_w > 0 && target_w % 2 != 0 {
+            if target_w > 0 && !target_w.is_multiple_of(2) {
                 target_w += 1;
             }
 
@@ -132,7 +137,10 @@ fn main() -> Result<()> {
         })?;
 
     println!("\n====================================================");
-    println!("Original file size : {:.2} KB", orig_file_size as f64 / 1024.0);
+    println!(
+        "Original file size : {:.2} KB",
+        orig_file_size as f64 / 1024.0
+    );
     println!("Total elapsed time : {:?}", total_start.elapsed());
     println!("Thumbnails saved to: {}", output_dir.display());
     println!("====================================================");

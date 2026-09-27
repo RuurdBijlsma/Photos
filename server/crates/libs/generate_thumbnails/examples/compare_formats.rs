@@ -1,3 +1,8 @@
+#![allow(clippy::similar_names)]
+#![allow(clippy::cast_precision_loss)]
+#![allow(clippy::cast_possible_truncation)]
+#![allow(clippy::cast_sign_loss)]
+
 use app_state::load_app_settings;
 use color_eyre::Result;
 use fast_image_resize::images::Image;
@@ -58,12 +63,13 @@ fn encode_avif(
     Ok(result.avif_file)
 }
 
-fn encode_webp(raw_rgb_pixels: &[u8], width: u32, height: u32) -> Result<Vec<u8>> {
+fn encode_webp(raw_rgb_pixels: &[u8], width: u32, height: u32) -> std::vec::Vec<u8> {
     let encoder = webp::Encoder::from_rgb(raw_rgb_pixels, width, height);
     let webp_memory = encoder.encode(WEBP_QUALITY);
-    Ok(webp_memory.to_vec())
+    webp_memory.to_vec()
 }
 
+#[allow(clippy::too_many_lines)]
 fn main() -> Result<()> {
     color_eyre::install()?;
 
@@ -95,12 +101,10 @@ fn main() -> Result<()> {
     // - RGB for JXL and WebP
     // - RGBA for AVIF (ravif)
     let rgb_img = dynamic_img.to_rgb8();
-    let src_image_rgb =
-        Image::from_vec_u8(orig_w, orig_h, rgb_img.into_raw(), PixelType::U8x3)?;
+    let src_image_rgb = Image::from_vec_u8(orig_w, orig_h, rgb_img.into_raw(), PixelType::U8x3)?;
 
     let rgba_img = dynamic_img.to_rgba8();
-    let src_image_rgba =
-        Image::from_vec_u8(orig_w, orig_h, rgba_img.into_raw(), PixelType::U8x4)?;
+    let src_image_rgba = Image::from_vec_u8(orig_w, orig_h, rgba_img.into_raw(), PixelType::U8x4)?;
 
     println!("==========================================================================");
     println!("Codec Comparison (JXL Max Effort / Quality Mode)");
@@ -133,7 +137,7 @@ fn main() -> Result<()> {
     for &target_h_u64 in &thumb_cfg.heights {
         let target_h = target_h_u64 as u32;
         let mut target_w = ((u64::from(orig_w) * target_h_u64) / u64::from(orig_h)) as u32;
-        if target_w % 2 != 0 {
+        if !target_w.is_multiple_of(2) {
             target_w += 1;
         }
 
@@ -185,7 +189,7 @@ fn main() -> Result<()> {
 
         // 3. WebP (Q82)
         let t0 = Instant::now();
-        let webp_bytes = encode_webp(raw_rgb, target_w, target_h)?;
+        let webp_bytes = encode_webp(raw_rgb, target_w, target_h);
         let webp_time = t0.elapsed().as_secs_f64() * 1000.0;
         let webp_path = output_dir.join(format!("{target_h}p_webp.webp"));
         fs::write(&webp_path, &webp_bytes)?;
