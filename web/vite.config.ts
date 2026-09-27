@@ -12,16 +12,16 @@ const repoName = 'Photos'
 
 const proxyConfig = {
   '/api': {
-    target: 'http://localhost:5272',
+    target: 'http://127.0.0.1:5272',
     changeOrigin: true,
     ws: true,
   },
   '/thumbnails': {
-    target: 'http://localhost:5272',
+    target: 'http://127.0.0.1:5272',
     changeOrigin: true,
   },
   '/hosted': {
-    target: 'http://localhost:5272',
+    target: 'http://127.0.0.1:5272',
     changeOrigin: true,
   },
 }
@@ -56,27 +56,80 @@ export default defineConfig({
         short_name: 'Photos',
         description: 'Manage your photos and videos',
         theme_color: '#101010',
-        background_color: '#101010',
+        background_color: '#ffffff',
         display: 'standalone',
         start_url: '.',
+        screenshots: [
+          {
+            src: 'screenshots/desktop/timeline.png',
+            sizes: '1758x989',
+            type: 'image/png',
+            form_factor: 'wide',
+            label: 'Main timeline view',
+          },
+          {
+            src: 'screenshots/desktop/map.png',
+            sizes: '1758x989',
+            type: 'image/png',
+            form_factor: 'wide',
+            label: 'Interactive map view',
+          },
+          {
+            src: 'screenshots/desktop/location.png',
+            sizes: '1758x989',
+            type: 'image/png',
+            form_factor: 'wide',
+            label: 'Browse by various collections',
+          },
+          {
+            src: 'screenshots/desktop/search.png',
+            sizes: '1758x989',
+            type: 'image/png',
+            form_factor: 'wide',
+            label: 'Advanced search',
+          },
+          {
+            src: 'screenshots/desktop/explore.png',
+            sizes: '1758x989',
+            type: 'image/png',
+            form_factor: 'wide',
+            label: 'Explore your stats & places',
+          },
+          {
+            src: 'screenshots/mobile/temp.png',
+            sizes: '428x953',
+            type: 'image/png',
+            form_factor: 'narrow',
+            label: 'Mobile timeline view',
+          },
+        ],
         icons: [
           {
             src: 'favicon-96x96.png',
             sizes: '96x96',
             type: 'image/png',
+            purpose: 'any',
           },
           {
             src: 'web-app-manifest-192x192.png',
             sizes: '192x192',
             type: 'image/png',
+            purpose: 'any',
           },
           {
             src: 'web-app-manifest-512x512.png',
             sizes: '512x512',
             type: 'image/png',
+            purpose: 'any',
           },
           {
-            src: 'web-app-manifest-512x512.png',
+            src: 'web-app-manifest-maskable-192x192.png',
+            sizes: '192x192',
+            type: 'image/png',
+            purpose: 'maskable',
+          },
+          {
+            src: 'web-app-manifest-maskable-512x512.png',
             sizes: '512x512',
             type: 'image/png',
             purpose: 'maskable',

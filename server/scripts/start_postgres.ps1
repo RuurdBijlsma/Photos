@@ -60,12 +60,12 @@ if ($existingContainer -eq $containerName) {
 Write-Host "--------------------------------------------------------" -ForegroundColor Green
 Write-Host "PostgreSQL with pgvector is now running!" -ForegroundColor Green
 Write-Host "You can connect to it using the following details:"
-Write-Host "  Host: 127.0.0.1" -ForegroundColor Green
+Write-Host "  Host: localhost" -ForegroundColor Green
 Write-Host "  Port: $dbPort"
 Write-Host "  Database: $dbName"
 Write-Host "  User: $dbUser"
 Write-Host "  Password: $dbPassword"
 Write-Host ""
 Write-Host "Connection String:"
-Write-Host "  postgresql://$dbUser`:$dbPassword@127.0.0.1:$dbPort/$dbName"
+Write-Host "  postgresql://$dbUser`:$dbPassword@localhost:$dbPort/$dbName"
 Write-Host "--------------------------------------------------------"
