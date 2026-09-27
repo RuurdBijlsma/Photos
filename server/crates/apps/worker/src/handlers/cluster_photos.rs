@@ -51,13 +51,12 @@ async fn load_vocab_labels() -> Result<Vec<String>> {
     Ok(labels)
 }
 
-// Optimization: Simplified query to use an Index-Only Scan on 'object(tag)', avoiding the join
 async fn load_object_tags(pool: &PgPool) -> Result<Vec<String>> {
     let tags = sqlx::query_scalar!(
         r#"SELECT DISTINCT o.tag
            FROM object o
            JOIN visual_analysis va ON va.id = o.visual_analysis_id
-           WHERE  va.deleted = false"#
+           WHERE va.deleted = false"#
     )
     .fetch_all(pool)
     .await?;
@@ -144,7 +143,8 @@ async fn load_tag_embeddings(
                     .map_err(|e| eyre!("CLIP embedding generation failed: {:?}", e))?;
 
                 for (i, tag) in chunk.iter().enumerate() {
-                    let row: Vec<f32> = embeddings_array.row(i).iter().copied().collect();
+                    let mut row: Vec<f32> = embeddings_array.row(i).iter().copied().collect();
+                    clustering::normalize_vector(&mut row);
                     static_cache.insert(tag.clone(), row.clone());
                     new_embeddings.push((tag.clone(), Vector::from(row)));
                 }
@@ -211,7 +211,9 @@ async fn fetch_embeddings(pool: &PgPool, user_id: i32) -> Result<Vec<MediaEmbedd
                va.embedding as "embedding!: Vector"
            FROM visual_analysis va
            JOIN media_item ON media_item.id = va.media_item_id
-           WHERE media_item.user_id = $1 AND media_item.deleted = false
+           WHERE media_item.user_id = $1
+             AND media_item.deleted = false
+             AND va.deleted = false
            ORDER BY media_item.id, va.created_at"#,
         user_id
     )
@@ -283,7 +285,21 @@ async fn upsert_and_link(
                 .fetch_one(&mut **tx).await?
         };
 
-        query!("INSERT INTO media_item_photo_cluster (media_item_id, photo_cluster_id) SELECT unnest($1::varchar[]), $2 ON CONFLICT DO NOTHING", &media_item_ids, photo_cluster_id)
+        // Remove media items that were previously linked to this cluster but are no longer in it
+        query!(
+            "DELETE FROM media_item_photo_cluster WHERE photo_cluster_id = $1 AND NOT (media_item_id = ANY($2))",
+            photo_cluster_id,
+            &media_item_ids
+        )
+            .execute(&mut **tx)
+            .await?;
+
+        // Link current items
+        query!(
+            "INSERT INTO media_item_photo_cluster (media_item_id, photo_cluster_id) SELECT unnest($1::varchar[]), $2 ON CONFLICT DO NOTHING",
+            &media_item_ids,
+            photo_cluster_id
+        )
             .execute(&mut **tx).await?;
     }
     Ok(())
@@ -313,26 +329,32 @@ async fn cleanup_obsolete(
     Ok(())
 }
 
-/// Checks if there have been any updates to media items since the last
-/// successful photo cluster generation for the user.
+/// Checks if there have been any updates since the last cluster run.
+/// Prevents spinning if the user has fewer than MIN_ITEMS_TO_CLUSTER photos.
 async fn needs_clustering(pool: &PgPool, user_id: i32) -> Result<bool> {
+    let min_items = MIN_ITEMS_TO_CLUSTER as i64;
     let needs_run = sqlx::query_scalar!(
         r#"
         WITH last_run AS (
             SELECT MAX(updated_at) AS last_run_time
             FROM photo_cluster
             WHERE user_id = $1
+        ),
+        photo_count AS (
+            SELECT COUNT(DISTINCT va.media_item_id) AS total_photos
+            FROM visual_analysis va
+            JOIN media_item mi ON mi.id = va.media_item_id
+            WHERE mi.user_id = $1 AND mi.deleted = false AND va.deleted = false
         )
         SELECT
             CASE
-                -- If there is no record of previous runs, clustering must run
+                WHEN (SELECT total_photos FROM photo_count) < $2 THEN FALSE
                 WHEN (SELECT last_run_time FROM last_run) IS NULL THEN TRUE
                 ELSE
-                    -- Check if any media items were created or updated since the last run
-                    -- Soft deletions are also detected, actual row deletions are not
                     EXISTS (
                         SELECT 1 FROM visual_analysis va
-                        WHERE va.user_id = $1 AND va.created_at > (SELECT last_run_time FROM last_run)
+                        JOIN media_item mi ON mi.id = va.media_item_id
+                        WHERE mi.user_id = $1 AND mi.deleted = false AND va.created_at > (SELECT last_run_time FROM last_run)
                     )
                     OR EXISTS (
                         SELECT 1 FROM media_item mi
@@ -340,10 +362,11 @@ async fn needs_clustering(pool: &PgPool, user_id: i32) -> Result<bool> {
                     )
             END AS "needs_run!"
         "#,
-        user_id
+        user_id,
+        min_items
     )
-    .fetch_one(pool)
-    .await?;
+        .fetch_one(pool)
+        .await?;
 
     Ok(needs_run)
 }
@@ -351,7 +374,7 @@ async fn needs_clustering(pool: &PgPool, user_id: i32) -> Result<bool> {
 pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
     let user_ids = clustering::fetch_user_ids(&context.pool, job).await?;
 
-    // Load, resolve, and generate embeddings for cluster labels
+    // Load and embed cluster label vocabulary tags
     let now = Instant::now();
     let text_embedder = context
         .text_embedder
@@ -366,7 +389,6 @@ pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
     info!("load_tag_embeddings took {:?}", now.elapsed());
 
     for user_id in user_ids {
-        // Skip user if there are no new updates or changes since the last run
         if !needs_clustering(&context.pool, user_id).await? {
             info!(
                 "Skipping photo clustering for user {} - no updates detected",

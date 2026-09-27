@@ -6,10 +6,21 @@ use pgvector::Vector;
 use sqlx::PgPool;
 use std::collections::{HashMap, HashSet};
 use std::time::Instant;
+use tracing::debug;
 
 pub trait ClusterEntity {
     fn id(&self) -> String;
     fn centroid(&self) -> Option<&Vector>;
+}
+
+/// Normalizes a vector in-place to unit length (L2 norm = 1.0).
+pub fn normalize_vector(v: &mut [f32]) {
+    let norm = v.iter().map(|x| x * x).sum::<f32>().sqrt();
+    if norm > 0.0 {
+        for x in v.iter_mut() {
+            *x /= norm;
+        }
+    }
 }
 
 /// Calculates the L2 (Euclidean) distance between two equal-length vectors.
@@ -43,43 +54,51 @@ pub fn run_hdbscan(
     let clusterer = Hdbscan::new(embeddings, params);
     let now = Instant::now();
     let labels = clusterer.cluster()?;
-    println!("clusterer.cluster()?, {:?}", now.elapsed());
-    let centroids = clusterer.calc_centers(Center::Centroid, &labels)?;
+    debug!("HDBSCAN clustering finished in {:?}", now.elapsed());
+
+    let mut centroids = clusterer.calc_centers(Center::Centroid, &labels)?;
+    // Normalize centroids back to unit length so distances remain consistent
+    for centroid in &mut centroids {
+        normalize_vector(centroid);
+    }
+
     Ok((labels, centroids))
 }
 
-/// Matches new centroids to existing clusters if they are within a distance threshold.
+/// Matches new centroids to existing clusters using globally sorted best-distance pairs.
 pub fn match_centroids<T: ClusterEntity>(
     new_centroids: &[Vec<f32>],
     existing_clusters: &[T],
     threshold: f32,
 ) -> Result<HashMap<usize, String>> {
-    let mut map = HashMap::new();
-    let mut used_old_ids = HashSet::new();
+    let mut candidates = Vec::new();
 
     for (new_cid, new_centroid) in new_centroids.iter().enumerate() {
-        let mut best_match: Option<(String, f32)> = None;
         for existing_cluster in existing_clusters {
             if let Some(existing_centroid) = existing_cluster.centroid() {
                 let distance = l2_distance(new_centroid.as_slice(), existing_centroid.as_slice())?;
                 if distance < threshold {
-                    if let Some((_, best_dist)) = best_match {
-                        if distance < best_dist {
-                            best_match = Some((existing_cluster.id(), distance));
-                        }
-                    } else {
-                        best_match = Some((existing_cluster.id(), distance));
-                    }
+                    candidates.push((distance, new_cid, existing_cluster.id()));
                 }
             }
         }
+    }
 
-        if let Some((id, _)) = best_match
-            && used_old_ids.insert(id.clone())
-        {
-            map.insert(new_cid, id.clone());
+    // Sort by smallest distance first so the best global pairings win
+    candidates.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
+
+    let mut map = HashMap::new();
+    let mut matched_new = HashSet::new();
+    let mut used_old = HashSet::new();
+
+    for (_dist, new_cid, old_id) in candidates {
+        if !matched_new.contains(&new_cid) && !used_old.contains(&old_id) {
+            matched_new.insert(new_cid);
+            used_old.insert(old_id.clone());
+            map.insert(new_cid, old_id);
         }
     }
+
     Ok(map)
 }
 

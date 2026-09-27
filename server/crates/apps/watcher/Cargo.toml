@@ -17,5 +17,4 @@ walkdir = "2.5.0"
 [features]
 load-dynamic = [
     "common_services/load-dynamic",
-    "common_services/load-dynamic",
 ] # -> Load ONNXRuntime dynamically instead of statically
