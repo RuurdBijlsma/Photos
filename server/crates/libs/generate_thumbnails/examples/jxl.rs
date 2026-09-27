@@ -53,21 +53,36 @@ fn main() -> Result<()> {
     let mut dynamic_img = DynamicImage::from_decoder(decoder)?;
     dynamic_img.apply_orientation(orientation);
 
-    // Convert to RGB8 (3-channel)
-    let src_rgb = dynamic_img.into_rgb8();
-    let (orig_w, orig_h) = src_rgb.dimensions();
+    // Detect if image has transparency
+    let has_alpha = dynamic_img.color().has_alpha();
+    let (orig_w, orig_h) = (dynamic_img.width(), dynamic_img.height());
     let orig_file_size = fs::metadata(input_path)?.len();
 
-    println!(
-        "Decoded source image: {}x{} in {:?}",
-        orig_w,
-        orig_h,
-        decode_start.elapsed()
-    );
+    println!("====================================================");
+    println!("JPEG XL Thumbnail Generation POC");
+    println!("Input file   : {}", input_path.display());
+    println!("Output dir   : {}", output_dir.display());
+    println!("Dimensions   : {}x{}", orig_w, orig_h);
+    println!("Has alpha    : {}", has_alpha);
+    println!("Decoded in   : {:?}", decode_start.elapsed());
+    println!("====================================================");
 
-    let src_image = Image::from_vec_u8(orig_w, orig_h, src_rgb.into_raw(), PixelType::U8x3)?;
+    // 2. Prepare source image buffer for fast_image_resize
+    let pixel_type = if has_alpha {
+        PixelType::U8x4
+    } else {
+        PixelType::U8x3
+    };
 
-    // 2. Generate thumbnails in parallel for each target height
+    let raw_src_bytes = if has_alpha {
+        dynamic_img.into_rgba8().into_raw()
+    } else {
+        dynamic_img.into_rgb8().into_raw()
+    };
+
+    let src_image = Image::from_vec_u8(orig_w, orig_h, raw_src_bytes, pixel_type)?;
+
+    // 3. Generate thumbnails in parallel for each target height
     println!("\nGenerating JXL thumbnails for heights: {TARGET_HEIGHTS:?}");
 
     TARGET_HEIGHTS
@@ -82,13 +97,13 @@ fn main() -> Result<()> {
                 target_w += 1;
             }
 
-            // Downscale RGB buffer
-            let mut dst_img = Image::new(target_w, target_h, PixelType::U8x3);
+            // Downscale buffer
+            let mut dst_img = Image::new(target_w, target_h, pixel_type);
             let mut resizer = Resizer::new();
             resizer.resize(&src_image, &mut dst_img, None)?;
 
             // Configure JPEG XL encoder:
-            // Butteraugli distance (0.0 = lossless, 1.0 = visually lossless, 1.5-2.5 = high quality)
+            // Butteraugli distance (0.0 = lossless, 1.0 = visually lossless, 1.5 = high quality)
             let mut encoder = encoder_builder()
                 .lossless(false)
                 .quality(1.5)
@@ -103,9 +118,10 @@ fn main() -> Result<()> {
 
             let size = result.data.len();
             println!(
-                "  [{target_h}p] Generated {}x{} -> {} ({} bytes, {:.2} KB) in {:?}",
+                "  [{target_h}p] Generated {}x{} (alpha: {}) -> {} ({} bytes, {:.2} KB) in {:?}",
                 target_w,
                 target_h,
+                has_alpha,
                 out_file.file_name().unwrap().to_string_lossy(),
                 size,
                 size as f64 / 1024.0,
