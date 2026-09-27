@@ -1,5 +1,4 @@
 use crate::api::app_error::AppError;
-use crate::api::auth::hashing::{hash_password, verify_password};
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use rand::{Rng, rng};
 use sha2::{Digest, Sha256};
