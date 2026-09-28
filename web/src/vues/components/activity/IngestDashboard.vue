@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch, shallowRef } from 'vue'
+import { computed, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue'
 import { useIngestJobsStore } from '@/scripts/stores/ingestJobsStore.ts'
 import { useUploadStore } from '@/scripts/stores/uploadStore.ts'
 import { useSystemStore } from '@/scripts/stores/systemStore.ts'
@@ -138,18 +138,11 @@ function onFolderChanged(e: Event) {
   }
 }
 
-// Ingest progress selectors
-const uploadSuccessCount = computed(
-  () => uploadStore.uploads.filter((u) => u.status === 'success').length,
-)
-const uploadFailedCount = computed(
-  () => uploadStore.uploads.filter((u) => u.status === 'failed').length,
-)
-const uploadTotalCount = computed(() => uploadStore.uploads.length)
-const uploadToGoCount = computed(() => {
-  return uploadStore.uploads.filter((u) => u.status === 'pending' || u.status === 'uploading')
-    .length
-})
+// Ingest progress selectors (O(1) lookups from store)
+const uploadSuccessCount = computed(() => uploadStore.successCount)
+const uploadFailedCount = computed(() => uploadStore.failedCount)
+const uploadTotalCount = computed(() => uploadStore.totalCount)
+const uploadToGoCount = computed(() => uploadStore.activeCount + uploadStore.pendingCount)
 
 const uploadProgress = computed(() => {
   if (uploadTotalCount.value === 0) return 100
@@ -158,9 +151,7 @@ const uploadProgress = computed(() => {
 })
 
 const uploadToGoText = computed(() => {
-  const active = uploadStore.activeCount
-  const pending = uploadStore.uploads.filter((u) => u.status === 'pending').length
-  const total = active + pending
+  const total = uploadStore.activeCount + uploadStore.pendingCount
   if (total > 0) {
     return `${total} remaining`
   }
@@ -553,57 +544,64 @@ onUnmounted(() => {
               </v-btn>
             </div>
 
-            <div class="active-uploads-list">
-              <div v-for="item in uploadStore.uploads" :key="item.id" class="upload-list-item">
-                <div class="upload-item-prefix">
-                  <v-progress-circular
-                    v-if="item.status === 'uploading'"
-                    :model-value="(item.bytesUploaded / item.size) * 100"
-                    :indeterminate="item.bytesUploaded / item.size === 1"
-                    color="primary"
-                    size="24"
-                    width="3"
-                  />
-                  <v-icon
-                    v-else
-                    :color="getStatusColor(item.status)"
-                    :icon="getStatusIcon(item.status)"
-                  />
-                </div>
+            <v-virtual-scroll
+              :items="uploadStore.uploads"
+              height="350"
+              item-height="62"
+              class="active-uploads-list"
+            >
+              <template #default="{ item }">
+                <div class="upload-list-item">
+                  <div class="upload-item-prefix">
+                    <v-progress-circular
+                      v-if="item.status === 'uploading'"
+                      :model-value="(item.bytesUploaded / item.size) * 100"
+                      :indeterminate="item.bytesUploaded / item.size === 1"
+                      color="primary"
+                      size="24"
+                      width="3"
+                    />
+                    <v-icon
+                      v-else
+                      :color="getStatusColor(item.status)"
+                      :icon="getStatusIcon(item.status)"
+                    />
+                  </div>
 
-                <div class="upload-item-details">
-                  <div class="upload-item-name">{{ item.name }}</div>
-                  <div class="upload-item-meta">
-                    {{ prettyBytes(item.bytesUploaded) }} / {{ prettyBytes(item.size) }}
-                    <span v-if="item.error" class="error-text">&bull; {{ item.error }}</span>
+                  <div class="upload-item-details">
+                    <div class="upload-item-name">{{ item.name }}</div>
+                    <div class="upload-item-meta">
+                      {{ prettyBytes(item.bytesUploaded) }} / {{ prettyBytes(item.size) }}
+                      <span v-if="item.error" class="error-text">&bull; {{ item.error }}</span>
+                    </div>
+                  </div>
+
+                  <v-spacer />
+
+                  <div class="upload-item-actions">
+                    <span class="progress-percent" v-if="item.status === 'uploading'">
+                      {{ ((item.bytesUploaded / item.size) * 100).toFixed(0) }}%
+                    </span>
+                    <v-btn
+                      v-if="item.status === 'uploading' || item.status === 'pending'"
+                      color="error"
+                      variant="tonal"
+                      :icon="MdiStop"
+                      size="x-small"
+                      @click="uploadStore.stopUpload(item.id)"
+                    />
+                    <v-btn
+                      v-else
+                      color="grey"
+                      variant="text"
+                      :icon="MdiClose"
+                      size="x-small"
+                      @click="uploadStore.removeUpload(item.id)"
+                    />
                   </div>
                 </div>
-
-                <v-spacer />
-
-                <div class="upload-item-actions">
-                  <span class="progress-percent" v-if="item.status === 'uploading'">
-                    {{ ((item.bytesUploaded / item.size) * 100).toFixed(0) }}%
-                  </span>
-                  <v-btn
-                    v-if="item.status === 'uploading' || item.status === 'pending'"
-                    color="error"
-                    variant="tonal"
-                    :icon="MdiStop"
-                    size="x-small"
-                    @click="uploadStore.stopUpload(item.id)"
-                  />
-                  <v-btn
-                    v-else
-                    color="grey"
-                    variant="text"
-                    :icon="MdiClose"
-                    size="x-small"
-                    @click="uploadStore.removeUpload(item.id)"
-                  />
-                </div>
-              </div>
-            </div>
+              </template>
+            </v-virtual-scroll>
           </div>
         </v-card>
       </div>
@@ -1008,17 +1006,18 @@ onUnmounted(() => {
 
 .active-uploads-list {
   max-height: 350px;
-  overflow-y: auto;
   padding-right: 4px;
 }
 
 .upload-list-item {
   display: flex;
   align-items: center;
-  padding: 12px 14px;
+  padding: 10px 14px;
   background-color: rgb(var(--v-theme-surface-container-high));
   border-radius: 16px;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
+  height: 56px;
+  box-sizing: border-box;
   transition: background-color 0.2s ease;
 }
 

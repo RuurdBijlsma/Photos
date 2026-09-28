@@ -20,6 +20,7 @@
 * door alle requests kijken op verse page load om te zien of ze allemaal relevant zijn (ik zag thunder icon geladen worden op timeline page load)
 * in failed list op ingest pagina, download knop voor de file toevoegen zodat je kan inspecteren of ie stuk is
 * fix PWA icons (currently has black borders on firefox for some reason)
+* upload 2000 photos lags the frontend. Backend is fine. Maybe not using virtual scroller? 
 * [PLS FIX] remove all requests that block the UI from rendering (i think auth & possibly system stats)
 
 # SERVER

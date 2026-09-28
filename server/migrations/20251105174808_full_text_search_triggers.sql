@@ -92,14 +92,10 @@ CREATE OR REPLACE FUNCTION tg_face_cluster_update_stmt()
 $$
 BEGIN
     PERFORM rebuild_media_item_search_vector(va.media_item_id)
-    FROM (SELECT DISTINCT visual_analysis_id
-          FROM (SELECT visual_analysis_id
-                FROM new_table
-                WHERE face_cluster_id IS NOT NULL
-                UNION
-                SELECT visual_analysis_id
-                FROM old_table
-                WHERE face_cluster_id IS NOT NULL) t) diff
+    FROM (SELECT DISTINCT nt.visual_analysis_id
+          FROM new_table nt
+                   JOIN old_table ot ON nt.id = ot.id
+          WHERE nt.face_cluster_id IS DISTINCT FROM ot.face_cluster_id) diff
              JOIN visual_analysis va ON diff.visual_analysis_id = va.id;
 
     RETURN NULL;
@@ -107,7 +103,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 CREATE TRIGGER trg_face_cluster_update_stmt
-    AFTER UPDATE OF face_cluster_id
+    AFTER UPDATE
     ON face
     REFERENCING NEW TABLE AS new_table OLD TABLE AS old_table
     FOR EACH STATEMENT
@@ -134,9 +130,6 @@ CREATE TRIGGER trg_face_insert_stmt
     ON face
     REFERENCING NEW TABLE AS new_table
     FOR EACH STATEMENT
-    WHEN (EXISTS (SELECT 1
-                  FROM new_table
-                  WHERE face_cluster_id IS NOT NULL))
 EXECUTE FUNCTION tg_face_insert_stmt();
 
 
