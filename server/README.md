@@ -68,7 +68,7 @@ uv sync
 
 ```text
 DATABASE_URL=postgres://user:pass@localhost/photos
-APP__AUTH__JWT_SECRET=your123secret
+RP__AUTH__JWT_SECRET=your123secret
 ```
 
 ### 5. Set up database

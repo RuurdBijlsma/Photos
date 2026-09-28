@@ -10,10 +10,16 @@ use sqlx::PgPool;
 /// Fetch the profile data and library statistics for any user.
 pub async fn get_user_profile_handler(
     State(pool): State<PgPool>,
-    Extension(user): Extension<ApiUser>,
-    Path(user_id): Path<i32>,
+    Extension(logged_in_user): Extension<ApiUser>,
+    Path(target_user_id): Path<i32>,
 ) -> Result<Json<UserProfile>, AppError> {
-    let profile = get_user_profile(&pool, user.id, user_id).await?;
+    let profile = get_user_profile(
+        &pool,
+        logged_in_user.role,
+        logged_in_user.id,
+        target_user_id,
+    )
+    .await?;
     Ok(Json(profile))
 }
 

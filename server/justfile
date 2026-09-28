@@ -22,7 +22,7 @@ clean:
     cargo clean
 
 setup:
-    script/start_postgres.ps1
+    scripts/start_postgres.ps1
 
 # --- Execution:
 

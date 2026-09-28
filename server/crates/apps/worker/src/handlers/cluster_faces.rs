@@ -77,7 +77,9 @@ async fn fetch_embeddings(pool: &PgPool, user_id: i32) -> Result<Vec<FaceToClust
            FROM face f
            JOIN visual_analysis va ON f.visual_analysis_id = va.id
            JOIN media_item mi ON mi.id = va.media_item_id
-           WHERE mi.user_id = $1"#,
+           WHERE mi.user_id = $1
+             AND mi.deleted = false
+             AND va.deleted = false"#,
         user_id
     )
     .fetch_all(pool)
@@ -233,7 +235,6 @@ async fn upsert_and_link(
                 .execute(&mut **tx)
                 .await?;
 
-            // Now update the person to point to this cluster for its thumbnail
             query!(
                 "UPDATE person SET face_thumb_id = $1 WHERE id = $2",
                 new_cluster_id,
@@ -245,7 +246,16 @@ async fn upsert_and_link(
             new_cluster_id
         };
 
-        // Link faces to the cluster
+        // Unlink faces previously in this cluster that drifted or became noise
+        query!(
+            "UPDATE face SET face_cluster_id = NULL WHERE face_cluster_id = $1 AND NOT (id = ANY($2))",
+            cluster_id,
+            &face_ids
+        )
+            .execute(&mut **tx)
+            .await?;
+
+        // Link current faces to the cluster
         query!(
             "UPDATE face SET face_cluster_id = $1 WHERE id = ANY($2)",
             cluster_id,
@@ -271,7 +281,6 @@ async fn cleanup_obsolete(
         .collect();
 
     if !obsolete_cluster_ids.is_empty() {
-        // Unlink faces from these clusters
         query!(
             "UPDATE face SET face_cluster_id = NULL WHERE face_cluster_id = ANY($1)",
             &obsolete_cluster_ids
@@ -287,35 +296,45 @@ async fn cleanup_obsolete(
         .await?;
     }
 
+    // Protect user-assigned names from being deleted during cluster shifts
     query!(
         "DELETE FROM person p
-             WHERE NOT EXISTS (SELECT 1 FROM face_cluster fc WHERE fc.person_id = p.id)"
+         WHERE p.name IS NULL
+           AND NOT EXISTS (SELECT 1 FROM face_cluster fc WHERE fc.person_id = p.id)"
     )
     .execute(&mut **tx)
     .await?;
+
     Ok(())
 }
 
-/// Checks if there have been any updates to media items or new visual analysis records
-/// since the last successful face cluster generation for the user.
+/// Checks if there have been any updates since the last cluster run.
+/// Prevents spinning if the user has fewer than `MIN_ITEMS_TO_CLUSTER` faces.
 async fn needs_clustering(pool: &PgPool, user_id: i32) -> Result<bool> {
+    let min_items = MIN_ITEMS_TO_CLUSTER as i64;
     let needs_run = sqlx::query_scalar!(
         r#"
         WITH last_run AS (
             SELECT MAX(updated_at) AS last_run_time
             FROM face_cluster
             WHERE user_id = $1
+        ),
+        face_count AS (
+            SELECT COUNT(*) AS total_faces
+            FROM face f
+            JOIN visual_analysis va ON f.visual_analysis_id = va.id
+            JOIN media_item mi ON mi.id = va.media_item_id
+            WHERE mi.user_id = $1 AND mi.deleted = false AND va.deleted = false
         )
         SELECT
             CASE
-                -- If there is no record of previous runs, clustering must run
+                WHEN (SELECT total_faces FROM face_count) < $2 THEN FALSE
                 WHEN (SELECT last_run_time FROM last_run) IS NULL THEN TRUE
                 ELSE
-                    -- Check if any media items were created or updated since the last run
-                    -- Soft deletions are also detected, actual row deletions are not
                     EXISTS (
                         SELECT 1 FROM visual_analysis va
-                        WHERE va.user_id = $1 AND va.created_at > (SELECT last_run_time FROM last_run)
+                        JOIN media_item mi ON mi.id = va.media_item_id
+                        WHERE mi.user_id = $1 AND mi.deleted = false AND va.created_at > (SELECT last_run_time FROM last_run)
                     )
                     OR EXISTS (
                         SELECT 1 FROM media_item mi
@@ -323,10 +342,11 @@ async fn needs_clustering(pool: &PgPool, user_id: i32) -> Result<bool> {
                     )
             END AS "needs_run!"
         "#,
-        user_id
+        user_id,
+        min_items
     )
-    .fetch_one(pool)
-    .await?;
+        .fetch_one(pool)
+        .await?;
 
     Ok(needs_run)
 }
@@ -378,7 +398,7 @@ pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
         )
         .await?;
 
-        // Cleanup
+        // Cleanup obsolete clusters and nameless orphaned persons
         let matched_old_ids: HashSet<String> = cluster_map.values().cloned().collect();
         cleanup_obsolete(&mut tx, &existing_clusters, &matched_old_ids).await?;
 

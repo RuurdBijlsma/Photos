@@ -24,9 +24,33 @@ export const useUploadStore = defineStore('upload', () => {
   let cachedJwt = ''
   let jwtFetchedAt = 0
 
-  const activeCount = computed(() => uploads.value.filter((u) => u.status === 'uploading').length)
-  const isUploading = computed(() =>
-    uploads.value.some((u) => u.status === 'uploading' || u.status === 'pending'),
+  // Cached status counts: these only recompute when upload items are added, removed, or change status
+  // They DO NOT recalculate on progress ticks!
+  const statusCounts = computed(() => {
+    let uploading = 0
+    let pending = 0
+    let success = 0
+    let failed = 0
+    let stopped = 0
+
+    for (const u of uploads.value) {
+      if (u.status === 'uploading') uploading++
+      else if (u.status === 'pending') pending++
+      else if (u.status === 'success') success++
+      else if (u.status === 'failed') failed++
+      else if (u.status === 'stopped') stopped++
+    }
+
+    return { uploading, pending, success, failed, stopped }
+  })
+
+  const activeCount = computed(() => statusCounts.value.uploading)
+  const successCount = computed(() => statusCounts.value.success)
+  const failedCount = computed(() => statusCounts.value.failed)
+  const pendingCount = computed(() => statusCounts.value.pending)
+  const totalCount = computed(() => uploads.value.length)
+  const isUploading = computed(
+    () => statusCounts.value.uploading > 0 || statusCounts.value.pending > 0,
   )
 
   async function getValidJwt(): Promise<string> {
@@ -61,6 +85,7 @@ export const useUploadStore = defineStore('upload', () => {
       if (existingItem) {
         // Reuse and reset the entry instead of creating a duplicate
         existingItem.status = 'pending'
+        existingItem.bytesUploaded = 0
         existingItem.error = undefined
         fileMap.set(existingItem.id, file)
       } else {
@@ -115,8 +140,9 @@ export const useUploadStore = defineStore('upload', () => {
       return
     }
 
-    // todo: maybe broken with new /api/ prefix in backend
     const endpoint = `${SERVER_BASE_URL}/api/files`
+
+    let lastProgressTick = 0
 
     const uploadInstance = new tus.Upload(file, {
       endpoint,
@@ -136,8 +162,14 @@ export const useUploadStore = defineStore('upload', () => {
         fileMap.delete(item.id)
         processQueue()
       },
-      onProgress: (bytesUploaded) => {
-        item.bytesUploaded = bytesUploaded
+      onProgress: (bytesUploaded, bytesTotal) => {
+        const now = performance.now()
+        // Throttle progress reactivity updates to at most once per 120ms per file,
+        // or immediately if complete.
+        if (bytesUploaded === bytesTotal || now - lastProgressTick > 120) {
+          lastProgressTick = now
+          item.bytesUploaded = bytesUploaded
+        }
       },
       onSuccess: () => {
         item.status = 'success'
@@ -212,6 +244,10 @@ export const useUploadStore = defineStore('upload', () => {
   return {
     uploads,
     activeCount,
+    successCount,
+    failedCount,
+    pendingCount,
+    totalCount,
     isUploading,
     addFiles,
     stopUpload,

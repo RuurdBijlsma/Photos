@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM media_item_photo_cluster WHERE photo_cluster_id = $1 AND NOT (media_item_id = ANY($2))",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "TextArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "877bf07ad3c5fc26a3fc0301f42e02e19c34eb501ba7027801df9c36dc92b58c"
+}

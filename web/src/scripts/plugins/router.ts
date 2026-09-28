@@ -306,17 +306,15 @@ let onAuthHandled = false
 export function registerNavigationGuard() {
   const snackbarsStore = useSnackbarsStore()
 
-  router.beforeEach(async (to) => {
+  router.beforeEach((to) => {
     const authStore = useAuthStore()
 
     if (!sessionChecked) {
       sessionChecked = true
-      try {
-        await authStore.fetchCurrentUser()
-      } catch (error) {
-        console.warn('Session restore failed or no active session:', error)
-        await authStore.logout(false)
-      }
+      // Validate session in background without blocking initial navigation / UI render
+      authStore.fetchCurrentUser().catch((error) => {
+        console.warn('Session verification failed or no active session:', error)
+      })
     }
 
     const isAuthenticated = authStore.isAuthenticated

@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE face SET face_cluster_id = NULL WHERE face_cluster_id = $1 AND NOT (id = ANY($2))",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Int8Array"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "8a27b537c1b56774ba7108d8267989fa864f81defefbfa814c122bf59a46e82a"
+}

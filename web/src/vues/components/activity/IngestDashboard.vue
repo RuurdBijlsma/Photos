@@ -1,12 +1,18 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch, shallowRef } from 'vue'
+import { computed, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue'
 import { useIngestJobsStore } from '@/scripts/stores/ingestJobsStore.ts'
 import { useUploadStore } from '@/scripts/stores/uploadStore.ts'
 import { useSystemStore } from '@/scripts/stores/systemStore.ts'
 import RunningJobPill from '@/vues/components/activity/RunningJobPill.vue'
 import ShowSelectedFolder from '@/vues/components/onboarding/ShowSelectedFolder.vue'
 import type { JobInfo } from '@/scripts/types/api/admin.ts'
-import { prettyBytes, ProcessingRateTracker } from '@/scripts/utils.ts'
+import {
+  downloadBlob,
+  filenameFromHeaders,
+  prettyBytes,
+  ProcessingRateTracker,
+} from '@/scripts/utils.ts'
+import mediaItemService from '@/scripts/services/mediaItemService.ts'
 import PipelineCard from '@/vues/components/activity/PipelineCard.vue'
 import MdiAlertCircle from '~icons/mdi/alert-circle'
 import MdiAlertCircleOutline from '~icons/mdi/alert-circle-outline'
@@ -16,6 +22,7 @@ import MdiChevronRight from '~icons/mdi/chevron-right'
 import MdiClockOutline from '~icons/mdi/clock-outline'
 import MdiClose from '~icons/mdi/close'
 import MdiCloudUploadOutline from '~icons/mdi/cloud-upload-outline'
+import MdiDownloadOutline from '~icons/mdi/download-outline'
 import MdiFileDocumentOutline from '~icons/mdi/file-document-outline'
 import MdiFolderOpen from '~icons/mdi/folder-open'
 import MdiFolderSearchOutline from '~icons/mdi/folder-search-outline'
@@ -29,11 +36,13 @@ import MdiStopCircleOutline from '~icons/mdi/stop-circle-outline'
 import MdiTrashCanOutline from '~icons/mdi/trash-can-outline'
 import MdiTrayArrowUp from '~icons/mdi/tray-arrow-up'
 import { useAuthStore } from '@/scripts/stores/authStore.ts'
+import { useSnackbarsStore } from '@/scripts/stores/snackbarStore.ts'
 
 const ingestStore = useIngestJobsStore()
 const uploadStore = useUploadStore()
 const authStore = useAuthStore()
 const systemStore = useSystemStore()
+const snackbarStore = useSnackbarsStore()
 
 const mediaFolderUnavailable = computed(
   () =>
@@ -66,8 +75,9 @@ const fileInput = shallowRef<HTMLInputElement | null>(null)
 const folderInput = shallowRef<HTMLInputElement | null>(null)
 const dragover = ref(false)
 
-// Retrying tracking
+// Retrying & downloading tracking
 const retryingJobIds = ref<Set<number>>(new Set())
+const downloadingJobIds = ref<Set<number>>(new Set())
 
 // Detail Dialog
 const detailsDialog = ref(false)
@@ -138,18 +148,11 @@ function onFolderChanged(e: Event) {
   }
 }
 
-// Ingest progress selectors
-const uploadSuccessCount = computed(
-  () => uploadStore.uploads.filter((u) => u.status === 'success').length,
-)
-const uploadFailedCount = computed(
-  () => uploadStore.uploads.filter((u) => u.status === 'failed').length,
-)
-const uploadTotalCount = computed(() => uploadStore.uploads.length)
-const uploadToGoCount = computed(() => {
-  return uploadStore.uploads.filter((u) => u.status === 'pending' || u.status === 'uploading')
-    .length
-})
+// Ingest progress selectors (O(1) lookups from store)
+const uploadSuccessCount = computed(() => uploadStore.successCount)
+const uploadFailedCount = computed(() => uploadStore.failedCount)
+const uploadTotalCount = computed(() => uploadStore.totalCount)
+const uploadToGoCount = computed(() => uploadStore.activeCount + uploadStore.pendingCount)
 
 const uploadProgress = computed(() => {
   if (uploadTotalCount.value === 0) return 100
@@ -158,9 +161,7 @@ const uploadProgress = computed(() => {
 })
 
 const uploadToGoText = computed(() => {
-  const active = uploadStore.activeCount
-  const pending = uploadStore.uploads.filter((u) => u.status === 'pending').length
-  const total = active + pending
+  const total = uploadStore.activeCount + uploadStore.pendingCount
   if (total > 0) {
     return `${total} remaining`
   }
@@ -204,6 +205,20 @@ const isUploadActive = computed(() => uploadStore.isUploading)
 const isMetadataActive = computed(() => computeIngestRemaining('metadata') > 0)
 const isThumbnailsActive = computed(() => computeIngestRemaining('thumbnails') > 0)
 const isAnalysisActive = computed(() => computeIngestRemaining('analysis') > 0)
+
+const statusPriority: Record<string, number> = {
+  uploading: 0,
+  failed: 1,
+  pending: 2,
+  stopped: 3,
+  success: 4,
+}
+
+const sortedUploads = computed(() => {
+  return [...uploadStore.uploads].sort(
+    (a, b) => (statusPriority[a.status] ?? 99) - (statusPriority[b.status] ?? 99),
+  )
+})
 
 // Track processing rate speeds
 watch(
@@ -296,6 +311,25 @@ async function handleRetry(jobId: number) {
     // Managed in store
   } finally {
     retryingJobIds.value.delete(jobId)
+  }
+}
+
+async function handleDownload(relativePath: string | null | undefined, jobId?: number) {
+  if (!relativePath) return
+  if (jobId !== undefined) {
+    downloadingJobIds.value.add(jobId)
+  }
+  try {
+    const response = await mediaItemService.downloadMediaFile(relativePath)
+    const fallbackFilename = relativePath.split(/[/\\]/).pop() || 'download'
+    const filename = filenameFromHeaders(response.headers) ?? fallbackFilename
+    downloadBlob(response.data, filename)
+  } catch (error) {
+    snackbarStore.error(`Failed to download file: ${relativePath}`, error)
+  } finally {
+    if (jobId !== undefined) {
+      downloadingJobIds.value.delete(jobId)
+    }
   }
 }
 
@@ -553,57 +587,64 @@ onUnmounted(() => {
               </v-btn>
             </div>
 
-            <div class="active-uploads-list">
-              <div v-for="item in uploadStore.uploads" :key="item.id" class="upload-list-item">
-                <div class="upload-item-prefix">
-                  <v-progress-circular
-                    v-if="item.status === 'uploading'"
-                    :model-value="(item.bytesUploaded / item.size) * 100"
-                    :indeterminate="item.bytesUploaded / item.size === 1"
-                    color="primary"
-                    size="24"
-                    width="3"
-                  />
-                  <v-icon
-                    v-else
-                    :color="getStatusColor(item.status)"
-                    :icon="getStatusIcon(item.status)"
-                  />
-                </div>
+            <v-virtual-scroll
+              :items="sortedUploads"
+              height="350"
+              item-height="62"
+              class="active-uploads-list"
+            >
+              <template #default="{ item }">
+                <div class="upload-list-item">
+                  <div class="upload-item-prefix">
+                    <v-progress-circular
+                      v-if="item.status === 'uploading'"
+                      :model-value="(item.bytesUploaded / item.size) * 100"
+                      :indeterminate="item.bytesUploaded / item.size === 1"
+                      color="primary"
+                      size="24"
+                      width="3"
+                    />
+                    <v-icon
+                      v-else
+                      :color="getStatusColor(item.status)"
+                      :icon="getStatusIcon(item.status)"
+                    />
+                  </div>
 
-                <div class="upload-item-details">
-                  <div class="upload-item-name">{{ item.name }}</div>
-                  <div class="upload-item-meta">
-                    {{ prettyBytes(item.bytesUploaded) }} / {{ prettyBytes(item.size) }}
-                    <span v-if="item.error" class="error-text">&bull; {{ item.error }}</span>
+                  <div class="upload-item-details">
+                    <div class="upload-item-name">{{ item.name }}</div>
+                    <div class="upload-item-meta">
+                      {{ prettyBytes(item.bytesUploaded) }} / {{ prettyBytes(item.size) }}
+                      <span v-if="item.error" class="error-text">&bull; {{ item.error }}</span>
+                    </div>
+                  </div>
+
+                  <v-spacer />
+
+                  <div class="upload-item-actions">
+                    <span class="progress-percent" v-if="item.status === 'uploading'">
+                      {{ ((item.bytesUploaded / item.size) * 100).toFixed(0) }}%
+                    </span>
+                    <v-btn
+                      v-if="item.status === 'uploading' || item.status === 'pending'"
+                      color="error"
+                      variant="tonal"
+                      :icon="MdiStop"
+                      size="x-small"
+                      @click="uploadStore.stopUpload(item.id)"
+                    />
+                    <v-btn
+                      v-else
+                      color="grey"
+                      variant="text"
+                      :icon="MdiClose"
+                      size="x-small"
+                      @click="uploadStore.removeUpload(item.id)"
+                    />
                   </div>
                 </div>
-
-                <v-spacer />
-
-                <div class="upload-item-actions">
-                  <span class="progress-percent" v-if="item.status === 'uploading'">
-                    {{ ((item.bytesUploaded / item.size) * 100).toFixed(0) }}%
-                  </span>
-                  <v-btn
-                    v-if="item.status === 'uploading' || item.status === 'pending'"
-                    color="error"
-                    variant="tonal"
-                    :icon="MdiStop"
-                    size="x-small"
-                    @click="uploadStore.stopUpload(item.id)"
-                  />
-                  <v-btn
-                    v-else
-                    color="grey"
-                    variant="text"
-                    :icon="MdiClose"
-                    size="x-small"
-                    @click="uploadStore.removeUpload(item.id)"
-                  />
-                </div>
-              </div>
-            </div>
+              </template>
+            </v-virtual-scroll>
           </div>
         </v-card>
       </div>
@@ -718,13 +759,25 @@ onUnmounted(() => {
                   <v-btn
                     v-if="item.status === 'failed'"
                     :icon="MdiCached"
-                    variant="tonal"
+                    variant="text"
                     color="primary"
                     density="comfortable"
                     size="small"
                     :loading="retryingJobIds.has(item.id)"
                     @click="handleRetry(item.id)"
                     title="Retry Job"
+                  />
+                  <!-- Download button for failed -->
+                  <v-btn
+                    v-if="item.status === 'failed' && item.relativePath"
+                    :icon="MdiDownloadOutline"
+                    variant="text"
+                    color="secondary"
+                    density="comfortable"
+                    size="small"
+                    :loading="downloadingJobIds.has(item.id)"
+                    @click="handleDownload(item.relativePath, item.id)"
+                    title="Download File"
                   />
                   <!-- Detail info button -->
                   <v-btn
@@ -835,6 +888,19 @@ onUnmounted(() => {
             class="dialog-action-btn"
           >
             Retry Job
+          </v-btn>
+          <!-- Download Button -->
+          <v-btn
+            v-if="detailedJob?.relativePath"
+            variant="tonal"
+            color="secondary"
+            :prepend-icon="MdiDownloadOutline"
+            rounded="xl"
+            :loading="detailedJob ? downloadingJobIds.has(detailedJob.id) : false"
+            @click="detailedJob && handleDownload(detailedJob.relativePath, detailedJob.id)"
+            class="dialog-action-btn"
+          >
+            Download File
           </v-btn>
           <v-spacer />
           <v-btn color="secondary" variant="text" rounded="xl" @click="closeDetails">Close</v-btn>
@@ -1008,17 +1074,18 @@ onUnmounted(() => {
 
 .active-uploads-list {
   max-height: 350px;
-  overflow-y: auto;
   padding-right: 4px;
 }
 
 .upload-list-item {
   display: flex;
   align-items: center;
-  padding: 12px 14px;
+  padding: 10px 14px;
   background-color: rgb(var(--v-theme-surface-container-high));
   border-radius: 16px;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
+  height: 56px;
+  box-sizing: border-box;
   transition: background-color 0.2s ease;
 }
 

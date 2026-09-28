@@ -96,8 +96,18 @@ pub async fn generate_thumbnails(
     };
 
     // todo: thumbs_exist should include panorama and motion photo video
+    let pano_check = if config.generate_panorama_tiles {
+        Some(pano_sub_folder)
+    } else {
+        None
+    };
     if !ingestion.thumbnails.recreate_if_exists
-        && ingestion.thumbs_exist(file, &sub_folder_name, Some(pano_sub_folder), true)?
+        && ingestion.thumbs_exist(
+            file,
+            &sub_folder_name,
+            pano_check,
+            config.extract_motion_photo,
+        )?
     {
         return Ok(ThumbnailOutput {
             already_exists: true,

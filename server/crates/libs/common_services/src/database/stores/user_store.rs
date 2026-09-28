@@ -4,6 +4,7 @@ use crate::database::tables::app_user::{User, UserInvite, UserRole, UserWithPass
 use chrono::{DateTime, Utc};
 use sqlx::postgres::PgQueryResult;
 use sqlx::{Executor, Postgres};
+use std::path::Path;
 
 pub struct UserStore;
 
@@ -232,7 +233,7 @@ impl UserStore {
 
         for user in users {
             if let Some(media_folder) = &user.media_folder
-                && relative_path.starts_with(media_folder)
+                && Path::new(&relative_path).starts_with(media_folder)
                 && media_folder.len() as i32 > max_len
             {
                 max_len = media_folder.len() as i32;

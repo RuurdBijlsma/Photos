@@ -68,8 +68,20 @@ export const useAuthStore = defineStore('auth', () => {
    * Fetches the current user's data using the access token cookie.
    */
   async function fetchCurrentUser() {
-    const response = await authService.getMe()
-    user.value = response.data
+    try {
+      const response = await authService.getMe()
+      user.value = response.data
+
+      if (router?.currentRoute?.value?.meta?.guest) {
+        await router.push({ name: 'timeline' })
+      }
+    } catch (error) {
+      const status = (error as { response?: { status?: number } })?.response?.status
+      if (status === 401 || status === 403) {
+        user.value = null
+      }
+      throw error
+    }
   }
 
   /**

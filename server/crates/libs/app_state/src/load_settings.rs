@@ -15,7 +15,7 @@ pub fn load_settings_from_path(path: &Path, env_path: Option<&Path>) -> Result<A
         let mut builder = Config::builder().add_source(File::from(path));
         if env_path.is_some() {
             builder = builder.add_source(
-                config::Environment::with_prefix("APP")
+                config::Environment::with_prefix("RP")
                     .separator("__")
                     .try_parsing(true),
             );

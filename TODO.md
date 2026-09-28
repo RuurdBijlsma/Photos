@@ -20,7 +20,6 @@
 * door alle requests kijken op verse page load om te zien of ze allemaal relevant zijn (ik zag thunder icon geladen worden op timeline page load)
 * in failed list op ingest pagina, download knop voor de file toevoegen zodat je kan inspecteren of ie stuk is
 * fix PWA icons (currently has black borders on firefox for some reason)
-* [PLS FIX] remove all requests that block the UI from rendering (i think auth & possibly system stats)
 
 # SERVER
 
@@ -31,6 +30,12 @@
 * better error if exiftool isnt there (worker wont work then)
 * apply rotation immidiately when going next/prev to other media item.
 * AVI toevoegen aan settings video_extensions
+* The original `PXL_20260911_122108760.jpg` puts exiftool in an infinite loop.
+  * possible solution -> if hangs (in media analyzer), then run:
+    * `exiftool -HDRPlusMakerNote= -overwrite_original <temp_file>`
+    * might as well also delete: `MakerNotes`
+  * on a temp file to get the exif data
+  * On a detected hang it should kill & restart the exiftool daemon
 
 # INFRASTRUCTURE:
 

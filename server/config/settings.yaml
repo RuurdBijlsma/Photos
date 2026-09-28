@@ -27,6 +27,7 @@ ingest:
       - "flv"
       - "m4v"
       - "m4p"
+      - "avi"
     photo_extensions:
       - "jpg"
       - "jpeg"
@@ -141,7 +142,7 @@ scaler:
     light:
       priority: 1
       estimated_ram_mb: 100
-      max_workers: 5
+      max_workers: 3
       excluded_jobs:
         - "ingest_thumbnails" # Needs worker limit
         - "ingest_analysis" # Needs VisualAnalysis (CLIP visual embedder, face models, object detection models)
@@ -149,13 +150,13 @@ scaler:
     thumbnails:
       priority: 2
       estimated_ram_mb: 1000
-      max_workers: 2
+      max_workers: 1
       excluded_jobs:
         - "ingest_analysis"
         - "cluster_photos"
     ml:
       priority: 3
       estimated_ram_mb: 1000
-      max_workers: 2
+      max_workers: 1
       excluded_jobs:
         - "ingest_thumbnails"

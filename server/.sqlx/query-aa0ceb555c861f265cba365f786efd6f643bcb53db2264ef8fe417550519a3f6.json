@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM person p\n         WHERE p.name IS NULL\n           AND NOT EXISTS (SELECT 1 FROM face_cluster fc WHERE fc.person_id = p.id)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "aa0ceb555c861f265cba365f786efd6f643bcb53db2264ef8fe417550519a3f6"
+}

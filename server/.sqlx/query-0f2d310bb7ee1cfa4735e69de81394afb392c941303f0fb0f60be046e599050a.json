@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT DISTINCT o.tag\n           FROM object o\n           JOIN visual_analysis va ON va.id = o.visual_analysis_id\n           WHERE  va.deleted = false",
+  "query": "SELECT DISTINCT o.tag\n           FROM object o\n           JOIN visual_analysis va ON va.id = o.visual_analysis_id\n           WHERE va.deleted = false",
   "describe": {
     "columns": [
       {
@@ -22,5 +22,5 @@
       false
     ]
   },
-  "hash": "a3d61fe91bbc2a662f493c11923a69096c9703ece972a96b9a09f1dd73ae9719"
+  "hash": "0f2d310bb7ee1cfa4735e69de81394afb392c941303f0fb0f60be046e599050a"
 }

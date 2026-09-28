@@ -1,7 +1,7 @@
 use crate::api::app_error::AppError;
-use crate::api::auth::hashing::{hash_password, verify_password};
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use rand::{Rng, rng};
+use sha2::{Digest, Sha256};
 
 /// Represents the components of a refresh token for secure storage and verification.
 pub struct RefreshTokenParts {
@@ -20,8 +20,7 @@ pub fn generate_refresh_token_parts() -> Result<RefreshTokenParts, AppError> {
 
     let selector = URL_SAFE_NO_PAD.encode(selector_bytes);
     let raw_token = URL_SAFE_NO_PAD.encode(raw_bytes);
-    let verifier_hash = hash_password(verifier_bytes)?;
-
+    let verifier_hash = hex::encode(Sha256::digest(verifier_bytes));
     Ok(RefreshTokenParts {
         raw_token,
         selector,
@@ -49,5 +48,6 @@ pub fn split_refresh_token(token: &str) -> Result<(String, Vec<u8>), AppError> {
 ///
 /// * `AppError::Internal` if password verification fails internally.
 pub fn verify_token(verifier_bytes: &[u8], verifier_hash: &str) -> Result<bool, AppError> {
-    Ok(verify_password(verifier_bytes, verifier_hash)?)
+    let expected_hash = hex::encode(Sha256::digest(verifier_bytes));
+    Ok(expected_hash == verifier_hash)
 }

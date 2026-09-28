@@ -492,13 +492,11 @@ pub async fn reprocess_media_item(
     relative_path: &str,
 ) -> Result<(), AppError> {
     let file_path = settings.media_root.join(relative_path);
-    dbg!("Reprocessing media item", &file_path);
     if !file_path.exists() {
         return Err(AppError::NotFound(
             "No file found for media item".to_owned(),
         ));
     }
-    dbg!("File exists");
 
     let analyzer = media_analyzer::MediaAnalyzer::builder()
         .build()
