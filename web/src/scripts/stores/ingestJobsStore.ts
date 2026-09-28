@@ -29,7 +29,7 @@ export const useIngestJobsStore = defineStore('ingestJobs', () => {
   const page = ref(1)
   const itemsPerPage = ref(10)
   const searchQuery = ref('')
-  const selectedTab = ref('queued') // queued, processing, failed
+  const selectedTab = ref('processing') // queued, processing, failed
 
   // Polling State & Connection Counters
   let pollingIntervalId: ReturnType<typeof setInterval> | null = null
