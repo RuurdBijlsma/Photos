@@ -30,7 +30,6 @@
 * better error if exiftool isnt there (worker wont work then)
 * apply rotation immidiately when going next/prev to other media item.
 * AVI toevoegen aan settings video_extensions
-* I change the file (orientation)
 * The original `PXL_20260911_122108760.jpg` puts exiftool in an infinite loop.
   * possible solution -> if hangs (in media analyzer), then run:
     * `exiftool -HDRPlusMakerNote= -overwrite_original <temp_file>`

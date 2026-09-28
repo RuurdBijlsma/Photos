@@ -27,6 +27,7 @@ ingest:
       - "flv"
       - "m4v"
       - "m4p"
+      - "avi"
     photo_extensions:
       - "jpg"
       - "jpeg"
