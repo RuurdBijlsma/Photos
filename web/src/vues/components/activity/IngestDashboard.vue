@@ -196,6 +196,20 @@ const isMetadataActive = computed(() => computeIngestRemaining('metadata') > 0)
 const isThumbnailsActive = computed(() => computeIngestRemaining('thumbnails') > 0)
 const isAnalysisActive = computed(() => computeIngestRemaining('analysis') > 0)
 
+const statusPriority: Record<string, number> = {
+  uploading: 0,
+  failed: 1,
+  pending: 2,
+  stopped: 3,
+  success: 4,
+}
+
+const sortedUploads = computed(() => {
+  return [...uploadStore.uploads].sort(
+    (a, b) => (statusPriority[a.status] ?? 99) - (statusPriority[b.status] ?? 99),
+  )
+})
+
 // Track processing rate speeds
 watch(
   () => uploadSuccessCount.value + uploadFailedCount.value,
@@ -545,7 +559,7 @@ onUnmounted(() => {
             </div>
 
             <v-virtual-scroll
-              :items="uploadStore.uploads"
+              :items="sortedUploads"
               height="350"
               item-height="62"
               class="active-uploads-list"
