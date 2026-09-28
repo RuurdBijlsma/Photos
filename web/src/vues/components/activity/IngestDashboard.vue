@@ -6,7 +6,13 @@ import { useSystemStore } from '@/scripts/stores/systemStore.ts'
 import RunningJobPill from '@/vues/components/activity/RunningJobPill.vue'
 import ShowSelectedFolder from '@/vues/components/onboarding/ShowSelectedFolder.vue'
 import type { JobInfo } from '@/scripts/types/api/admin.ts'
-import { prettyBytes, ProcessingRateTracker } from '@/scripts/utils.ts'
+import {
+  downloadBlob,
+  filenameFromHeaders,
+  prettyBytes,
+  ProcessingRateTracker,
+} from '@/scripts/utils.ts'
+import mediaItemService from '@/scripts/services/mediaItemService.ts'
 import PipelineCard from '@/vues/components/activity/PipelineCard.vue'
 import MdiAlertCircle from '~icons/mdi/alert-circle'
 import MdiAlertCircleOutline from '~icons/mdi/alert-circle-outline'
@@ -16,6 +22,7 @@ import MdiChevronRight from '~icons/mdi/chevron-right'
 import MdiClockOutline from '~icons/mdi/clock-outline'
 import MdiClose from '~icons/mdi/close'
 import MdiCloudUploadOutline from '~icons/mdi/cloud-upload-outline'
+import MdiDownloadOutline from '~icons/mdi/download-outline'
 import MdiFileDocumentOutline from '~icons/mdi/file-document-outline'
 import MdiFolderOpen from '~icons/mdi/folder-open'
 import MdiFolderSearchOutline from '~icons/mdi/folder-search-outline'
@@ -29,11 +36,13 @@ import MdiStopCircleOutline from '~icons/mdi/stop-circle-outline'
 import MdiTrashCanOutline from '~icons/mdi/trash-can-outline'
 import MdiTrayArrowUp from '~icons/mdi/tray-arrow-up'
 import { useAuthStore } from '@/scripts/stores/authStore.ts'
+import { useSnackbarsStore } from '@/scripts/stores/snackbarStore.ts'
 
 const ingestStore = useIngestJobsStore()
 const uploadStore = useUploadStore()
 const authStore = useAuthStore()
 const systemStore = useSystemStore()
+const snackbarStore = useSnackbarsStore()
 
 const mediaFolderUnavailable = computed(
   () =>
@@ -66,8 +75,9 @@ const fileInput = shallowRef<HTMLInputElement | null>(null)
 const folderInput = shallowRef<HTMLInputElement | null>(null)
 const dragover = ref(false)
 
-// Retrying tracking
+// Retrying & downloading tracking
 const retryingJobIds = ref<Set<number>>(new Set())
+const downloadingJobIds = ref<Set<number>>(new Set())
 
 // Detail Dialog
 const detailsDialog = ref(false)
@@ -301,6 +311,25 @@ async function handleRetry(jobId: number) {
     // Managed in store
   } finally {
     retryingJobIds.value.delete(jobId)
+  }
+}
+
+async function handleDownload(relativePath: string | null | undefined, jobId?: number) {
+  if (!relativePath) return
+  if (jobId !== undefined) {
+    downloadingJobIds.value.add(jobId)
+  }
+  try {
+    const response = await mediaItemService.downloadMediaFile(relativePath)
+    const fallbackFilename = relativePath.split(/[/\\]/).pop() || 'download'
+    const filename = filenameFromHeaders(response.headers) ?? fallbackFilename
+    downloadBlob(response.data, filename)
+  } catch (error) {
+    snackbarStore.error(`Failed to download file: ${relativePath}`, error)
+  } finally {
+    if (jobId !== undefined) {
+      downloadingJobIds.value.delete(jobId)
+    }
   }
 }
 
@@ -730,13 +759,25 @@ onUnmounted(() => {
                   <v-btn
                     v-if="item.status === 'failed'"
                     :icon="MdiCached"
-                    variant="tonal"
+                    variant="text"
                     color="primary"
                     density="comfortable"
                     size="small"
                     :loading="retryingJobIds.has(item.id)"
                     @click="handleRetry(item.id)"
                     title="Retry Job"
+                  />
+                  <!-- Download button for failed -->
+                  <v-btn
+                    v-if="item.status === 'failed' && item.relativePath"
+                    :icon="MdiDownloadOutline"
+                    variant="text"
+                    color="secondary"
+                    density="comfortable"
+                    size="small"
+                    :loading="downloadingJobIds.has(item.id)"
+                    @click="handleDownload(item.relativePath, item.id)"
+                    title="Download File"
                   />
                   <!-- Detail info button -->
                   <v-btn
@@ -847,6 +888,19 @@ onUnmounted(() => {
             class="dialog-action-btn"
           >
             Retry Job
+          </v-btn>
+          <!-- Download Button -->
+          <v-btn
+            v-if="detailedJob?.relativePath"
+            variant="tonal"
+            color="secondary"
+            :prepend-icon="MdiDownloadOutline"
+            rounded="xl"
+            :loading="detailedJob ? downloadingJobIds.has(detailedJob.id) : false"
+            @click="detailedJob && handleDownload(detailedJob.relativePath, detailedJob.id)"
+            class="dialog-action-btn"
+          >
+            Download File
           </v-btn>
           <v-spacer />
           <v-btn color="secondary" variant="text" rounded="xl" @click="closeDetails">Close</v-btn>
