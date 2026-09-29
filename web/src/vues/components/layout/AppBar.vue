@@ -20,12 +20,14 @@ import transLogo from '@/assets/img/logo/transparent/192.png'
 import { useResponsive } from '@/scripts/composables/useResponsive.ts'
 import { useRoute } from 'vue-router'
 import { useTimelineStore } from '@/scripts/stores/timeline/timelineStore.ts'
-import { useThrottleFn } from '@vueuse/core'
+import { useStorage, useThrottleFn } from '@vueuse/core'
+import { useSnackbarsStore } from '@/scripts/stores/snackbarStore.ts'
 
 const authStore = useAuthStore()
 const settings = useSettingStore()
 const systemStore = useSystemStore()
 const timelineStore = useTimelineStore()
+const snackbarStore = useSnackbarsStore()
 const responsive = useResponsive()
 const route = useRoute()
 
@@ -33,6 +35,7 @@ const menuOpen = ref(false)
 const ingestMenuOpen = ref(false)
 const isAppBarVisible = ref(true)
 const logoAngle = ref(0)
+const isClicker = useStorage('clickerUnlocked', false)
 let velocity = 0
 let lastTime = 0
 let animFrameId: number | null = null
@@ -78,7 +81,18 @@ function scrollTimelineToTop() {
   timelineStore.scrollToTop()
 }
 
+let clickCounter = 0
+const clickTarget = 100
+
 function onLogoClick() {
+  clickCounter += 1
+  if (clickCounter > clickTarget - 4 && clickCounter < clickTarget)
+    snackbarStore.info(`You are ${clickTarget - clickCounter} clicks away...`)
+  if (clickCounter === clickTarget) {
+    isClicker.value = true
+    snackbarStore.info(`You are now a clicker!`)
+  }
+  if (!isClicker.value) return
   // Add impulse on every click
   velocity = velocity + 0.9
 
