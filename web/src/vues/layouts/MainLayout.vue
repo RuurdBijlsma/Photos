@@ -4,11 +4,15 @@ import { useSettingStore } from '@/scripts/stores/settingsStore.ts'
 import NavDrawer from '@/vues/components/layout/NavDrawer.vue'
 import AppBar from '@/vues/components/layout/AppBar.vue'
 import { useAuthStore } from '@/scripts/stores/authStore.ts'
+import BottomNav from '@/vues/components/layout/BottomNav.vue'
+import { useDisplay } from 'vuetify/framework'
+import { watch } from 'vue'
 
 // Instantiate stores
 const backgroundStore = useBackgroundStore()
 const settings = useSettingStore()
 const authStore = useAuthStore()
+const display = useDisplay()
 
 // Initialize the stores.
 backgroundStore.initialize()
@@ -31,8 +35,13 @@ backgroundStore.initialize()
   <v-layout>
     <app-bar />
 
-    <nav-drawer v-if="authStore.isAuthenticated" />
-    <v-navigation-drawer :width="40" floating color="transparent" v-else></v-navigation-drawer>
+    <template v-if="authStore.isAuthenticated">
+      <bottom-nav v-if="display.mobile.value" />
+      <nav-drawer v-else />
+    </template>
+    <template v-else>
+      <v-navigation-drawer :width="40" floating color="transparent"></v-navigation-drawer>
+    </template>
 
     <v-main class="layout-body">
       <router-view class="router-view" />
