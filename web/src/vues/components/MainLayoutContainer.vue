@@ -47,12 +47,10 @@ withDefaults(
   height: 100%;
 }
 
-@media (max-width: 959.99px) {
-  .outer-container {
-    max-width: 100%;
-    border-top-left-radius: 20px;
-    border-top-right-radius: 20px;
-  }
+.is-mobile .outer-container {
+  max-width: 100%;
+  border-top-left-radius: 20px;
+  border-top-right-radius: 20px;
 }
 
 .outer-container.ignore-scrollbar {
@@ -99,13 +97,11 @@ withDefaults(
   scrollbar-width: none;
 }
 
-@media (max-width: 959.99px) {
-  .inner-container {
-    width: 100%;
-    height: 100%;
-    margin: 0;
-    border-radius: 0;
-  }
+.is-mobile .inner-container {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  border-radius: 0;
 }
 
 .fit-content .inner-container {

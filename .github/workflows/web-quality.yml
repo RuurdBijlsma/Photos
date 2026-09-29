@@ -4,7 +4,7 @@ on:
   push:
     branches: [ main ]
     paths:
-      - 'server/**'
+      - 'web/**'
       - '.github/workflows/web-quality.yml'
   pull_request:
     branches: [ main ]

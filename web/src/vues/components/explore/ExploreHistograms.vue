@@ -255,10 +255,8 @@ function getMonthLabelForWeek(weekNum: number): string | null {
   gap: 28px;
 }
 
-@media (min-width: 960px) {
-  .top-row {
-    grid-template-columns: 1fr 1fr;
-  }
+.is-mobile .top-row {
+  grid-template-columns: 1fr 1fr;
 }
 
 .histogram-card {

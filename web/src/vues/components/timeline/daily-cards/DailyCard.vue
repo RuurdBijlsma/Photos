@@ -6,11 +6,11 @@ import MdiImageArea from '~icons/mdi/image-area'
 import ThumbnailImg from '@/vues/components/ui/ThumbnailImg.vue'
 import type { DailyCardResponse } from '@/scripts/types/api/dailyCards.ts'
 import { useDailyCardStore } from '@/scripts/stores/timeline/dailyCardStore.ts'
-import { useDisplay } from 'vuetify/framework'
 import { computed } from 'vue'
+import { useResponsive } from '@/scripts/composables/useResponsive.ts'
 
 const cardStore = useDailyCardStore()
-const display = useDisplay()
+const responsive = useResponsive()
 
 const emit = defineEmits<{
   (e: 'close-card'): void
@@ -21,7 +21,7 @@ defineProps<{
   width: number
 }>()
 
-const borderRadius = computed(()=>display.mobile.value ? 70: 40)
+const borderRadius = computed(() => (responsive.isMobile.value ? 70 : 40))
 
 function closeCard(e: PointerEvent) {
   e.stopPropagation()

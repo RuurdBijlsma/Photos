@@ -87,14 +87,37 @@ watch(pickedDate, (newVal) => {
     0 6px 20px 0 rgba(0, 0, 0, 0.19);
 }
 
+.is-mobile .date-view {
+  top: 20px;
+  right: inherit;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 70%;
+  max-width: 270px;
+  text-align: center;
+  padding: 10px 20px;
+}
+
 .date-view-date {
   font-weight: 700;
   font-size: 22px;
   margin-right: 20px;
 }
 
+.is-mobile .date-view-date {
+  font-weight: 600;
+  font-size: 18px;
+  margin-right: 0;
+}
+
 .date-view-year {
   font-weight: 400;
   font-size: 16px;
+}
+
+.is-mobile .date-view-year {
+  font-weight: 500;
+  font-size: 18px;
+  margin-left: 10px;
 }
 </style>

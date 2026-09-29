@@ -29,7 +29,7 @@ import { useSettingStore } from '@/scripts/stores/settingsStore.ts'
 import DailyCardList from '@/vues/components/timeline/daily-cards/DailyCardList.vue'
 import { useDailyCardStore } from '@/scripts/stores/timeline/dailyCardStore.ts'
 import { useRefreshStore } from '@/scripts/stores/refreshStore.ts'
-import { useDisplay } from 'vuetify/framework'
+import { useResponsive } from '@/scripts/composables/useResponsive.ts'
 
 const timelineStore = useTimelineStore()
 const selectionStore = useSelectionStore()
@@ -45,7 +45,7 @@ const dailyCardsHeight = computed(() => {
 })
 const route = useRoute()
 const router = useRouter()
-const display = useDisplay()
+const responsive = useResponsive()
 
 const MAX_SIZE_MULTIPLIER = 1.5
 const ITEM_GAP = 2
@@ -93,7 +93,7 @@ const virtualizerOptions = computed(() => ({
 
 const desiredRowHeight = computed(
   () =>
-    (display.mobile.value ? DESIRED_ROW_HEIGHT_MOBILE : DESIRED_ROW_HEIGHT_DESKTOP) *
+    (responsive.isMobile.value ? DESIRED_ROW_HEIGHT_MOBILE : DESIRED_ROW_HEIGHT_DESKTOP) *
     settings.rowHeightMultiplier,
 )
 const rowVirtualizer = useVirtualizer(virtualizerOptions)

@@ -32,7 +32,7 @@ const openSearch = () => {
 
 <template>
   <div class="floating-nav-container">
-    <v-sheet class="nav-sheet">
+    <v-sheet class="nav-sheet" elevation="3">
       <v-btn
         v-for="tab in tabs"
         :key="tab.key"
@@ -50,7 +50,7 @@ const openSearch = () => {
       </v-btn>
     </v-sheet>
 
-    <v-btn :icon="MdiMagnify" class="search-btn" @click="openSearch" />
+    <v-btn :icon="MdiMagnify" class="search-btn" @click="openSearch" elevation="3" />
   </div>
 </template>
 

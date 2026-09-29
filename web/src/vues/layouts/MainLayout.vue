@@ -5,14 +5,13 @@ import NavDrawer from '@/vues/components/layout/NavDrawer.vue'
 import AppBar from '@/vues/components/layout/AppBar.vue'
 import { useAuthStore } from '@/scripts/stores/authStore.ts'
 import BottomNav from '@/vues/components/layout/BottomNav.vue'
-import { useDisplay } from 'vuetify/framework'
-import { watch } from 'vue'
+import { useResponsive } from '@/scripts/composables/useResponsive.ts'
 
 // Instantiate stores
 const backgroundStore = useBackgroundStore()
 const settings = useSettingStore()
 const authStore = useAuthStore()
-const display = useDisplay()
+const responsive = useResponsive()
 
 // Initialize the stores.
 backgroundStore.initialize()
@@ -36,7 +35,7 @@ backgroundStore.initialize()
     <app-bar />
 
     <template v-if="authStore.isAuthenticated">
-      <bottom-nav v-if="display.mobile.value" />
+      <bottom-nav v-if="responsive.isMobile.value" />
       <nav-drawer v-else />
     </template>
     <template v-else>

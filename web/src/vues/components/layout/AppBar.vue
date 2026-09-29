@@ -16,13 +16,13 @@ import { useSystemStore } from '@/scripts/stores/systemStore.ts'
 import { themeOptions } from '@/scripts/constants.ts'
 import { caps } from '@/scripts/utils.ts'
 import IngestOverlayMenu from '@/vues/components/activity/IngestOverlayMenu.vue'
-import { useDisplay } from 'vuetify/framework'
 import transLogo from '@/assets/img/logo/transparent/192.png'
+import { useResponsive } from '@/scripts/composables/useResponsive.ts'
 
 const authStore = useAuthStore()
 const settings = useSettingStore()
 const systemStore = useSystemStore()
-const display = useDisplay()
+const responsive = useResponsive()
 
 const menuOpen = ref(false)
 const ingestMenuOpen = ref(false)
@@ -47,10 +47,10 @@ async function logout() {
     elevation="0"
     v-model="isAppBarVisible"
   >
-    <v-img class="appbar-logo" :src="transLogo" v-if="display.mobile.value" />
+    <v-img class="appbar-logo" :src="transLogo" v-if="responsive.isMobile.value" />
     <h1 v-else class="appbar-title"><span>Ruurd</span> Photos</h1>
     <v-spacer />
-    <search-bar v-if="authStore.isAuthenticated && !display.mobile.value" />
+    <search-bar v-if="authStore.isAuthenticated && !responsive.isMobile.value" />
     <v-spacer />
     <div v-if="authStore.isAuthenticated" class="header-buttons">
       <!-- Sync Menu overlay for background ingestion state (hidden when on full activity page) -->
@@ -188,8 +188,9 @@ async function logout() {
 }
 
 .appbar-logo {
-  margin-left: 10px;
-  transform: scale(0.7);
+  transform: scale(0.65);
+  width: 80px;
+  flex-grow: 0;
 }
 
 .appbar-title > span {
@@ -200,6 +201,10 @@ async function logout() {
   display: flex;
   gap: 20px;
   align-items: center;
+}
+
+.header-buttons {
+  margin-right: 10px;
 }
 
 .menu-container {

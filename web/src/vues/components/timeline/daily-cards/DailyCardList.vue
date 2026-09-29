@@ -6,19 +6,19 @@ import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useResizeObserver } from '@vueuse/core'
 import DailyCard from '@/vues/components/timeline/daily-cards/DailyCard.vue'
 import type { DailyCardResponse } from '@/scripts/types/api/dailyCards.ts'
-import { useDisplay } from 'vuetify/framework'
+import { useResponsive } from '@/scripts/composables/useResponsive.ts'
 
 defineProps<{
   width: number
 }>()
 
-const display = useDisplay()
+const responsive = useResponsive()
 
 const cardStore = useDailyCardStore()
 const cards = computed(() => cardStore.todayCards)
 
-const cardHeight = computed(() => (display.mobile.value ? 200 : 300))
-const cardWidth = computed(() => (display.mobile.value ? 250 : 500))
+const cardHeight = computed(() => (responsive.isMobile.value ? 200 : 300))
+const cardWidth = computed(() => (responsive.isMobile.value ? 250 : 500))
 
 const containerRef = ref<HTMLElement | null>(null)
 const canScrollLeft = ref(false)
