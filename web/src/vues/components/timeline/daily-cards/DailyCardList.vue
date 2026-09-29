@@ -17,8 +17,7 @@ const responsive = useResponsive()
 const cardStore = useDailyCardStore()
 const cards = computed(() => cardStore.todayCards)
 
-const cardHeight = computed(() => (responsive.isMobile.value ? 200 : 300))
-const cardWidth = computed(() => (responsive.isMobile.value ? 250 : 500))
+const cardWidth = computed(() => (responsive.isMobile.value ? 170 : 500))
 
 const containerRef = ref<HTMLElement | null>(null)
 const canScrollLeft = ref(false)
@@ -114,7 +113,11 @@ onMounted(() => cardStore.fetchDailyCards())
 .daily-cards-wrapper {
   position: relative;
   width: calc(v-bind(width) * 1px);
-  height: calc(v-bind(cardHeight) * 1px);
+  height: 300px;
+}
+
+.is-mobile .daily-cards-wrapper {
+  height: 250px;
 }
 
 .daily-cards {
@@ -127,6 +130,11 @@ onMounted(() => cardStore.fetchDailyCards())
   overflow-x: auto;
   scrollbar-width: none;
   -ms-overflow-style: none;
+}
+
+.is-mobile .daily-cards {
+  gap: 5px;
+  padding: 5px;
 }
 
 .daily-cards::-webkit-scrollbar {

@@ -21,7 +21,7 @@ defineProps<{
   width: number
 }>()
 
-const borderRadius = computed(() => (responsive.isMobile.value ? 70 : 40))
+const borderRadius = computed(() => (responsive.isMobile.value ? 30 : 40))
 
 function closeCard(e: PointerEvent) {
   e.stopPropagation()
@@ -66,7 +66,7 @@ function isGame(cardType: string) {
             <h2>{{ card.title }}</h2>
             <p>{{ card.subtitle }}</p>
           </div>
-          <div class="card-icon-container">
+          <div class="card-icon-container" v-if="!responsive.isMobile.value">
             <v-icon
               size="40"
               :icon="cardStore.completedCards.includes(card.id) ? MdiCheck : MdiController"
@@ -144,6 +144,12 @@ function isGame(cardType: string) {
   padding: 15px 30px;
 }
 
+.is-mobile .card-info {
+  padding: 15px 15px;
+  text-align: center;
+  width: 100%;
+}
+
 .card-thumb {
   position: absolute;
   top: 0;
@@ -166,7 +172,15 @@ function isGame(cardType: string) {
   font-weight: 600;
 }
 
+.is-mobile .daily-card h2 {
+  font-size: 15px;
+}
+
 .daily-card p {
   margin: 0;
+}
+
+.is-mobile .daily-card p {
+  font-size: 12px;
 }
 </style>

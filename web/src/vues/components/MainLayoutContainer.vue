@@ -49,8 +49,8 @@ withDefaults(
 
 .is-mobile .outer-container {
   max-width: 100%;
-  border-top-left-radius: 20px;
-  border-top-right-radius: 20px;
+  border-top-left-radius: 35px;
+  border-top-right-radius: 35px;
 }
 
 .outer-container.ignore-scrollbar {

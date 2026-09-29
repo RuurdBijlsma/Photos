@@ -37,6 +37,7 @@
 * make click on logo in appbar take you to timeline
 * Photo viewer is uggo
 * activity view is uggo
+* fix snackbars
 
 # SERVER
 
