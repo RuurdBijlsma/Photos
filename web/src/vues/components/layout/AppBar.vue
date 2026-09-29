@@ -7,7 +7,7 @@ import MdiLogout from '~icons/mdi/logout'
 import MdiSecurity from '~icons/mdi/security'
 import MdiSync from '~icons/mdi/sync'
 import MdiUpload from '~icons/mdi/upload'
-import { computed, ref } from 'vue'
+import { computed, onBeforeUnmount, ref } from 'vue'
 import SearchBar from '@/vues/components/ui/SearchBar.vue'
 import { useAuthStore } from '@/scripts/stores/authStore.ts'
 import UserAvatar from '@/vues/components/ui/UserAvatar.vue'
@@ -20,6 +20,7 @@ import transLogo from '@/assets/img/logo/transparent/192.png'
 import { useResponsive } from '@/scripts/composables/useResponsive.ts'
 import { useRoute } from 'vue-router'
 import { useTimelineStore } from '@/scripts/stores/timeline/timelineStore.ts'
+import { useThrottleFn } from '@vueuse/core'
 
 const authStore = useAuthStore()
 const settings = useSettingStore()
@@ -31,7 +32,11 @@ const route = useRoute()
 const menuOpen = ref(false)
 const ingestMenuOpen = ref(false)
 const isAppBarVisible = ref(true)
-const isLogoSpinning = ref(false)
+const logoAngle = ref(0)
+let velocity = 0
+let lastTime = 0
+let animFrameId: number | null = null
+
 const isSearch = computed(() => route.name === 'search')
 const showSearchBar = computed(
   () => authStore.isAuthenticated && (isSearch.value || !responsive.isMobile),
@@ -40,11 +45,55 @@ const showSearchBar = computed(
 const mediaFolderAvailable = computed(() => systemStore.stats.mediaFolderAvailable !== false)
 const showIngestMenu = computed(() => systemStore.stats.isIngesting || !mediaFolderAvailable.value)
 
-function onLogoClick() {
-  if (isLogoSpinning.value) return
-  isLogoSpinning.value = true
+function updateSpin(now: number) {
+  const dt = Math.min(now - lastTime, 64)
+  lastTime = now
+
+  logoAngle.value += velocity * dt
+  // Friction decay (frame-rate independent)
+  velocity *= Math.pow(0.96, dt / 16.67)
+
+  // Once velocity is low enough, gently snap to the nearest full 360-degree rotation
+  if (velocity < 0.05) {
+    const target = Math.round(logoAngle.value / 360) * 360
+    const diff = target - logoAngle.value
+
+    if (Math.abs(diff) < 0.5) {
+      logoAngle.value = 0
+      velocity = 0
+      animFrameId = null
+      return
+    }
+
+    logoAngle.value += diff * Math.min(1, (dt / 16.67) * 0.15)
+  }
+
+  console.log('spin')
+
+  animFrameId = requestAnimationFrame(updateSpin)
+}
+
+const handleScrollToTop = useThrottleFn(scrollTimelineToTop, 1000, false, true)
+function scrollTimelineToTop() {
   timelineStore.scrollToTop()
 }
+
+function onLogoClick() {
+  // Add impulse on every click
+  velocity = velocity + 0.9
+
+  if (animFrameId === null) {
+    lastTime = performance.now()
+    animFrameId = requestAnimationFrame(updateSpin)
+  }
+  handleScrollToTop()
+}
+
+onBeforeUnmount(() => {
+  if (animFrameId !== null) {
+    cancelAnimationFrame(animFrameId)
+  }
+})
 
 async function logout() {
   menuOpen.value = false
@@ -66,12 +115,11 @@ async function logout() {
     <template v-if="responsive.isMobile.value">
       <img
         class="appbar-logo"
-        :class="{ 'spin-once': isLogoSpinning }"
+        :style="{ transform: `scale(0.5) rotate(${logoAngle}deg)` }"
         :src="transLogo"
         v-if="!isSearch"
         alt="app logo"
         @click="onLogoClick"
-        @animationend="isLogoSpinning = false"
       />
       <v-spacer />
       <search-bar v-if="showSearchBar" />
@@ -224,19 +272,9 @@ async function logout() {
   width: 80px;
   flex-grow: 0;
   cursor: pointer;
-}
-
-.spin-once {
-  animation: spin-once 0.6s ease-in-out;
-}
-
-@keyframes spin-once {
-  from {
-    transform: scale(0.5) rotate(0deg);
-  }
-  to {
-    transform: scale(0.5) rotate(360deg);
-  }
+  user-select: none;
+  -webkit-user-drag: none;
+  will-change: transform;
 }
 
 .appbar-title > span {

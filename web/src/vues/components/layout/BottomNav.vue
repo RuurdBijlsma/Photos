@@ -5,8 +5,10 @@ import MdiImage from '~icons/mdi/image'
 import MdiImageAlbum from '~icons/mdi/image-album'
 import MdiCompass from '~icons/mdi/compass'
 import MdiMagnify from '~icons/mdi/magnify'
+import { useTimelineStore } from '@/scripts/stores/timeline/timelineStore.ts'
 
 const route = useRoute()
+const timelineStore = useTimelineStore()
 
 const tabs = [
   {
@@ -45,12 +47,19 @@ const activeTab = computed(() => {
   const path = route.path
   return tabs.find((tab) => tab.match(path))?.key
 })
+
+function handleClick(tabKey: string) {
+  if (tabKey === 'photos') {
+    timelineStore.scrollToTop()
+  }
+}
 </script>
 
 <template>
   <div class="floating-nav-container">
     <v-sheet color="surface-container" class="nav-sheet" elevation="3">
       <v-btn
+        @click="handleClick(tab.key)"
         v-for="tab in tabs"
         :key="tab.key"
         :variant="activeTab === tab.key ? 'flat' : 'text'"
