@@ -119,7 +119,6 @@ function formatCoords(lat: number | null, lon: number | null): string {
         item-value="id"
         hover
         class="explore-server-table"
-        @update:options="loadTableData"
         @click:row="onRowClick"
       >
         <!-- Thumbnail Column -->

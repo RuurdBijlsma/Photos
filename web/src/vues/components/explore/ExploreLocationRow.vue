@@ -17,11 +17,20 @@ const containerRef = shallowRef<HTMLElement | null>(null)
 const canScrollLeft = ref(false)
 const canScrollRight = ref(false)
 
+let rafId: number | null = null
+
 function updateScrollButtons() {
-  const el = containerRef.value
-  if (!el) return
-  canScrollLeft.value = el.scrollLeft > 1.5
-  canScrollRight.value = el.scrollLeft + el.clientWidth < el.scrollWidth - 1.5
+  if (rafId !== null) cancelAnimationFrame(rafId)
+
+  rafId = requestAnimationFrame(() => {
+    const el = containerRef.value
+    if (!el) return
+    const left = el.scrollLeft > 1.5
+    const right = el.scrollLeft + el.clientWidth < el.scrollWidth - 1.5
+
+    if (canScrollLeft.value !== left) canScrollLeft.value = left
+    if (canScrollRight.value !== right) canScrollRight.value = right
+  })
 }
 
 function scroll(direction: 'left' | 'right') {

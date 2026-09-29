@@ -127,10 +127,7 @@ function getMonthLabelForWeek(weekNum: number): string | null {
                 v-for="day in daysData"
                 :key="day.label"
                 class="chart-column"
-                v-tooltip="{
-                  text: `${day.fullName}: ${day.count} photos & videos`,
-                  location: 'top',
-                }"
+                :title="`${day.fullName}: ${day.count} photos & videos`"
               >
                 <div class="bar-container">
                   <div
@@ -159,10 +156,7 @@ function getMonthLabelForWeek(weekNum: number): string | null {
                 v-for="hour in hoursData"
                 :key="hour.hour"
                 class="chart-column"
-                v-tooltip="{
-                  text: `${hour.label}: ${hour.count} photos & videos`,
-                  location: 'top',
-                }"
+                :title="`${hour.label}: ${hour.count} photos & videos`"
               >
                 <div class="bar-container">
                   <div
@@ -199,10 +193,7 @@ function getMonthLabelForWeek(weekNum: number): string | null {
               v-for="week in weeksData"
               :key="week.week"
               class="chart-column thin-column"
-              v-tooltip="{
-                text: `Week ${week.week}: ${week.count} photos & videos`,
-                location: 'top',
-              }"
+              :title="`Week ${week.week}: ${week.count} photos & videos`"
             >
               <div class="bar-container">
                 <div
