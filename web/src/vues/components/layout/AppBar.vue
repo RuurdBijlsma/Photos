@@ -16,10 +16,13 @@ import { useSystemStore } from '@/scripts/stores/systemStore.ts'
 import { themeOptions } from '@/scripts/constants.ts'
 import { caps } from '@/scripts/utils.ts'
 import IngestOverlayMenu from '@/vues/components/activity/IngestOverlayMenu.vue'
+import { useDisplay } from 'vuetify/framework'
+import transLogo from '@/assets/img/logo/transparent/192.png'
 
 const authStore = useAuthStore()
 const settings = useSettingStore()
 const systemStore = useSystemStore()
+const display = useDisplay()
 
 const menuOpen = ref(false)
 const ingestMenuOpen = ref(false)
@@ -36,9 +39,10 @@ async function logout() {
 
 <template>
   <v-app-bar density="comfortable" :height="70" class="header" color="transparent" elevation="0">
-    <h1 class="appbar-title"><span>Ruurd</span> Photos</h1>
+    <v-img class="appbar-logo" :src="transLogo" v-if="display.mobile.value" />
+    <h1 v-else class="appbar-title"><span>Ruurd</span> Photos</h1>
     <v-spacer />
-    <search-bar v-if="authStore.isAuthenticated" />
+    <search-bar v-if="authStore.isAuthenticated && !display.mobile.value" />
     <v-spacer />
     <div v-if="authStore.isAuthenticated" class="header-buttons">
       <!-- Sync Menu overlay for background ingestion state (hidden when on full activity page) -->
@@ -173,6 +177,11 @@ async function logout() {
   font-size: 20px;
   margin-left: 50px;
   opacity: 0.8;
+}
+
+.appbar-logo{
+  margin-left: 10px;
+  transform: scale(.7);
 }
 
 .appbar-title > span {

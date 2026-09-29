@@ -845,7 +845,7 @@ if (!timelineStore.isInitialized) timelineStore.initialize()
     </main-layout-container>
 
     <div
-      class="timeline-scroll"
+      class="timeline-scroll d-none d-md-block"
       ref="scrollTrack"
       @mousedown="handleMouseDown"
       @mousemove="handleTooltipMove"
