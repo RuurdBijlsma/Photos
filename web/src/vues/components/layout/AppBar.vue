@@ -71,8 +71,6 @@ function updateSpin(now: number) {
     logoAngle.value += diff * Math.min(1, (dt / 16.67) * 0.15)
   }
 
-  console.log('spin')
-
   animFrameId = requestAnimationFrame(updateSpin)
 }
 

@@ -50,7 +50,7 @@ const backgroundColor = computed(() => stringToColor(props.name))
 <style scoped>
 .img-cover {
   object-fit: cover;
-  width:100%;
-  height:100%;
+  width: 100%;
+  height: 100%;
 }
 </style>
