@@ -47,7 +47,12 @@ async function logout() {
     elevation="0"
     v-model="isAppBarVisible"
   >
-    <v-img class="appbar-logo" :src="transLogo" v-if="responsive.isMobile.value" />
+    <img
+      class="appbar-logo"
+      :src="transLogo"
+      v-if="responsive.isMobile.value"
+      alt="app logo"
+    />
     <h1 v-else class="appbar-title"><span>Ruurd</span> Photos</h1>
     <v-spacer />
     <search-bar v-if="authStore.isAuthenticated && !responsive.isMobile.value" />
@@ -188,7 +193,7 @@ async function logout() {
 }
 
 .appbar-logo {
-  transform: scale(0.65);
+  transform: scale(0.5);
   width: 80px;
   flex-grow: 0;
 }

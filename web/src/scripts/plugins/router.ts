@@ -114,6 +114,12 @@ const router = createRouter({
           ],
         },
         {
+          path: 'collections',
+          name: 'collections',
+          meta: { title: 'Collections' },
+          component: () => import('@/vues/views/main/CollectionsView.vue'),
+        },
+        {
           path: 'bin',
           name: 'bin',
           meta: { title: 'Bin' },

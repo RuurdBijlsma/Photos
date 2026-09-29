@@ -42,7 +42,15 @@ const backgroundColor = computed(() => stringToColor(props.name))
     }"
     :color="avatarId ? undefined : backgroundColor"
   >
-    <v-img v-if="avatarUrl" :src="avatarUrl" cover />
+    <img class="img-cover" v-if="avatarUrl" :src="avatarUrl" alt="avatar" />
     <template v-else>{{ initials }}</template>
   </v-avatar>
 </template>
+
+<style scoped>
+.img-cover {
+  object-fit: cover;
+  width:100%;
+  height:100%;
+}
+</style>

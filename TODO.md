@@ -22,15 +22,7 @@
 * fix PWA icons (currently has black borders on firefox for some reason)
 * [MOBILE REFACTOR]
 * Bottom nav
-  * Make work with router
-  * Click on search takes you to /search
-  * explore takes you to /explore
-  * make dedicated collections page
-    * map
-    * bin
-    * cameras
-    * people
-    * albums
+  * Click on search takes you to search
 * hide app bar when scrolling down
 * Fix simpletimeline for mobile
 * make click on Photos scroll you up in timeline

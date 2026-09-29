@@ -1,33 +1,51 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import MdiImage from '~icons/mdi/image'
 import MdiImageAlbum from '~icons/mdi/image-album'
 import MdiCompass from '~icons/mdi/compass'
 import MdiMagnify from '~icons/mdi/magnify'
 
-const activeTab = ref('photos')
+const route = useRoute()
+const router = useRouter()
 
 const tabs = [
   {
     icon: MdiImage,
     text: 'Photos',
     key: 'photos',
+    to: '/',
+    match: (path: string) => path === '/',
   },
   {
     icon: MdiImageAlbum,
     text: 'Collections',
     key: 'collections',
+    to: '/collections',
+    match: (path: string) =>
+      path === '/collections' ||
+      path.startsWith('/map') ||
+      path.startsWith('/bin') ||
+      path.startsWith('/cameras') ||
+      path.startsWith('/camera/') ||
+      path.startsWith('/people') ||
+      path.startsWith('/person/') ||
+      path.startsWith('/albums') ||
+      path.startsWith('/album/'),
   },
   {
     icon: MdiCompass,
     text: 'Explore',
     key: 'explore',
+    to: '/explore',
+    match: (path: string) => path.startsWith('/explore'),
   },
 ]
 
-const openSearch = () => {
-  console.log('Search clicked')
-}
+const activeTab = computed(() => {
+  const path = route.path
+  return tabs.find((tab) => tab.match(path))?.key
+})
 </script>
 
 <template>
@@ -44,13 +62,14 @@ const openSearch = () => {
           activeTab === tab.key ? 'tab-btn--active' : 'tab-btn--inactive',
         ]"
         rounded="pill"
-        @click="activeTab = tab.key"
+        :active="false"
+        :to="tab.to"
       >
         {{ tab.text }}
       </v-btn>
     </v-sheet>
 
-    <v-btn :icon="MdiMagnify" class="search-btn" @click="openSearch" elevation="3" />
+    <v-btn to="/search" :icon="MdiMagnify" class="search-btn" elevation="3" />
   </div>
 </template>
 
