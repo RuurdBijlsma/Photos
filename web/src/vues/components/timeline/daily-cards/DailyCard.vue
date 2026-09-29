@@ -6,8 +6,11 @@ import MdiImageArea from '~icons/mdi/image-area'
 import ThumbnailImg from '@/vues/components/ui/ThumbnailImg.vue'
 import type { DailyCardResponse } from '@/scripts/types/api/dailyCards.ts'
 import { useDailyCardStore } from '@/scripts/stores/timeline/dailyCardStore.ts'
+import { useDisplay } from 'vuetify/framework'
+import { computed } from 'vue'
 
 const cardStore = useDailyCardStore()
+const display = useDisplay()
 
 const emit = defineEmits<{
   (e: 'close-card'): void
@@ -17,6 +20,8 @@ defineProps<{
   card: DailyCardResponse
   width: number
 }>()
+
+const borderRadius = computed(()=>display.mobile.value ? 70: 40)
 
 function closeCard(e: PointerEvent) {
   e.stopPropagation()
@@ -84,7 +89,7 @@ function isGame(cardType: string) {
   display: block;
   height: 100%;
   width: calc(v-bind(width) * 1px);
-  border-radius: 40px;
+  border-radius: calc(v-bind(borderRadius) * 1px);
   flex-shrink: 0;
   flex-grow: 0;
   position: relative;
@@ -106,14 +111,13 @@ function isGame(cardType: string) {
   width: 100%;
   height: 100%;
   background: linear-gradient(180deg, rgba(0, 0, 0, 0) 30%, rgba(0, 0, 0, 0.6) 100%);
-  border-radius: 40px;
+  border-radius: calc(v-bind(borderRadius) * 1px);
   overflow: hidden;
 }
 
 .card-top {
   display: flex;
   justify-content: flex-end;
-  padding: 20px;
 }
 
 .close-button {
@@ -146,7 +150,7 @@ function isGame(cardType: string) {
   left: 0;
   width: 100%;
   height: 100%;
-  border-radius: 40px;
+  border-radius: calc(v-bind(borderRadius) * 1px);
   overflow: hidden;
 }
 

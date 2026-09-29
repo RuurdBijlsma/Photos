@@ -6,13 +6,19 @@ import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useResizeObserver } from '@vueuse/core'
 import DailyCard from '@/vues/components/timeline/daily-cards/DailyCard.vue'
 import type { DailyCardResponse } from '@/scripts/types/api/dailyCards.ts'
+import { useDisplay } from 'vuetify/framework'
 
 defineProps<{
   width: number
 }>()
 
+const display = useDisplay()
+
 const cardStore = useDailyCardStore()
 const cards = computed(() => cardStore.todayCards)
+
+const cardHeight = computed(() => (display.mobile.value ? 200 : 300))
+const cardWidth = computed(() => (display.mobile.value ? 250 : 500))
 
 const containerRef = ref<HTMLElement | null>(null)
 const canScrollLeft = ref(false)
@@ -82,7 +88,7 @@ onMounted(() => cardStore.fetchDailyCards())
       <daily-card
         @close-card="closeCard(card)"
         :card="card"
-        :width="500"
+        :width="cardWidth"
         v-for="card in cards"
         :key="card.id"
       />
@@ -108,7 +114,7 @@ onMounted(() => cardStore.fetchDailyCards())
 .daily-cards-wrapper {
   position: relative;
   width: calc(v-bind(width) * 1px);
-  height: 300px;
+  height: calc(v-bind(cardHeight) * 1px);
 }
 
 .daily-cards {

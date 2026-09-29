@@ -2,9 +2,9 @@
 import MdiBlur from '~icons/mdi/blur'
 import MdiEyeOutline from '~icons/mdi/eye-outline'
 import MdiMonitorDashboard from '~icons/mdi/monitor-dashboard'
-import { TIMELINE_ROW_HEIGHT, useSettingStore } from '@/scripts/stores/settingsStore.ts'
+import { ROW_HEIGHT_MULTIPLIER, useSettingStore } from '@/scripts/stores/settingsStore.ts'
 import ViewPhoto from '@/vues/views/main/ViewPhoto.vue'
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { SimpleTimelineItem } from '@/scripts/types/generated/timeline.ts'
 import searchService from '@/scripts/services/searchService.ts'
 import SimpleTimeline from '@/vues/components/timeline/simple-timeline/SimpleTimeline.vue'
@@ -21,6 +21,7 @@ const previewTimeline = ref<SimpleTimelineItem[]>([])
 searchService.search({ query: 'sunset', limit: 10, mediaType: 'photo' }).then((items) => {
   previewTimeline.value = items.items
 })
+const timelineRowHeight = computed(() => settings.rowHeightMultiplier * 320)
 </script>
 
 <template>
@@ -31,9 +32,9 @@ searchService.search({ query: 'sunset', limit: 10, mediaType: 'photo' }).then((i
       class="timeline-preview"
       :timeline-items="previewTimeline"
       view-link="/unreachable"
-      :ideal-row-height="settings.timelineRowHeight"
+      :ideal-row-height="timelineRowHeight"
       :style="{
-        height: settings.timelineRowHeight + 100 + 'px',
+        height: timelineRowHeight + 100 + 'px',
       }"
     />
     <!-- Settings Configuration Panel -->
@@ -103,13 +104,12 @@ searchService.search({ query: 'sunset', limit: 10, mediaType: 'photo' }).then((i
 
           <div class="settings-group">
             <settings-slider
-              v-model="settings.timelineRowHeight"
-              label="Timeline Row Height:"
-              unit="px"
-              :min="50"
-              :max="1000"
-              :step="5"
-              :reset-value="TIMELINE_ROW_HEIGHT"
+              v-model="settings.rowHeightMultiplier"
+              label="Timeline Row Height Multiplier:"
+              :min="0.2"
+              :max="3"
+              :step="0.01"
+              :reset-value="ROW_HEIGHT_MULTIPLIER"
               @slide-start="rowHeightEditing = true"
               description="<em>Target</em> height for the rows on the front page photo grid."
             />
@@ -236,8 +236,9 @@ searchService.search({ query: 'sunset', limit: 10, mediaType: 'photo' }).then((i
   top: 0;
   left: 0;
   width: 100%;
-  opacity: 0.6;
+  opacity: 1;
   pointer-events: none;
+  background-color: cyan;
 }
 
 .ui-settings-layout {

@@ -29,6 +29,7 @@ import { useSettingStore } from '@/scripts/stores/settingsStore.ts'
 import DailyCardList from '@/vues/components/timeline/daily-cards/DailyCardList.vue'
 import { useDailyCardStore } from '@/scripts/stores/timeline/dailyCardStore.ts'
 import { useRefreshStore } from '@/scripts/stores/refreshStore.ts'
+import { useDisplay } from 'vuetify/framework'
 
 const timelineStore = useTimelineStore()
 const selectionStore = useSelectionStore()
@@ -44,12 +45,15 @@ const dailyCardsHeight = computed(() => {
 })
 const route = useRoute()
 const router = useRouter()
+const display = useDisplay()
 
 const MAX_SIZE_MULTIPLIER = 1.5
 const ITEM_GAP = 2
 const ROW_HEADER_HEIGHT = 76
 const MIN_SCROLL_THUMB_HEIGHT = 20
 const SCROLL_PROTRUSION_HEIGHT = 4
+const DESIRED_ROW_HEIGHT_DESKTOP = 320
+const DESIRED_ROW_HEIGHT_MOBILE = 200
 
 const containerSize = shallowRef({ width: 0, height: 0 })
 const scrollTrackHeight = shallowRef(0)
@@ -87,6 +91,11 @@ const virtualizerOptions = computed(() => ({
   scrollMargin: dailyCardsHeight.value,
 }))
 
+const desiredRowHeight = computed(
+  () =>
+    (display.mobile.value ? DESIRED_ROW_HEIGHT_MOBILE : DESIRED_ROW_HEIGHT_DESKTOP) *
+    settings.rowHeightMultiplier,
+)
 const rowVirtualizer = useVirtualizer(virtualizerOptions)
 const scrollThumbHeight = computed(() =>
   Math.max(
@@ -219,13 +228,13 @@ function calculateLayout(
     for (const [i, ratio] of ratios.entries()) {
       rowItems.push({ ratio, index: i })
       const gapSize = (rowItems.length - 1) * ITEM_GAP
-      itemsWidth += settings.timelineRowHeight * ratio
+      itemsWidth += desiredRowHeight.value * ratio
       if (itemsWidth + gapSize > containerWidth) {
         const sizeMultiplier = Math.min(
           (containerWidth - gapSize) / itemsWidth,
           MAX_SIZE_MULTIPLIER,
         )
-        const rowHeight = Math.round(settings.timelineRowHeight * sizeMultiplier)
+        const rowHeight = Math.round(desiredRowHeight.value * sizeMultiplier)
         const lastOfTheMonth = i === ratios.length - 1
         layoutRows.push({
           items: rowItems,
@@ -258,7 +267,7 @@ function calculateLayout(
       if (itemsWidth * sizeMultiplier < containerWidth) {
         sizeMultiplier = 1
       }
-      const rowHeight = Math.round(settings.timelineRowHeight * sizeMultiplier)
+      const rowHeight = Math.round(desiredRowHeight.value * sizeMultiplier)
       layoutRows.push({
         items: rowItems,
         height: rowHeight,
@@ -587,12 +596,7 @@ watch(
 )
 
 watch(
-  [
-    () => timelineStore.monthRatios,
-    containerSize,
-    () => settings.timelineRowHeight,
-    dailyCardsHeight,
-  ],
+  [() => timelineStore.monthRatios, containerSize, () => desiredRowHeight.value, dailyCardsHeight],
   ([, oldSize], [, newSize]) => {
     const now = performance.now()
     const { rows, scrollYears, scrollMonths, totalHeight } = calculateLayout(
@@ -682,7 +686,7 @@ watch(
         const viewportBottom = viewportTop + containerSize.value.height
         const rowTop = row.firstOfTheMonth ? row.offsetTop - ROW_HEADER_HEIGHT : row.offsetTop
         const rowBottom = row.offsetTop + row.height
-        const doNothingMargin = settings.timelineRowHeight * 0.5
+        const doNothingMargin = desiredRowHeight.value * 0.5
         const isFullyInViewport =
           rowTop >= viewportTop - doNothingMargin && rowBottom <= viewportBottom + doNothingMargin
         if (isFullyInViewport) return

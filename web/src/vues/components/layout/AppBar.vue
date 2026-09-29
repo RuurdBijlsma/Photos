@@ -26,6 +26,7 @@ const display = useDisplay()
 
 const menuOpen = ref(false)
 const ingestMenuOpen = ref(false)
+const isAppBarVisible = ref(true)
 
 const mediaFolderAvailable = computed(() => systemStore.stats.mediaFolderAvailable !== false)
 const showIngestMenu = computed(() => systemStore.stats.isIngesting || !mediaFolderAvailable.value)
@@ -38,7 +39,14 @@ async function logout() {
 </script>
 
 <template>
-  <v-app-bar density="comfortable" :height="70" class="header" color="transparent" elevation="0">
+  <v-app-bar
+    density="comfortable"
+    :height="70"
+    class="header"
+    color="transparent"
+    elevation="0"
+    v-model="isAppBarVisible"
+  >
     <v-img class="appbar-logo" :src="transLogo" v-if="display.mobile.value" />
     <h1 v-else class="appbar-title"><span>Ruurd</span> Photos</h1>
     <v-spacer />
@@ -179,9 +187,9 @@ async function logout() {
   opacity: 0.8;
 }
 
-.appbar-logo{
+.appbar-logo {
   margin-left: 10px;
-  transform: scale(.7);
+  transform: scale(0.7);
 }
 
 .appbar-title > span {

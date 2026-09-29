@@ -42,19 +42,16 @@ withDefaults(
   box-shadow:
     0 10px 200px 0 rgba(var(--v-theme-primary-lighten-1), 0.1),
     0 10px 20px 0 rgba(0, 0, 0, 0.1);
-  max-width: calc(100% - 50px); /* Desktop default (leaves room for scrollbar) */
+  max-width: calc(100% - 50px);
   width: 100%;
   height: 100%;
 }
 
-/* ── Mobile: take the full width ──────────────────────── */
 @media (max-width: 959.99px) {
   .outer-container {
     max-width: 100%;
-    /* Optional: On mobile, 60px corners can cut off photos,
-       so you can soften them if desired: */
-    border-top-left-radius: 28px;
-    border-top-right-radius: 28px;
+    border-top-left-radius: 20px;
+    border-top-right-radius: 20px;
   }
 }
 
@@ -100,6 +97,15 @@ withDefaults(
 
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+@media (max-width: 959.99px) {
+  .inner-container {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    border-radius: 0;
+  }
 }
 
 .fit-content .inner-container {
