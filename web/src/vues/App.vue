@@ -12,8 +12,10 @@ import MdiRefresh from '~icons/mdi/refresh'
 const settings = useSettingStore()
 const themeStore = useThemeStore()
 const snackbarsStore = useSnackbarsStore()
+import { useResponsive } from '@/scripts/composables/useResponsive'
 
 themeStore.initThemeSync()
+const { isMobile } = useResponsive()
 
 // Register the Service Worker and destructure status states
 const { offlineReady, needRefresh, updateServiceWorker } = useRegisterSW()
@@ -60,7 +62,7 @@ watch(
 </script>
 
 <template>
-  <v-app class="main-content">
+  <v-app class="main-content" :class="{ 'is-mobile': isMobile, 'is-desktop': !isMobile }">
     <RouterView />
   </v-app>
 

@@ -1305,23 +1305,20 @@ onUnmounted(() => {
   opacity: 0;
 }
 
-/* Mobile responsive scaling overrides */
-@media (max-width: 960px) {
-  .estimatr-summary-content {
-    flex-direction: column-reverse;
-  }
-  .full-summary-map-container {
-    height: 50%;
-    top: auto;
-    bottom: 0;
-  }
-  .summary-details-panel {
-    top: 10px;
-    left: 10px;
-    right: 10px;
-    bottom: calc(50% + 10px);
-    width: auto;
-  }
+.is-mobile .estimatr-summary-content {
+  flex-direction: column-reverse;
+}
+.is-mobile .full-summary-map-container {
+  height: 50%;
+  top: auto;
+  bottom: 0;
+}
+.is-mobile .summary-details-panel {
+  top: 10px;
+  left: 10px;
+  right: 10px;
+  bottom: calc(50% + 10px);
+  width: auto;
 }
 
 @media (max-width: 600px) {

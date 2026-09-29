@@ -6,8 +6,11 @@ import MdiImageArea from '~icons/mdi/image-area'
 import ThumbnailImg from '@/vues/components/ui/ThumbnailImg.vue'
 import type { DailyCardResponse } from '@/scripts/types/api/dailyCards.ts'
 import { useDailyCardStore } from '@/scripts/stores/timeline/dailyCardStore.ts'
+import { computed } from 'vue'
+import { useResponsive } from '@/scripts/composables/useResponsive.ts'
 
 const cardStore = useDailyCardStore()
+const responsive = useResponsive()
 
 const emit = defineEmits<{
   (e: 'close-card'): void
@@ -17,6 +20,8 @@ defineProps<{
   card: DailyCardResponse
   width: number
 }>()
+
+const borderRadius = computed(() => (responsive.isMobile.value ? 30 : 40))
 
 function closeCard(e: PointerEvent) {
   e.stopPropagation()
@@ -61,7 +66,7 @@ function isGame(cardType: string) {
             <h2>{{ card.title }}</h2>
             <p>{{ card.subtitle }}</p>
           </div>
-          <div class="card-icon-container">
+          <div class="card-icon-container" v-if="!responsive.isMobile.value">
             <v-icon
               size="40"
               :icon="cardStore.completedCards.includes(card.id) ? MdiCheck : MdiController"
@@ -84,7 +89,7 @@ function isGame(cardType: string) {
   display: block;
   height: 100%;
   width: calc(v-bind(width) * 1px);
-  border-radius: 40px;
+  border-radius: calc(v-bind(borderRadius) * 1px);
   flex-shrink: 0;
   flex-grow: 0;
   position: relative;
@@ -106,14 +111,13 @@ function isGame(cardType: string) {
   width: 100%;
   height: 100%;
   background: linear-gradient(180deg, rgba(0, 0, 0, 0) 30%, rgba(0, 0, 0, 0.6) 100%);
-  border-radius: 40px;
+  border-radius: calc(v-bind(borderRadius) * 1px);
   overflow: hidden;
 }
 
 .card-top {
   display: flex;
   justify-content: flex-end;
-  padding: 20px;
 }
 
 .close-button {
@@ -140,13 +144,19 @@ function isGame(cardType: string) {
   padding: 15px 30px;
 }
 
+.is-mobile .card-info {
+  padding: 15px 15px;
+  text-align: center;
+  width: 100%;
+}
+
 .card-thumb {
   position: absolute;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
-  border-radius: 40px;
+  border-radius: calc(v-bind(borderRadius) * 1px);
   overflow: hidden;
 }
 
@@ -162,7 +172,15 @@ function isGame(cardType: string) {
   font-weight: 600;
 }
 
+.is-mobile .daily-card h2 {
+  font-size: 15px;
+}
+
 .daily-card p {
   margin: 0;
+}
+
+.is-mobile .daily-card p {
+  font-size: 12px;
 }
 </style>

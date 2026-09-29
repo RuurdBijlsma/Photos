@@ -127,10 +127,7 @@ function getMonthLabelForWeek(weekNum: number): string | null {
                 v-for="day in daysData"
                 :key="day.label"
                 class="chart-column"
-                v-tooltip="{
-                  text: `${day.fullName}: ${day.count} photos & videos`,
-                  location: 'top',
-                }"
+                :title="`${day.fullName}: ${day.count} photos & videos`"
               >
                 <div class="bar-container">
                   <div
@@ -159,10 +156,7 @@ function getMonthLabelForWeek(weekNum: number): string | null {
                 v-for="hour in hoursData"
                 :key="hour.hour"
                 class="chart-column"
-                v-tooltip="{
-                  text: `${hour.label}: ${hour.count} photos & videos`,
-                  location: 'top',
-                }"
+                :title="`${hour.label}: ${hour.count} photos & videos`"
               >
                 <div class="bar-container">
                   <div
@@ -199,10 +193,7 @@ function getMonthLabelForWeek(weekNum: number): string | null {
               v-for="week in weeksData"
               :key="week.week"
               class="chart-column thin-column"
-              v-tooltip="{
-                text: `Week ${week.week}: ${week.count} photos & videos`,
-                location: 'top',
-              }"
+              :title="`Week ${week.week}: ${week.count} photos & videos`"
             >
               <div class="bar-container">
                 <div
@@ -255,10 +246,8 @@ function getMonthLabelForWeek(weekNum: number): string | null {
   gap: 28px;
 }
 
-@media (min-width: 960px) {
-  .top-row {
-    grid-template-columns: 1fr 1fr;
-  }
+.is-mobile .top-row {
+  grid-template-columns: 1fr 1fr;
 }
 
 .histogram-card {
@@ -379,26 +368,33 @@ function getMonthLabelForWeek(weekNum: number): string | null {
   border-radius: 6px;
 }
 
-/* Week chart adjustments */
+/* Update .thin-column to override flexbox min-content constraint */
+.thin-column {
+  flex: 1;
+  min-width: 0;
+  position: relative;
+}
+
+/* Ensure the week chart gaps and column widths scale down gracefully on mobile */
 .week-chart {
-  gap: 3px;
+  gap: 2px;
   height: 160px;
 }
 
-.thin-column {
-  flex: 1;
+.is-mobile .week-chart {
+  gap: 1px;
 }
 
-.week-chart .bar-container,
-.week-chart .bar-fill {
-  border-radius: 3px;
-}
-
+/* Keep the label from pushing the column wider while remaining centered */
 .week-label {
   font-size: 0.7rem;
   white-space: nowrap;
+  width: 0;
+  overflow: visible;
+  display: flex;
+  justify-content: center;
   position: relative;
-  /* Slightly shift to look beautifully balanced on thin columns */
-  transform: translateX(10px);
+  /* Shift slightly to center across the month */
+  transform: translateX(8px);
 }
 </style>

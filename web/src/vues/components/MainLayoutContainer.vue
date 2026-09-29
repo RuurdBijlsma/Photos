@@ -47,6 +47,16 @@ withDefaults(
   height: 100%;
 }
 
+.is-mobile .outer-container {
+  max-width: 100%;
+  border-top-left-radius: 35px;
+  border-top-right-radius: 35px;
+}
+
+.outer-container.ignore-scrollbar {
+  max-width: 100%;
+}
+
 .outer-container.ignore-scrollbar {
   max-width: 100%;
 }
@@ -85,6 +95,13 @@ withDefaults(
 
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+.is-mobile .inner-container {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  border-radius: 0;
 }
 
 .fit-content .inner-container {

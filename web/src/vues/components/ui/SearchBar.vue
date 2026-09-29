@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, watch, useTemplateRef, onMounted, computed } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
+import { computed, onMounted, ref, useTemplateRef, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useDebounceFn } from '@vueuse/core'
 import { useSnackbarsStore } from '@/scripts/stores/snackbarStore.ts'
 import { type SimpleTimelineItem, SuggestionType } from '@/scripts/types/generated/timeline.ts'
@@ -520,6 +520,11 @@ watch(
   margin: 0 auto;
   position: relative;
   flex-grow: 1;
+}
+
+.is-mobile .search-centered-section {
+  width: calc(100% - 100px);
+  margin-left: 24px;
 }
 
 .search-suggestions {

@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { useStorage } from '@vueuse/core'
 import type { ThemeType, ThemeVariant } from '@/scripts/constants.ts'
 
-export const TIMELINE_ROW_HEIGHT = 320
+export const ROW_HEIGHT_MULTIPLIER = 1
 export const CUSTOM_THEME_CONTRAST = 0.2
 export const UPLOAD_CONCURRENCY_LIMIT = 3
 
@@ -26,7 +26,7 @@ export const useSettingStore = defineStore('settings', () => {
   // UI -> General
   const useBackdropBlur = useStorage('backdropBlur', true)
   // UI -> Timeline
-  const timelineRowHeight = useStorage('timelineRowHeight', TIMELINE_ROW_HEIGHT)
+  const rowHeightMultiplier = useStorage('rowHeightMultiplier', ROW_HEIGHT_MULTIPLIER)
   const timelineUseDayLabels = useStorage('timelineUseDayLabels', false)
   const asyncImageDecoding = useStorage('timelineAsyncImageDecoding', false)
   // Uploads
@@ -40,7 +40,7 @@ export const useSettingStore = defineStore('settings', () => {
     customThemeColor,
     customThemeVariant,
     customThemeContrast,
-    timelineRowHeight,
+    rowHeightMultiplier,
     timelineUseDayLabels,
     asyncImageDecoding,
     darkPhotoViewer,

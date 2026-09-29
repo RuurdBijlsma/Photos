@@ -20,6 +20,16 @@
 * door alle requests kijken op verse page load om te zien of ze allemaal relevant zijn (ik zag thunder icon geladen worden op timeline page load)
 * in failed list op ingest pagina, download knop voor de file toevoegen zodat je kan inspecteren of ie stuk is
 * fix PWA icons (currently has black borders on firefox for some reason)
+* [MOBILE REFACTOR]
+* Bottom nav
+  * Click on search takes you to search
+* hide app bar when scrolling down
+* Fix simpletimeline for mobile
+* make click on Photos scroll you up in timeline
+* make click on logo in appbar take you to timeline
+* Photo viewer is uggo
+* activity view is uggo
+* fix snackbars
 
 # SERVER
 

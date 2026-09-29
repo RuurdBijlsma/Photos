@@ -6,13 +6,18 @@ import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useResizeObserver } from '@vueuse/core'
 import DailyCard from '@/vues/components/timeline/daily-cards/DailyCard.vue'
 import type { DailyCardResponse } from '@/scripts/types/api/dailyCards.ts'
+import { useResponsive } from '@/scripts/composables/useResponsive.ts'
 
 defineProps<{
   width: number
 }>()
 
+const responsive = useResponsive()
+
 const cardStore = useDailyCardStore()
 const cards = computed(() => cardStore.todayCards)
+
+const cardWidth = computed(() => (responsive.isMobile.value ? 170 : 500))
 
 const containerRef = ref<HTMLElement | null>(null)
 const canScrollLeft = ref(false)
@@ -82,7 +87,7 @@ onMounted(() => cardStore.fetchDailyCards())
       <daily-card
         @close-card="closeCard(card)"
         :card="card"
-        :width="500"
+        :width="cardWidth"
         v-for="card in cards"
         :key="card.id"
       />
@@ -111,6 +116,10 @@ onMounted(() => cardStore.fetchDailyCards())
   height: 300px;
 }
 
+.is-mobile .daily-cards-wrapper {
+  height: 250px;
+}
+
 .daily-cards {
   width: 100%;
   height: 100%;
@@ -121,6 +130,11 @@ onMounted(() => cardStore.fetchDailyCards())
   overflow-x: auto;
   scrollbar-width: none;
   -ms-overflow-style: none;
+}
+
+.is-mobile .daily-cards {
+  gap: 5px;
+  padding: 5px;
 }
 
 .daily-cards::-webkit-scrollbar {
