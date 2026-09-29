@@ -5,12 +5,6 @@ import MdiImageAlbum from '~icons/mdi/image-album'
 import MdiCompass from '~icons/mdi/compass'
 import MdiMagnify from '~icons/mdi/magnify'
 
-const currentTab = ref('photos')
-
-const openSearch = () => {
-  console.log('Search clicked')
-}
-
 const activeTab = ref('photos')
 
 const tabs = [
@@ -30,24 +24,33 @@ const tabs = [
     key: 'explore',
   },
 ]
+
+const openSearch = () => {
+  console.log('Search clicked')
+}
 </script>
 
 <template>
   <div class="floating-nav-container">
     <v-sheet class="nav-sheet">
       <v-btn
-        variant="text"
         v-for="tab in tabs"
         :key="tab.key"
+        :variant="activeTab === tab.key ? 'flat' : 'text'"
+        :color="activeTab === tab.key ? 'surface-variant' : undefined"
         :prepend-icon="activeTab === tab.key ? tab.icon : undefined"
-        :value="tab.key"
+        :class="[
+          'tab-btn text-none',
+          activeTab === tab.key ? 'tab-btn--active' : 'tab-btn--inactive',
+        ]"
         rounded="pill"
         @click="activeTab = tab.key"
-        >{{ tab.text }}</v-btn
       >
+        {{ tab.text }}
+      </v-btn>
     </v-sheet>
 
-    <v-btn :icon="MdiMagnify" @click="openSearch" />
+    <v-btn :icon="MdiMagnify" class="search-btn" @click="openSearch" />
   </div>
 </template>
 
@@ -60,16 +63,34 @@ const tabs = [
   z-index: 1000;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
+  width: max-content;
   max-width: calc(100vw - 32px);
 }
 
 .nav-sheet {
-  width: 100%;
-  display: flex;
-  flex-direction: row;
+  align-items: center;
   padding: 6px;
-  border-radius:30px;
-  font-size: 14px;
+  border-radius: 50px;
+}
+
+.tab-btn {
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.1px;
+  transition: all 0.2s ease;
+}
+
+.tab-btn--active {
+  padding: 0 16px !important;
+}
+
+.tab-btn--inactive {
+  padding: 0 12px !important;
+  opacity: 0.8;
+}
+
+.tab-btn:hover {
+  opacity: 1;
 }
 </style>
