@@ -6,7 +6,7 @@ import MdiThermometer from '~icons/mdi/thermometer'
 import MdiWaterPercent from '~icons/mdi/water-percent'
 import MdiWeatherPouring from '~icons/mdi/weather-pouring'
 import MdiWeatherWindy from '~icons/mdi/weather-windy'
-import { watch } from 'vue'
+import { watch, ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useExploreStore } from '@/scripts/stores/exploreStore.ts'
 import { useViewPhotoStore } from '@/scripts/stores/timeline/viewPhotoStore.ts'
@@ -16,6 +16,8 @@ import ThumbnailImg from '@/vues/components/ui/ThumbnailImg.vue'
 const exploreStore = useExploreStore()
 const viewPhotoStore = useViewPhotoStore()
 const router = useRouter()
+
+const isMounted = ref(false)
 
 // Simplified column layout
 const headers = [
@@ -56,17 +58,40 @@ watch(
   { immediate: true },
 )
 
-// Triggered on page size, pagination, or sorting changes
+// Triggered only by user interactions (page switch, per-page change, column sort)
 async function loadTableData(options: {
   page: number
   itemsPerPage: number
   sortBy: { key: string; order: 'asc' | 'desc' }[]
 }) {
+  // 1. Ignore synchronous initial mount emit
+  if (!isMounted.value) return
+
+  // 2. Prevent redundant fetches if options haven't actually changed
+  const sortChanged =
+    JSON.stringify(options.sortBy || []) !== JSON.stringify(exploreStore.sortBy || [])
+  const pageChanged = options.page !== exploreStore.page
+  const perPageChanged = options.itemsPerPage !== exploreStore.itemsPerPage
+
+  if (!sortChanged && !pageChanged && !perPageChanged) return
+
   exploreStore.page = options.page
   exploreStore.itemsPerPage = options.itemsPerPage
   exploreStore.sortBy = options.sortBy || []
   await exploreStore.fetchExploreTable()
 }
+
+onMounted(() => {
+  // Defer until after the navigation transition has finished and painted
+  requestAnimationFrame(() => {
+    isMounted.value = true
+
+    // Fetch initial data if store is empty
+    if (exploreStore.items.length === 0) {
+      exploreStore.fetchExploreTable()
+    }
+  })
+})
 
 // Opens native full-screen Lightbox on click
 function onRowClick(event: PointerEvent, row: { item: { id: string } }) {
@@ -100,7 +125,6 @@ function formatCoords(lat: number | null, lon: number | null): string {
 
 <template>
   <v-card class="explore-table-card" flat>
-    <!-- Styled Header to match ExploreHistograms cards -->
     <div class="card-header">
       <div class="header-texts">
         <h3 class="card-title">Media Catalog</h3>
@@ -112,6 +136,7 @@ function formatCoords(lat: number | null, lon: number | null): string {
       <v-data-table-server
         v-model:items-per-page="exploreStore.itemsPerPage"
         v-model:page="exploreStore.page"
+        v-model:sort-by="exploreStore.sortBy"
         :headers="headers"
         :items="exploreStore.items"
         :items-length="exploreStore.totalCount"
@@ -119,6 +144,7 @@ function formatCoords(lat: number | null, lon: number | null): string {
         item-value="id"
         hover
         class="explore-server-table"
+        @update:options="loadTableData"
         @click:row="onRowClick"
       >
         <!-- Thumbnail Column -->

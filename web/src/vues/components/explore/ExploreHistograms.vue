@@ -368,26 +368,33 @@ function getMonthLabelForWeek(weekNum: number): string | null {
   border-radius: 6px;
 }
 
-/* Week chart adjustments */
+/* Update .thin-column to override flexbox min-content constraint */
+.thin-column {
+  flex: 1;
+  min-width: 0;
+  position: relative;
+}
+
+/* Ensure the week chart gaps and column widths scale down gracefully on mobile */
 .week-chart {
-  gap: 3px;
+  gap: 2px;
   height: 160px;
 }
 
-.thin-column {
-  flex: 1;
+.is-mobile .week-chart {
+  gap: 1px;
 }
 
-.week-chart .bar-container,
-.week-chart .bar-fill {
-  border-radius: 3px;
-}
-
+/* Keep the label from pushing the column wider while remaining centered */
 .week-label {
   font-size: 0.7rem;
   white-space: nowrap;
+  width: 0;
+  overflow: visible;
+  display: flex;
+  justify-content: center;
   position: relative;
-  /* Slightly shift to look beautifully balanced on thin columns */
-  transform: translateX(10px);
+  /* Shift slightly to center across the month */
+  transform: translateX(8px);
 }
 </style>
