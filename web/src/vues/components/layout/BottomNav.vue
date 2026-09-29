@@ -1,13 +1,12 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import MdiImage from '~icons/mdi/image'
 import MdiImageAlbum from '~icons/mdi/image-album'
 import MdiCompass from '~icons/mdi/compass'
 import MdiMagnify from '~icons/mdi/magnify'
 
 const route = useRoute()
-const router = useRouter()
 
 const tabs = [
   {
@@ -50,7 +49,7 @@ const activeTab = computed(() => {
 
 <template>
   <div class="floating-nav-container">
-    <v-sheet class="nav-sheet" elevation="3">
+    <v-sheet color="surface-container" class="nav-sheet" elevation="3">
       <v-btn
         v-for="tab in tabs"
         :key="tab.key"
@@ -69,7 +68,15 @@ const activeTab = computed(() => {
       </v-btn>
     </v-sheet>
 
-    <v-btn to="/search" :icon="MdiMagnify" class="search-btn" elevation="3" />
+    <v-btn
+      color="surface-container"
+      to="/search"
+      :icon="MdiMagnify"
+      :active="false"
+      class="search-btn"
+      elevation="3"
+      v-if="route.name !== 'search'"
+    />
   </div>
 </template>
 

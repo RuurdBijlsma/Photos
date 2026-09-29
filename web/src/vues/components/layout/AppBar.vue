@@ -18,18 +18,33 @@ import { caps } from '@/scripts/utils.ts'
 import IngestOverlayMenu from '@/vues/components/activity/IngestOverlayMenu.vue'
 import transLogo from '@/assets/img/logo/transparent/192.png'
 import { useResponsive } from '@/scripts/composables/useResponsive.ts'
+import { useRoute } from 'vue-router'
+import { useTimelineStore } from '@/scripts/stores/timeline/timelineStore.ts'
 
 const authStore = useAuthStore()
 const settings = useSettingStore()
 const systemStore = useSystemStore()
+const timelineStore = useTimelineStore()
 const responsive = useResponsive()
+const route = useRoute()
 
 const menuOpen = ref(false)
 const ingestMenuOpen = ref(false)
 const isAppBarVisible = ref(true)
+const isLogoSpinning = ref(false)
+const isSearch = computed(() => route.name === 'search')
+const showSearchBar = computed(
+  () => authStore.isAuthenticated && (isSearch.value || !responsive.isMobile),
+)
 
 const mediaFolderAvailable = computed(() => systemStore.stats.mediaFolderAvailable !== false)
 const showIngestMenu = computed(() => systemStore.stats.isIngesting || !mediaFolderAvailable.value)
+
+function onLogoClick() {
+  if (isLogoSpinning.value) return
+  isLogoSpinning.value = true
+  timelineStore.scrollToTop()
+}
 
 async function logout() {
   menuOpen.value = false
@@ -47,45 +62,57 @@ async function logout() {
     elevation="0"
     v-model="isAppBarVisible"
   >
-    <img
-      class="appbar-logo"
-      :src="transLogo"
-      v-if="responsive.isMobile.value"
-      alt="app logo"
-    />
-    <h1 v-else class="appbar-title"><span>Ruurd</span> Photos</h1>
-    <v-spacer />
-    <search-bar v-if="authStore.isAuthenticated && !responsive.isMobile.value" />
-    <v-spacer />
+    <!--    Mobile     -->
+    <template v-if="responsive.isMobile.value">
+      <img
+        class="appbar-logo"
+        :class="{ 'spin-once': isLogoSpinning }"
+        :src="transLogo"
+        v-if="!isSearch"
+        alt="app logo"
+        @click="onLogoClick"
+        @animationend="isLogoSpinning = false"
+      />
+      <v-spacer />
+      <search-bar v-if="showSearchBar" />
+    </template>
+    <!--    Desktop    -->
+    <template v-else>
+      <h1 class="appbar-title"><span>Ruurd</span> Photos</h1>
+      <v-spacer />
+      <template v-if="authStore.isAuthenticated">
+        <search-bar />
+        <v-spacer />
+        <v-menu
+          v-if="showIngestMenu"
+          v-model="ingestMenuOpen"
+          :close-on-content-click="false"
+          location="bottom end"
+          offset="10"
+          transition="slide-y-transition"
+        >
+          <template v-slot:activator="{ props }">
+            <v-btn
+              icon
+              v-bind="props"
+              variant="text"
+              :color="mediaFolderAvailable ? 'primary' : 'error'"
+              class="mr-1"
+            >
+              <v-icon
+                :class="{
+                  'spinning-sync-icon': mediaFolderAvailable && systemStore.stats.isIngesting,
+                }"
+                :icon="mediaFolderAvailable ? MdiSync : MdiAlertCircle"
+              />
+            </v-btn>
+          </template>
+          <ingest-overlay-menu @close-menu="ingestMenuOpen = false" />
+        </v-menu>
+        <v-btn variant="plain" rounded :prepend-icon="MdiUpload" to="/activity"> Upload </v-btn>
+      </template>
+    </template>
     <div v-if="authStore.isAuthenticated" class="header-buttons">
-      <!-- Sync Menu overlay for background ingestion state (hidden when on full activity page) -->
-      <v-menu
-        v-if="showIngestMenu"
-        v-model="ingestMenuOpen"
-        :close-on-content-click="false"
-        location="bottom end"
-        offset="10"
-        transition="slide-y-transition"
-      >
-        <template v-slot:activator="{ props }">
-          <v-btn
-            icon
-            v-bind="props"
-            variant="text"
-            :color="mediaFolderAvailable ? 'primary' : 'error'"
-            class="mr-1"
-          >
-            <v-icon
-              :class="{
-                'spinning-sync-icon': mediaFolderAvailable && systemStore.stats.isIngesting,
-              }"
-              :icon="mediaFolderAvailable ? MdiSync : MdiAlertCircle"
-            />
-          </v-btn>
-        </template>
-        <ingest-overlay-menu @close-menu="ingestMenuOpen = false" />
-      </v-menu>
-      <v-btn variant="plain" rounded :prepend-icon="MdiUpload" to="/activity"> Upload </v-btn>
       <v-menu v-model="menuOpen" :close-on-content-click="false">
         <template v-slot:activator="{ props }">
           <v-btn icon v-bind="props">
@@ -196,6 +223,20 @@ async function logout() {
   transform: scale(0.5);
   width: 80px;
   flex-grow: 0;
+  cursor: pointer;
+}
+
+.spin-once {
+  animation: spin-once 0.6s ease-in-out;
+}
+
+@keyframes spin-once {
+  from {
+    transform: scale(0.5) rotate(0deg);
+  }
+  to {
+    transform: scale(0.5) rotate(360deg);
+  }
 }
 
 .appbar-title > span {
