@@ -40,6 +40,10 @@ import ExploreLocations from '@/vues/components/explore/ExploreLocations.vue'
   padding: 32px 24px;
 }
 
+.is-mobile .explore-content {
+  padding: 16px 0px 32px;
+}
+
 .explore-title {
   font-size: 2.125rem;
   font-weight: 700;
@@ -47,9 +51,19 @@ import ExploreLocations from '@/vues/components/explore/ExploreLocations.vue'
   color: rgb(var(--v-theme-on-surface));
 }
 
+.is-mobile .explore-title {
+  font-size: 1.6rem;
+  padding: 0 20px;
+}
+
 .explore-subtitle {
   font-size: 0.95rem;
   color: rgb(var(--v-theme-on-surface-variant));
   margin-bottom: 0;
+}
+
+.is-mobile .explore-subtitle {
+  font-size: 0.85rem;
+  padding: 0 20px;
 }
 </style>

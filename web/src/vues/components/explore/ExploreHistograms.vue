@@ -1,8 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted } from 'vue'
 import { useExploreStore } from '@/scripts/stores/exploreStore.ts'
+import { useResponsive } from '@/scripts/composables/useResponsive.ts'
+import MdiCalendarWeekOutline from '~icons/mdi/calendar-week-outline'
+import MdiClockOutline from '~icons/mdi/clock-outline'
+import MdiCalendarMonthOutline from '~icons/mdi/calendar-month-outline'
 
 const exploreStore = useExploreStore()
+const { isMobile } = useResponsive()
 
 onMounted(async () => {
   if (!exploreStore.histograms) {
@@ -103,18 +108,27 @@ const monthLabels = [
 
 function getMonthLabelForWeek(weekNum: number): string | null {
   const match = monthLabels.find((m) => m.week === weekNum)
-  return match ? match.label : null
+  if (!match) return null
+
+  // On mobile, show alternate months to avoid text collisions
+  if (isMobile.value) {
+    const mobileVisibleWeeks = [1, 9, 18, 27, 36, 44]
+    return mobileVisibleWeeks.includes(weekNum) ? match.label : null
+  }
+  return match.label
 }
 </script>
 
 <template>
   <div class="histograms-container">
+    <!-- Histograms Grid -->
     <div class="histograms-grid">
-      <!-- Top Row: Day of Week & Hour of Day -->
+      <!-- Top Row: Day of Week & Time of Day -->
       <div class="top-row">
         <!-- Day of Week Card -->
-        <v-card class="histogram-card" flat :loading="exploreStore.isHistogramsLoading">
+        <v-card class="histogram-card" flat elevation="0">
           <div class="card-header">
+            <v-icon class="card-icon" :icon="MdiCalendarWeekOutline" />
             <div class="header-texts">
               <h3 class="card-title">Weekly Habits</h3>
               <p class="card-subtitle">Media volume captured across days of the week</p>
@@ -132,7 +146,7 @@ function getMonthLabelForWeek(weekNum: number): string | null {
                 <div class="bar-container">
                   <div
                     class="bar-fill"
-                    :style="{ height: `${(day.count / maxDayCount) * 100}%` }"
+                    :style="{ height: `${maxDayCount > 0 ? (day.count / maxDayCount) * 100 : 0}%` }"
                   />
                 </div>
                 <span class="column-label">{{ day.label }}</span>
@@ -141,9 +155,10 @@ function getMonthLabelForWeek(weekNum: number): string | null {
           </div>
         </v-card>
 
-        <!-- Hour of Day Card -->
-        <v-card class="histogram-card" flat :loading="exploreStore.isHistogramsLoading">
+        <!-- Time of Day Card -->
+        <v-card class="histogram-card" flat elevation="0">
           <div class="card-header">
+            <v-icon class="card-icon" :icon="MdiClockOutline" />
             <div class="header-texts">
               <h3 class="card-title">Daily Rhythm</h3>
               <p class="card-subtitle">Activity trends mapped by hour of the day</p>
@@ -155,32 +170,33 @@ function getMonthLabelForWeek(weekNum: number): string | null {
               <div
                 v-for="hour in hoursData"
                 :key="hour.hour"
-                class="chart-column"
+                class="chart-column thin-column"
                 :title="`${hour.label}: ${hour.count} photos & videos`"
               >
                 <div class="bar-container">
                   <div
                     class="bar-fill"
-                    :style="{ height: `${(hour.count / maxHourCount) * 100}%` }"
+                    :style="{
+                      height: `${maxHourCount > 0 ? (hour.count / maxHourCount) * 100 : 0}%`,
+                    }"
                   />
                 </div>
-                <span v-if="hour.hour % 4 === 0" class="column-label">{{
-                  hour.hour.toString().padStart(2, '0')
-                }}</span>
-                <span v-else class="column-label spacer" />
+                <span
+                  class="column-label"
+                  :class="{ spacer: hour.hour % (isMobile ? 6 : 3) !== 0 }"
+                >
+                  {{ hour.hour % (isMobile ? 6 : 3) === 0 ? `${hour.hour}h` : '' }}
+                </span>
               </div>
             </div>
           </div>
         </v-card>
       </div>
 
-      <!-- Bottom Row: Seasonal / Week of Year -->
-      <v-card
-        class="histogram-card full-width-card"
-        flat
-        :loading="exploreStore.isHistogramsLoading"
-      >
+      <!-- Bottom Card: Seasonality (Week of Year) -->
+      <v-card class="histogram-card" flat elevation="0">
         <div class="card-header">
+          <v-icon class="card-icon" :icon="MdiCalendarMonthOutline" />
           <div class="header-texts">
             <h3 class="card-title">Seasonal Trends</h3>
             <p class="card-subtitle">Distribution of photos and videos over 52 weeks of the year</p>
@@ -198,12 +214,15 @@ function getMonthLabelForWeek(weekNum: number): string | null {
               <div class="bar-container">
                 <div
                   class="bar-fill"
-                  :style="{ height: `${(week.count / maxWeekCount) * 100}%` }"
+                  :style="{
+                    height: `${maxWeekCount > 0 ? (week.count / maxWeekCount) * 100 : 0}%`,
+                  }"
                 />
               </div>
-              <span class="column-label week-label">
-                {{ getMonthLabelForWeek(week.week) || '' }}
+              <span v-if="getMonthLabelForWeek(week.week)" class="column-label week-label">
+                {{ getMonthLabelForWeek(week.week) }}
               </span>
+              <span v-else class="column-label spacer" />
             </div>
           </div>
         </div>
@@ -215,7 +234,11 @@ function getMonthLabelForWeek(weekNum: number): string | null {
 <style scoped>
 .histograms-container {
   width: 100%;
-  margin-bottom: 32px;
+  margin-bottom: 28px;
+}
+
+.is-mobile.histograms-container {
+  margin-bottom: 20px;
 }
 
 .loading-state {
@@ -240,14 +263,19 @@ function getMonthLabelForWeek(weekNum: number): string | null {
   gap: 28px;
 }
 
+.is-mobile .histograms-grid {
+  gap: 16px;
+}
+
 .top-row {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: 1fr 1fr;
   gap: 28px;
 }
 
 .is-mobile .top-row {
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
+  gap: 16px;
 }
 
 .histogram-card {
@@ -255,6 +283,12 @@ function getMonthLabelForWeek(weekNum: number): string | null {
   border-radius: 28px !important;
   padding: 24px;
   border: none !important;
+  overflow: hidden;
+}
+
+.is-mobile .histogram-card {
+  border-radius: 22px !important;
+  padding: 18px 14px;
 }
 
 .card-header {
@@ -264,14 +298,26 @@ function getMonthLabelForWeek(weekNum: number): string | null {
   margin-bottom: 24px;
 }
 
+.is-mobile .card-header {
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
 .card-icon {
   color: rgb(var(--v-theme-primary));
   font-size: 28px;
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.is-mobile .card-icon {
+  font-size: 22px;
 }
 
 .header-texts {
   display: flex;
   flex-direction: column;
+  min-width: 0;
 }
 
 .card-title {
@@ -281,14 +327,23 @@ function getMonthLabelForWeek(weekNum: number): string | null {
   color: rgb(var(--v-theme-on-surface));
 }
 
+.is-mobile .card-title {
+  font-size: 1.1rem;
+}
+
 .card-subtitle {
   margin: 4px 0 0;
   font-size: 0.85rem;
   color: rgb(var(--v-theme-on-surface-variant));
 }
 
+.is-mobile .card-subtitle {
+  font-size: 0.78rem;
+}
+
 .chart-wrapper {
   padding-top: 8px;
+  width: 100%;
 }
 
 .bar-chart {
@@ -297,6 +352,12 @@ function getMonthLabelForWeek(weekNum: number): string | null {
   height: 180px;
   gap: 8px;
   position: relative;
+  width: 100%;
+  touch-action: pan-y;
+}
+
+.is-mobile .bar-chart {
+  height: 140px;
 }
 
 .chart-column {
@@ -306,10 +367,16 @@ function getMonthLabelForWeek(weekNum: number): string | null {
   flex: 1;
   height: 100%;
   transition: opacity 0.15s ease;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .chart-column:hover {
   opacity: 0.85;
+}
+
+.chart-column:active {
+  opacity: 0.7;
 }
 
 .bar-container {
@@ -332,7 +399,7 @@ function getMonthLabelForWeek(weekNum: number): string | null {
     rgba(var(--v-theme-primary), 0.7) 100%
   );
   border-radius: 8px;
-  transition: height 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: height 0.5s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .column-label {
@@ -342,6 +409,12 @@ function getMonthLabelForWeek(weekNum: number): string | null {
   color: rgb(var(--v-theme-on-surface-variant));
   height: 16px;
   text-align: center;
+  white-space: nowrap;
+}
+
+.is-mobile .column-label {
+  font-size: 0.68rem;
+  margin-top: 6px;
 }
 
 .column-label.spacer {
@@ -353,9 +426,18 @@ function getMonthLabelForWeek(weekNum: number): string | null {
   gap: 14px;
 }
 
+.is-mobile .day-chart {
+  gap: 6px;
+}
+
 .day-chart .bar-container,
 .day-chart .bar-fill {
   border-radius: 12px;
+}
+
+.is-mobile .day-chart .bar-container,
+.is-mobile .day-chart .bar-fill {
+  border-radius: 8px;
 }
 
 /* Hour chart adjustments */
@@ -363,19 +445,27 @@ function getMonthLabelForWeek(weekNum: number): string | null {
   gap: 4px;
 }
 
+.is-mobile .hour-chart {
+  gap: 1.5px;
+}
+
 .hour-chart .bar-container,
 .hour-chart .bar-fill {
   border-radius: 6px;
 }
 
-/* Update .thin-column to override flexbox min-content constraint */
+.is-mobile .hour-chart .bar-container,
+.is-mobile .hour-chart .bar-fill {
+  border-radius: 3px;
+}
+
 .thin-column {
   flex: 1;
   min-width: 0;
   position: relative;
 }
 
-/* Ensure the week chart gaps and column widths scale down gracefully on mobile */
+/* Week chart adjustments */
 .week-chart {
   gap: 2px;
   height: 160px;
@@ -383,9 +473,20 @@ function getMonthLabelForWeek(weekNum: number): string | null {
 
 .is-mobile .week-chart {
   gap: 1px;
+  height: 130px;
 }
 
-/* Keep the label from pushing the column wider while remaining centered */
+.week-chart .bar-container,
+.week-chart .bar-fill {
+  border-radius: 4px;
+}
+
+.is-mobile .week-chart .bar-container,
+.is-mobile .week-chart .bar-fill {
+  border-radius: 2px;
+}
+
+/* Month labels across 52 weeks */
 .week-label {
   font-size: 0.7rem;
   white-space: nowrap;
@@ -394,7 +495,11 @@ function getMonthLabelForWeek(weekNum: number): string | null {
   display: flex;
   justify-content: center;
   position: relative;
-  /* Shift slightly to center across the month */
   transform: translateX(8px);
+}
+
+.is-mobile .week-label {
+  font-size: 0.65rem;
+  transform: translateX(4px);
 }
 </style>
