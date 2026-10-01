@@ -18,6 +18,7 @@ import { computed } from 'vue'
 import { useDownloadStore } from '@/scripts/stores/downloadStore.ts'
 import { useSnackbarsStore } from '@/scripts/stores/snackbarStore.ts'
 import { useMediaItemStore } from '@/scripts/stores/timeline/mediaItemStore.ts'
+import { useResponsive } from '@/scripts/composables/useResponsive.ts'
 
 withDefaults(
   defineProps<{
@@ -40,6 +41,7 @@ const missingMediaStore = useMissingMediaStore()
 const downloadStore = useDownloadStore()
 const snackbarStore = useSnackbarsStore()
 const mediaItemStore = useMediaItemStore()
+const { isMobile } = useResponsive()
 
 async function setProfilePic() {
   if (selectionStore.selection.size !== 1) return
@@ -64,6 +66,11 @@ const searchSimilarUrl = computed(() => {
 const SNACK_HEIGHT = 66
 const SNACK_GAP = 8
 const avoidSnackbarBottom = computed(() => {
+  if (isMobile.value) {
+    const count = Math.min(snackbarStore.snackQueue.length, 2)
+    if (count === 0) return 0
+    return count * (52 + 8) + 8
+  }
   let increase = snackbarStore.snackQueue.length * (SNACK_HEIGHT + SNACK_GAP)
   if (snackbarStore.snackQueue.length > 0) increase += 16
   return increase
@@ -76,7 +83,9 @@ const avoidSnackbarBottom = computed(() => {
       class="actions-overlay"
       v-if="selectionStore.selection.size > 0"
       :style="{
-        transform: `translateY(${-1 * avoidSnackbarBottom}px)`,
+        transform: isMobile
+          ? `translate(-50%, ${-1 * avoidSnackbarBottom}px)`
+          : `translateY(${-1 * avoidSnackbarBottom}px)`,
       }"
     >
       <v-btn
@@ -202,7 +211,7 @@ const avoidSnackbarBottom = computed(() => {
   width: var(--width);
   height: 70px;
   padding: 10px 20px;
-  z-index: 3;
+  z-index: 1005;
   text-align: left;
   font-weight: 500;
   border-radius: 40px;
@@ -212,11 +221,33 @@ const avoidSnackbarBottom = computed(() => {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  transition: transform 0.3s;
+  transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
   border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity)) !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
 }
 
 .bold-select {
   font-weight: 600;
+}
+
+.select-text {
+  white-space: nowrap;
+}
+
+.is-mobile .actions-overlay {
+  bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+  left: 50%;
+  right: auto;
+  width: calc(100vw - 32px);
+  max-width: 440px;
+  height: 56px;
+  padding: 6px 12px;
+  border-radius: 28px;
+  gap: 8px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
+}
+
+.is-mobile .select-text {
+  font-size: 0.85rem;
 }
 </style>
