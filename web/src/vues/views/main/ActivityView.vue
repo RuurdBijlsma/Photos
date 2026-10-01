@@ -34,16 +34,22 @@ useEventListener('beforeunload', handleBeforeUnload)
 <style scoped>
 .activity-scroll-view {
   overflow-y: auto;
+  overflow-x: hidden;
+  width: 100%;
+  max-width: 100%;
 }
 
 .activity-content {
   max-width: 1400px;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   margin: 0 auto;
   padding: 32px 24px;
 }
 
 .is-mobile .activity-content {
-  padding: 16px 14px 96px 14px;
+  padding: 16px 12px 96px 12px;
 }
 
 .activity-title {

@@ -476,7 +476,7 @@ onUnmounted(() => {
 
     <!-- Bottom Layout Grid -->
     <div class="dashboard-grid">
-      <!-- Left Column: Scan, Dropzone, Upload Progress -->
+      <!-- Left Column: Dropzone, Scan, Upload Progress -->
       <div class="grid-column">
         <!-- File Dropzone -->
         <v-card class="action-card" flat>
@@ -879,7 +879,6 @@ onUnmounted(() => {
         </v-card-text>
 
         <v-card-actions class="dialog-actions">
-          <!-- Retry Button for Failed, Done, Cancelled -->
           <v-btn
             v-if="
               detailedJob &&
@@ -897,7 +896,6 @@ onUnmounted(() => {
           >
             Retry Job
           </v-btn>
-          <!-- Download Button -->
           <v-btn
             v-if="detailedJob?.relativePath"
             variant="tonal"
@@ -921,10 +919,17 @@ onUnmounted(() => {
 <style scoped>
 .dashboard-root {
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 /* Pipeline styles */
 .pipeline-section {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   border-radius: 28px;
   padding: 24px;
   margin-bottom: 32px;
@@ -941,6 +946,9 @@ onUnmounted(() => {
   justify-content: space-evenly;
   flex-wrap: wrap;
   gap: 16px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .is-mobile .pipeline-row {
@@ -975,27 +983,41 @@ onUnmounted(() => {
 /* Grid Layout */
 .dashboard-grid {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(0, 1fr);
   gap: 28px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .is-mobile .dashboard-grid {
   gap: 16px;
 }
 
-.is-desktop .dashboard-grid {
-  grid-template-columns: 5fr 6fr;
+@media (min-width: 1024px) {
+  .dashboard-grid {
+    grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+  }
 }
 
 .grid-column {
   display: flex;
   flex-direction: column;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .action-card {
   background-color: rgb(var(--v-theme-surface-container-low)) !important;
   border-radius: 28px !important;
   margin-bottom: 24px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .is-mobile .action-card {
@@ -1008,6 +1030,9 @@ onUnmounted(() => {
   flex-direction: column;
   align-items: flex-start;
   padding: 20px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .is-mobile .action-content {
@@ -1018,6 +1043,8 @@ onUnmounted(() => {
   display: flex;
   align-items: flex-start;
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .is-mobile .action-text {
@@ -1027,6 +1054,8 @@ onUnmounted(() => {
 
 .action-description {
   flex-grow: 1;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .section-title {
@@ -1055,6 +1084,7 @@ onUnmounted(() => {
   margin-top: 12px;
   margin-right: 4px;
   max-width: 100%;
+  overflow: hidden;
 }
 
 .is-mobile .selected-folder-display {
@@ -1073,6 +1103,9 @@ onUnmounted(() => {
 /* Card Body spacing */
 .card-body {
   padding: 20px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .is-mobile .card-body {
@@ -1098,6 +1131,9 @@ onUnmounted(() => {
   text-align: center;
   cursor: pointer;
   transition: all 0.2s ease-in-out;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .is-mobile .custom-dropzone {
@@ -1148,6 +1184,7 @@ onUnmounted(() => {
   flex-wrap: wrap;
   gap: 8px;
   margin-top: 16px;
+  width: 100%;
 }
 
 .is-mobile .dropzone-buttons {
@@ -1173,6 +1210,7 @@ onUnmounted(() => {
 .active-uploads-list {
   max-height: 350px;
   padding-right: 4px;
+  width: 100%;
 }
 
 .upload-list-item {
@@ -1185,6 +1223,7 @@ onUnmounted(() => {
   height: 56px;
   box-sizing: border-box;
   transition: background-color 0.2s ease;
+  width: 100%;
 }
 
 .is-mobile .upload-list-item {
@@ -1198,6 +1237,7 @@ onUnmounted(() => {
 .upload-item-prefix {
   display: flex;
   align-items: center;
+  flex-shrink: 0;
 }
 
 .upload-item-details {
@@ -1239,6 +1279,7 @@ onUnmounted(() => {
   margin-left: 8px;
   display: flex;
   align-items: center;
+  flex-shrink: 0;
 }
 
 .progress-percent {
@@ -1250,6 +1291,7 @@ onUnmounted(() => {
 /* Running Jobs Feed */
 .running-list-container {
   min-height: 140px;
+  width: 100%;
 }
 
 .feed-title {
@@ -1272,6 +1314,7 @@ onUnmounted(() => {
   max-height: 240px;
   overflow-y: auto;
   padding-right: 4px;
+  width: 100%;
 }
 
 .background-tasks-indicator {
@@ -1304,6 +1347,7 @@ onUnmounted(() => {
   justify-content: space-between;
   margin-top: 16px;
   margin-bottom: 16px;
+  width: 100%;
 }
 
 .is-mobile .table-filters {
@@ -1317,21 +1361,27 @@ onUnmounted(() => {
 
 .is-mobile .search-bar {
   max-width: 100%;
+  width: 100%;
 }
 
 .tabs-control {
   border-bottom: 1px solid rgba(var(--v-border-color), 0.1);
   font-weight: 500;
   margin-bottom: 12px;
+  width: 100%;
 }
 
 .table-container {
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
   overflow-x: auto;
 }
 
 .user-jobs-table {
   background: transparent !important;
+  width: 100%;
+  max-width: 100%;
 }
 
 .table-empty-state {
@@ -1379,6 +1429,7 @@ onUnmounted(() => {
   align-items: center;
   justify-content: space-between;
   margin-top: 16px;
+  width: 100%;
 }
 
 .is-mobile .table-pagination-row {
