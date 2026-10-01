@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { formatEta } from '@/scripts/utils.ts'
 import type { IconValue } from '@/scripts/types/iconValue.ts'
+import { useResponsive } from '@/scripts/composables/useResponsive.ts'
 
 const props = withDefaults(
   defineProps<{
@@ -21,6 +22,8 @@ const props = withDefaults(
     tooltipText: '',
   },
 )
+
+const { isMobile } = useResponsive()
 
 const MINIMUM_TO_SHOW_ETA = 5
 
@@ -63,12 +66,12 @@ const formattedSpeed = computed(() => {
       <v-progress-circular
         :model-value="progress"
         color="primary"
-        size="88"
-        width="6"
+        :size="isMobile ? 64 : 88"
+        :width="isMobile ? 5 : 6"
         class="pipeline-circle"
       >
         <div class="circle-inner">
-          <v-icon size="default" :icon="icon" />
+          <v-icon :size="isMobile ? 'small' : 'default'" :icon="icon" />
           <span class="circle-pct">{{ Math.round(progress) }}%</span>
         </div>
       </v-progress-circular>
@@ -89,6 +92,8 @@ const formattedSpeed = computed(() => {
   display: flex;
   flex-direction: column;
   align-items: center;
+  flex-shrink: 0;
+  scroll-snap-align: start;
 }
 
 .pipeline-step-card {
@@ -101,6 +106,13 @@ const formattedSpeed = computed(() => {
   background-color: rgb(var(--v-theme-surface-container-low));
   min-width: 140px;
   min-height: 206px;
+}
+
+.is-mobile .pipeline-step-card {
+  padding: 12px 14px;
+  border-radius: 20px;
+  min-width: 110px;
+  min-height: 154px;
 }
 
 @keyframes pulse-glow {
@@ -138,6 +150,10 @@ const formattedSpeed = computed(() => {
   margin-top: 2px;
 }
 
+.is-mobile .circle-pct {
+  font-size: 0.65rem;
+}
+
 .step-details {
   display: flex;
   flex-direction: column;
@@ -154,10 +170,18 @@ const formattedSpeed = computed(() => {
   color: rgb(var(--v-theme-on-surface));
 }
 
+.is-mobile .step-label {
+  font-size: 0.8rem;
+}
+
 .step-status {
   font-size: 0.75rem;
   font-weight: 500;
   color: rgba(var(--v-theme-on-surface), 0.6);
+}
+
+.is-mobile .step-status {
+  font-size: 0.7rem;
 }
 
 .step-speed {
@@ -167,9 +191,17 @@ const formattedSpeed = computed(() => {
   margin-top: 2px;
 }
 
+.is-mobile .step-speed {
+  font-size: 0.65rem;
+}
+
 .step-eta {
   font-size: 0.7rem;
   font-weight: 500;
   color: rgba(var(--v-theme-on-surface), 0.7);
+}
+
+.is-mobile .step-eta {
+  font-size: 0.65rem;
 }
 </style>

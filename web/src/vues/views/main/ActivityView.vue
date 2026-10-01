@@ -42,6 +42,10 @@ useEventListener('beforeunload', handleBeforeUnload)
   padding: 32px 24px;
 }
 
+.is-mobile .activity-content {
+  padding: 16px 14px 96px 14px;
+}
+
 .activity-title {
   font-size: 2.125rem;
   font-weight: 700;
@@ -49,9 +53,22 @@ useEventListener('beforeunload', handleBeforeUnload)
   color: rgb(var(--v-theme-on-surface));
 }
 
+.is-mobile .activity-title {
+  font-size: 1.5rem;
+  margin-bottom: 4px;
+}
+
 .activity-subtitle {
   font-size: 0.95rem;
   color: rgb(var(--v-theme-on-surface-variant));
   margin-bottom: 0;
+}
+
+.is-mobile .activity-subtitle {
+  font-size: 0.825rem;
+}
+
+.is-mobile .activity-header {
+  margin-bottom: 16px !important;
 }
 </style>
