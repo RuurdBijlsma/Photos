@@ -39,7 +39,6 @@ const viewPhotoStore = useViewPhotoStore()
 const settings = useSettingStore()
 const cardStore = useDailyCardStore()
 const refreshStore = useRefreshStore()
-const layoutStore = useLayoutStore()
 
 const isLoading = computed(() => timelineStore.isLoading || !timelineStore.isInitialized)
 const cards = computed(() => cardStore.todayCards)
