@@ -21,7 +21,6 @@
 * in failed list op ingest pagina, download knop voor de file toevoegen zodat je kan inspecteren of ie stuk is
 * fix PWA icons (currently has black borders on firefox for some reason)
 * [MOBILE REFACTOR]
-* hide app bar when scrolling down
 * Fix simpletimeline for mobile
 * Photo viewer is uggo
 * activity view is uggo

@@ -22,23 +22,27 @@ import { useRoute } from 'vue-router'
 import { useTimelineStore } from '@/scripts/stores/timeline/timelineStore.ts'
 import { useStorage, useThrottleFn } from '@vueuse/core'
 import { useSnackbarsStore } from '@/scripts/stores/snackbarStore.ts'
+import { useLayoutStore } from '@/scripts/stores/layoutStore.ts'
 
 const authStore = useAuthStore()
 const settings = useSettingStore()
 const systemStore = useSystemStore()
 const timelineStore = useTimelineStore()
 const snackbarStore = useSnackbarsStore()
+const layoutStore = useLayoutStore()
 const responsive = useResponsive()
 const route = useRoute()
 
 const menuOpen = ref(false)
 const ingestMenuOpen = ref(false)
-const isAppBarVisible = ref(true)
 const logoAngle = ref(0)
 const isClicker = useStorage('clickerUnlocked', false)
 let velocity = 0
 let lastTime = 0
 let animFrameId: number | null = null
+const appbarScrollTarget = computed(() =>
+  layoutStore.scrollTarget === undefined ? undefined : '#' + layoutStore.scrollTarget,
+)
 
 const isSearch = computed(() => route.name === 'search')
 const showSearchBar = computed(
@@ -119,9 +123,12 @@ async function logout() {
     density="comfortable"
     :height="70"
     class="header"
+    :scroll-target="appbarScrollTarget"
     color="transparent"
     elevation="0"
-    v-model="isAppBarVisible"
+    scroll-behavior="hide"
+    scroll-threshold="400"
+    v-model="layoutStore.isAppBarVisible"
   >
     <!--    Mobile     -->
     <template v-if="responsive.isMobile.value">
