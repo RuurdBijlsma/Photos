@@ -30,7 +30,6 @@ import DailyCardList from '@/vues/components/timeline/daily-cards/DailyCardList.
 import { useDailyCardStore } from '@/scripts/stores/timeline/dailyCardStore.ts'
 import { useRefreshStore } from '@/scripts/stores/refreshStore.ts'
 import { useResponsive } from '@/scripts/composables/useResponsive.ts'
-import { useLayoutStore } from '@/scripts/stores/layoutStore.ts'
 import { useScrollTarget } from '@/scripts/composables/useScrollTarget.ts'
 
 const timelineStore = useTimelineStore()
