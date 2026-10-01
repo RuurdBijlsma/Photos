@@ -44,7 +44,7 @@ backgroundStore.initialize()
       <v-navigation-drawer :width="40" floating color="transparent"></v-navigation-drawer>
     </template>
 
-    <v-main class="layout-body" :class="{'app-bar-hidden': !layoutStore.isAppBarVisible}">
+    <v-main class="layout-body" :class="{ 'app-bar-hidden': !layoutStore.isAppBarVisible }">
       <router-view class="router-view" />
     </v-main>
   </v-layout>
