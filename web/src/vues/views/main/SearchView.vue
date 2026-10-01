@@ -14,9 +14,11 @@ import { getThumbnailHeight } from '@/scripts/utils.ts'
 import { usePageTitle } from '@/scripts/composables/usePageTitle.ts'
 import MdiClose from '~icons/mdi/close'
 import MdiMagnify from '~icons/mdi/magnify'
+import { useResponsive } from '@/scripts/composables/useResponsive.ts'
 
 const snackStore = useSnackbarsStore()
 const searchStore = useSearchStore()
+const responsive = useResponsive()
 const route = useRoute()
 const router = useRouter()
 
@@ -233,29 +235,31 @@ usePageTitle(query, { fallback: 'Search' })
   >
     <div class="search-options">
       <h2 class="search-query-title">
-        <v-icon class="mr-5 search-query-icon" :icon="MdiMagnify" />
-        <template v-if="query">
-          Search for “<span class="search-query-highlight">{{ query }}</span
-          >”
+        <template v-if="!responsive.isMobile">
+          <v-icon class="mr-5 search-query-icon" :icon="MdiMagnify" />
+          <template v-if="query">
+            Search for “<span class="search-query-highlight">{{ query }}</span
+            >”
+          </template>
+          <template v-else-if="searchStore.searchImage">
+            Images similar to
+            <img
+              class="image-preview"
+              v-if="searchStore.imagePreview"
+              :src="searchStore.imagePreview"
+              height="50"
+              width="auto"
+              alt="Search image"
+            />
+          </template>
+          <template v-else-if="isSimilarSearch">
+            Similar to {{ similarIds.length }} item{{ similarIds.length > 1 ? 's' : '' }}
+          </template>
+          <template v-else-if="hasFilters">Filtered results</template>
+          <template v-else>Search</template>
         </template>
-        <template v-else-if="searchStore.searchImage">
-          Images similar to
-          <img
-            class="image-preview"
-            v-if="searchStore.imagePreview"
-            :src="searchStore.imagePreview"
-            height="50"
-            width="auto"
-            alt="Search image"
-          />
-        </template>
-        <template v-else-if="isSimilarSearch">
-          Similar to {{ similarIds.length }} item{{ similarIds.length > 1 ? 's' : '' }}
-        </template>
-        <template v-else-if="hasFilters">Filtered results</template>
-        <template v-else>Search</template>
       </h2>
-      <v-spacer />
+      <v-spacer v-if="!responsive.isMobile" />
       <search-filter-menu />
     </div>
 
