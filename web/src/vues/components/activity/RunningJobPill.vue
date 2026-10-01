@@ -43,6 +43,12 @@ defineProps<{
   gap: 12px;
 }
 
+.is-mobile .job-pill {
+  border-radius: 14px;
+  margin-bottom: 6px;
+  padding: 10px 12px !important;
+}
+
 .job-info-left {
   display: flex;
   flex-direction: column;
@@ -56,11 +62,19 @@ defineProps<{
   color: rgb(var(--v-theme-primary));
 }
 
+.is-mobile .job-type-badge {
+  font-size: 0.68rem;
+}
+
 .job-path {
   font-size: 0.85rem;
   color: rgb(var(--v-theme-on-surface));
   text-overflow: ellipsis;
   overflow: hidden;
   white-space: nowrap;
+}
+
+.is-mobile .job-path {
+  font-size: 0.78rem;
 }
 </style>

@@ -37,12 +37,14 @@ import MdiTrashCanOutline from '~icons/mdi/trash-can-outline'
 import MdiTrayArrowUp from '~icons/mdi/tray-arrow-up'
 import { useAuthStore } from '@/scripts/stores/authStore.ts'
 import { useSnackbarsStore } from '@/scripts/stores/snackbarStore.ts'
+import { useResponsive } from '@/scripts/composables/useResponsive.ts'
 
 const ingestStore = useIngestJobsStore()
 const uploadStore = useUploadStore()
 const authStore = useAuthStore()
 const systemStore = useSystemStore()
 const snackbarStore = useSnackbarsStore()
+const { isMobile } = useResponsive()
 
 const mediaFolderUnavailable = computed(
   () =>
@@ -148,7 +150,7 @@ function onFolderChanged(e: Event) {
   }
 }
 
-// Ingest progress selectors (O(1) lookups from store)
+// Ingest progress selectors
 const uploadSuccessCount = computed(() => uploadStore.successCount)
 const uploadFailedCount = computed(() => uploadStore.failedCount)
 const uploadTotalCount = computed(() => uploadStore.totalCount)
@@ -449,6 +451,7 @@ onUnmounted(() => {
     >
       {{ mediaFolderError }}
     </v-alert>
+
     <!-- Top Pipeline Section -->
     <section class="pipeline-section">
       <div class="pipeline-row">
@@ -465,7 +468,7 @@ onUnmounted(() => {
           />
 
           <div v-if="index < pipelineSteps.length - 1" class="pipeline-arrow">
-            <v-icon size="large" :icon="MdiChevronRight" />
+            <v-icon :size="isMobile ? 'default' : 'large'" :icon="MdiChevronRight" />
           </div>
         </template>
       </div>
@@ -473,7 +476,7 @@ onUnmounted(() => {
 
     <!-- Bottom Layout Grid -->
     <div class="dashboard-grid">
-      <!-- Left Column: Scan, Dropzone, Upload Progress -->
+      <!-- Left Column: Dropzone, Scan, Upload Progress -->
       <div class="grid-column">
         <!-- File Dropzone -->
         <v-card class="action-card" flat>
@@ -540,7 +543,7 @@ onUnmounted(() => {
         <v-card class="action-card" flat>
           <div class="action-content">
             <div class="action-text">
-              <div>
+              <div class="action-description">
                 <h2 class="section-title">Index Library Folder</h2>
                 <p class="section-subtitle">
                   Folder: Start a search of your media folder to discover new photos and videos.
@@ -669,6 +672,7 @@ onUnmounted(() => {
                   :key="job.id"
                   :job-type="job.jobType"
                   :relative-path="job.relativePath"
+                  :compact="isMobile"
                 />
                 <div v-if="ingestStore.runningJobs.length > 15" class="background-tasks-indicator">
                   + {{ ingestStore.runningJobs.length - 15 }} more active tasks in background
@@ -717,81 +721,85 @@ onUnmounted(() => {
             </v-tabs>
 
             <!-- Table -->
-            <v-data-table
-              :headers="headers"
-              :items="ingestStore.userJobs"
-              :loading="ingestStore.isJobsLoading"
-              hide-default-footer
-              hover
-              class="user-jobs-table"
-            >
-              <!-- Empty state -->
-              <template #no-data>
-                <div class="table-empty-state">No ingest jobs match this filter.</div>
-              </template>
+            <div class="table-container">
+              <v-data-table
+                :headers="headers"
+                :items="ingestStore.userJobs"
+                :loading="ingestStore.isJobsLoading"
+                hide-default-footer
+                hover
+                class="user-jobs-table"
+              >
+                <!-- Empty state -->
+                <template #no-data>
+                  <div class="table-empty-state">No ingest jobs match this filter.</div>
+                </template>
 
-              <!-- Job Status Slot -->
-              <template #[`item.status`]="{ item }">
-                <v-chip class="table-chip">{{ item.status }}</v-chip>
-              </template>
+                <!-- Job Status Slot -->
+                <template #[`item.status`]="{ item }">
+                  <v-chip class="table-chip">{{ item.status }}</v-chip>
+                </template>
 
-              <!-- Job Type Slot -->
-              <template #[`item.jobType`]="{ item }">
-                <v-chip class="table-chip">{{ formatJobType(item.jobType) }}</v-chip>
-              </template>
+                <!-- Job Type Slot -->
+                <template #[`item.jobType`]="{ item }">
+                  <v-chip class="table-chip">{{ formatJobType(item.jobType) }}</v-chip>
+                </template>
 
-              <!-- Relative Path Slot -->
-              <template #[`item.relativePath`]="{ item }">
-                <span class="path-text">
-                  {{ item.relativePath || '-' }}
-                </span>
-              </template>
+                <!-- Relative Path Slot -->
+                <template #[`item.relativePath`]="{ item }">
+                  <span class="path-text">
+                    {{ item.relativePath || '-' }}
+                  </span>
+                </template>
 
-              <!-- Attempts Slot -->
-              <template #[`item.attempts`]="{ item }">
-                <span class="attempts-display"> {{ item.attempts }} / {{ item.maxAttempts }} </span>
-              </template>
+                <!-- Attempts Slot -->
+                <template #[`item.attempts`]="{ item }">
+                  <span class="attempts-display">
+                    {{ item.attempts }} / {{ item.maxAttempts }}
+                  </span>
+                </template>
 
-              <!-- Actions Slot -->
-              <template #[`item.actions`]="{ item }">
-                <div class="row-actions">
-                  <!-- Retry button for failed -->
-                  <v-btn
-                    v-if="item.status === 'failed'"
-                    :icon="MdiCached"
-                    variant="text"
-                    color="primary"
-                    density="comfortable"
-                    size="small"
-                    :loading="retryingJobIds.has(item.id)"
-                    @click="handleRetry(item.id)"
-                    title="Retry Job"
-                  />
-                  <!-- Download button for failed -->
-                  <v-btn
-                    v-if="item.status === 'failed' && item.relativePath"
-                    :icon="MdiDownloadOutline"
-                    variant="text"
-                    color="secondary"
-                    density="comfortable"
-                    size="small"
-                    :loading="downloadingJobIds.has(item.id)"
-                    @click="handleDownload(item.relativePath, item.id)"
-                    title="Download File"
-                  />
-                  <!-- Detail info button -->
-                  <v-btn
-                    :icon="MdiInformationOutline"
-                    variant="text"
-                    color="secondary"
-                    density="comfortable"
-                    size="small"
-                    @click="openDetails(item)"
-                    title="View Job Details"
-                  />
-                </div>
-              </template>
-            </v-data-table>
+                <!-- Actions Slot -->
+                <template #[`item.actions`]="{ item }">
+                  <div class="row-actions">
+                    <!-- Retry button for failed -->
+                    <v-btn
+                      v-if="item.status === 'failed'"
+                      :icon="MdiCached"
+                      variant="text"
+                      color="primary"
+                      density="comfortable"
+                      size="small"
+                      :loading="retryingJobIds.has(item.id)"
+                      @click="handleRetry(item.id)"
+                      title="Retry Job"
+                    />
+                    <!-- Download button for failed -->
+                    <v-btn
+                      v-if="item.status === 'failed' && item.relativePath"
+                      :icon="MdiDownloadOutline"
+                      variant="text"
+                      color="secondary"
+                      density="comfortable"
+                      size="small"
+                      :loading="downloadingJobIds.has(item.id)"
+                      @click="handleDownload(item.relativePath, item.id)"
+                      title="Download File"
+                    />
+                    <!-- Detail info button -->
+                    <v-btn
+                      :icon="MdiInformationOutline"
+                      variant="text"
+                      color="secondary"
+                      density="comfortable"
+                      size="small"
+                      @click="openDetails(item)"
+                      title="View Job Details"
+                    />
+                  </div>
+                </template>
+              </v-data-table>
+            </div>
 
             <!-- Pagination -->
             <div
@@ -808,7 +816,7 @@ onUnmounted(() => {
               <v-pagination
                 v-model="ingestStore.page"
                 :length="Math.ceil(ingestStore.totalJobsCount / ingestStore.itemsPerPage)"
-                :total-visible="4"
+                :total-visible="isMobile ? 3 : 4"
                 density="compact"
               />
             </div>
@@ -855,7 +863,7 @@ onUnmounted(() => {
 
           <!-- Extra Meta Info -->
           <v-row class="dialog-metadata" density="comfortable">
-            <v-col cols="6" sm="4">
+            <v-col cols="12" sm="4">
               <strong>Created:</strong><br />
               {{ formatDate(detailedJob?.createdAt || '') }}
             </v-col>
@@ -871,7 +879,6 @@ onUnmounted(() => {
         </v-card-text>
 
         <v-card-actions class="dialog-actions">
-          <!-- Retry Button for Failed, Done, Cancelled -->
           <v-btn
             v-if="
               detailedJob &&
@@ -889,7 +896,6 @@ onUnmounted(() => {
           >
             Retry Job
           </v-btn>
-          <!-- Download Button -->
           <v-btn
             v-if="detailedJob?.relativePath"
             variant="tonal"
@@ -913,13 +919,25 @@ onUnmounted(() => {
 <style scoped>
 .dashboard-root {
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 /* Pipeline styles */
 .pipeline-section {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   border-radius: 28px;
   padding: 24px;
   margin-bottom: 32px;
+}
+
+.is-mobile .pipeline-section {
+  padding: 0;
+  margin-bottom: 20px;
 }
 
 .pipeline-row {
@@ -928,6 +946,25 @@ onUnmounted(() => {
   justify-content: space-evenly;
   flex-wrap: wrap;
   gap: 16px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.is-mobile .pipeline-row {
+  flex-wrap: nowrap;
+  justify-content: flex-start;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  padding: 4px 4px 10px 4px;
+  gap: 8px;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+}
+
+.is-mobile .pipeline-row::-webkit-scrollbar {
+  display: none;
 }
 
 .pipeline-arrow {
@@ -936,30 +973,56 @@ onUnmounted(() => {
   justify-content: center;
   opacity: 0.5;
   color: rgb(var(--v-theme-on-surface));
+  flex-shrink: 0;
+}
+
+.is-mobile .pipeline-arrow {
+  opacity: 0.35;
 }
 
 /* Grid Layout */
 .dashboard-grid {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(0, 1fr);
   gap: 28px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.is-mobile .dashboard-grid {
+  gap: 16px;
 }
 
 @media (min-width: 1024px) {
   .dashboard-grid {
-    grid-template-columns: 5fr 6fr;
+    grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
   }
 }
 
 .grid-column {
   display: flex;
   flex-direction: column;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .action-card {
   background-color: rgb(var(--v-theme-surface-container-low)) !important;
   border-radius: 28px !important;
   margin-bottom: 24px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.is-mobile .action-card {
+  border-radius: 22px !important;
+  margin-bottom: 16px;
 }
 
 .action-content {
@@ -967,17 +1030,42 @@ onUnmounted(() => {
   flex-direction: column;
   align-items: flex-start;
   padding: 20px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.is-mobile .action-content {
+  padding: 16px 14px;
 }
 
 .action-text {
   display: flex;
   align-items: flex-start;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.is-mobile .action-text {
+  flex-direction: column;
+  gap: 12px;
+}
+
+.action-description {
+  flex-grow: 1;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .section-title {
   margin: 0;
   font-size: 1.25rem;
   font-weight: 700;
+}
+
+.is-mobile .section-title {
+  font-size: 1.1rem;
 }
 
 .section-subtitle {
@@ -988,24 +1076,50 @@ onUnmounted(() => {
   margin-bottom: 0;
 }
 
+.is-mobile .section-subtitle {
+  font-size: 0.8rem;
+}
+
 .selected-folder-display {
   margin-top: 12px;
   margin-right: 4px;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.is-mobile .selected-folder-display {
+  margin-top: 0;
+  margin-right: 0;
 }
 
 .scan-button {
   margin-top: 16px;
 }
 
+.is-mobile .scan-button {
+  width: 100%;
+}
+
 /* Card Body spacing */
 .card-body {
   padding: 20px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.is-mobile .card-body {
+  padding: 16px 14px;
 }
 
 .card-title {
   font-size: 1.25rem;
   font-weight: 700;
   margin-bottom: 12px;
+}
+
+.is-mobile .card-title {
+  font-size: 1.1rem;
 }
 
 /* Custom Dropzone */
@@ -1017,6 +1131,14 @@ onUnmounted(() => {
   text-align: center;
   cursor: pointer;
   transition: all 0.2s ease-in-out;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.is-mobile .custom-dropzone {
+  padding: 22px 14px;
+  border-radius: 16px;
 }
 
 .custom-dropzone:hover,
@@ -1033,6 +1155,10 @@ onUnmounted(() => {
   font-size: 0.95rem;
   font-weight: 600;
   color: rgb(var(--v-theme-on-surface));
+}
+
+.is-mobile .dropzone-label {
+  font-size: 0.88rem;
 }
 
 .browse-link {
@@ -1058,10 +1184,19 @@ onUnmounted(() => {
   flex-wrap: wrap;
   gap: 8px;
   margin-top: 16px;
+  width: 100%;
+}
+
+.is-mobile .dropzone-buttons {
+  width: 100%;
 }
 
 .clear-button {
   margin-left: 8px;
+}
+
+.is-mobile .clear-button {
+  margin-left: 0;
 }
 
 /* Active Uploads */
@@ -1075,6 +1210,7 @@ onUnmounted(() => {
 .active-uploads-list {
   max-height: 350px;
   padding-right: 4px;
+  width: 100%;
 }
 
 .upload-list-item {
@@ -1087,6 +1223,11 @@ onUnmounted(() => {
   height: 56px;
   box-sizing: border-box;
   transition: background-color 0.2s ease;
+  width: 100%;
+}
+
+.is-mobile .upload-list-item {
+  padding: 8px 10px;
 }
 
 .upload-list-item:hover {
@@ -1096,6 +1237,7 @@ onUnmounted(() => {
 .upload-item-prefix {
   display: flex;
   align-items: center;
+  flex-shrink: 0;
 }
 
 .upload-item-details {
@@ -1113,10 +1255,19 @@ onUnmounted(() => {
   max-width: 220px;
 }
 
+.is-mobile .upload-item-name {
+  max-width: 130px;
+  font-size: 0.8rem;
+}
+
 .upload-item-meta {
   font-size: 0.75rem;
   font-weight: 500;
   color: rgba(var(--v-theme-on-surface), 0.6);
+}
+
+.is-mobile .upload-item-meta {
+  font-size: 0.7rem;
 }
 
 .error-text {
@@ -1128,6 +1279,7 @@ onUnmounted(() => {
   margin-left: 8px;
   display: flex;
   align-items: center;
+  flex-shrink: 0;
 }
 
 .progress-percent {
@@ -1139,6 +1291,7 @@ onUnmounted(() => {
 /* Running Jobs Feed */
 .running-list-container {
   min-height: 140px;
+  width: 100%;
 }
 
 .feed-title {
@@ -1150,6 +1303,10 @@ onUnmounted(() => {
   gap: 8px;
 }
 
+.is-mobile .feed-title {
+  font-size: 1.1rem;
+}
+
 .running-jobs-wrap {
   display: flex;
   flex-direction: column;
@@ -1157,6 +1314,7 @@ onUnmounted(() => {
   max-height: 240px;
   overflow-y: auto;
   padding-right: 4px;
+  width: 100%;
 }
 
 .background-tasks-indicator {
@@ -1189,20 +1347,41 @@ onUnmounted(() => {
   justify-content: space-between;
   margin-top: 16px;
   margin-bottom: 16px;
+  width: 100%;
+}
+
+.is-mobile .table-filters {
+  margin-top: 10px;
+  margin-bottom: 12px;
 }
 
 .search-bar {
   max-width: 280px;
 }
 
+.is-mobile .search-bar {
+  max-width: 100%;
+  width: 100%;
+}
+
 .tabs-control {
   border-bottom: 1px solid rgba(var(--v-border-color), 0.1);
   font-weight: 500;
   margin-bottom: 12px;
+  width: 100%;
+}
+
+.table-container {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
 }
 
 .user-jobs-table {
   background: transparent !important;
+  width: 100%;
+  max-width: 100%;
 }
 
 .table-empty-state {
@@ -1228,6 +1407,11 @@ onUnmounted(() => {
   max-width: 200px;
 }
 
+.is-mobile .path-text {
+  max-width: 120px;
+  font-size: 0.74rem;
+}
+
 .attempts-display {
   font-size: 0.75rem;
   color: rgba(var(--v-theme-on-surface), 0.6);
@@ -1245,6 +1429,13 @@ onUnmounted(() => {
   align-items: center;
   justify-content: space-between;
   margin-top: 16px;
+  width: 100%;
+}
+
+.is-mobile .table-pagination-row {
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
 }
 
 .pagination-info {
@@ -1265,11 +1456,19 @@ onUnmounted(() => {
   border-bottom: 1px solid rgba(var(--v-border-color), 0.12);
 }
 
+.is-mobile .dialog-header {
+  padding: 14px 16px;
+}
+
 .dialog-title {
   display: flex;
   align-items: center;
   font-weight: 700;
   font-size: 1.25rem;
+}
+
+.is-mobile .dialog-title {
+  font-size: 1.05rem;
 }
 
 .dialog-title-icon {
@@ -1278,6 +1477,10 @@ onUnmounted(() => {
 
 .dialog-body {
   padding: 16px 24px;
+}
+
+.is-mobile .dialog-body {
+  padding: 14px 16px;
 }
 
 .dialog-section-label {
@@ -1339,6 +1542,12 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   border-top: 1px solid rgba(var(--v-border-color), 0.12);
+}
+
+.is-mobile .dialog-actions {
+  padding: 12px 16px 16px 16px;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .dialog-action-btn {

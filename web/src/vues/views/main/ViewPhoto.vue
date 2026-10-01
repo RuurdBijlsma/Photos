@@ -48,6 +48,7 @@ import PhotoGallery from '@/vues/components/viewer/components/PhotoGallery.vue'
 import { useEventListener, useStorage } from '@vueuse/core'
 import { useDetailTitle } from '@/scripts/composables/usePageTitle.ts'
 import { useSnackbarsStore } from '@/scripts/stores/snackbarStore.ts'
+import { useResponsive } from '@/scripts/composables/useResponsive.ts'
 
 const props = withDefaults(
   defineProps<{
@@ -65,6 +66,7 @@ const props = withDefaults(
 const route = useRoute()
 const router = useRouter()
 const theme = useTheme()
+const responsive = useResponsive()
 const mediaItemStore = useMediaItemStore()
 const downloadStore = useDownloadStore()
 const settings = useSettingStore()
@@ -393,7 +395,11 @@ useDetailTitle(mediaDetailTitle, { fallback: 'Photo' })
     :theme="settings.darkPhotoViewer ? 'dark' : theme.current.value.dark ? 'dark' : 'light'"
     with-background
     class="view-container"
-    :class="{ 'backdrop-blur': settings.useBackdropBlur, 'hide-ui': !showUI }"
+    :class="{
+      'backdrop-blur': settings.useBackdropBlur,
+      'hide-ui': !showUI,
+      'is-mobile': responsive.isMobile,
+    }"
     :style="{
       backgroundColor: settings.useImageGlow ? 'rgb(var(--v-theme-background))' : 'black',
     }"
@@ -428,7 +434,7 @@ useDetailTitle(mediaDetailTitle, { fallback: 'Photo' })
     />
     <div v-if="showGallery && id" class="gallery-resize-handle" @pointerdown="startResize" />
     <div class="top-bar" @wheel="forwardWheel">
-      <div class="left-buttons">
+      <div class="left-buttons" v-if="!responsive.isMobile">
         <v-btn
           :to="parentLocation"
           rounded="xl"
@@ -444,7 +450,7 @@ useDetailTitle(mediaDetailTitle, { fallback: 'Photo' })
           v-tooltip="{ text: 'Toggle gallery', location: 'bottom', attach: true, width: 140 }"
         />
       </div>
-      <div class="top-main-text">
+      <div class="top-main-text" v-if="!responsive.isMobile">
         <h3 v-if="fullImage?.user_caption">{{ fullImage.user_caption }}</h3>
         <router-link
           class="top-link"
@@ -482,6 +488,14 @@ useDetailTitle(mediaDetailTitle, { fallback: 'Photo' })
         </p>
       </div>
       <div class="right-buttons">
+        <v-btn
+          v-if="responsive.isMobile"
+          :to="parentLocation"
+          rounded="xl"
+          :icon="MdiClose"
+          variant="plain"
+          v-tooltip="{ text: 'Close viewer', location: 'bottom', attach: true, width: 140 }"
+        />
         <v-btn
           v-if="
             settings.playMotionPhotos &&
@@ -792,6 +806,11 @@ useDetailTitle(mediaDetailTitle, { fallback: 'Photo' })
   transition:
     background-color 0.15s,
     transform 0.5s;
+}
+
+.is-mobile .right-buttons {
+  padding: 0 15px !important;
+  margin: 10px auto;
 }
 
 .backdrop-blur .right-buttons,

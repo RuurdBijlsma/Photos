@@ -21,15 +21,7 @@
 * in failed list op ingest pagina, download knop voor de file toevoegen zodat je kan inspecteren of ie stuk is
 * fix PWA icons (currently has black borders on firefox for some reason)
 * [MOBILE REFACTOR]
-* Bottom nav
-  * Click on search takes you to search
-* hide app bar when scrolling down
-* Fix simpletimeline for mobile
-* make click on Photos scroll you up in timeline
-* make click on logo in appbar take you to timeline
-* Photo viewer is uggo
-* activity view is uggo
-* fix snackbars
+* on mobile notification bar and bottom bar should be transparent if possible.
 
 # SERVER
 

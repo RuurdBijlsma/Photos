@@ -2,9 +2,10 @@
 import MdiChevronLeft from '~icons/mdi/chevron-left'
 import MdiChevronRight from '~icons/mdi/chevron-right'
 import MdiMapMarkerOutline from '~icons/mdi/map-marker-outline'
-import { ref, watch, nextTick, shallowRef } from 'vue'
+import { nextTick, ref, shallowRef, watch } from 'vue'
 import { useResizeObserver } from '@vueuse/core'
 import { useExploreStore } from '@/scripts/stores/exploreStore.ts'
+import { useResponsive } from '@/scripts/composables/useResponsive.ts'
 import ThumbnailImg from '@/vues/components/ui/ThumbnailImg.vue'
 import type { VisitedLocation } from '@/scripts/types/generated/timeline.ts'
 
@@ -13,6 +14,7 @@ const props = defineProps<{
 }>()
 
 const exploreStore = useExploreStore()
+const { isMobile } = useResponsive()
 const containerRef = shallowRef<HTMLElement | null>(null)
 const canScrollLeft = ref(false)
 const canScrollRight = ref(false)
@@ -81,10 +83,10 @@ watch(
 <template>
   <div class="category-row-wrapper" v-if="locations && locations.length > 0">
     <div class="scroll-wrapper">
-      <!-- Scroll Left Button -->
+      <!-- Scroll Left Button (desktop only) -->
       <transition name="fade">
         <v-btn
-          v-if="canScrollLeft"
+          v-if="canScrollLeft && !isMobile"
           :icon="MdiChevronLeft"
           class="scroll-btn scroll-btn-left"
           variant="elevated"
@@ -103,6 +105,7 @@ watch(
           :key="loc.id"
           class="location-item"
           @mouseenter="prefetchLocation(loc.id)"
+          @touchstart.passive="prefetchLocation(loc.id)"
         >
           <div class="avatar-wrapper">
             <thumbnail-img
@@ -113,7 +116,7 @@ watch(
               class="location-avatar"
             />
             <div v-else class="location-avatar-placeholder">
-              <v-icon size="40" color="primary" :icon="MdiMapMarkerOutline" />
+              <v-icon :size="isMobile ? 30 : 40" color="primary" :icon="MdiMapMarkerOutline" />
             </div>
           </div>
           <span class="location-primary" :title="loc.name">{{ loc.name }}</span>
@@ -123,10 +126,10 @@ watch(
         </router-link>
       </div>
 
-      <!-- Scroll Right Button -->
+      <!-- Scroll Right Button (desktop only) -->
       <transition name="fade">
         <v-btn
-          v-if="canScrollRight"
+          v-if="canScrollRight && !isMobile"
           :icon="MdiChevronRight"
           class="scroll-btn scroll-btn-right"
           variant="elevated"
@@ -159,6 +162,13 @@ watch(
   padding: 8px 4px;
 }
 
+.is-mobile .scroll-container {
+  gap: 12px;
+  padding: 4px 2px;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+}
+
 .scroll-container::-webkit-scrollbar {
   display: none;
 }
@@ -177,16 +187,31 @@ watch(
     transform 0.2s cubic-bezier(0.16, 1, 0.3, 1),
     background-color 0.2s ease;
   user-select: none;
+  -webkit-user-select: none;
   text-decoration: none;
 }
 
-.location-item:active {
-  background-color: rgba(var(--v-theme-on-surface), 0.1);
+.is-mobile .location-item {
+  width: 96px;
+  padding: 4px;
+  scroll-snap-align: start;
 }
 
-.location-item:hover {
-  transform: translateY(-4px);
-  background-color: rgba(var(--v-theme-on-surface), 0.04);
+.location-item:active {
+  background-color: rgba(var(--v-theme-on-surface), 0.08);
+  transform: scale(0.97);
+}
+
+@media (hover: hover) {
+  .location-item:hover {
+    transform: translateY(-4px);
+    background-color: rgba(var(--v-theme-on-surface), 0.04);
+  }
+
+  .location-item:hover .avatar-wrapper {
+    border-color: rgb(var(--v-theme-primary));
+    box-shadow: 0 4px 10px rgba(var(--v-theme-primary), 0.2);
+  }
 }
 
 .avatar-wrapper {
@@ -205,9 +230,11 @@ watch(
     box-shadow 0.2s ease;
 }
 
-.location-item:hover .avatar-wrapper {
-  border-color: rgb(var(--v-theme-primary));
-  box-shadow: 0 4px 10px rgba(var(--v-theme-primary), 0.2);
+.is-mobile .avatar-wrapper {
+  width: 82px;
+  height: 82px;
+  border-width: 2.5px;
+  margin-bottom: 8px;
 }
 
 .location-avatar {
@@ -234,6 +261,10 @@ watch(
   text-overflow: ellipsis;
 }
 
+.is-mobile .location-primary {
+  font-size: 0.78rem;
+}
+
 .location-secondary {
   font-size: 0.75rem;
   color: rgb(var(--v-theme-on-surface-variant));
@@ -242,6 +273,10 @@ watch(
   overflow: hidden;
   text-overflow: ellipsis;
   margin-top: 2px;
+}
+
+.is-mobile .location-secondary {
+  font-size: 0.7rem;
 }
 
 /* Floating Scroll Buttons */

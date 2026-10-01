@@ -34,12 +34,22 @@ useEventListener('beforeunload', handleBeforeUnload)
 <style scoped>
 .activity-scroll-view {
   overflow-y: auto;
+  overflow-x: hidden;
+  width: 100%;
+  max-width: 100%;
 }
 
 .activity-content {
   max-width: 1400px;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   margin: 0 auto;
   padding: 32px 24px;
+}
+
+.is-mobile .activity-content {
+  padding: 16px 12px 96px 12px;
 }
 
 .activity-title {
@@ -49,9 +59,22 @@ useEventListener('beforeunload', handleBeforeUnload)
   color: rgb(var(--v-theme-on-surface));
 }
 
+.is-mobile .activity-title {
+  font-size: 1.5rem;
+  margin-bottom: 4px;
+}
+
 .activity-subtitle {
   font-size: 0.95rem;
   color: rgb(var(--v-theme-on-surface-variant));
   margin-bottom: 0;
+}
+
+.is-mobile .activity-subtitle {
+  font-size: 0.825rem;
+}
+
+.is-mobile .activity-header {
+  margin-bottom: 16px !important;
 }
 </style>

@@ -8,14 +8,16 @@ import { useThemeStore } from '@/scripts/stores/themeStore.ts'
 import { useSnackbarsStore } from '@/scripts/stores/snackbarStore.ts'
 import { useRegisterSW } from 'virtual:pwa-register/vue'
 import MdiRefresh from '~icons/mdi/refresh'
+import { useResponsive } from '@/scripts/composables/useResponsive'
+import { useTheme } from 'vuetify'
 
 const settings = useSettingStore()
 const themeStore = useThemeStore()
 const snackbarsStore = useSnackbarsStore()
-import { useResponsive } from '@/scripts/composables/useResponsive'
 
 themeStore.initThemeSync()
 const { isMobile } = useResponsive()
+const theme = useTheme()
 
 // Register the Service Worker and destructure status states
 const { offlineReady, needRefresh, updateServiceWorker } = useRegisterSW()
@@ -26,6 +28,22 @@ watch(offlineReady, (ready) => {
     snackbarsStore.success('App is ready to work offline.')
   }
 })
+
+watch(
+  () => theme.global.name.value,
+  (newTheme) => {
+    let metaThemeColor = document.querySelector('meta[name="theme-color"]')
+    if (!metaThemeColor) {
+      metaThemeColor = document.createElement('meta')
+      metaThemeColor.setAttribute('name', 'theme-color')
+      document.head.appendChild(metaThemeColor)
+    }
+    // Set to the surface / background color of your current theme
+    const color = newTheme === 'dark' ? '#101010' : '#FFF0EE'
+    metaThemeColor.setAttribute('content', color)
+  },
+  { immediate: true },
+)
 
 // Watch for update availability (new files detected on server)
 watch(needRefresh, (refresh) => {

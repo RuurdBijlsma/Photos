@@ -30,6 +30,7 @@ import DailyCardList from '@/vues/components/timeline/daily-cards/DailyCardList.
 import { useDailyCardStore } from '@/scripts/stores/timeline/dailyCardStore.ts'
 import { useRefreshStore } from '@/scripts/stores/refreshStore.ts'
 import { useResponsive } from '@/scripts/composables/useResponsive.ts'
+import { useScrollTarget } from '@/scripts/composables/useScrollTarget.ts'
 
 const timelineStore = useTimelineStore()
 const selectionStore = useSelectionStore()
@@ -55,6 +56,7 @@ const SCROLL_PROTRUSION_HEIGHT = 4
 const DESIRED_ROW_HEIGHT_DESKTOP = 320
 const DESIRED_ROW_HEIGHT_MOBILE = 200
 
+const { scrollId } = useScrollTarget()
 const containerSize = shallowRef({ width: 0, height: 0 })
 const scrollTrackHeight = shallowRef(0)
 const currentScrollTop = ref(0)
@@ -596,7 +598,12 @@ watch(
 )
 
 watch(
-  [() => timelineStore.monthRatios, containerSize, () => desiredRowHeight.value, dailyCardsHeight],
+  [
+    () => timelineStore.monthRatios,
+    () => containerSize.value.width,
+    () => desiredRowHeight.value,
+    dailyCardsHeight,
+  ],
   ([, oldSize], [, newSize]) => {
     const now = performance.now()
     const { rows, scrollYears, scrollMonths, totalHeight } = calculateLayout(
@@ -614,7 +621,7 @@ watch(
     gridLayout.value = rows
     scrollHeight.value = totalHeight
 
-    const isResize = newSize.width !== 0 && oldSize.width !== 0 && oldSize.width !== newSize.width
+    const isResize = newSize !== 0 && oldSize !== 0 && oldSize !== newSize
 
     if (isResize) {
       if (timelineStore.mediaIdInView) {
@@ -812,6 +819,7 @@ if (!timelineStore.isInitialized) timelineStore.initialize()
       <div
         class="scroll-container"
         ref="scrollContainer"
+        :id="scrollId"
         @scroll.passive="onScroll"
         v-show="!isEmpty"
       >

@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import MdiClose from '~icons/mdi/close'
 import MdiInformationOutline from '~icons/mdi/information-outline'
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { isAxiosError } from 'axios'
 import { type Snack, useSnackbarsStore } from '@/scripts/stores/snackbarStore'
+import { useResponsive } from '@/scripts/composables/useResponsive.ts'
 
 const store = useSnackbarsStore()
+const { isMobile } = useResponsive()
 
 // For the Error Details Modal
 const dialog = ref(false)
@@ -30,12 +32,25 @@ const handleAction = async (snack: Snack) => {
 
 const onMouseEnter = (id: string) => store.pauseTimeout(id)
 const onMouseLeave = (id: string) => store.resumeTimeout(id)
+
+// On mobile, show at most 3 newest snackbars to avoid covering the whole screen
+const visibleSnacks = computed(() => {
+  if (isMobile.value) {
+    return store.snackQueue.slice(-3)
+  }
+  return store.snackQueue
+})
 </script>
 
 <template>
-  <TransitionGroup name="snack" tag="div" class="snackbar-queue-container">
+  <TransitionGroup
+    name="snack"
+    tag="div"
+    class="snackbar-queue-container"
+    :class="{ 'is-mobile': isMobile }"
+  >
     <div
-      v-for="snack in store.snackQueue"
+      v-for="snack in visibleSnacks"
       :key="snack.id"
       class="snack-wrapper"
       @mouseenter="onMouseEnter(snack.id)"
@@ -215,5 +230,57 @@ const onMouseLeave = (id: string) => store.resumeTimeout(id)
   white-space: pre-wrap;
   overflow-x: auto;
   max-height: 200px;
+}
+
+/* Mobile: Target container directly with .snackbar-queue-container.is-mobile */
+.snackbar-queue-container.is-mobile {
+  bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+  left: 50%;
+  right: auto;
+  transform: translateX(-50%);
+  width: calc(100vw - 32px);
+  max-width: 440px;
+  padding: 0;
+  gap: 8px;
+}
+
+.snackbar-queue-container.is-mobile .snack-leave-active {
+  left: 0;
+  right: 0;
+}
+
+.snackbar-queue-container.is-mobile .snack-alert {
+  padding: 6px 14px !important;
+  min-height: 44px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.28) !important;
+}
+
+.snackbar-queue-container.is-mobile .snack-alert :deep(.v-alert__prepend) {
+  margin-inline-end: 8px;
+}
+
+.snackbar-queue-container.is-mobile .snack-content-wrapper {
+  gap: 8px;
+}
+
+.snackbar-queue-container.is-mobile .snack-message {
+  font-size: 0.825rem;
+  line-height: 1.3;
+}
+
+.snackbar-queue-container.is-mobile .snack-actions {
+  gap: 2px;
+}
+
+.snackbar-queue-container.is-mobile .snack-actions :deep(.v-btn) {
+  font-size: 0.75rem;
+  padding: 0 8px;
+  height: 30px;
+}
+
+.snackbar-queue-container.is-mobile .snack-actions :deep(.action-btn) {
+  width: 30px;
+  height: 30px;
+  padding: 0 !important;
 }
 </style>

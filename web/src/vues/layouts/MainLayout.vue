@@ -6,12 +6,14 @@ import AppBar from '@/vues/components/layout/AppBar.vue'
 import { useAuthStore } from '@/scripts/stores/authStore.ts'
 import BottomNav from '@/vues/components/layout/BottomNav.vue'
 import { useResponsive } from '@/scripts/composables/useResponsive.ts'
+import { useLayoutStore } from '@/scripts/stores/layoutStore.ts'
 
 // Instantiate stores
 const backgroundStore = useBackgroundStore()
 const settings = useSettingStore()
 const authStore = useAuthStore()
 const responsive = useResponsive()
+const layoutStore = useLayoutStore()
 
 // Initialize the stores.
 backgroundStore.initialize()
@@ -42,7 +44,7 @@ backgroundStore.initialize()
       <v-navigation-drawer :width="40" floating color="transparent"></v-navigation-drawer>
     </template>
 
-    <v-main class="layout-body">
+    <v-main class="layout-body" :class="{ 'app-bar-hidden': !layoutStore.isAppBarVisible }">
       <router-view class="router-view" />
     </v-main>
   </v-layout>

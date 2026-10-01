@@ -12,6 +12,7 @@ import { useViewPhotoStore } from '@/scripts/stores/timeline/viewPhotoStore.ts'
 import { useSelectionStore } from '@/scripts/stores/timeline/selectionStore.ts'
 import ReorderGridRow from '@/vues/components/timeline/simple-timeline/ReorderGridRow.vue'
 import { useSettingStore } from '@/scripts/stores/settingsStore.ts'
+import { useScrollTarget } from '@/scripts/composables/useScrollTarget.ts'
 
 const props = withDefaults(
   defineProps<{
@@ -41,6 +42,7 @@ const settings = useSettingStore()
 
 const localItemsOrder = shallowRef<SimpleTimelineItem[]>([])
 let scrollInterval: number | null = null
+const { scrollId } = useScrollTarget()
 
 watch(
   () => props.timelineItems,
@@ -375,6 +377,7 @@ useEventListener(window, 'mouseup', () => {
 
       <div
         class="scroll-container"
+        :id="scrollId"
         ref="scrollContainer"
         @scroll.passive="onScroll"
         @dragover="handleDragOver"
@@ -480,6 +483,10 @@ useEventListener(window, 'mouseup', () => {
   cursor: pointer;
   flex-shrink: 0;
   user-select: none;
+}
+
+.is-mobile .timeline-scroll {
+  display: none;
 }
 
 .scroll-track {

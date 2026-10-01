@@ -43,11 +43,22 @@ onMounted(async () => {
   min-height: 318px;
 }
 
+.is-mobile .explore-locations-card {
+  border-radius: 22px !important;
+  padding: 18px 14px;
+  min-height: unset;
+}
+
 .card-header {
   display: flex;
   align-items: flex-start;
   gap: 16px;
   margin-bottom: 24px;
+}
+
+.is-mobile .card-header {
+  gap: 12px;
+  margin-bottom: 14px;
 }
 
 .header-texts {
@@ -62,24 +73,18 @@ onMounted(async () => {
   color: rgb(var(--v-theme-on-surface));
 }
 
+.is-mobile .card-title {
+  font-size: 1.1rem;
+}
+
 .card-subtitle {
   margin: 4px 0 0;
   font-size: 0.85rem;
   color: rgb(var(--v-theme-on-surface-variant));
 }
 
-.loading-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 35px;
-}
-
-.loading-text {
-  margin-top: 16px;
-  color: rgb(var(--v-theme-on-surface-variant));
-  font-size: 0.95rem;
+.is-mobile .card-subtitle {
+  font-size: 0.78rem;
 }
 
 .locations-list {

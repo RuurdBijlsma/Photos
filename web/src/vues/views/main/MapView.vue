@@ -16,8 +16,10 @@ import type { MapPhotosResponse, SimpleTimelineItem } from '@/scripts/types/gene
 import SimpleTimeline from '@/vues/components/timeline/simple-timeline/SimpleTimeline.vue'
 import { useRoute } from 'vue-router'
 import { useRefreshFunction } from '@/scripts/composables/useRefreshFunction.ts'
+import { useResponsive } from '@/scripts/composables/useResponsive.ts'
 
 const route = useRoute()
+const responsive = useResponsive()
 
 // --- State & Storage ---
 const mapPhotos = ref<MapPhotosResponse | null>(null)
@@ -218,76 +220,78 @@ useRefreshFunction(() => loadMediaItems(), { immediate: true })
       </v-btn>
     </main-layout-container>
 
-    <div
-      class="sidebar-resize-handle"
-      :class="{ disabled: !sidebarOpen }"
-      @mousedown="startSidebarResize"
-    />
+    <template v-if="!responsive.isMobile">
+      <div
+        class="sidebar-resize-handle"
+        :class="{ disabled: !sidebarOpen }"
+        @mousedown="startSidebarResize"
+      />
 
-    <simple-timeline
-      v-if="mapPhotos"
-      hide-drop-shadow
-      class="timeline"
-      :timeline-items="timelineItems"
-      view-link="/map/view/"
-    >
-      <div class="timeline-header">
-        <div>
-          <template v-if="selectedClusterItems">
-            <div class="photo-count-header">
-              <h2>Cluster</h2>
-              <span class="photo-count">{{ timelineItems.length.toLocaleString() }}</span>
-            </div>
-            <v-btn
-              density="compact"
-              variant="plain"
-              color="primary"
-              class="return-cluster-button"
-              rounded
-              @click="clearMarkerSelection"
-              :prepend-icon="MdiChevronLeft"
-            >
-              Deselect
-            </v-btn>
-          </template>
-          <template v-else>
-            <div class="photo-count-header">
-              <h2>In View</h2>
-              <span class="photo-count">{{ timelineItems.length.toLocaleString() }}</span>
-            </div>
-          </template>
+      <simple-timeline
+        v-if="mapPhotos"
+        hide-drop-shadow
+        class="timeline"
+        :timeline-items="timelineItems"
+        view-link="/map/view/"
+      >
+        <div class="timeline-header">
+          <div>
+            <template v-if="selectedClusterItems">
+              <div class="photo-count-header">
+                <h2>Cluster</h2>
+                <span class="photo-count">{{ timelineItems.length.toLocaleString() }}</span>
+              </div>
+              <v-btn
+                density="compact"
+                variant="plain"
+                color="primary"
+                class="return-cluster-button"
+                rounded
+                @click="clearMarkerSelection"
+                :prepend-icon="MdiChevronLeft"
+              >
+                Deselect
+              </v-btn>
+            </template>
+            <template v-else>
+              <div class="photo-count-header">
+                <h2>In View</h2>
+                <span class="photo-count">{{ timelineItems.length.toLocaleString() }}</span>
+              </div>
+            </template>
+          </div>
+          <v-spacer />
+          <v-btn
+            icon
+            density="compact"
+            color="primary"
+            variant="text"
+            @click="closeSidebar"
+            v-tooltip="{ location: 'top', text: 'Close sidebar' }"
+          >
+            <v-icon size="18" :icon="MdiChevronRight" />
+          </v-btn>
         </div>
-        <v-spacer />
-        <v-btn
-          icon
-          density="compact"
-          color="primary"
-          variant="text"
-          @click="closeSidebar"
-          v-tooltip="{ location: 'top', text: 'Close sidebar' }"
-        >
-          <v-icon size="18" :icon="MdiChevronRight" />
-        </v-btn>
-      </div>
 
-      <div v-if="timelineItems.length === 0" class="map-empty-state">
-        <v-icon :icon="MdiMapSearchOutline" size="120" class="map-empty-icon" />
-        <h3 class="map-empty-title">No items in this area</h3>
-        <p class="map-empty-description">
-          Move or zoom the map to find photos taken in other locations.
-        </p>
-        <v-btn
-          color="primary"
-          variant="tonal"
-          rounded="xl"
-          class="map-empty-button"
-          :prepend-icon="MdiImageMultipleOutline"
-          @click="mapContainerRef?.zoomToFitAll()"
-        >
-          View All Photos
-        </v-btn>
-      </div>
-    </simple-timeline>
+        <div v-if="timelineItems.length === 0" class="map-empty-state">
+          <v-icon :icon="MdiMapSearchOutline" size="120" class="map-empty-icon" />
+          <h3 class="map-empty-title">No items in this area</h3>
+          <p class="map-empty-description">
+            Move or zoom the map to find photos taken in other locations.
+          </p>
+          <v-btn
+            color="primary"
+            variant="tonal"
+            rounded="xl"
+            class="map-empty-button"
+            :prepend-icon="MdiImageMultipleOutline"
+            @click="mapContainerRef?.zoomToFitAll()"
+          >
+            View All Photos
+          </v-btn>
+        </div>
+      </simple-timeline>
+    </template>
   </div>
 </template>
 
@@ -299,6 +303,14 @@ useRefreshFunction(() => loadMediaItems(), { immediate: true })
   display: grid;
   grid-template-columns: minmax(400px, 1fr) 5px var(--map-sidebar-width);
   transition: grid-template-columns 0.22s ease;
+}
+
+.is-mobile .outer-layout {
+  display: flex;
+  height: calc(100% - 100px);
+  border-bottom-right-radius: 35px;
+  border-bottom-left-radius: 35px;
+  overflow: hidden;
 }
 
 .outer-layout.sidebar-resizing {

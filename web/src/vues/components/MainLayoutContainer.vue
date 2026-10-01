@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useScrollTarget } from '@/scripts/composables/useScrollTarget.ts'
+
 withDefaults(
   defineProps<{
     fitToContent?: boolean
@@ -11,6 +13,8 @@ withDefaults(
     ignoreScrollBar: false,
   },
 )
+
+const { scrollId } = useScrollTarget()
 </script>
 
 <template>
@@ -22,7 +26,7 @@ withDefaults(
       'ignore-scrollbar': ignoreScrollBar,
     }"
   >
-    <div class="inner-container">
+    <div class="inner-container" :id="scrollId">
       <slot></slot>
     </div>
   </div>
@@ -45,12 +49,20 @@ withDefaults(
   max-width: calc(100% - 50px);
   width: 100%;
   height: 100%;
+  transition:
+    border-top-right-radius 0.2s,
+    border-top-left-radius 0.2s;
 }
 
 .is-mobile .outer-container {
   max-width: 100%;
   border-top-left-radius: 35px;
   border-top-right-radius: 35px;
+}
+
+.is-mobile .app-bar-hidden .outer-container {
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
 }
 
 .outer-container.ignore-scrollbar {

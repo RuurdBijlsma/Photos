@@ -78,11 +78,19 @@ const expanded = ref(false)
   flex-direction: column;
 }
 
+.is-mobile .failed-pill {
+  border-radius: 16px;
+}
+
 .failed-main {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+}
+
+.is-mobile .failed-main {
+  padding: 12px 14px !important;
 }
 
 .job-info-left {
@@ -102,6 +110,10 @@ const expanded = ref(false)
   color: rgb(var(--v-theme-error));
 }
 
+.is-mobile .job-type-badge {
+  font-size: 0.68rem;
+}
+
 .job-path {
   font-size: 0.85rem;
   color: rgb(var(--v-theme-on-surface));
@@ -112,9 +124,19 @@ const expanded = ref(false)
   margin-bottom: 5px;
 }
 
+.is-mobile .job-path {
+  font-size: 0.78rem;
+  margin-top: 3px;
+  margin-bottom: 3px;
+}
+
 .attempts {
   font-size: 0.875rem;
   color: rgb(var(--v-theme-on-surface-variant));
+}
+
+.is-mobile .attempts {
+  font-size: 0.75rem;
 }
 
 .failed-actions {
@@ -125,6 +147,10 @@ const expanded = ref(false)
 .error-pre-container {
   background-color: rgba(var(--v-theme-error), 0.05);
   border-top: 1px solid rgba(var(--v-theme-error), 0.1);
+}
+
+.is-mobile .error-pre-container {
+  padding: 12px !important;
 }
 
 .error-pre {
@@ -138,5 +164,10 @@ const expanded = ref(false)
   white-space: pre-wrap;
   word-break: break-all;
   max-height: 200px;
+}
+
+.is-mobile .error-pre {
+  font-size: 0.72rem;
+  padding: 10px;
 }
 </style>
