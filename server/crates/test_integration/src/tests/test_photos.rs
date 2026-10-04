@@ -289,7 +289,7 @@ pub async fn test_get_random_photo(context: &TestContext) -> Result<()> {
     let Some(data) = body else {
         bail!("No random photo data found");
     };
-    assert!(!data.media_id.is_empty());
+    assert_ne!(data.media_id, "");
     assert_eq!(
         data.theme.variant,
         context.settings.ingest.analyzer.theme_generation.variant

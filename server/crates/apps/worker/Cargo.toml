@@ -9,32 +9,32 @@ common_types = { path = "../../libs/common_types" }
 common_services = { path = "../../libs/common_services" }
 generate_thumbnails = { path = "../../libs/generate_thumbnails" }
 ml_analysis = { path = "../../libs/ml_analysis" }
-media_analyzer = "0.10.4"
+media_analyzer = "0.10.6"
 sqlx = { version = "0.9.0", features = ["runtime-tokio", "tls-native-tls", "postgres", "chrono", "macros", "json", "uuid"] }
-tokio = { version = "1.47.1", features = ["full"] }
+tokio = { version = "1.53.2", features = ["full"] }
 color-eyre = "0.6.5"
-tracing = "0.1.41"
-tracing-subscriber = { version = "0.3.22", features = ["env-filter"] }
-chrono = "0.4.42"
-serde_json = "1.0.145"
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
+chrono = "0.4.45"
+serde_json = "1.0.151"
 pgvector = { version = "0.4.2", features = ["sqlx", "serde"] }
-clap = { version = "4.5.48", features = ["derive"] }
+clap = { version = "4.6.7", features = ["derive"] }
 walkdir = "2.5.0"
-rand = "0.10.1"
+rand = "0.10.3"
 hdbscan = "0.12.0"
-image = { version = "0.25.8" }
+image = { version = "0.25.10" }
 face_id = "0.4.4"
-imageproc = "0.26.0"
+imageproc = "0.27.0"
 ab_glyph = "0.2.32"
-reqwest = "0.13.2"
+reqwest = "0.13.5"
 sanitize-filename = "0.6.0"
-serde = { version = "1.0.228", features = ["derive"] }
-tempfile = "3.23.0"
-itertools = "0.14.0"
+serde = { version = "1.0.229", features = ["derive"] }
+tempfile = "3.27.0"
+itertools = "0.15.0"
 open_clip_inference = { version = "0.4.2" }
-async-trait = "0.1.89"
+async-trait = "0.1.92"
 fileloft-core = "0.3.0"
-rkyv = "0.8.17"
+rkyv = "0.8.18"
 
 [features]
 load-dynamic = ["common_services/load-dynamic", "ml_analysis/load-dynamic", "common_types/load-dynamic", "open_clip_inference/load-dynamic"] # -> Load ONNXRuntime dynamically instead of statically
@@ -42,5 +42,5 @@ load-dynamic = ["common_services/load-dynamic", "ml_analysis/load-dynamic", "com
 [dev-dependencies]
 umap-rs = "0.4.5"
 ndarray = "0.17.2"
-rayon = "1.10.0"
+rayon = "1.12.0"
 plotters = "0.3.7"

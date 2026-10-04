@@ -5,26 +5,24 @@ edition = "2024"
 
 [dependencies]
 app_state = { path = "../../libs/app_state" }
-tokio = { version = "1.47.1", features = ["full"] }
-serde_json = "1.0.145"
-serde = { version = "1.0.228", features = ["derive"] }
+tokio = { version = "1.53.2", features = ["full"] }
+serde_json = "1.0.151"
+serde = { version = "1.0.229", features = ["derive"] }
 temp-dir = "0.2.0"
 color-eyre = "0.6.5"
 ravif = { version = "0.13.0", features = ["asm"] }
-rayon = "1.11.0"
-image = { version = "0.25.8", features = ["jpeg", "png", "gif", "webp"] }
-fast_image_resize = { version = "6.0.0", features = ["image"] }
+rayon = "1.12.0"
+image = { version = "0.25.10", features = ["jpeg", "png", "gif", "webp"] }
+fast_image_resize = { version = "6.1.0", features = ["image"] }
 rgb = "0.8"
-imgref = "1.12.0"
+imgref = "1.12.3"
 walkdir = "2.5.0"
-libheif-rs = "2.7.0"
+libheif-rs = "3.0.0"
 panorama-tiler = "0.1.2"
 tracing = "0.1.44"
 exiftool = "0.3.1"
-webp = "0.3"
 
 [dev-dependencies]
 sqlx = { version = "0.9.0", features = ["runtime-tokio", "tls-native-tls", "postgres", "chrono", "macros", "json", "uuid"] }
 dotenvy = "0.15.7"
-tracing-subscriber = "0.3.18"
-jpegxl-rs = { version = "0.15", default-features = false, features = ["vendored"] }
+tracing-subscriber = "0.3.23"

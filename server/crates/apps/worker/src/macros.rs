@@ -1,9 +1,10 @@
 // simple exponential backoff: 2^attempt * 10 seconds
 #[must_use]
 pub fn backoff_seconds(attempts: i32) -> i64 {
+    let clamped = attempts.clamp(0, 9);
     #[allow(clippy::cast_sign_loss)]
-    let secs = 10 * (2_i64.pow(attempts as u32));
-    secs.min(3600) // cap at 1h
+    let secs = 10 * (2_i64.pow(clamped as u32));
+    secs.min(7200) // cap at 2h
 }
 
 #[macro_export]
