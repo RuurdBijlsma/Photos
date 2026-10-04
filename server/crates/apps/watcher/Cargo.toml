@@ -7,11 +7,11 @@ edition = "2024"
 app_state = { path = "../../libs/app_state" }
 common_services = { path = "../../libs/common_services" }
 sqlx = { version = "0.9.0", features = ["runtime-tokio", "tls-native-tls", "postgres", "chrono", "macros", "json", "uuid"] }
-tokio = { version = "1.47.1", features = ["full"] }
+tokio = { version = "1.52.3", features = ["full"] }
 color-eyre = "0.6.5"
 notify = "8.2.0"
-tracing = "0.1.41"
-tracing-subscriber = "0.3.20"
+tracing = "0.1.44"
+tracing-subscriber = "0.3.23"
 walkdir = "2.5.0"
 
 [features]

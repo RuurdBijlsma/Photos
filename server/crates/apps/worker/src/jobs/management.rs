@@ -102,14 +102,23 @@ pub async fn update_job_on_completion(pool: &PgPool, job: &Job, result: JobResul
         JobResult::Done => mark_job_done(pool, job.id).await,
         JobResult::Cancelled => mark_job_cancelled(pool, job.id).await,
         JobResult::DependencyReschedule => {
-            if job.dependency_attempts > 10 {
-                alert!(
-                    "Alarmingly many attempts to dependency reschedule job {}.",
-                    job.id
+            const MAX_DEPENDENCY_ATTEMPTS: i32 = 20;
+            if job.dependency_attempts >= MAX_DEPENDENCY_ATTEMPTS {
+                warn!(
+                    "Dependency not met after {} attempts for job {} ({:?}). Cancelling job.",
+                    job.dependency_attempts, job.id, job.relative_path
                 );
+                mark_job_cancelled(pool, job.id).await
+            } else {
+                if job.dependency_attempts > 10 {
+                    alert!(
+                        "Alarmingly many attempts to dependency reschedule job {}.",
+                        job.id
+                    );
+                }
+                let delay = backoff_seconds(job.dependency_attempts);
+                dependency_reschedule_job(pool, job.id, delay).await
             }
-            let delay = backoff_seconds(job.dependency_attempts);
-            dependency_reschedule_job(pool, job.id, delay).await
         }
         JobResult::FileNotFound => {
             const MAX_FILE_NOT_FOUND_ATTEMPTS: i32 = 5;

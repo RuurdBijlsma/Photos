@@ -10,30 +10,30 @@ common_services = { path = "../../libs/common_services" }
 model_provider = { path = "../../libs/model_provider" }
 ml_analysis = { path = "../../libs/ml_analysis" }
 tasks = { path = "../../libs/tasks" }
-tracing = "0.1.41"
-tracing-subscriber = { version = "0.3.20", features = ["ansi", "env-filter"] }
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["ansi", "env-filter"] }
 color-eyre = "0.6.5"
-axum = { version = "0.8.8", features = ["macros", "ws", "http2", "multipart"] }
-tokio = { version = "1.47.1", features = ["full"] }
-jsonwebtoken = { version = "10.0.0", features = ["rust_crypto"] }
-chrono = { version = "0.4.42", features = ["serde"] }
+axum = { version = "0.8.9", features = ["macros", "ws", "http2", "multipart"] }
+tokio = { version = "1.53.2", features = ["full"] }
+jsonwebtoken = { version = "11.1.0", features = ["rust_crypto"] }
+chrono = { version = "0.4.45", features = ["serde"] }
 sqlx = { version = "0.9.0", features = ["runtime-tokio", "tls-native-tls", "postgres", "chrono", "macros", "json", "uuid"] }
-serde_json = "1.0.145"
-tower-http = { version = "0.6.6", features = ["cors", "limit", "trace", "fs", "set-header", "compression-br", "compression-gzip", "sensitive-headers"] }
+serde_json = "1.0.151"
+tower-http = { version = "0.7.1", features = ["cors", "limit", "trace", "fs", "set-header", "compression-br", "compression-gzip", "sensitive-headers"] }
 mime_guess = "2.0.5"
-tokio-util = { version = "0.7.16", features = ["codec"] }
-http = "1.3.1"
-axum-extra = { version = "0.12.2", features = ["protobuf", "typed-header", "query"] }
-reqwest = { version = "0.13.2", features = ["json"] }
+tokio-util = { version = "0.7.19", features = ["codec"] }
+http = "1.5.0"
+axum-extra = { version = "0.12.6", features = ["protobuf", "typed-header", "query"] }
+reqwest = { version = "0.13.5", features = ["json"] }
 tower_governor = { version = "0.8.0" }
-serde = { version = "1.0.228", features = ["derive"] }
+serde = { version = "1.0.229", features = ["derive"] }
 open_clip_inference = { version = "0.4.2" }
 material-color-utils = "0.1.3"
-clap = { version = "4.5.48", features = ["derive"] }
+clap = { version = "4.6.7", features = ["derive"] }
 image = "0.25.10"
-uuid = { version = "1.23.2", features = ["v4", "serde"] }
-zip = { version = "9.0.0-pre2", default-features = false, features = ["deflate"] }
-tokio-stream = { version = "0.1.18", features = ["sync"] }
+uuid = { version = "1.27.0", features = ["v4", "serde"] }
+zip = { version = "9.0.0-pre3", default-features = false, features = ["deflate"] }
+tokio-stream = { version = "0.1.19", features = ["sync"] }
 fileloft-core = "0.3.0"
 fileloft-store-fs = "0.3.0"
 fileloft-axum = "0.3.0"

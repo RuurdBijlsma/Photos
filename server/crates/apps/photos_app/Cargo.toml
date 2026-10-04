@@ -14,10 +14,10 @@ watcher = { path = "../watcher" }
 model_provider = { path = "../../libs/model_provider" }
 app_state = { path = "../../libs/app_state" }
 common_services = { path = "../../libs/common_services" }
-clap = { version = "4.5.48", features = ["derive"] }
-tokio = { version = "1.47.1", features = ["full"] }
+clap = { version = "4.6.7", features = ["derive"] }
+tokio = { version = "1.53.2", features = ["full"] }
 color-eyre = "0.6.5"
-tracing = "0.1.41"
+tracing = "0.1.44"
 sqlx = { version = "0.9.0", features = ["runtime-tokio", "tls-native-tls", "postgres", "chrono", "macros", "json", "uuid"] }
 
 [features]
