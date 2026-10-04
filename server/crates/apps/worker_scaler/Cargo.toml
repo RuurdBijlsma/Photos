@@ -8,7 +8,7 @@ app_state = { path = "../../libs/app_state" }
 common_services = { path = "../../libs/common_services" }
 model_provider = { path = "../../libs/model_provider" }
 worker = { path = "../worker" }
-media_analyzer = "0.10.4"
+media_analyzer = "0.10.6"
 sqlx = { version = "0.9.0", features = ["runtime-tokio", "tls-native-tls", "postgres", "chrono", "macros", "json"] }
 tokio = { version = "1.53.2", features = ["full"] }
 color-eyre = "0.6.5"

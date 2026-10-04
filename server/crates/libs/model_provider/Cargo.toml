@@ -7,9 +7,9 @@ edition = "2024"
 app_state = { path = "../../libs/app_state" }
 ml_analysis = { path = "../../libs/ml_analysis" }
 open_clip_inference = { version = "0.4.2" }
-tokio = { version = "1.47.1", features = ["sync", "time"] }
+tokio = { version = "1.53.2", features = ["sync", "time"] }
 color-eyre = "0.6.5"
-tracing = "0.1.41"
+tracing = "0.1.44"
 
 [features]
 load-dynamic = [

@@ -320,10 +320,8 @@ async fn main() -> Result<()> {
             let norm_y = (y - min_y) / range_y;
 
             // Project coordinates onto canvas pixel coordinates
-            let pixel_x = margin + norm_x * 2.0f64.mul_add(-margin, f64::from(CANVAS_WIDTH));
-            let pixel_y = f64::from(CANVAS_HEIGHT)
-                - margin
-                - norm_y * 2.0f64.mul_add(-margin, f64::from(CANVAS_HEIGHT));
+            let pixel_x = f64::mul_add(norm_x, 2.0f64.mul_add(-margin, f64::from(CANVAS_WIDTH)), margin);
+            let pixel_y = f64::mul_add(norm_y, -2.0f64.mul_add(-margin, f64::from(CANVAS_HEIGHT)), f64::from(CANVAS_HEIGHT) - margin);
 
             // Centered offset placement calculations
             let px = (pixel_x - (f64::from(thumb.width()) / 2.0)) as i64;

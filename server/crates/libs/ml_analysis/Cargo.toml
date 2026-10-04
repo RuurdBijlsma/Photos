@@ -7,13 +7,13 @@ edition = "2024"
 app_state = { path = "../../libs/app_state" }
 common_types = { path = "../common_types" }
 serde_json = "1.0"
-serde = { version = "1.0.228", features = ["derive"] }
-image = { version = "0.25.8" }
-palette = "0.7.6"
+serde = { version = "1.0.229", features = ["derive"] }
+image = { version = "0.25.10" }
+palette = "0.7.7"
 color-eyre = "0.6.5"
-imageproc = { version = "0.26.0" }
-tempfile = "3.23.0"
-tokio = { version = "1.47.1", features = ["full"] }
+imageproc = { version = "0.27.0" }
+tempfile = "3.27.0"
+tokio = { version = "1.53.2", features = ["full"] }
 open_clip_inference = { version = "0.4.2" }
 tracing = "0.1.44"
 face_id = "0.4.4"

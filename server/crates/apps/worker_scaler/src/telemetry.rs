@@ -16,7 +16,7 @@ impl Telemetry {
 
         let total_memory_mb = sys.total_memory() / (1024 * 1024);
         let available_memory_mb = sys.available_memory() / (1024 * 1024);
-        let physical_cores = sys.physical_core_count().unwrap_or(1);
+        let physical_cores = System::physical_core_count().unwrap_or(1);
 
         Self {
             total_memory_mb,

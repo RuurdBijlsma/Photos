@@ -57,7 +57,7 @@ pub async fn test_search_filters(context: &TestContext) -> Result<()> {
         .await?;
     assert_eq!(res.status(), StatusCode::OK);
     let search_res = SearchResponse::decode(Cursor::new(res.bytes().await?))?;
-    assert!(!search_res.items.is_empty());
+    assert_ne!(search_res.items, []);
 
     // --- TEST 5: Negative Query ---
     let res = client
