@@ -12,6 +12,8 @@ on:
 env:
   CARGO_TERM_COLOR: always
   SQLX_OFFLINE: true
+  PKG_CONFIG_PATH: /usr/local/lib/pkgconfig:/usr/local/lib/x86_64-linux-gnu/pkgconfig
+  LD_LIBRARY_PATH: /usr/local/lib
 
 jobs:
   rust-clippy-build:
@@ -35,8 +37,31 @@ jobs:
       - name: Cache and install system dependencies
         uses: awalsh128/cache-apt-pkgs-action@latest
         with:
-          packages: libfontconfig1-dev pkg-config exiftool protobuf-compiler nasm postgresql-client libheif-dev
-          version: 1.1
+          packages: libfontconfig1-dev pkg-config exiftool protobuf-compiler nasm postgresql-client cmake libde265-dev libx265-dev libaom-dev
+          version: 1.2
+
+      - name: Cache compiled libheif
+        id: cache-libheif
+        uses: actions/cache@v4
+        with:
+          path: /usr/local/lib/libheif*
+          key: libheif-1.23.1-${{ runner.os }}
+
+      - name: Build and install libheif 1.23.1
+        if: steps.cache-libheif.outputs.cache-hit != 'true'
+        run: |
+          curl -sSL https://github.com/strukturag/libheif/releases/download/v1.23.1/libheif-1.23.1.tar.gz | tar xz
+          cd libheif-1.23.1
+          mkdir build && cd build
+          cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_LIBDIR=lib -DWITH_EXAMPLES=OFF -DWITH_RAV1E=OFF -DWITH_SVT_AV1=OFF
+          make -j$(nproc)
+          sudo make install
+          sudo ldconfig
+          cd ../.. && rm -rf libheif-1.23.1
+
+      - name: Register cached libheif
+        if: steps.cache-libheif.outputs.cache-hit == 'true'
+        run: sudo ldconfig
 
       - name: Check formatting
         run: cargo fmt --all -- --check
