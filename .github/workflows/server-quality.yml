@@ -37,8 +37,8 @@ jobs:
       - name: Cache and install system dependencies
         uses: awalsh128/cache-apt-pkgs-action@latest
         with:
-          packages: libfontconfig1-dev pkg-config exiftool protobuf-compiler nasm postgresql-client cmake libde265-dev libx265-dev libaom-dev
-          version: 1.2
+          packages: libfontconfig1-dev pkg-config exiftool protobuf-compiler nasm postgresql-client cmake libde265-dev libx265-dev
+          version: 1.3
 
       - name: Cache compiled libheif
         id: cache-libheif
@@ -53,7 +53,14 @@ jobs:
           curl -sSL https://github.com/strukturag/libheif/releases/download/v1.23.1/libheif-1.23.1.tar.gz | tar xz
           cd libheif-1.23.1
           mkdir build && cd build
-          cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_LIBDIR=lib -DWITH_EXAMPLES=OFF -DWITH_RAV1E=OFF -DWITH_SVT_AV1=OFF
+          cmake .. \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_LIBDIR=lib \
+            -DWITH_EXAMPLES=OFF \
+            -DWITH_RAV1E=OFF \
+            -DWITH_SVT_AV1=OFF \
+            -DWITH_AOM_DECODER=OFF \
+            -DWITH_AOM_ENCODER=OFF
           make -j$(nproc)
           sudo make install
           sudo ldconfig
