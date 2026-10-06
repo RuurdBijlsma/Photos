@@ -220,7 +220,7 @@ useRefreshFunction(() => loadMediaItems(), { immediate: true })
       </v-btn>
     </main-layout-container>
 
-    <template v-if="!responsive.isMobile">
+    <template v-if="!responsive.isMobile.value">
       <div
         class="sidebar-resize-handle"
         :class="{ disabled: !sidebarOpen }"

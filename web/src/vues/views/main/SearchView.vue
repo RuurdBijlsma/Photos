@@ -235,7 +235,7 @@ usePageTitle(query, { fallback: 'Search' })
   >
     <div class="search-options">
       <h2 class="search-query-title">
-        <template v-if="!responsive.isMobile">
+        <template v-if="!responsive.isMobile.value">
           <v-icon class="mr-5 search-query-icon" :icon="MdiMagnify" />
           <template v-if="query">
             Search for “<span class="search-query-highlight">{{ query }}</span
@@ -259,7 +259,7 @@ usePageTitle(query, { fallback: 'Search' })
           <template v-else>Search</template>
         </template>
       </h2>
-      <v-spacer v-if="!responsive.isMobile" />
+      <v-spacer v-if="!responsive.isMobile.value" />
       <search-filter-menu />
     </div>
 

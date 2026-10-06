@@ -16,12 +16,6 @@
 * improve messaging when you load the website and the server is off
 * on login redirect to where you were
 * don't allow user to go to /onboarding if onboarding is done already.
-* --- HIGH PRIO ---
-* door alle requests kijken op verse page load om te zien of ze allemaal relevant zijn (ik zag thunder icon geladen worden op timeline page load)
-* in failed list op ingest pagina, download knop voor de file toevoegen zodat je kan inspecteren of ie stuk is
-* fix PWA icons (currently has black borders on firefox for some reason)
-* [MOBILE REFACTOR]
-* on mobile notification bar and bottom bar should be transparent if possible.
 
 # SERVER
 

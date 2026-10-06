@@ -1,5 +1,6 @@
 // src/scripts/composables/useResponsive.ts
 import { useDisplay } from 'vuetify/framework'
+import { watch } from 'vue'
 
 /**
  * 'sm' threshold ends at 959.99px (under 'md').
@@ -16,6 +17,14 @@ export function useResponsive() {
   // smAndDown: true when width < 960px
   const isMobile = display.smAndDown
   const isDesktop = display.mdAndUp
+
+  watch(
+    isMobile,
+    () => {
+      console.log('IS MOBILE', isMobile.value)
+    },
+    { immediate: true },
+  )
 
   return {
     isMobile,

@@ -46,7 +46,7 @@ const appbarScrollTarget = computed(() =>
 
 const isSearch = computed(() => route.name === 'search')
 const showSearchBar = computed(
-  () => authStore.isAuthenticated && (isSearch.value || !responsive.isMobile),
+  () => authStore.isAuthenticated && (isSearch.value || !responsive.isMobile.value),
 )
 
 const mediaFolderAvailable = computed(() => systemStore.stats.mediaFolderAvailable !== false)
