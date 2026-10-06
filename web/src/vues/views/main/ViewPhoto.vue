@@ -398,7 +398,7 @@ useDetailTitle(mediaDetailTitle, { fallback: 'Photo' })
     :class="{
       'backdrop-blur': settings.useBackdropBlur,
       'hide-ui': !showUI,
-      'is-mobile': responsive.isMobile,
+      'is-mobile': responsive.isMobile.value,
     }"
     :style="{
       backgroundColor: settings.useImageGlow ? 'rgb(var(--v-theme-background))' : 'black',
@@ -434,7 +434,7 @@ useDetailTitle(mediaDetailTitle, { fallback: 'Photo' })
     />
     <div v-if="showGallery && id" class="gallery-resize-handle" @pointerdown="startResize" />
     <div class="top-bar" @wheel="forwardWheel">
-      <div class="left-buttons" v-if="!responsive.isMobile">
+      <div class="left-buttons" v-if="!responsive.isMobile.value">
         <v-btn
           :to="parentLocation"
           rounded="xl"
@@ -450,7 +450,7 @@ useDetailTitle(mediaDetailTitle, { fallback: 'Photo' })
           v-tooltip="{ text: 'Toggle gallery', location: 'bottom', attach: true, width: 140 }"
         />
       </div>
-      <div class="top-main-text" v-if="!responsive.isMobile">
+      <div class="top-main-text" v-if="!responsive.isMobile.value">
         <h3 v-if="fullImage?.user_caption">{{ fullImage.user_caption }}</h3>
         <router-link
           class="top-link"
@@ -489,7 +489,7 @@ useDetailTitle(mediaDetailTitle, { fallback: 'Photo' })
       </div>
       <div class="right-buttons">
         <v-btn
-          v-if="responsive.isMobile"
+          v-if="responsive.isMobile.value"
           :to="parentLocation"
           rounded="xl"
           :icon="MdiClose"
