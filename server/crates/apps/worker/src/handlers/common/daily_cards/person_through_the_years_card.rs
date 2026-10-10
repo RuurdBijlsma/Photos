@@ -184,13 +184,13 @@ impl DailyCardGenerator for PersonThroughTheYearsCardGenerator {
             let mut photo_map: HashMap<String, CandidatePhoto> = HashMap::new();
             for p in raw_photos {
                 // Filter out accidental or low confidence faces
-                if p.accidentalness.unwrap_or(0.0) > 0.45 || p.face_conf < 0.70 {
+                if p.accidentalness.unwrap_or(0.0) > 0.35 || p.face_conf < 0.60 {
                     continue;
                 }
 
                 let face_area = p.face_w * p.face_h;
-                // Require at least 0.8% of image area to filter out background crowd
-                if face_area < 0.008 {
+                // Require at least 0.4% of image area to filter out background crowd
+                if face_area < 0.004 {
                     continue;
                 }
 
@@ -256,7 +256,11 @@ impl DailyCardGenerator for PersonThroughTheYearsCardGenerator {
 
             for epoch_idx in 0..target_count {
                 let epoch_start = t_min + Duration::days(epoch_idx as i64 * epoch_days);
-                let epoch_end = epoch_start + Duration::days(epoch_days);
+                let epoch_end = if epoch_idx == target_count - 1 {
+                    t_max + Duration::days(1)
+                } else {
+                    epoch_start + Duration::days(epoch_days)
+                };
 
                 // Collect valid candidates within this epoch that satisfy the 30-day gap
                 let mut epoch_candidates: Vec<usize> = Vec::new();

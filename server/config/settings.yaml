@@ -140,9 +140,9 @@ daily_cards:
       min_cards: 1
       max_cards: 3
     person_through_the_years:
-      chance: 1
-      min_cards: 3
-      max_cards: 5
+      chance: 0.33
+      min_cards: 1
+      max_cards: 1
   estimatr:
     rounds_per_day: 3
 
