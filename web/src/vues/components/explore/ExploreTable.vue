@@ -6,7 +6,7 @@ import MdiThermometer from '~icons/mdi/thermometer'
 import MdiWaterPercent from '~icons/mdi/water-percent'
 import MdiWeatherPouring from '~icons/mdi/weather-pouring'
 import MdiWeatherWindy from '~icons/mdi/weather-windy'
-import { watch, ref, onMounted } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useExploreStore } from '@/scripts/stores/exploreStore.ts'
 import { useViewPhotoStore } from '@/scripts/stores/timeline/viewPhotoStore.ts'
@@ -134,9 +134,9 @@ function formatCoords(lat: number | null, lon: number | null): string {
 
     <div class="table-container">
       <v-data-table-server
-        v-model:items-per-page="exploreStore.itemsPerPage"
-        v-model:page="exploreStore.page"
-        v-model:sort-by="exploreStore.sortBy"
+        :items-per-page="exploreStore.itemsPerPage"
+        :page="exploreStore.page"
+        :sort-by="exploreStore.sortBy"
         :headers="headers"
         :items="exploreStore.items"
         :items-length="exploreStore.totalCount"
