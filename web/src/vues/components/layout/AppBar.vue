@@ -88,7 +88,7 @@ let scrollAnchorY = 0
 let lastDirection: 'up' | 'down' | null = null
 
 const SCROLL_TOP_BUFFER = 300 // Keep visible within 300px from top
-const HIDE_DELTA = 100 // Must scroll down at least 60px to hide
+const HIDE_DELTA = 100 // Must scroll down at least X to hide
 const SHOW_DELTA = 20 // Must scroll up at least 20px to show
 
 // Dynamically track layoutStore.scrollTarget
@@ -160,7 +160,7 @@ function handleScroll() {
   }
 
   if (currentDirection === 'down') {
-    // Only hide if scrolled down past the anchor by at least HIDE_DELTA (60px)
+    // Only hide if scrolled down past the anchor by at least HIDE_DELTA
     if (currentY - scrollAnchorY > HIDE_DELTA) {
       layoutStore.isAppBarVisible = false
     }
