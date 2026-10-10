@@ -46,7 +46,7 @@ watch(
 <template>
   <div class="collection-viewer" v-if="card">
     <daily-collection-viewer
-      v-if="card.cardType === 'on_this_day' || card.cardType === 'cluster'"
+      v-if="card.cardType === 'on_this_day' || card.cardType === 'cluster' || card.cardType === 'person_through_the_years'"
       :card="card"
     />
     <location-estimatr v-else-if="card.cardType === 'estimatr'" :card="card" />

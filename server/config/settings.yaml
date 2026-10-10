@@ -134,9 +134,15 @@ constants:
     album_invitation_expiry_minutes: 1440 # 24 hours
 
 daily_cards:
-  cluster:
-    min_cards: 1
-    max_cards: 3
+  dateless:
+    cluster:
+      chance: 1.0
+      min_cards: 1
+      max_cards: 3
+    person_through_the_years:
+      chance: 1
+      min_cards: 1
+      max_cards: 1
   estimatr:
     rounds_per_day: 3
 

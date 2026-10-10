@@ -40,13 +40,13 @@ pub async fn get_daily_cards(
         .await?;
 
     for card_type in types {
-        let (min, max) = match card_type.as_str() {
-            "cluster" => (
-                settings.daily_cards.cluster.min_cards,
-                settings.daily_cards.cluster.max_cards,
-            ),
-            _ => (1, 1),
-        };
+        let policy = settings.daily_cards.dateless.get(&card_type).copied();
+        let (chance, min, max) =
+            policy.map_or((1.0, 1, 1), |p| (p.chance, p.min_cards, p.max_cards));
+
+        if chance < 1.0 && rand::rng().random_range(0.0..1.0) > chance {
+            continue;
+        }
 
         let count = if min >= max {
             min

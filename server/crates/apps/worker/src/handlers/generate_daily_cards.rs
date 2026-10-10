@@ -4,6 +4,7 @@ use crate::handlers::common::daily_cards::DailyCardGenerator;
 use crate::handlers::common::daily_cards::cluster_card::ClusterCardGenerator;
 use crate::handlers::common::daily_cards::estimatr_card::LocationEstimatrCardGenerator;
 use crate::handlers::common::daily_cards::on_this_day_card::OnThisDayCardGenerator;
+use crate::handlers::common::daily_cards::person_through_the_years_card::PersonThroughTheYearsCardGenerator;
 use chrono::Utc;
 use color_eyre::Result;
 use common_services::database::jobs::Job;
@@ -33,6 +34,7 @@ pub async fn handle(context: &WorkerContext, _job: &Job) -> Result<JobResult> {
         Box::new(ClusterCardGenerator),
         Box::new(OnThisDayCardGenerator),
         Box::new(LocationEstimatrCardGenerator),
+        Box::new(PersonThroughTheYearsCardGenerator),
     ];
 
     for user in users {

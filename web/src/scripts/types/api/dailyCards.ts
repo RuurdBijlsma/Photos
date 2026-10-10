@@ -3,7 +3,7 @@ import type { SimpleTimelineItem } from '@/scripts/types/generated/timeline.ts'
 export interface DailyCardResponse {
   id: number
   cardDate: string | null // NaiveDate
-  cardType: 'cluster' | 'on_this_day' | 'estimatr'
+  cardType: 'cluster' | 'on_this_day' | 'estimatr' | 'person_through_the_years'
   title: string
   subtitle: string | null
   thumbnailMediaItemId: string | null

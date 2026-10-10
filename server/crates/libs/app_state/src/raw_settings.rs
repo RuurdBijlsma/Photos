@@ -200,16 +200,17 @@ pub struct AuthConstants {
     pub upload_token_expiry_minutes: i64,
 }
 
-#[derive(Debug, Deserialize, Clone, Serialize)]
-pub struct DailyCardsSettings {
-    pub cluster: CardLimits,
-    pub estimatr: EstimatrSettings,
+#[derive(Debug, Deserialize, Clone, Copy, Serialize)]
+pub struct DatelessCardPolicy {
+    pub chance: f64,
+    pub min_cards: usize,
+    pub max_cards: usize,
 }
 
 #[derive(Debug, Deserialize, Clone, Serialize)]
-pub struct CardLimits {
-    pub min_cards: usize,
-    pub max_cards: usize,
+pub struct DailyCardsSettings {
+    pub dateless: HashMap<String, DatelessCardPolicy>,
+    pub estimatr: EstimatrSettings,
 }
 
 #[derive(Debug, Deserialize, Clone, Serialize)]
