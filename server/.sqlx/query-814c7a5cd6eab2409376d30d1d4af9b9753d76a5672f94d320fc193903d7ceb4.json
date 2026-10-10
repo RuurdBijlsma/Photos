@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO media_item_photo_cluster (media_item_id, photo_cluster_id, session_id)\n            SELECT unnest($1::varchar[]), $2, unnest($3::int4[])\n            ON CONFLICT (media_item_id, photo_cluster_id) DO UPDATE SET session_id = EXCLUDED.session_id\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "VarcharArray",
+        "Varchar",
+        "Int4Array"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "814c7a5cd6eab2409376d30d1d4af9b9753d76a5672f94d320fc193903d7ceb4"
+}

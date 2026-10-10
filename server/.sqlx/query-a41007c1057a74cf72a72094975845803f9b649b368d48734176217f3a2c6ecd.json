@@ -1,0 +1,141 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                SELECT\n                    m.id,\n                    m.width,\n                    m.height,\n                    m.is_video,\n                    m.use_panorama_viewer,\n                    m.duration_ms,\n                    m.has_thumbnails,\n                    m.sort_timestamp,\n                    pc.session_id,\n                    va.embedding as \"embedding!: Vector\"\n                FROM media_item_photo_cluster pc\n                JOIN media_item m ON pc.media_item_id = m.id\n                JOIN LATERAL (\n                    SELECT va.embedding\n                    FROM visual_analysis va\n                    WHERE va.media_item_id = m.id AND va.deleted = false\n                    ORDER BY va.created_at DESC\n                    LIMIT 1\n                ) va ON true\n                WHERE pc.photo_cluster_id = $1 AND m.deleted = false\n                ORDER BY m.sort_timestamp ASC\n                ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "media_item",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "width",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "media_item",
+            "name": "width"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "height",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "media_item",
+            "name": "height"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "is_video",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "media_item",
+            "name": "is_video"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "use_panorama_viewer",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "media_item",
+            "name": "use_panorama_viewer"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "duration_ms",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "media_item",
+            "name": "duration_ms"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "has_thumbnails",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "media_item",
+            "name": "has_thumbnails"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "sort_timestamp",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "media_item",
+            "name": "sort_timestamp"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "session_id",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "media_item_photo_cluster",
+            "name": "session_id"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "embedding!: Vector",
+        "type_info": {
+          "Custom": {
+            "name": "vector",
+            "kind": "Simple"
+          }
+        },
+        "origin": {
+          "Table": {
+            "table": "visual_analysis",
+            "name": "embedding"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "a41007c1057a74cf72a72094975845803f9b649b368d48734176217f3a2c6ecd"
+}

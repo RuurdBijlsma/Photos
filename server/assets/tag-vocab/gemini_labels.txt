@@ -603,7 +603,7 @@ Waiting on train platform
 Riding city bus
 Boarding commercial airplane
 Walking pedestrian crosswalk
-Driving highway road
+Driving on the highway
 Car parking
 Pumping gasoline nozzle
 Paying parking meter
