@@ -1,12 +1,14 @@
+use crate::handlers::common::clustering::{self, CandidatePhoto};
 use crate::handlers::common::daily_cards::DailyCardGenerator;
 use app_state::AppSettings;
 use async_trait::async_trait;
-use common_services::api::album::service::get_representative_thumbnail;
+use pgvector::Vector;
 use sqlx::PgTransaction;
 
 pub struct ClusterCardGenerator;
 
 #[async_trait]
+#[allow(clippy::too_many_lines)]
 impl DailyCardGenerator for ClusterCardGenerator {
     fn card_type(&self) -> &'static str {
         "cluster"
@@ -16,7 +18,7 @@ impl DailyCardGenerator for ClusterCardGenerator {
         &self,
         tx: &mut PgTransaction<'_>,
         user_id: i32,
-        _settings: &AppSettings,
+        settings: &AppSettings,
     ) -> color_eyre::Result<()> {
         let latest_cluster_update: Option<chrono::DateTime<chrono::Utc>> = sqlx::query_scalar!(
             "SELECT MAX(updated_at) FROM photo_cluster WHERE user_id = $1",
@@ -52,39 +54,104 @@ impl DailyCardGenerator for ClusterCardGenerator {
 
         // Fetch all clusters for the user
         let clusters = sqlx::query!(
-            "SELECT id, friendly_label FROM photo_cluster WHERE user_id = $1",
+            r#"
+            SELECT id, friendly_label, centroid as "centroid: Vector"
+            FROM photo_cluster
+            WHERE user_id = $1
+            ORDER BY updated_at DESC
+            "#,
             user_id
         )
         .fetch_all(&mut **tx)
         .await?;
 
+        let clustering_settings = settings.ingest.analyzer.clustering;
+
         for cluster in clusters {
-            // Fetch media items in this cluster
+            // Fetch media items in this cluster along with session_id and embedding
             let items = sqlx::query!(
                 r#"
-                SELECT m.id, m.width, m.height, m.is_video, m.use_panorama_viewer, m.duration_ms, m.has_thumbnails
+                SELECT
+                    m.id,
+                    m.width,
+                    m.height,
+                    m.is_video,
+                    m.use_panorama_viewer,
+                    m.duration_ms,
+                    m.has_thumbnails,
+                    m.sort_timestamp,
+                    pc.session_id,
+                    va.embedding as "embedding!: Vector"
                 FROM media_item_photo_cluster pc
                 JOIN media_item m ON pc.media_item_id = m.id
+                JOIN LATERAL (
+                    SELECT va.embedding
+                    FROM visual_analysis va
+                    WHERE va.media_item_id = m.id AND va.deleted = false
+                    ORDER BY va.created_at DESC
+                    LIMIT 1
+                ) va ON true
                 WHERE pc.photo_cluster_id = $1 AND m.deleted = false
-                ORDER BY m.sort_timestamp
+                ORDER BY m.sort_timestamp ASC
                 "#,
                 cluster.id
             )
-                .fetch_all(&mut **tx)
-                .await?;
+            .fetch_all(&mut **tx)
+            .await?;
 
             if items.is_empty() {
                 continue;
             }
 
-            let item_ids: Vec<String> = items.iter().map(|i| i.id.clone()).collect();
-            let thumbnail_id = get_representative_thumbnail(tx, &item_ids)
-                .await
-                .map_err(|e| {
-                    color_eyre::eyre::eyre!("Failed to get representative thumbnail: {:?}", e)
-                })?;
+            // Prepare candidates for MMR diversity sampling
+            let candidates: Vec<CandidatePhoto> = items
+                .iter()
+                .map(|i| CandidatePhoto {
+                    media_item_id: i.id.clone(),
+                    session_id: i.session_id,
+                    embedding: i.embedding.to_vec(),
+                })
+                .collect();
 
-            let payload_items: Vec<serde_json::Value> = items
+            // Determine cluster centroid
+            let centroid: Vec<f32> = cluster.centroid.map_or_else(
+                || {
+                    let mut avg = vec![0.0f32; candidates[0].embedding.len()];
+                    for c in &candidates {
+                        for (k, &val) in c.embedding.iter().enumerate() {
+                            if k < avg.len() {
+                                avg[k] += val;
+                            }
+                        }
+                    }
+                    clustering::normalize_vector(&mut avg);
+                    avg
+                },
+                |c| c.to_vec(),
+            );
+
+            let selected_indices = clustering::select_mmr_photos(
+                &candidates,
+                &centroid,
+                clustering_settings.card_max_photos,
+                clustering_settings.mmr_relevance_lambda,
+            );
+
+            if selected_indices.len() < clustering_settings.card_min_photos {
+                continue;
+            }
+
+            // The first MMR pick is the most representative photo of the theme centroid
+            let thumbnail_id = items[selected_indices[0]].id.clone();
+
+            // Order selected photos chronologically for the card slideshow
+            let mut selected_items: Vec<_> = selected_indices
+                .into_iter()
+                .map(|idx| &items[idx])
+                .collect();
+            selected_items.sort_by_key(|i| i.sort_timestamp);
+
+            let payload_items: Vec<serde_json::Value> = selected_items
                 .iter()
                 .map(|i| {
                     serde_json::json!({

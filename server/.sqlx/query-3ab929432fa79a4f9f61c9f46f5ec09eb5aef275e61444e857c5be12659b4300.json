@@ -1,0 +1,81 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        WITH latest_va AS (\n            SELECT DISTINCT ON (va.media_item_id)\n                va.media_item_id,\n                va.embedding\n            FROM visual_analysis va\n            WHERE va.deleted = false\n            ORDER BY va.media_item_id, va.created_at DESC\n        )\n        SELECT\n            m.id AS media_item_id,\n            m.sort_timestamp,\n            g.latitude AS \"latitude?\",\n            g.longitude AS \"longitude?\",\n            va.embedding AS \"embedding!: Vector\"\n        FROM media_item m\n        JOIN latest_va va ON va.media_item_id = m.id\n        LEFT JOIN gps g ON g.media_item_id = m.id\n        WHERE m.user_id = $1\n          AND m.deleted = false\n        ORDER BY m.sort_timestamp ASC\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "media_item_id",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "media_item",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "sort_timestamp",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "media_item",
+            "name": "sort_timestamp"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "latitude?",
+        "type_info": "Float8",
+        "origin": {
+          "Table": {
+            "table": "gps",
+            "name": "latitude"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "longitude?",
+        "type_info": "Float8",
+        "origin": {
+          "Table": {
+            "table": "gps",
+            "name": "longitude"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "embedding!: Vector",
+        "type_info": {
+          "Custom": {
+            "name": "vector",
+            "kind": "Simple"
+          }
+        },
+        "origin": {
+          "Table": {
+            "table": "visual_analysis",
+            "name": "embedding"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "3ab929432fa79a4f9f61c9f46f5ec09eb5aef275e61444e857c5be12659b4300"
+}

@@ -51,6 +51,7 @@ CREATE TABLE media_item_photo_cluster
 (
     media_item_id    VARCHAR(10) NOT NULL REFERENCES media_item (id) ON DELETE CASCADE,
     photo_cluster_id VARCHAR(10) NOT NULL REFERENCES photo_cluster (id) ON DELETE CASCADE,
+    session_id       INT         NOT NULL DEFAULT 0,
     PRIMARY KEY (media_item_id, photo_cluster_id)
 );
 

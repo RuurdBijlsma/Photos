@@ -163,6 +163,9 @@ Belly rub requests
 Cats in boxes
 Muddy paw prints
 Birdwatching from windows
+Cloudwatching from windows
+Cloudwatching
+Supermarket aisles
 Squirrel chasing adventures
 Fluffy dog grooming
 Cat nap spots
@@ -822,6 +825,8 @@ Glovebox map scrambles
 Sun visor flips
 Windshield wiper sweeps
 Sunset camper vans
+Camper camping
+Tent camping
 Campsite picnic tables
 Tent zipper pulls
 Camping lantern glows

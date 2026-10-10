@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT id, friendly_label FROM photo_cluster WHERE user_id = $1",
+  "query": "\n            SELECT id, friendly_label, centroid as \"centroid: Vector\"\n            FROM photo_cluster\n            WHERE user_id = $1\n            ORDER BY updated_at DESC\n            ",
   "describe": {
     "columns": [
       {
@@ -24,6 +24,22 @@
             "name": "friendly_label"
           }
         }
+      },
+      {
+        "ordinal": 2,
+        "name": "centroid: Vector",
+        "type_info": {
+          "Custom": {
+            "name": "vector",
+            "kind": "Simple"
+          }
+        },
+        "origin": {
+          "Table": {
+            "table": "photo_cluster",
+            "name": "centroid"
+          }
+        }
       }
     ],
     "parameters": {
@@ -33,8 +49,9 @@
     },
     "nullable": [
       false,
+      true,
       true
     ]
   },
-  "hash": "8f140ee9e532a466278e427c92dca2587262c149a55147221b568a842c92e14b"
+  "hash": "73ba69b67b07a1b3e2ef3a84df2578bb9431fa32d36e701112ed9b612d3dd1b9"
 }

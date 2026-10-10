@@ -15,6 +15,14 @@ ingest:
     onnx:
       inter_threads: 1
       intra_threads: 4
+    clustering:
+      session_time_gap_seconds: 1800
+      session_distance_meters: 300.0
+      min_cluster_size: 4
+      min_samples: 3
+      card_max_photos: 8
+      card_min_photos: 4
+      mmr_relevance_lambda: 0.6
 
   file_detection:
     video_extensions:

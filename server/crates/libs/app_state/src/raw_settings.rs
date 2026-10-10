@@ -31,6 +31,18 @@ pub struct AnalyzerSettings {
     pub theme_generation: ThemeSettings,
     pub search: SearchSettings,
     pub onnx: OnnxSettings,
+    pub clustering: ClusteringSettings,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone, Copy)]
+pub struct ClusteringSettings {
+    pub session_time_gap_seconds: u64,
+    pub session_distance_meters: f64,
+    pub min_cluster_size: usize,
+    pub min_samples: usize,
+    pub card_max_photos: usize,
+    pub card_min_photos: usize,
+    pub mmr_relevance_lambda: f32,
 }
 
 #[derive(Debug, Deserialize, Clone)]

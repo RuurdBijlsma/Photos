@@ -1,14 +1,13 @@
 use crate::context::WorkerContext;
 use crate::handlers::JobResult;
 use crate::handlers::common::cache::tag_vocab_cache::{load_tag_vocab_cache, save_tag_vocab_cache};
-use crate::handlers::common::clustering::{self, ClusterEntity};
+use crate::handlers::common::clustering::{self, ClusterEntity, MediaItemForClustering};
 use app_state::constants::TAG_VOCAB_FOLDER;
 use color_eyre::Result;
 use color_eyre::eyre::eyre;
 use common_services::api::album::service::get_representative_thumbnail;
 use common_services::database::jobs::Job;
 use common_services::database::photo_cluster::ExistingPhotoCluster;
-use common_services::database::visual_analysis::visual_analysis::MediaEmbedding;
 use common_services::utils::nice_id;
 use open_clip_inference::TextEmbedder;
 use pgvector::Vector;
@@ -20,8 +19,6 @@ use tokio::fs;
 use tracing::info;
 
 const ENTITY_NAME: &str = "photo";
-const MIN_ITEMS_TO_CLUSTER: usize = 4;
-const MIN_SAMPLES: usize = 4;
 const CENTROID_MATCH_THRESHOLD: f32 = 0.6;
 
 impl ClusterEntity for ExistingPhotoCluster {
@@ -203,23 +200,53 @@ async fn fetch_existing_clusters(pool: &PgPool, user_id: i32) -> Result<Vec<Exis
         .map_err(Into::into)
 }
 
-async fn fetch_embeddings(pool: &PgPool, user_id: i32) -> Result<Vec<MediaEmbedding>> {
-    query_as!(
-        MediaEmbedding,
-        r#"SELECT DISTINCT ON (media_item.id)
-               media_item.id as media_item_id,
-               va.embedding as "embedding!: Vector"
-           FROM visual_analysis va
-           JOIN media_item ON media_item.id = va.media_item_id
-           WHERE media_item.user_id = $1
-             AND media_item.deleted = false
-             AND va.deleted = false
-           ORDER BY media_item.id, va.created_at"#,
+struct ClusterItemAssignment {
+    media_item_id: String,
+    session_id: i32,
+}
+
+async fn fetch_media_items_for_clustering(
+    pool: &PgPool,
+    user_id: i32,
+) -> Result<Vec<MediaItemForClustering>> {
+    let rows = sqlx::query!(
+        r#"
+        WITH latest_va AS (
+            SELECT DISTINCT ON (va.media_item_id)
+                va.media_item_id,
+                va.embedding
+            FROM visual_analysis va
+            WHERE va.deleted = false
+            ORDER BY va.media_item_id, va.created_at DESC
+        )
+        SELECT
+            m.id AS media_item_id,
+            m.sort_timestamp,
+            g.latitude AS "latitude?",
+            g.longitude AS "longitude?",
+            va.embedding AS "embedding!: Vector"
+        FROM media_item m
+        JOIN latest_va va ON va.media_item_id = m.id
+        LEFT JOIN gps g ON g.media_item_id = m.id
+        WHERE m.user_id = $1
+          AND m.deleted = false
+        ORDER BY m.sort_timestamp ASC, m.id ASC
+        "#,
         user_id
     )
     .fetch_all(pool)
-    .await
-    .map_err(Into::into)
+    .await?;
+
+    Ok(rows
+        .into_iter()
+        .map(|r| MediaItemForClustering {
+            media_item_id: r.media_item_id,
+            sort_timestamp: r.sort_timestamp,
+            latitude: r.latitude,
+            longitude: r.longitude,
+            embedding: r.embedding.to_vec(),
+        })
+        .collect())
 }
 
 async fn find_cluster_label(
@@ -244,7 +271,7 @@ async fn find_cluster_label(
 async fn upsert_and_link(
     tx: &mut Transaction<'_, sqlx::Postgres>,
     user_id: i32,
-    clusters: HashMap<usize, Vec<&MediaEmbedding>>,
+    clusters: HashMap<usize, Vec<ClusterItemAssignment>>,
     new_centroids: &[Vec<f32>],
     cluster_map: &HashMap<usize, String>,
 ) -> Result<()> {
@@ -253,16 +280,10 @@ async fn upsert_and_link(
             .iter()
             .map(|p| p.media_item_id.clone())
             .collect();
+        let session_ids: Vec<i32> = photos_in_cluster.iter().map(|p| p.session_id).collect();
         let new_centroid_vec = new_centroids.get(cluster_idx);
         let new_centroid = new_centroid_vec.map(|v| Vector::from(v.clone()));
-        let thumbnail_media_item_id = get_representative_thumbnail(
-            tx,
-            &photos_in_cluster
-                .iter()
-                .map(|f| f.media_item_id.clone())
-                .collect::<Vec<String>>(),
-        )
-        .await?;
+        let thumbnail_media_item_id = get_representative_thumbnail(tx, &media_item_ids).await?;
 
         let user_friendly_label = if let Some(centroid) = new_centroid_vec {
             Some(find_cluster_label(tx, centroid).await?)
@@ -291,16 +312,22 @@ async fn upsert_and_link(
             photo_cluster_id,
             &media_item_ids
         )
-            .execute(&mut **tx)
-            .await?;
+        .execute(&mut **tx)
+        .await?;
 
         // Link current items
         query!(
-            "INSERT INTO media_item_photo_cluster (media_item_id, photo_cluster_id) SELECT unnest($1::varchar[]), $2 ON CONFLICT DO NOTHING",
+            r#"
+            INSERT INTO media_item_photo_cluster (media_item_id, photo_cluster_id, session_id)
+            SELECT unnest($1::varchar[]), $2, unnest($3::int4[])
+            ON CONFLICT (media_item_id, photo_cluster_id) DO UPDATE SET session_id = EXCLUDED.session_id
+            "#,
             &media_item_ids,
-            photo_cluster_id
+            photo_cluster_id,
+            &session_ids
         )
-            .execute(&mut **tx).await?;
+        .execute(&mut **tx)
+        .await?;
     }
     Ok(())
 }
@@ -330,9 +357,9 @@ async fn cleanup_obsolete(
 }
 
 /// Checks if there have been any updates since the last cluster run.
-/// Prevents spinning if the user has fewer than `MIN_ITEMS_TO_CLUSTER` photos.
-async fn needs_clustering(pool: &PgPool, user_id: i32) -> Result<bool> {
-    let min_items = MIN_ITEMS_TO_CLUSTER as i64;
+/// Prevents spinning if the user has fewer than `min_cluster_size` photos.
+async fn needs_clustering(pool: &PgPool, user_id: i32, min_cluster_size: usize) -> Result<bool> {
+    let min_items = min_cluster_size as i64;
     let needs_run = sqlx::query_scalar!(
         r#"
         WITH last_run AS (
@@ -365,14 +392,15 @@ async fn needs_clustering(pool: &PgPool, user_id: i32) -> Result<bool> {
         user_id,
         min_items
     )
-        .fetch_one(pool)
-        .await?;
+    .fetch_one(pool)
+    .await?;
 
     Ok(needs_run)
 }
 
 pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
     let user_ids = clustering::fetch_user_ids(&context.pool, job).await?;
+    let clustering_settings = context.settings.ingest.analyzer.clustering;
 
     // Load and embed cluster label vocabulary tags
     let now = Instant::now();
@@ -389,7 +417,7 @@ pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
     info!("load_tag_embeddings took {:?}", now.elapsed());
 
     for user_id in user_ids {
-        if !needs_clustering(&context.pool, user_id).await? {
+        if !needs_clustering(&context.pool, user_id, clustering_settings.min_cluster_size).await? {
             info!(
                 "Skipping photo clustering for user {} - no updates detected",
                 user_id
@@ -398,18 +426,31 @@ pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
         }
 
         let existing_clusters = fetch_existing_clusters(&context.pool, user_id).await?;
-        let items_to_cluster = fetch_embeddings(&context.pool, user_id).await?;
+        let items_to_cluster = fetch_media_items_for_clustering(&context.pool, user_id).await?;
 
-        if items_to_cluster.len() < MIN_ITEMS_TO_CLUSTER {
+        let sessions = clustering::segment_into_sessions(
+            &items_to_cluster,
+            clustering_settings.session_time_gap_seconds,
+            clustering_settings.session_distance_meters,
+        );
+
+        if sessions.len() < clustering_settings.min_cluster_size {
+            info!(
+                "User {} has {} sessions, fewer than minimum {} needed to cluster",
+                user_id,
+                sessions.len(),
+                clustering_settings.min_cluster_size
+            );
             continue;
         }
 
-        let embeddings: Vec<Vec<f32>> = items_to_cluster
-            .iter()
-            .map(|p| p.embedding.to_vec())
-            .collect();
-        let (labels, new_centroids) =
-            clustering::run_hdbscan(&embeddings, MIN_ITEMS_TO_CLUSTER, MIN_SAMPLES)?;
+        let session_centroids: Vec<Vec<f32>> =
+            sessions.iter().map(|s| s.centroid.clone()).collect();
+        let (labels, new_centroids) = clustering::run_hdbscan(
+            &session_centroids,
+            clustering_settings.min_cluster_size,
+            clustering_settings.min_samples,
+        )?;
 
         let cluster_map = clustering::match_centroids(
             &new_centroids,
@@ -417,7 +458,23 @@ pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
             CENTROID_MATCH_THRESHOLD,
         )?;
         let matched_old_ids: HashSet<String> = cluster_map.values().cloned().collect();
-        let new_clusters = clustering::group_by_cluster(&labels, &items_to_cluster);
+
+        // Map session cluster assignments to photos
+        let mut new_clusters: HashMap<usize, Vec<ClusterItemAssignment>> = HashMap::new();
+        for (session_idx, &label) in labels.iter().enumerate() {
+            if label >= 0 {
+                let cluster_idx = label as usize;
+                for item in &sessions[session_idx].items {
+                    new_clusters
+                        .entry(cluster_idx)
+                        .or_default()
+                        .push(ClusterItemAssignment {
+                            media_item_id: item.media_item_id.clone(),
+                            session_id: session_idx as i32,
+                        });
+                }
+            }
+        }
 
         let mut tx = context.pool.begin().await?;
 
