@@ -1,0 +1,18 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                INSERT INTO daily_card (user_id, card_type, title, subtitle, thumbnail_media_item_id, payload)\n                VALUES ($1, 'person_through_the_years', $2, $3, $4, $5)\n                ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int4",
+        "Text",
+        "Text",
+        "Varchar",
+        "Jsonb"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "723a36aef53a0640e7dba955940965f71fa041ce45714886568564911335c797"
+}

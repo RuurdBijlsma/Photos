@@ -1,0 +1,214 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                SELECT\n                    mi.id,\n                    mi.width,\n                    mi.height,\n                    mi.is_video,\n                    mi.duration_ms,\n                    mi.has_thumbnails,\n                    mi.use_panorama_viewer,\n                    mi.taken_at_local,\n                    f.width as \"face_w!: f32\",\n                    f.height as \"face_h!: f32\",\n                    f.position_x as \"face_x!: f32\",\n                    f.position_y as \"face_y!: f32\",\n                    f.confidence as \"face_conf!: f32\",\n                    mq.weighted_score as \"quality_score?\",\n                    mq.accidentalness as \"accidentalness?\",\n                    va.embedding as \"embedding!: Vector\"\n                FROM person p\n                JOIN face_cluster fc ON fc.person_id = p.id\n                JOIN face f ON f.face_cluster_id = fc.id\n                JOIN visual_analysis va ON f.visual_analysis_id = va.id\n                JOIN media_item mi ON va.media_item_id = mi.id\n                LEFT JOIN measured_quality mq ON mq.visual_analysis_id = va.id\n                WHERE p.id = $1 AND p.user_id = $2 AND mi.deleted = false AND mi.is_video = false\n                ORDER BY mi.taken_at_local ASC\n                ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "media_item",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "width",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "media_item",
+            "name": "width"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "height",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "media_item",
+            "name": "height"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "is_video",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "media_item",
+            "name": "is_video"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "duration_ms",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "media_item",
+            "name": "duration_ms"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "has_thumbnails",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "media_item",
+            "name": "has_thumbnails"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "use_panorama_viewer",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "media_item",
+            "name": "use_panorama_viewer"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "taken_at_local",
+        "type_info": "Timestamp",
+        "origin": {
+          "Table": {
+            "table": "media_item",
+            "name": "taken_at_local"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "face_w!: f32",
+        "type_info": "Float4",
+        "origin": {
+          "Table": {
+            "table": "face",
+            "name": "width"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "face_h!: f32",
+        "type_info": "Float4",
+        "origin": {
+          "Table": {
+            "table": "face",
+            "name": "height"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "face_x!: f32",
+        "type_info": "Float4",
+        "origin": {
+          "Table": {
+            "table": "face",
+            "name": "position_x"
+          }
+        }
+      },
+      {
+        "ordinal": 11,
+        "name": "face_y!: f32",
+        "type_info": "Float4",
+        "origin": {
+          "Table": {
+            "table": "face",
+            "name": "position_y"
+          }
+        }
+      },
+      {
+        "ordinal": 12,
+        "name": "face_conf!: f32",
+        "type_info": "Float4",
+        "origin": {
+          "Table": {
+            "table": "face",
+            "name": "confidence"
+          }
+        }
+      },
+      {
+        "ordinal": 13,
+        "name": "quality_score?",
+        "type_info": "Float8",
+        "origin": {
+          "Table": {
+            "table": "measured_quality",
+            "name": "weighted_score"
+          }
+        }
+      },
+      {
+        "ordinal": 14,
+        "name": "accidentalness?",
+        "type_info": "Float8",
+        "origin": {
+          "Table": {
+            "table": "measured_quality",
+            "name": "accidentalness"
+          }
+        }
+      },
+      {
+        "ordinal": 15,
+        "name": "embedding!: Vector",
+        "type_info": {
+          "Custom": {
+            "name": "vector",
+            "kind": "Simple"
+          }
+        },
+        "origin": {
+          "Table": {
+            "table": "visual_analysis",
+            "name": "embedding"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Int4"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "02b5c24da1471647a08a195e1cf72ba0afe232b59d4b0938c073111680627512"
+}

@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT payload->>'personId' as \"person_id!\"\n            FROM daily_card\n            WHERE user_id = $1 AND card_type = 'person_through_the_years' AND shown = false\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "person_id!",
+        "type_info": "Text",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "85e80f155ef74e3683b59e52a6cef283b8a5e0112053eae07d3051ba9dd5a828"
+}
