@@ -1,0 +1,30 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT payload->>'personId' as \"person_id!\", MAX(created_at) as \"last_featured!\"\n            FROM daily_card\n            WHERE user_id = $1 AND card_type = 'person_through_the_years'\n            GROUP BY payload->>'personId'\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "person_id!",
+        "type_info": "Text",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 1,
+        "name": "last_featured!",
+        "type_info": "Timestamptz",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4"
+      ]
+    },
+    "nullable": [
+      null,
+      null
+    ]
+  },
+  "hash": "eb326cc1aeda170840d21c1d45c0c6b478db744785af8d33f0c660b41a41d9ee"
+}

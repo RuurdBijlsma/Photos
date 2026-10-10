@@ -1,0 +1,61 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                p.id as person_id,\n                p.name as \"person_name!\",\n                MIN(mi.taken_at_local) as \"min_date!\",\n                MAX(mi.taken_at_local) as \"max_date!\",\n                COUNT(DISTINCT mi.id) as \"photo_count!\"\n            FROM person p\n            JOIN face_cluster fc ON fc.person_id = p.id\n            JOIN face f ON f.face_cluster_id = fc.id\n            JOIN visual_analysis va ON f.visual_analysis_id = va.id\n            JOIN media_item mi ON va.media_item_id = mi.id\n            WHERE p.user_id = $1\n              AND p.name IS NOT NULL\n              AND TRIM(p.name) != ''\n              AND mi.deleted = false\n            GROUP BY p.id, p.name\n            HAVING EXTRACT(EPOCH FROM (MAX(mi.taken_at_local) - MIN(mi.taken_at_local))) >= (730.0 * 86400.0)\n               AND COUNT(DISTINCT mi.id) >= 4\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "person_id",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "person",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "person_name!",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "person",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "min_date!",
+        "type_info": "Timestamp",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 3,
+        "name": "max_date!",
+        "type_info": "Timestamp",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 4,
+        "name": "photo_count!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "e3b6fe3e4da350746f704f9922bf75324672971389428c7db42d216f6df95455"
+}

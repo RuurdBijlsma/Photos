@@ -5,6 +5,7 @@ use sqlx::PgTransaction;
 pub mod cluster_card;
 pub mod estimatr_card;
 pub mod on_this_day_card;
+pub mod person_through_the_years_card;
 
 #[async_trait]
 pub trait DailyCardGenerator {

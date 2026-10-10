@@ -7,7 +7,7 @@ import MdiLogout from '~icons/mdi/logout'
 import MdiSecurity from '~icons/mdi/security'
 import MdiSync from '~icons/mdi/sync'
 import MdiUpload from '~icons/mdi/upload'
-import { computed, onBeforeUnmount, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import SearchBar from '@/vues/components/ui/SearchBar.vue'
 import { useAuthStore } from '@/scripts/stores/authStore.ts'
 import UserAvatar from '@/vues/components/ui/UserAvatar.vue'
@@ -20,7 +20,7 @@ import transLogo from '@/assets/img/logo/transparent/192.png'
 import { useResponsive } from '@/scripts/composables/useResponsive.ts'
 import { useRoute } from 'vue-router'
 import { useTimelineStore } from '@/scripts/stores/timeline/timelineStore.ts'
-import { useStorage, useThrottleFn } from '@vueuse/core'
+import { useEventListener, useStorage, useThrottleFn } from '@vueuse/core'
 import { useSnackbarsStore } from '@/scripts/stores/snackbarStore.ts'
 import { useLayoutStore } from '@/scripts/stores/layoutStore.ts'
 
@@ -40,9 +40,6 @@ const isClicker = useStorage('clickerUnlocked', false)
 let velocity = 0
 let lastTime = 0
 let animFrameId: number | null = null
-const appbarScrollTarget = computed(() =>
-  layoutStore.scrollTarget === undefined ? undefined : '#' + layoutStore.scrollTarget,
-)
 
 const isSearch = computed(() => route.name === 'search')
 const showSearchBar = computed(
@@ -82,6 +79,103 @@ const handleScrollToTop = useThrottleFn(scrollTimelineToTop, 1000, false, true)
 function scrollTimelineToTop() {
   timelineStore.scrollToTop()
 }
+
+// --- Dynamic Scroll Target & Smooth Mobile Hide ---
+const targetElement = ref<HTMLElement | Window>(window)
+
+let lastScrollY = 0
+let scrollAnchorY = 0
+let lastDirection: 'up' | 'down' | null = null
+
+const SCROLL_TOP_BUFFER = 300 // Keep visible within 300px from top
+const HIDE_DELTA = 100 // Must scroll down at least X to hide
+const SHOW_DELTA = 20 // Must scroll up at least 20px to show
+
+// Dynamically track layoutStore.scrollTarget
+watch(
+  () => layoutStore.scrollTarget,
+  async (newId) => {
+    // Reset state on target change (route changes, container unmounts)
+    lastScrollY = 0
+    scrollAnchorY = 0
+    lastDirection = null
+    layoutStore.isAppBarVisible = true
+
+    if (!newId) {
+      targetElement.value = window
+      return
+    }
+
+    await nextTick()
+    const el = document.getElementById(newId)
+    targetElement.value = el ?? window
+  },
+  { immediate: true },
+)
+
+// Ensure AppBar stays visible on desktop
+watch(
+  responsive.isMobile,
+  (isMobile) => {
+    if (!isMobile) {
+      layoutStore.isAppBarVisible = true
+    }
+  },
+  { immediate: true },
+)
+
+function getScrollTop(): number {
+  if (targetElement.value instanceof Window) {
+    return window.scrollY || document.documentElement.scrollTop || 0
+  }
+  return (targetElement.value as HTMLElement).scrollTop || 0
+}
+
+function handleScroll() {
+  if (!responsive.isMobile.value) {
+    layoutStore.isAppBarVisible = true
+    return
+  }
+
+  const currentY = getScrollTop()
+
+  // Always show near the top of the container
+  if (currentY <= SCROLL_TOP_BUFFER) {
+    layoutStore.isAppBarVisible = true
+    lastScrollY = currentY
+    scrollAnchorY = currentY
+    lastDirection = null
+    return
+  }
+
+  const delta = currentY - lastScrollY
+  if (Math.abs(delta) < 1) return
+
+  const currentDirection: 'up' | 'down' = delta > 0 ? 'down' : 'up'
+
+  // Reset anchor whenever scroll direction reverses
+  if (currentDirection !== lastDirection) {
+    scrollAnchorY = lastScrollY
+    lastDirection = currentDirection
+  }
+
+  if (currentDirection === 'down') {
+    // Only hide if scrolled down past the anchor by at least HIDE_DELTA
+    if (currentY - scrollAnchorY > HIDE_DELTA) {
+      layoutStore.isAppBarVisible = false
+    }
+  } else {
+    // Reveal if scrolled up by at least SHOW_DELTA (20px)
+    if (scrollAnchorY - currentY > SHOW_DELTA) {
+      layoutStore.isAppBarVisible = true
+    }
+  }
+
+  lastScrollY = currentY
+}
+
+// VueUse automatically re-binds to targetElement when its value changes
+useEventListener(targetElement, 'scroll', handleScroll, { passive: true })
 
 let clickCounter = 0
 const clickTarget = 100
@@ -123,11 +217,8 @@ async function logout() {
     density="comfortable"
     :height="70"
     class="header"
-    :scroll-target="appbarScrollTarget"
     color="transparent"
     elevation="0"
-    scroll-behavior="hide"
-    scroll-threshold="400"
     v-model="layoutStore.isAppBarVisible"
   >
     <!--    Mobile     -->
