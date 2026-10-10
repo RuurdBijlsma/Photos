@@ -41,18 +41,20 @@ impl DailyCardGenerator for PersonThroughTheYearsCardGenerator {
         user_id: i32,
         _settings: &AppSettings,
     ) -> Result<()> {
-        // Limit unshown buffer to at most 2 cards to avoid cluttering unshown cards
+        // Limit unshown buffer to at most 7 cards
         let unshown_count: i64 = sqlx::query_scalar!(
             "SELECT COUNT(*) FROM daily_card WHERE user_id = $1 AND card_type = 'person_through_the_years' AND shown = false",
             user_id
         )
-        .fetch_one(&mut **tx)
-        .await?
-        .unwrap_or(0);
+            .fetch_one(&mut **tx)
+            .await?
+            .unwrap_or(0);
 
-        if unshown_count >= 2 {
+        if unshown_count >= 7 {
             return Ok(());
         }
+
+        let to_generate = usize::try_from(7 - unshown_count).unwrap_or(0);
 
         // Query eligible named persons with >= 2 years (730 days) span and at least 4 photos
         let eligible_people = sqlx::query!(
@@ -78,8 +80,8 @@ impl DailyCardGenerator for PersonThroughTheYearsCardGenerator {
             "#,
             user_id
         )
-        .fetch_all(&mut **tx)
-        .await?;
+            .fetch_all(&mut **tx)
+            .await?;
 
         if eligible_people.is_empty() {
             return Ok(());
@@ -136,7 +138,9 @@ impl DailyCardGenerator for PersonThroughTheYearsCardGenerator {
             }
         });
 
-        // Try candidate persons until one successfully yields a valid card
+        let mut generated_count = 0;
+
+        // Try candidate persons until we satisfy the buffer or run out of eligible people
         for person in candidates {
             let person_id = person.person_id;
             let person_name = person.person_name;
@@ -198,8 +202,10 @@ impl DailyCardGenerator for PersonThroughTheYearsCardGenerator {
                 let centrality = f64::mul_add(center_dist, -2.0, 1.0).clamp(0.0, 1.0);
                 let conf = f64::from(p.face_conf.clamp(0.0, 1.0));
 
-                let composite_score =
-                    0.10f64.mul_add(conf, 0.15f64.mul_add(centrality, 0.35f64.mul_add(face_size, 0.40 * quality_norm)));
+                let composite_score = 0.10f64.mul_add(
+                    conf,
+                    0.15f64.mul_add(centrality, 0.35f64.mul_add(face_size, 0.40 * quality_norm)),
+                );
 
                 if let Some(existing) = photo_map.get_mut(&p.id) {
                     if composite_score > existing.composite_score {
@@ -292,7 +298,8 @@ impl DailyCardGenerator for PersonThroughTheYearsCardGenerator {
                             .fold(f32::NEG_INFINITY, f32::max)
                     };
 
-                    let mmr = (1.0 - lambda).mul_add(-max_sim, lambda * (cand.composite_score as f32));
+                    let mmr =
+                        (1.0 - lambda).mul_add(-max_sim, lambda * (cand.composite_score as f32));
                     if mmr > best_mmr {
                         best_mmr = mmr;
                         best_idx = cand_idx;
@@ -371,11 +378,13 @@ impl DailyCardGenerator for PersonThroughTheYearsCardGenerator {
                 thumbnail_photo.id,
                 payload
             )
-            .execute(&mut **tx)
-            .await?;
+                .execute(&mut **tx)
+                .await?;
 
-            // Generated one card successfully for this user run
-            break;
+            generated_count += 1;
+            if generated_count >= to_generate {
+                break;
+            }
         }
 
         Ok(())
