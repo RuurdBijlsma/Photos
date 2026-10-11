@@ -29,6 +29,7 @@ import AlbumReorderHeader from '@/vues/components/library/album/AlbumReorderHead
 import AlbumCollaborators from '@/vues/components/library/album/AlbumCollaborators.vue'
 import AlbumEmptyState from '@/vues/components/library/album/AlbumEmptyState.vue'
 import EditableTitle from '@/vues/components/library/album/EditableTitle.vue'
+import { useResponsive } from '@/scripts/composables/useResponsive.ts'
 
 const route = useRoute()
 const router = useRouter()
@@ -37,6 +38,7 @@ const albumStore = useAlbumStore()
 const snackbars = useSnackbarsStore()
 const dialogs = useDialogStore()
 const authStore = useAuthStore()
+const { isMobile, width: windowWidth } = useResponsive()
 
 const isInitialLoad = ref(true)
 const isManualOrderMode = ref(false)
@@ -391,12 +393,12 @@ useRefreshFunction(() => {
       :is-manual-order-mode="isManualOrderMode"
       @reorder="onReorder"
     >
-      <div class="album-header">
+      <div class="album-header" :class="{ 'is-mobile-header': isMobile }">
         <div class="album-header-left">
           <glow-thumbnail
             v-if="thumbnailId"
             :media-item-id="thumbnailId"
-            border-radius="44px"
+            :border-radius="isMobile ? '28px' : '44px'"
             :height="222"
             :max-width="(222 * 16) / 9"
           />
@@ -559,28 +561,55 @@ useRefreshFunction(() => {
   width: 100%;
 }
 
+.album-header.is-mobile-header {
+  flex-direction: column;
+}
+
 .album-header-left {
   padding: 10px;
+}
+
+.is-mobile-header .album-header-left {
+  padding: 20px 20px 0 20px;
+  display: flex;
+  justify-content: center;
 }
 
 .album-header-right {
   padding: 20px;
   flex-grow: 1;
+  min-width: 0;
+}
+
+.is-mobile-header .album-header-right {
+  padding: 10px 20px 20px 20px;
 }
 
 .album-header-first-row {
   display: flex;
   align-items: flex-start;
   gap: 10px;
+  max-width: 100%;
+}
+
+.is-mobile-header .album-header-first-row {
+  align-items: center;
 }
 
 .album-options-btn {
   margin: 4px;
+  flex-shrink: 0;
 }
 
 .editable-header {
   margin-left: -19px;
   width: calc(100% + 19px);
+  min-width: 0;
+}
+
+.is-mobile-header .editable-header {
+  margin-left: -10px;
+  width: calc(100% + 10px);
 }
 
 .non-owner-title {
@@ -590,6 +619,14 @@ useRefreshFunction(() => {
   line-height: 1.2;
   color: rgb(var(--v-theme-on-background));
   padding: 5px 3px;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  min-width: 0;
+  flex-grow: 1;
+}
+
+.is-mobile-header .non-owner-title {
+  font-size: 32px;
 }
 
 .album-dates {
@@ -600,6 +637,7 @@ useRefreshFunction(() => {
   margin: 0;
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
 }
 
 .description-add-button {
