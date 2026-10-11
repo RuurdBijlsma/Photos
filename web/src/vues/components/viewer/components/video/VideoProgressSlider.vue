@@ -23,7 +23,6 @@ const tooltipX = ref(0)
 const hoverTime = ref(0)
 const isDragging = ref(false)
 
-// Convert buffered ranges to relative percentages against the total duration
 const normalizedBuffered = computed(() => {
   if (!props.max || props.max <= 0) return []
   return props.buffered.map((range) => {
@@ -44,12 +43,11 @@ const formattedHoverTime = computed(() => {
   return toHms(hoverTime.value)
 })
 
-// Keep the tooltip pill centered on the pointer, while clamping its body within track boundaries
 const tooltipStyle = computed(() => {
   if (!sliderRef.value) return { left: `${tooltipX.value}px` }
   const rect = sliderRef.value.getBoundingClientRect()
   const width = rect.width
-  const halfTooltipWidth = 34 // approximate half width of "10:20" pill in pixels
+  const halfTooltipWidth = 34
   const clampedX = Math.max(halfTooltipWidth, Math.min(width - halfTooltipWidth, tooltipX.value))
   return {
     left: `${clampedX}px`,
@@ -91,7 +89,7 @@ function onPointerLeave() {
 }
 
 function onPointerDown(e: PointerEvent) {
-  if (e.button !== 0 && e.pointerType === 'mouse') return // Left click only for mouse input
+  if (e.button !== 0 && e.pointerType === 'mouse') return
   isDragging.value = true
   showTooltip.value = true
 
@@ -138,17 +136,12 @@ onUnmounted(() => {
     @pointerleave="onPointerLeave"
     @pointerdown="onPointerDown"
   >
-    <!-- Slate blue tooltip matching screenshot details -->
     <div v-if="showTooltip && max > 0" class="slider-tooltip" :style="tooltipStyle">
       {{ formattedHoverTime }}
     </div>
 
-    <!-- Slider Track Wrap -->
     <div class="slider-track-wrap">
-      <!-- Background Track -->
       <div class="slider-track-bg"></div>
-
-      <!-- Buffered Segments -->
       <div
         v-for="(range, idx) in normalizedBuffered"
         :key="idx"
@@ -158,11 +151,7 @@ onUnmounted(() => {
           width: `${range.widthPercent}%`,
         }"
       ></div>
-
-      <!-- Played/Progress Fill -->
       <div class="slider-track-fill" :style="{ width: `${progressPercent}%` }"></div>
-
-      <!-- Red Drag Handle (Thumb) -->
       <div class="slider-thumb" :style="{ left: `${progressPercent}%` }"></div>
     </div>
   </div>
@@ -189,7 +178,6 @@ onUnmounted(() => {
   transition: height 0.1s ease;
 }
 
-/* Slick expansion animations similar to modern video players */
 .custom-slider-container:hover .slider-track-wrap {
   height: 6px;
 }
