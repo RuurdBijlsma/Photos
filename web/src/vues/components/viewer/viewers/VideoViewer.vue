@@ -531,6 +531,11 @@ useEventListener(window, 'keydown', handleKeyDown)
       <span>Video is still processing, check back later to watch it</span>
     </div>
 
+    <!-- Buffering Spinner Indicator -->
+    <div v-if="isBufferingOrLoading" class="buffering-spinner">
+      <v-progress-circular indeterminate size="56" width="4" color="white" />
+    </div>
+
     <!-- Center Play/Pause Ripple Indicator -->
     <VideoPlayPauseOverlay :action="overlayAction" :trigger="overlayTrigger" />
 
@@ -592,5 +597,21 @@ useEventListener(window, 'keydown', handleKeyDown)
   display: flex;
   place-items: center;
   place-content: center;
+}
+
+.buffering-spinner {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 1500;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.buffering-spinner :deep(.v-progress-circular) {
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.4));
 }
 </style>

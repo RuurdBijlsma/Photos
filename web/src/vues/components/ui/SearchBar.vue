@@ -401,6 +401,7 @@ watch(
           <span class="search-icon-div">
             <v-icon
               class="search-icon"
+              :class="{ 'mdi-spin': loading }"
               :icon="
                 loading ? MdiLoading : searchStore.searchImage ? MdiImageSearchOutline : MdiMagnify
               "
@@ -651,8 +652,9 @@ watch(
 }
 
 .mdi-spin {
-  animation: mdi-spin 2s infinite linear;
+  animation: mdi-spin .5s infinite linear;
 }
+
 @keyframes mdi-spin {
   from {
     transform: rotate(0deg);
