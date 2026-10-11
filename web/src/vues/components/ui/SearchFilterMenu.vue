@@ -202,7 +202,7 @@ watch(
 )
 
 const hasFilters = computed(() => {
-  return (
+  return Boolean(
     filterCountries.value.length > 0 ||
     filterPeople.value.length > 0 ||
     filterNegativeQuery.value ||
