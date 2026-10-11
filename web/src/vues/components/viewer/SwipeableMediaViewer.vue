@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, useTemplateRef, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, useTemplateRef, watch } from 'vue'
 import { useElementSize } from '@vueuse/core'
 import MediaViewer from '@/vues/components/viewer/MediaViewer.vue'
 import type { PannellumConfig } from '@/scripts/types/api/pannellumConfig.ts'
@@ -58,6 +58,7 @@ const isAnimating = ref(false)
 const dragOffset = ref(0) // Drag offset in pixels
 let pendingAction: 'next' | 'prev' | null = null
 let animationTimeoutId: ReturnType<typeof setTimeout> | null = null
+let navFallbackTimer: ReturnType<typeof setTimeout> | null = null
 
 // Touch tracking metrics
 let startX = 0
@@ -101,8 +102,28 @@ function onPanoActive(active: boolean) {
   emit('pano-active', active)
 }
 
+function clearNavFallback() {
+  if (navFallbackTimer !== null) {
+    clearTimeout(navFallbackTimer)
+    navFallbackTimer = null
+  }
+}
+
+function clearAnimationTimeout() {
+  if (animationTimeoutId !== null) {
+    clearTimeout(animationTimeoutId)
+    animationTimeoutId = null
+  }
+}
+
 function onTouchStart(e: TouchEvent) {
-  if (props.disableEventCapture || isZoomed.value || isPanoActive.value || isAnimating.value) {
+  if (
+    props.disableEventCapture ||
+    isZoomed.value ||
+    isPanoActive.value ||
+    isAnimating.value ||
+    pendingAction !== null
+  ) {
     return
   }
 
@@ -131,7 +152,8 @@ function onTouchMove(e: TouchEvent) {
     props.disableEventCapture ||
     isZoomed.value ||
     isPanoActive.value ||
-    isAnimating.value
+    isAnimating.value ||
+    pendingAction !== null
   ) {
     return
   }
@@ -166,7 +188,6 @@ function onTouchMove(e: TouchEvent) {
   if (gestureDirection === 'horizontal') {
     if (e.cancelable) e.preventDefault()
 
-    // Calculate instantaneous velocity
     const now = performance.now()
     const dt = now - lastTime
     if (dt > 10) {
@@ -228,8 +249,7 @@ function animateTo(targetOffset: number) {
   isAnimating.value = true
   dragOffset.value = targetOffset
 
-  // Timeout fallback in case transitionend does not fire
-  if (animationTimeoutId !== null) clearTimeout(animationTimeoutId)
+  clearAnimationTimeout()
   animationTimeoutId = setTimeout(() => {
     finishTransition()
   }, 320)
@@ -241,29 +261,41 @@ function onTransitionEnd(e: TransitionEvent) {
 }
 
 function finishTransition() {
-  if (animationTimeoutId !== null) {
-    clearTimeout(animationTimeoutId)
-    animationTimeoutId = null
-  }
+  clearAnimationTimeout()
   if (!isAnimating.value) return
 
   isAnimating.value = false
-
   const action = pendingAction
-  pendingAction = null
-  dragOffset.value = 0
 
   if (action === 'next') {
+    // Keep dragOffset at -width so Photo B stays on screen while router updates
+    clearNavFallback()
+    navFallbackTimer = setTimeout(() => {
+      // Safety fallback in case router navigation fails or is blocked
+      dragOffset.value = 0
+      pendingAction = null
+    }, 800)
     emit('next')
   } else if (action === 'prev') {
+    // Keep dragOffset at +width so Photo Prev stays on screen while router updates
+    clearNavFallback()
+    navFallbackTimer = setTimeout(() => {
+      dragOffset.value = 0
+      pendingAction = null
+    }, 800)
     emit('prev')
+  } else {
+    // Snapped back to current item
+    dragOffset.value = 0
+    pendingAction = null
   }
 }
 
-// Reset internal positions if active item changes
+// Reset internal positions once active item actually updates
 watch(
   () => props.mediaItemId,
   () => {
+    clearNavFallback()
     dragOffset.value = 0
     isDragging.value = false
     isAnimating.value = false
@@ -271,6 +303,11 @@ watch(
     isZoomed.value = false
   },
 )
+
+onBeforeUnmount(() => {
+  clearAnimationTimeout()
+  clearNavFallback()
+})
 </script>
 
 <template>
