@@ -234,37 +234,35 @@ usePageTitle(query, { fallback: 'Search' })
     @load-more="executeSearch"
   >
     <div class="search-options">
-      <h2 class="search-query-title">
-        <template v-if="!responsive.isMobile.value">
-          <v-icon class="mr-5 search-query-icon" :icon="MdiMagnify" />
-          <template v-if="query">
-            Search for “<span class="search-query-highlight">{{ query }}</span
-            >”
-          </template>
-          <template v-else-if="searchStore.searchImage">
-            Images similar to
-            <img
-              class="image-preview"
-              v-if="searchStore.imagePreview"
-              :src="searchStore.imagePreview"
-              height="50"
-              width="auto"
-              alt="Search image"
-            />
-          </template>
-          <template v-else-if="isSimilarSearch">
-            Similar to {{ similarIds.length }} item{{ similarIds.length > 1 ? 's' : '' }}
-          </template>
-          <template v-else-if="hasFilters">Filtered results</template>
-          <template v-else>Search</template>
+      <h2 class="search-query-title" v-if="!responsive.isMobile.value">
+        <v-icon class="mr-5 search-query-icon" :icon="MdiMagnify" />
+        <template v-if="query">
+          Search for “<span class="search-query-highlight">{{ query }}</span
+          >”
         </template>
+        <template v-else-if="searchStore.searchImage">
+          Images similar to
+          <img
+            class="image-preview"
+            v-if="searchStore.imagePreview"
+            :src="searchStore.imagePreview"
+            height="50"
+            width="auto"
+            alt="Search image"
+          />
+        </template>
+        <template v-else-if="isSimilarSearch">
+          Similar to {{ similarIds.length }} item{{ similarIds.length > 1 ? 's' : '' }}
+        </template>
+        <template v-else-if="hasFilters">Filtered results</template>
+        <template v-else>Search</template>
       </h2>
       <v-spacer v-if="!responsive.isMobile.value" />
       <search-filter-menu />
     </div>
 
     <!-- Similar Previews Section -->
-    <div v-if="isSimilarSearch" class="similar-previews-section px-5 mb-4">
+    <div v-if="isSimilarSearch" class="similar-previews-section px-3 px-sm-5 mb-4">
       <div class="d-flex align-center flex-wrap gap-2">
         <div v-for="itemId in similarIds.slice(0, 8)" :key="itemId" class="preview-card">
           <thumbnail-img
@@ -330,6 +328,11 @@ usePageTitle(query, { fallback: 'Search' })
   border-radius: 10px;
   display: flex;
   align-items: center;
+  width: 100%;
+}
+
+.is-mobile .search-options {
+  padding: 10px 12px 4px;
 }
 
 @media screen and (max-width: 1350px) {
