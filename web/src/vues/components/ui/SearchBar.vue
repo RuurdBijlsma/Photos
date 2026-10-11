@@ -652,7 +652,7 @@ watch(
 }
 
 .mdi-spin {
-  animation: mdi-spin .5s infinite linear;
+  animation: mdi-spin 0.5s infinite linear;
 }
 
 @keyframes mdi-spin {

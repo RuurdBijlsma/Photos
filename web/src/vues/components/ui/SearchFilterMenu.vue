@@ -208,7 +208,7 @@ const hasFilters = computed(() => {
     filterNegativeQuery.value ||
     route.query.start !== undefined ||
     route.query.end !== undefined ||
-    filterMediaType.value !== 'all'
+    filterMediaType.value !== 'all',
   )
 })
 
