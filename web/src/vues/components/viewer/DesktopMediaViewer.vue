@@ -8,6 +8,7 @@ import type { PannellumConfig } from '@/scripts/types/api/pannellumConfig.ts'
 withDefaults(
   defineProps<{
     mediaItemId: string
+    orderedIds?: string[]
     prevId?: string | null
     nextId?: string | null
     isVideo: boolean
@@ -20,6 +21,7 @@ withDefaults(
     showGallery?: boolean
   }>(),
   {
+    orderedIds: () => [],
     prevId: null,
     nextId: null,
     disableEventCapture: false,
