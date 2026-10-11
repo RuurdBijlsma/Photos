@@ -17,10 +17,12 @@ const props = withDefaults(
     showUi?: boolean
     autoplay?: boolean
     elementalFullscreen: boolean
+    active?: boolean
   }>(),
   {
     showUi: true,
     autoplay: true,
+    active: true,
   },
 )
 
@@ -132,14 +134,18 @@ const videoUrl = computed(() => {
 })
 
 const isBufferingOrLoading = computed(() => {
-  if (!videoUrl.value) return false
+  if (!props.active || !videoUrl.value) return false
   return !isVideoLoaded.value || isBuffering.value
 })
 
 watch(
-  isBufferingOrLoading,
-  (val) => {
-    emit('buffering', val)
+  [isBufferingOrLoading, () => props.active],
+  ([val, active]) => {
+    if (active) {
+      emit('buffering', val)
+    } else {
+      emit('buffering', false)
+    }
   },
   { immediate: true },
 )
@@ -248,7 +254,7 @@ function onLoadedMetadata() {
 }
 
 function playVideo() {
-  if (videoEl.value) {
+  if (videoEl.value && props.active) {
     videoEl.value.play().catch((err) => {
       console.warn('Playback failed or was blocked by browser:', err)
     })
@@ -266,7 +272,10 @@ watch(
     nextTick(() => {
       if (videoEl.value) {
         const shouldPlay =
-          isPlayingOnQualityChange.value !== null ? isPlayingOnQualityChange.value : true
+          props.active &&
+          (isPlayingOnQualityChange.value !== null
+            ? isPlayingOnQualityChange.value
+            : props.autoplay)
 
         videoEl.value.load()
 
@@ -281,6 +290,21 @@ watch(
     })
   },
   { immediate: true },
+)
+
+watch(
+  () => props.active,
+  (isActive) => {
+    if (!isActive) {
+      if (videoEl.value && !videoEl.value.paused) {
+        videoEl.value.pause()
+      }
+    } else {
+      if (videoEl.value && props.autoplay && !isPlaying.value) {
+        playVideo()
+      }
+    }
+  },
 )
 
 watch(
@@ -350,7 +374,7 @@ function onProgress() {
 }
 
 function togglePlay(showOverlay = false) {
-  if (!videoEl.value) return
+  if (!videoEl.value || !props.active) return
   if (videoEl.value.paused) {
     playVideo()
     if (showOverlay) triggerOverlay('play')
@@ -361,7 +385,7 @@ function togglePlay(showOverlay = false) {
 }
 
 function seekBy(seconds: number) {
-  if (!videoEl.value) return
+  if (!videoEl.value || !props.active) return
   let target = videoEl.value.currentTime + seconds
   if (target < 0) target = 0
   if (target > duration.value) target = duration.value
@@ -370,7 +394,7 @@ function seekBy(seconds: number) {
 }
 
 function stepFrame(direction: number) {
-  if (!videoEl.value) return
+  if (!videoEl.value || !props.active) return
   const frameDuration = 1 / fps.value
   let target = videoEl.value.currentTime + direction * frameDuration
   if (target < 0) target = 0
@@ -380,7 +404,7 @@ function stepFrame(direction: number) {
 }
 
 function onSeekInput(val: number) {
-  if (videoEl.value) {
+  if (videoEl.value && props.active) {
     videoEl.value.currentTime = val
     currentTime.value = val
   }
@@ -428,6 +452,7 @@ function onFullscreenChange() {
 }
 
 function handleKeyDown(e: KeyboardEvent) {
+  if (!props.active) return
   const target = e.target as HTMLElement
   if (target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA' || target?.isContentEditable) {
     return
@@ -483,7 +508,7 @@ function handleKeyDown(e: KeyboardEvent) {
 
 onMounted(() => {
   document.addEventListener('fullscreenchange', onFullscreenChange)
-  if (videoEl.value && isPlaying.value === false && props.autoplay) {
+  if (videoEl.value && isPlaying.value === false && props.autoplay && props.active) {
     playVideo()
   }
 })
@@ -541,6 +566,7 @@ useEventListener(window, 'keydown', handleKeyDown)
 
     <!-- Custom Player Controls Bar -->
     <VideoControls
+      v-if="active"
       :current-time="currentTime"
       :duration="duration"
       :buffered="bufferedRanges"

@@ -34,6 +34,15 @@ export function useResponsive() {
     { immediate: true },
   )
 
+
+  watch(
+    useTouchControls,
+    () => {
+      console.log('USE TOUCH', useTouchControls.value)
+    },
+    { immediate: true },
+  )
+
   return {
     isMobile,
     isDesktop,

@@ -2,8 +2,6 @@
 import MdiAlertCircleOutline from '~icons/mdi/alert-circle-outline'
 import MdiCheckboxBlankCircleOutline from '~icons/mdi/checkbox-blank-circle-outline'
 import MdiCheckCircle from '~icons/mdi/check-circle'
-import MdiChevronLeft from '~icons/mdi/chevron-left'
-import MdiChevronRight from '~icons/mdi/chevron-right'
 import MdiClose from '~icons/mdi/close'
 import MdiCloudDownloadOutline from '~icons/mdi/cloud-download-outline'
 import MdiDotsHorizontal from '~icons/mdi/dots-horizontal'
@@ -19,7 +17,8 @@ import { useSettingStore } from '@/scripts/stores/settingsStore.ts'
 import { useMediaItemStore } from '@/scripts/stores/timeline/mediaItemStore.ts'
 import { useSelectionStore } from '@/scripts/stores/timeline/selectionStore.ts'
 import { useViewPhotoStore } from '@/scripts/stores/timeline/viewPhotoStore.ts'
-import MediaViewer from '@/vues/components/viewer/MediaViewer.vue'
+import DesktopMediaViewer from '@/vues/components/viewer/DesktopMediaViewer.vue'
+import SwipeableMediaViewer from '@/vues/components/viewer/SwipeableMediaViewer.vue'
 import {
   type SimpleTimelineItem,
   type StorageReviewItem,
@@ -79,8 +78,6 @@ const missingMediaStore = useMissingMediaStore()
 const snackbarStore = useSnackbarsStore()
 const profileStore = useProfileStore()
 
-const showRightButton = ref(false)
-const showLeftButton = ref(false)
 const persistentInfo = ref(false)
 const infoMenuOpen = ref(false)
 const optionsOpen = ref(false)
@@ -222,14 +219,11 @@ const currentItemRatio = computed(() => {
 const mediaDetailTitle = computed(() => fullImage.value?.user_caption ?? fullImage.value?.filename)
 
 function forwardWheel(e: WheelEvent) {
-  // Find the interactive pan container inside the photo viewer
   const zoomPanContainer = document.querySelector('.zoom-pan-container')
   if (!zoomPanContainer) return
 
-  // Prevent default page scroll actions
   e.preventDefault()
 
-  // Replicate and dispatch the wheel event downward with matching coordinate context
   const forwardedEvent = new WheelEvent('wheel', {
     clientX: e.clientX,
     clientY: e.clientY,
@@ -265,7 +259,6 @@ function toggleSelected() {
 }
 
 function handleKeyDown(e: KeyboardEvent) {
-  console.log(dialogs.customVisible, dialogs.anyVisible, dialogs.visible)
   if (dialogs.anyVisible) return
   if (e.key === 'ArrowLeft' && prevId.value) {
     e.preventDefault()
@@ -364,7 +357,7 @@ function goPrev() {
   if (prevId.value) changeMediaItem(prevId.value)
 }
 
-// Pre-fetch
+// Pre-fetch adjacent items
 watch(prevId, () => {
   if (prevId.value) requestIdleCallback(() => prefetchMediaItem(prevId.value))
 })
@@ -372,7 +365,6 @@ watch(nextId, () => {
   if (nextId.value) requestIdleCallback(() => prefetchMediaItem(nextId.value))
 })
 
-// Reset zoom states when content identifiers or viewer states change
 watch(
   id,
   () => {
@@ -407,22 +399,27 @@ useDetailTitle(mediaDetailTitle, { fallback: 'Photo' })
       backgroundColor: settings.useImageGlow ? 'rgb(var(--v-theme-background))' : 'black',
     }"
   >
-    <media-viewer
+    <!-- Switch between Touch Swipeable viewer and Desktop mouse viewer -->
+    <component
+      :is="responsive.useTouchControls.value ? SwipeableMediaViewer : DesktopMediaViewer"
+      v-if="id"
+      :media-item-id="id"
+      :prev-id="prevId"
+      :next-id="nextId"
+      :is-video="isVideo"
       :disable-event-capture="disableEventCapture ?? false"
       :muted="muted ?? false"
-      v-if="id"
-      :is-video="isVideo"
-      :media-item-id="id"
       :show-ui="showUI"
-      class="photo-viewer"
+      :elemental-fullscreen="false"
+      :photo-gallery-height="photoGalleryHeight"
+      :show-gallery="showGallery"
+      @next="goNext"
+      @prev="goPrev"
       @zoom-change="isZoomed = $event"
       @pano-active="isPanoActive = $event"
       @buffering="isVideoBuffering = $event"
-      :elemental-fullscreen="false"
-      :style="{
-        height: `calc(100% - ${showGallery ? photoGalleryHeight : 0}px)`,
-      }"
     />
+
     <photo-gallery
       :height="photoGalleryHeight"
       :style="{
@@ -654,42 +651,6 @@ useDetailTitle(mediaDetailTitle, { fallback: 'Photo' })
         </template>
       </div>
     </div>
-    <div
-      v-if="prevId !== null"
-      class="prev-area"
-      :class="{ 'zoomed-nav': isZoomed || isPanoActive }"
-      @click="goPrev()"
-      @mouseenter="showLeftButton = true"
-      @mouseleave="showLeftButton = false"
-      @wheel="forwardWheel"
-    >
-      <v-btn
-        class="nav-btn"
-        :class="{ 'show-btn': showLeftButton }"
-        :icon="MdiChevronLeft"
-        variant="elevated"
-        rounded="xl"
-        size="70"
-      ></v-btn>
-    </div>
-    <div
-      v-if="nextId !== null"
-      class="next-area"
-      :class="{ 'zoomed-nav': isZoomed || isPanoActive }"
-      @click="goNext()"
-      @mouseenter="showRightButton = true"
-      @mouseleave="showRightButton = false"
-      @wheel="forwardWheel"
-    >
-      <v-btn
-        class="nav-btn"
-        :class="{ 'show-btn': showRightButton }"
-        :icon="MdiChevronRight"
-        variant="elevated"
-        rounded="xl"
-        size="70"
-      ></v-btn>
-    </div>
   </v-theme-provider>
 </template>
 
@@ -701,6 +662,8 @@ useDetailTitle(mediaDetailTitle, { fallback: 'Photo' })
   width: 100%;
   height: 100%;
   z-index: 1400;
+  overflow: hidden;
+  overscroll-behavior-x: none;
   --bg: var(--v-theme-surface-container-lowest);
   --fg: var(--v-theme-on-surface-container-lowest);
 }
@@ -712,15 +675,6 @@ useDetailTitle(mediaDetailTitle, { fallback: 'Photo' })
 .hide-ui,
 .hide-ui :deep(*) {
   cursor: none !important;
-}
-
-.photo-viewer {
-  width: 100%;
-  position: absolute;
-  top: 0;
-  left: 0;
-  z-index: 1500;
-  background-color: rgb(var(--bg));
 }
 
 .photo-gallery {
@@ -852,59 +806,5 @@ useDetailTitle(mediaDetailTitle, { fallback: 'Photo' })
 
 .location-link {
   color: rgba(var(--fg), 0.6);
-}
-
-.next-area {
-  position: absolute;
-  right: 0;
-  top: 150px;
-  height: calc(100% - 360px);
-  width: 15%;
-  min-width: 92px;
-  cursor: pointer;
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  padding: 20px;
-  z-index: 1502;
-}
-
-.prev-area {
-  position: absolute;
-  left: 0;
-  top: 150px;
-  height: calc(100% - 360px);
-  width: 15%;
-  min-width: 92px;
-  cursor: pointer;
-  display: flex;
-  justify-content: flex-start;
-  align-items: center;
-  padding: 20px;
-  z-index: 1502;
-}
-
-/* Custom transitions and styling for navigation buttons */
-.nav-btn {
-  opacity: 0;
-  transition: opacity 0.15s ease-in-out;
-  pointer-events: auto; /* Always keep the button itself interactive */
-}
-
-.nav-btn.show-btn {
-  opacity: 1;
-}
-
-/* When zoomed in, disable pointer events on the large navigation container */
-.prev-area.zoomed-nav,
-.next-area.zoomed-nav {
-  pointer-events: none;
-  cursor: default;
-}
-
-/* Let the button itself show on hover in zoomed mode */
-.prev-area.zoomed-nav .nav-btn:hover,
-.next-area.zoomed-nav .nav-btn:hover {
-  opacity: 1;
 }
 </style>

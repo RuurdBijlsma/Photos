@@ -9,16 +9,22 @@ const VideoViewer = defineAsyncComponent(
   () => import('@/vues/components/viewer/viewers/VideoViewer.vue'),
 )
 
-defineProps<{
-  disableEventCapture: boolean
-  isVideo: boolean
-  mediaItemId: string
-  muted: boolean
-  showUi?: boolean
-  autoplay?: boolean
-  elementalFullscreen: boolean
-  forcePano?: PannellumConfig | undefined
-}>()
+withDefaults(
+  defineProps<{
+    disableEventCapture: boolean
+    isVideo: boolean
+    mediaItemId: string
+    muted: boolean
+    showUi?: boolean
+    autoplay?: boolean
+    elementalFullscreen: boolean
+    forcePano?: PannellumConfig | undefined
+    active?: boolean
+  }>(),
+  {
+    active: true,
+  },
+)
 
 const emit = defineEmits<{
   (e: 'zoom-change', isZoomed: boolean): void
@@ -32,6 +38,7 @@ const emit = defineEmits<{
     <photo-viewer
       :media-item-id="mediaItemId"
       v-if="!isVideo"
+      :active="active"
       :disable-event-capture="disableEventCapture"
       :show-ui="showUi"
       @zoom-change="emit('zoom-change', $event)"
@@ -40,6 +47,7 @@ const emit = defineEmits<{
     />
     <video-viewer
       :media-item-id="mediaItemId"
+      :active="active"
       :elemental-fullscreen="elementalFullscreen"
       v-else
       :muted="muted"
@@ -53,5 +61,7 @@ const emit = defineEmits<{
 <style scoped>
 .viewer-container {
   position: relative;
+  width: 100%;
+  height: 100%;
 }
 </style>

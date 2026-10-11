@@ -25,9 +25,11 @@ const props = withDefaults(
     mediaItemId: string
     showUi?: boolean
     forcePano?: PannellumConfig | undefined
+    active?: boolean
   }>(),
   {
     showUi: true,
+    active: true,
   },
 )
 
@@ -124,7 +126,6 @@ async function loadFromStore(item: FullMediaItem) {
   fullResUrl.value = preloadedUrl
   fullResLoaded.value = true
   isLoadingFull.value = false
-  return
 }
 
 // Download the original full-resolution media file blob
@@ -208,7 +209,7 @@ const { pause: stopMonitoring, resume: startMonitoring } = useRafFn(
 )
 
 function playMotionPhoto() {
-  if (!settings.playMotionPhotos) return
+  if (!settings.playMotionPhotos || !props.active) return
   showingMotionVideo.value = true
   nextTick(() => {
     if (videoPlayerRef.value) {
@@ -237,23 +238,37 @@ watch(
     isThumbLoaded.value = false
     showingMotionVideo.value = false
     stopMonitoring()
+    cleanup()
   },
   { immediate: true },
 )
 
-// Drive Media Content Loading Lifecycle whenever fullImage changes
+// Drive Media Content Loading Lifecycle whenever fullImage or active state changes
 watch(
-  fullImage,
-  (item) => {
+  [fullImage, () => props.active],
+  ([item, active]) => {
     if (!item) {
       cleanup()
+      return
+    }
+
+    if (!active) {
+      showingMotionVideo.value = false
+      stopMonitoring()
+      if (currentAbortController) {
+        currentAbortController.abort()
+        currentAbortController = null
+        isLoadingFull.value = false
+      }
       return
     }
 
     if (settings.playMotionPhotos && item.media_features?.is_motion_photo) {
       playMotionPhoto()
     }
-    // clean up previous blob URLs or active network requests
+
+    if (fullResLoaded.value && fullResUrl.value) return
+
     cleanup()
 
     if (
@@ -273,9 +288,11 @@ watch(
 )
 
 watch(
-  is3DMode,
-  (isActive) => {
-    emit('pano-active', isActive)
+  [is3DMode, () => props.active],
+  ([isActive, active]) => {
+    if (active) {
+      emit('pano-active', isActive)
+    }
   },
   { immediate: true },
 )
@@ -299,11 +316,13 @@ watch(
   { immediate: true },
 )
 
-// Emit zoom state to parents
+// Emit zoom state to parents only when active
 watch(
-  [scale, is3DMode, rotation],
-  ([newScale, is3D, rot]) => {
-    emit('zoom-change', !is3D && rot % 360 === 0 && newScale > 1)
+  [scale, is3DMode, rotation, () => props.active],
+  ([newScale, is3D, rot, active]) => {
+    if (active) {
+      emit('zoom-change', !is3D && rot % 360 === 0 && newScale > 1)
+    }
   },
   { immediate: true },
 )
@@ -312,7 +331,7 @@ watch(
 watch(
   () => viewPhotoStore.playMotionTrigger,
   () => {
-    if (fullImage.value?.media_features?.is_motion_photo) {
+    if (props.active && fullImage.value?.media_features?.is_motion_photo) {
       playMotionPhoto()
     }
   },
@@ -470,26 +489,41 @@ function clampTranslations() {
 
 // Pointer events panning & pinch-to-zoom
 function handlePointerDown(e: PointerEvent) {
-  if (props.disableEventCapture || rotation.value % 360 !== 0) return
+  if (props.disableEventCapture || !props.active || rotation.value % 360 !== 0) return
   if (e.pointerType === 'mouse' && e.button !== 0) {
     return
   }
+
+  const isTouchAtNormalScale = e.pointerType === 'touch' && scale.value <= 1
 
   if (scale.value > 1) {
     setTransforming(true)
   }
 
   const target = e.currentTarget as HTMLElement
-  target.setPointerCapture(e.pointerId)
   activePointers.set(e.pointerId, e)
 
   if (activePointers.size === 1) {
-    isDragging = true
-    startX = e.clientX
-    startY = e.clientY
-    startTranslateX = translateX.value
-    startTranslateY = translateY.value
+    // Single touch at 1x scale does not capture pointer, enabling carousel swiping
+    if (!isTouchAtNormalScale) {
+      try {
+        target.setPointerCapture(e.pointerId)
+      } catch {}
+      isDragging = true
+      startX = e.clientX
+      startY = e.clientY
+      startTranslateX = translateX.value
+      startTranslateY = translateY.value
+    } else {
+      isDragging = false
+    }
   } else if (activePointers.size === 2) {
+    // Pinch to zoom started - capture both pointers
+    for (const pid of activePointers.keys()) {
+      try {
+        target.setPointerCapture(pid)
+      } catch {}
+    }
     isDragging = false
     const pointers = Array.from(activePointers.values())
     const dx = pointers[0].clientX - pointers[1].clientX
@@ -500,7 +534,7 @@ function handlePointerDown(e: PointerEvent) {
 }
 
 function handlePointerMove(e: PointerEvent) {
-  if (props.disableEventCapture || rotation.value % 360 !== 0) return
+  if (props.disableEventCapture || !props.active || rotation.value % 360 !== 0) return
   if (!activePointers.has(e.pointerId)) return
   activePointers.set(e.pointerId, e)
 
@@ -536,9 +570,7 @@ function handlePointerUp(e: PointerEvent) {
   try {
     const target = e.currentTarget as HTMLElement
     target.releasePointerCapture(e.pointerId)
-  } catch {
-    // Ignore
-  }
+  } catch {}
 
   if (activePointers.size === 0) {
     isDragging = false
@@ -563,7 +595,7 @@ function handlePointerCancel(e: PointerEvent) {
 }
 
 function handleWheel(e: WheelEvent) {
-  if (props.disableEventCapture || rotation.value % 360 !== 0) return
+  if (props.disableEventCapture || !props.active || rotation.value % 360 !== 0) return
   const target = e.target as HTMLElement
   // Only zoom if the event isn't targeted inside overlays, info panels or menus
   if (
