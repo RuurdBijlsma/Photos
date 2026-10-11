@@ -16,6 +16,9 @@
 * improve messaging when you load the website and the server is off
 * on login redirect to where you were
 * don't allow user to go to /onboarding if onboarding is done already.
+* Make ViewPhoto handle swipes and such for next/prev (mobile)
+* Make selecting photos work better on mobile
+* Fix Card collection viewer on mobile
 
 # SERVER
 
