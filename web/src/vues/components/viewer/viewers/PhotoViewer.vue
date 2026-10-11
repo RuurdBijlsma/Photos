@@ -14,6 +14,7 @@ import type { PannellumConfig } from '@/scripts/types/api/pannellumConfig.ts'
 import { useAuthStore } from '@/scripts/stores/authStore.ts'
 import { isMimeTypeSupported } from '@/scripts/utils.ts'
 import { useDelayedBoolean } from '@/scripts/composables/useDelayedBoolean.ts'
+import { useResponsive } from '@/scripts/composables/useResponsive.ts'
 
 const PanoramaViewer = defineAsyncComponent(
   () => import('@/vues/components/viewer/components/PanoramaViewer.vue'),
@@ -42,6 +43,7 @@ const mediaItemStore = useMediaItemStore()
 const settings = useSettingStore()
 const viewPhotoStore = useViewPhotoStore()
 const authStore = useAuthStore()
+const responsive = useResponsive()
 
 // Zoom and Pan state
 const scale = ref(1)
@@ -96,6 +98,21 @@ const isPendingLoad = computed(() => !isThumbLoaded.value && !fullResLoaded.valu
 const showBlank = useDelayedBoolean(isPendingLoad, 100)
 
 let currentAbortController: AbortController | null = null
+
+// Desktop idle timer for deferring full-res download
+const isDesktopIdle = ref(false)
+let idleTimer: ReturnType<typeof setTimeout> | null = null
+
+function resetIdleTimer() {
+  isDesktopIdle.value = false
+  if (idleTimer !== null) clearTimeout(idleTimer)
+  // Only idle-fetch full-res on desktop with a mouse; mobile stays on 1440p unless zoomed
+  if (!responsive.useTouchControls.value) {
+    idleTimer = setTimeout(() => {
+      isDesktopIdle.value = true
+    }, 1200)
+  }
+}
 
 // Cleanup full resolution load resources
 function cleanup() {
@@ -199,7 +216,6 @@ const { pause: stopMonitoring, resume: startMonitoring } = useRafFn(
       targetTime = video.duration / 2
     }
 
-    // Swap back to the static photo once the presentation timestamp is crossed
     if (targetTime > 0 && video.currentTime >= targetTime) {
       showingMotionVideo.value = false
       stopMonitoring()
@@ -239,14 +255,15 @@ watch(
     showingMotionVideo.value = false
     stopMonitoring()
     cleanup()
+    resetIdleTimer()
   },
   { immediate: true },
 )
 
-// Drive Media Content Loading Lifecycle whenever fullImage or active state changes
+// Drive Media Content Loading Lifecycle
 watch(
-  [fullImage, () => props.active],
-  ([item, active]) => {
+  [fullImage, () => props.active, scale, isDesktopIdle],
+  ([item, active, currentScale, isIdle]) => {
     if (!item) {
       cleanup()
       return
@@ -269,17 +286,20 @@ watch(
 
     if (fullResLoaded.value && fullResUrl.value) return
 
-    cleanup()
+    const hasPreloaded = viewPhotoStore.preloadedBlobs.has(item.id)
+    const isZoomed = currentScale > 1
+    // Load full resolution immediately if zoomed, rotated, or if desktop has remained idle on the photo
+    const shouldLoad = hasPreloaded || isZoomed || isIdle
 
     if (
+      shouldLoad &&
       authStore.isAuthenticated &&
       isMimeTypeSupported(item.media_features?.mime_type) &&
       !item.missing_since
     ) {
-      // Check if a preloaded blob is available
-      if (viewPhotoStore.preloadedBlobs.has(item.id)) {
+      if (hasPreloaded) {
         loadFromStore(item as FullMediaItem)
-      } else {
+      } else if (!isLoadingFull.value) {
         loadFullResBlob(item as FullMediaItem)
       }
     }
@@ -339,6 +359,7 @@ watch(
 
 onUnmounted(() => {
   cleanup()
+  if (idleTimer !== null) clearTimeout(idleTimer)
 })
 
 const wrapperStyle = computed(() => {
@@ -399,12 +420,10 @@ function zoomToPoint(clientX: number, clientY: number, newScale: number) {
 
   const oldScale = scale.value
   if (oldScale === clampedScale) {
-    // We didn't actually change zoom levels (meaning we tried zooming past limits), stop transform immediately
     setTransforming(false)
     return
   }
 
-  // Zoom centered at the cursor coordinates
   const nextTranslateX = xScreen - (xScreen - translateX.value) * (clampedScale / oldScale)
   const nextTranslateY = yScreen - (yScreen - translateY.value) * (clampedScale / oldScale)
 
@@ -414,7 +433,6 @@ function zoomToPoint(clientX: number, clientY: number, newScale: number) {
 
   clampTranslations()
 
-  // Snap resolution crispness immediately if we reached minimum or maximum zoom boundaries
   if (clampedScale === minScale || clampedScale === maxScale) {
     setTransforming(false)
   } else {
@@ -454,33 +472,27 @@ function clampTranslations() {
 
   const paddingPx = scale.value < 1.4 ? 0 : scale.value * 40
 
-  // Horizontal clamping
   if (scale.value <= 1) {
     translateX.value = 0
   } else if (drawnWidth * scale.value <= w) {
-    // Image is narrower than the viewport: Center it, but allow comfortable wiggle room
     const center = (w / 2) * (1 - scale.value)
     const minX = center - paddingPx
     const maxX = center + paddingPx
     translateX.value = Math.max(minX, Math.min(maxX, translateX.value))
   } else {
-    // Image is wider than the viewport: Allow panning, clamped with soft edge padding
     const minX = w - paddingPx - ((w + drawnWidth) / 2) * scale.value
     const maxX = paddingPx - ((w - drawnWidth) / 2) * scale.value
     translateX.value = Math.max(minX, Math.min(maxX, translateX.value))
   }
 
-  // Vertical clamping
   if (scale.value <= 1) {
     translateY.value = 0
   } else if (drawnHeight * scale.value <= h) {
-    // Image is shorter than the viewport: Center it, but allow comfortable wiggle room
     const center = (h / 2) * (1 - scale.value)
     const minY = center - paddingPx
     const maxY = center + paddingPx
     translateY.value = Math.max(minY, Math.min(maxY, translateY.value))
   } else {
-    // Image is taller than the viewport: Allow panning, clamped with soft edge padding
     const minY = h - paddingPx - ((h + drawnHeight) / 2) * scale.value
     const maxY = paddingPx - ((h - drawnHeight) / 2) * scale.value
     translateY.value = Math.max(minY, Math.min(maxY, translateY.value))
@@ -504,7 +516,6 @@ function handlePointerDown(e: PointerEvent) {
   activePointers.set(e.pointerId, e)
 
   if (activePointers.size === 1) {
-    // Single touch at 1x scale does not capture pointer, enabling carousel swiping
     if (!isTouchAtNormalScale) {
       try {
         target.setPointerCapture(e.pointerId)
@@ -518,7 +529,6 @@ function handlePointerDown(e: PointerEvent) {
       isDragging = false
     }
   } else if (activePointers.size === 2) {
-    // Pinch to zoom started - capture both pointers
     for (const pid of activePointers.keys()) {
       try {
         target.setPointerCapture(pid)
@@ -597,7 +607,6 @@ function handlePointerCancel(e: PointerEvent) {
 function handleWheel(e: WheelEvent) {
   if (props.disableEventCapture || !props.active || rotation.value % 360 !== 0) return
   const target = e.target as HTMLElement
-  // Only zoom if the event isn't targeted inside overlays, info panels or menus
   if (
     target.closest('.media-info-panel') ||
     target.closest('.v-overlay') ||
@@ -608,10 +617,8 @@ function handleWheel(e: WheelEvent) {
 
   e.preventDefault()
 
-  // Flag active transform state
   setTransforming(true)
 
-  // Adjust zoom sensitivity based on device
   const zoomFactor = e.ctrlKey ? 0.05 : 0.01
   const direction = e.deltaY < 0 ? 1 : -1
   const newScale = scale.value * (1 + direction * zoomFactor * 10)
@@ -637,7 +644,6 @@ useEventListener(containerRef, 'wheel', handleWheel, { passive: false })
       }"
     ></div>
 
-    <!-- 3D mode: Instantiated when toggled to true -->
     <template v-if="is3DMode && panoramaConfig">
       <PanoramaViewer
         :config="panoramaConfig"
@@ -656,7 +662,7 @@ useEventListener(containerRef, 'wheel', handleWheel, { passive: false })
       @pointercancel="handlePointerCancel"
     >
       <div class="image-wrapper" :style="wrapperStyle">
-        <!-- Thumbnail layer at bottom -->
+        <!-- 1440p thumbnail layer: always displayed fast and sharp -->
         <img
           ref="thumbRef"
           class="image-tag thumbnail-img"
@@ -672,7 +678,7 @@ useEventListener(containerRef, 'wheel', handleWheel, { passive: false })
           @dragstart.prevent
         />
 
-        <!-- Full-resolution layer stacked on top -->
+        <!-- Full-resolution layer: loaded only when zooming in or desktop idle -->
         <img
           v-if="fullResUrl"
           class="image-tag full-res-img"
@@ -704,7 +710,6 @@ useEventListener(containerRef, 'wheel', handleWheel, { passive: false })
       </div>
     </div>
 
-    <!-- Bottom Center Panorama Toggle Control -->
     <div
       v-if="isPanorama && panoramaConfig"
       class="pano-toggle-container"
@@ -781,7 +786,6 @@ useEventListener(containerRef, 'wheel', handleWheel, { passive: false })
   background-color: transparent;
 }
 
-/* Bottom Center Panorama Overlay controls to match ViewPhoto's top header bars */
 .pano-toggle-container {
   position: absolute;
   bottom: 20px;

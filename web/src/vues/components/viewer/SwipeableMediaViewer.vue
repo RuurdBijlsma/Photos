@@ -402,5 +402,6 @@ onBeforeUnmount(() => {
   flex-shrink: 0;
   position: relative;
   overflow: hidden;
+  contain: strict; /* Isolate style, layout, and painting for each slide */
 }
 </style>
