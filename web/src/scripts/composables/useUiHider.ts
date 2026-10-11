@@ -6,9 +6,10 @@ export function useUiHider(maxHideSeconds: number, preventUiHide: () => boolean 
   const showUI = computed(() => hideSeconds.value > 0)
 
   const { pause, resume, isActive } = useIntervalFn(() => {
-    hideSeconds.value--
     if (preventUiHide()) {
       hideSeconds.value = maxHideSeconds
+    } else {
+      hideSeconds.value--
     }
   }, 1000)
 
@@ -24,5 +25,5 @@ export function useUiHider(maxHideSeconds: number, preventUiHide: () => boolean 
     }
   })
 
-  return { showUI, pause, resume, isActive }
+  return { showUI, pause, resume, isActive, hideSeconds }
 }

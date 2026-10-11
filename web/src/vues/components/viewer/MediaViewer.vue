@@ -23,6 +23,7 @@ defineProps<{
 const emit = defineEmits<{
   (e: 'zoom-change', isZoomed: boolean): void
   (e: 'pano-active', isActive: boolean): void
+  (e: 'buffering', isBuffering: boolean): void
 }>()
 </script>
 
@@ -44,6 +45,7 @@ const emit = defineEmits<{
       :muted="muted"
       :show-ui="showUi"
       :autoplay="autoplay"
+      @buffering="emit('buffering', $event)"
     />
   </div>
 </template>

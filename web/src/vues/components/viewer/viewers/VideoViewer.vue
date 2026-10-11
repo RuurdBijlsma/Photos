@@ -8,15 +8,15 @@ import MdiPlay from '~icons/mdi/play'
 import MdiVolumeHigh from '~icons/mdi/volume-high'
 import MdiVolumeMedium from '~icons/mdi/volume-medium'
 import MdiVolumeMute from '~icons/mdi/volume-mute'
-import { computed, nextTick, onMounted, onUnmounted, ref, useTemplateRef, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, useTemplateRef, watch } from 'vue'
 import { useEventListener, useStorage } from '@vueuse/core'
 import { useMediaItemStore } from '@/scripts/stores/timeline/mediaItemStore.ts'
 import mediaItemService from '@/scripts/services/mediaItemService.ts'
 import { VIDEO_SIZES } from '@/scripts/constants.ts'
 import { getVideoHeight, toHms, useObjStorage } from '@/scripts/utils.ts'
 import VideoProgressSlider from '@/vues/components/viewer/components/VideoProgressSlider.vue'
+import VideoPlayer from '@/vues/components/viewer/viewers/VideoPlayer.vue'
 import { useAuthStore } from '@/scripts/stores/authStore.ts'
-import { useDelayedBoolean } from '@/scripts/composables/useDelayedBoolean.ts'
 
 const props = withDefaults(
   defineProps<{
@@ -32,58 +32,20 @@ const props = withDefaults(
   },
 )
 
+const emit = defineEmits<{
+  (e: 'buffering', isBuffering: boolean): void
+}>()
+
 const mediaItemStore = useMediaItemStore()
 const authStore = useAuthStore()
 
-// Video Element Reference
-const videoEl = useTemplateRef('videoElement')
-const videoContainerEl = useTemplateRef('videoViewer')
-const fps = computed(() => fullImage.value?.media_features?.video_fps || 30)
+// DOM & Component References
+const videoPlayerRef = useTemplateRef<InstanceType<typeof VideoPlayer>>('videoPlayer')
+const videoContainerEl = useTemplateRef<HTMLDivElement>('videoViewer')
 
-// Playback States
-const isPlaying = ref(false)
-const isVideoLoaded = ref(false)
-const currentTime = ref(0)
-const duration = ref(0)
-const bufferedRanges = ref<Array<{ start: number; end: number }>>([])
-
-// Track loading state for delayed blanking (swaps fast path without flicker, unloads on slow path)
-const isPendingLoad = computed(() => !isVideoLoaded.value)
-const showBlank = useDelayedBoolean(isPendingLoad, 100)
-
-// Play/Pause Overlay States
-const overlayAction = ref<'play' | 'pause' | null>(null)
-const overlayTrigger = ref(0)
-let overlayTimeout: ReturnType<typeof setTimeout> | null = null
-
-// Volume State (Persisted with useStorage)
-const savedVolume = useStorage<number>('video-player-volume', 1.0)
-const isMuted = useStorage<boolean>('video-player-muted', false)
-
-// Playback Speed State (Persisted with useStorage)
-const savedPlaybackRate = useStorage<number>('video-player-playback-rate', 1.0)
-const playbackRates = [3.0, 2.0, 1.5, 1.0, 0.5, 0.25]
-
-const currentPlaybackRate = computed<number>({
-  get() {
-    return savedPlaybackRate.value
-  },
-  set(val: number) {
-    savedPlaybackRate.value = val
-    if (videoEl.value) {
-      videoEl.value.playbackRate = val
-    }
-  },
-})
-
-// Settings Menu Open State
-const settingsMenuOpen = ref(false)
-
-// Fullscreen State
-const isFullscreen = ref(false)
-
-// Fetch metadata from the Pinia store if it is missing
+// Metadata & Capabilities
 const fullImage = computed(() => mediaItemStore.anyMediaItems.get(props.mediaItemId))
+const fps = computed(() => fullImage.value?.media_features?.video_fps || 30)
 const hasThumbnails = computed(() => fullImage.value?.has_thumbnails ?? true)
 
 const isSourceAvailable = computed(() => {
@@ -97,7 +59,43 @@ const sourceHeight = computed(() => {
   return Math.min(fullImage.value.width, fullImage.value.height)
 })
 
-// Quality State (Persisted with useStorage)
+// Playback States
+const isPlaying = ref(false)
+const isVideoLoaded = ref(false)
+const isBuffering = ref(false)
+const currentTime = ref(0)
+const duration = ref(0)
+const bufferedRanges = ref<Array<{ start: number; end: number }>>([])
+
+// Play/Pause Center Indicator Overlay
+const overlayAction = ref<'play' | 'pause' | null>(null)
+const overlayTrigger = ref(0)
+let overlayTimeout: ReturnType<typeof setTimeout> | null = null
+
+// Volume State (Persisted)
+const savedVolume = useStorage<number>('video-player-volume', 1.0)
+const isMuted = useStorage<boolean>('video-player-muted', false)
+
+// Playback Speed State (Persisted)
+const savedPlaybackRate = useStorage<number>('video-player-playback-rate', 1.0)
+const playbackRates = [3.0, 2.0, 1.5, 1.0, 0.5, 0.25]
+
+const currentPlaybackRate = computed<number>({
+  get() {
+    return savedPlaybackRate.value
+  },
+  set(val: number) {
+    savedPlaybackRate.value = val
+  },
+})
+
+// Settings Menu Open State
+const settingsMenuOpen = ref(false)
+
+// Fullscreen State
+const isFullscreen = ref(false)
+
+// Quality State (Persisted)
 const defaultQuality = getVideoHeight(screen.height)
 const savedQuality = useObjStorage<number | 'source'>('video-player-quality', defaultQuality)
 const sortedVideoSizes = [...VIDEO_SIZES].sort((a, b) => b - a)
@@ -106,7 +104,6 @@ const currentQuality = computed<number | 'source'>({
   get() {
     const saved = savedQuality.value
     if (!fullImage.value) {
-      // If metadata is not loaded yet, assume the saved quality is available
       return saved || defaultQuality
     }
 
@@ -126,7 +123,7 @@ const currentQuality = computed<number | 'source'>({
   },
 })
 
-// Computed video source URL based on quality and thumbnail generation availability
+// Video Source URL resolution
 const videoUrl = computed(() => {
   if (currentQuality.value === 'source') {
     return mediaItemService.getVideo(props.mediaItemId, 0, true)
@@ -138,15 +135,21 @@ const videoUrl = computed(() => {
   return mediaItemService.getVideo(props.mediaItemId, currentQuality.value as number, onDemand)
 })
 
-// Keep track of the position and play state to restore across source swaps
-const timeToRestore = ref<number | null>(null)
-const isPlayingOnQualityChange = ref<boolean | null>(null)
+// Forward buffering flag to parent
+const isBufferingOrLoading = computed(() => {
+  if (!videoUrl.value) return false
+  return !isVideoLoaded.value || isBuffering.value
+})
+
+watch(
+  isBufferingOrLoading,
+  (val) => {
+    emit('buffering', val)
+  },
+  { immediate: true },
+)
 
 function onQualitySelect(size: number | 'source') {
-  if (videoEl.value) {
-    timeToRestore.value = videoEl.value.currentTime
-    isPlayingOnQualityChange.value = !videoEl.value.paused
-  }
   currentQuality.value = size
   settingsMenuOpen.value = false
 }
@@ -156,7 +159,6 @@ function onPlaybackRateSelect(rate: number) {
   settingsMenuOpen.value = false
 }
 
-// Native browser-streamable support check
 function isVideoStreamable(mimeType?: string): boolean {
   if (!mimeType) return false
   const lower = mimeType.toLowerCase()
@@ -168,7 +170,6 @@ function isVideoStreamable(mimeType?: string): boolean {
   )
 }
 
-// Triggers the temporary play/pause animation overlay in the middle of the screen
 function triggerOverlay(action: 'play' | 'pause') {
   overlayAction.value = action
   overlayTrigger.value++
@@ -179,173 +180,25 @@ function triggerOverlay(action: 'play' | 'pause') {
   }, 750)
 }
 
-// Queries current media buffering intervals directly from the browser instance
-function updateBufferedProgress() {
-  if (videoEl.value) {
-    const b = videoEl.value.buffered
-    const ranges: Array<{ start: number; end: number }> = []
-    for (let i = 0; i < b.length; i++) {
-      ranges.push({
-        start: b.start(i),
-        end: b.end(i),
-      })
-    }
-    bufferedRanges.value = ranges
-  }
-}
-
-function onLoadedMetadata() {
-  if (videoEl.value) {
-    duration.value = videoEl.value.duration || 0
-    if (timeToRestore.value !== null) {
-      videoEl.value.currentTime = timeToRestore.value
-      currentTime.value = timeToRestore.value
-      timeToRestore.value = null
-    }
-    videoEl.value.playbackRate = currentPlaybackRate.value
-    updateBufferedProgress()
-  }
-}
-
-// Helper to trigger safe programmatic playback
-function playVideo() {
-  if (videoEl.value) {
-    videoEl.value.play().catch((err) => {
-      console.warn('Playback failed or was blocked by browser:', err)
-    })
-  }
-}
-
-// Trigger reload on source changes
-watch(
-  videoUrl,
-  () => {
-    bufferedRanges.value = [] // Reset buffering indicator layout
-    nextTick(() => {
-      if (videoEl.value) {
-        const shouldPlay =
-          isPlayingOnQualityChange.value !== null ? isPlayingOnQualityChange.value : true
-
-        videoEl.value.load()
-
-        if (shouldPlay) {
-          playVideo()
-        } else {
-          videoEl.value.pause()
-        }
-        videoEl.value.playbackRate = currentPlaybackRate.value
-
-        isPlayingOnQualityChange.value = null
-      }
-    })
-  },
-  { immediate: true },
-)
-
-// Volume & Mute Synchronization
-watch(
-  [savedVolume, isMuted],
-  () => {
-    if (videoEl.value) {
-      videoEl.value.volume = savedVolume.value
-      videoEl.value.muted = isMuted.value
-    }
-  },
-  { immediate: true },
-)
-watch(
-  () => props.muted,
-  () => {
-    if (props.muted) {
-      isMuted.value = props.muted
-    }
-  },
-  { immediate: true },
-)
-
-// Reset loaded state on media item id changes
-watch(
-  () => props.mediaItemId,
-  () => {
-    isVideoLoaded.value = false
-  },
-)
-
-// Animation loop to ensure smooth, high-precision progress updates during active playback
-let animationFrameId: number | null = null
-
-function updateProgressSmoothly() {
-  if (videoEl.value && !videoEl.value.paused) {
-    currentTime.value = videoEl.value.currentTime
-    updateBufferedProgress()
-    animationFrameId = requestAnimationFrame(updateProgressSmoothly)
-  }
-}
-
-function onPlay() {
-  isPlaying.value = true
-  if (animationFrameId === null) {
-    animationFrameId = requestAnimationFrame(updateProgressSmoothly)
-  }
-}
-
-function onPause() {
-  isPlaying.value = false
-  if (animationFrameId !== null) {
-    cancelAnimationFrame(animationFrameId)
-    animationFrameId = null
-  }
-}
-
-// Fallback listener for captures while paused
-function onTimeUpdate() {
-  if (videoEl.value && videoEl.value.paused) {
-    currentTime.value = videoEl.value.currentTime
-  }
-  updateBufferedProgress()
-}
-
-function onProgress() {
-  updateBufferedProgress()
-}
-
-// Playback Controls
 function togglePlay(showOverlay = false) {
-  if (!videoEl.value) return
-  if (videoEl.value.paused) {
-    playVideo()
-    if (showOverlay) triggerOverlay('play')
-  } else {
-    videoEl.value.pause()
-    if (showOverlay) triggerOverlay('pause')
+  if (!videoPlayerRef.value) return
+  const willPlay = !isPlaying.value
+  videoPlayerRef.value.togglePlay()
+  if (showOverlay) {
+    triggerOverlay(willPlay ? 'play' : 'pause')
   }
 }
 
-// Seeking Control Helpers
 function seekBy(seconds: number) {
-  if (!videoEl.value) return
-  let target = videoEl.value.currentTime + seconds
-  if (target < 0) target = 0
-  if (target > duration.value) target = duration.value
-  videoEl.value.currentTime = target
-  currentTime.value = target
+  videoPlayerRef.value?.seekBy(seconds)
 }
 
 function stepFrame(direction: number) {
-  if (!videoEl.value) return
-  const frameDuration = 1 / fps.value
-  let target = videoEl.value.currentTime + direction * frameDuration
-  if (target < 0) target = 0
-  if (target > duration.value) target = duration.value
-  videoEl.value.currentTime = target
-  currentTime.value = target
+  videoPlayerRef.value?.stepFrame(direction)
 }
 
 function onSeekInput(val: number) {
-  if (videoEl.value) {
-    videoEl.value.currentTime = val
-    currentTime.value = val
-  }
+  videoPlayerRef.value?.seek(val)
 }
 
 function toggleMute() {
@@ -359,7 +212,6 @@ function onVolumeChange(val: number) {
   }
 }
 
-// Volume Keyboard Helper
 function adjustVolume(amount: number) {
   let target = savedVolume.value + amount
   if (target < 0) target = 0
@@ -370,7 +222,7 @@ function adjustVolume(amount: number) {
   }
 }
 
-// Fullscreen API Handling (Syncs state on browser escape/system fullscreen change)
+// Fullscreen API handling
 function toggleFullscreen() {
   if (!document.fullscreenElement) {
     if (props.elementalFullscreen && videoContainerEl.value) {
@@ -391,7 +243,7 @@ function onFullscreenChange() {
   isFullscreen.value = !!document.fullscreenElement
 }
 
-// Keyboard shortcuts logic
+// Global Keyboard shortcuts
 function handleKeyDown(e: KeyboardEvent) {
   const target = e.target as HTMLElement
   if (target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA' || target?.isContentEditable) {
@@ -401,7 +253,7 @@ function handleKeyDown(e: KeyboardEvent) {
   switch (e.key.toLowerCase()) {
     case ' ':
       e.preventDefault()
-      togglePlay(true) // Triggers play/pause with screen animation feedback
+      togglePlay(true)
       break
     case 'arrowleft':
       e.preventDefault()
@@ -428,13 +280,13 @@ function handleKeyDown(e: KeyboardEvent) {
       toggleFullscreen()
       break
     case ',':
-      if (videoEl.value?.paused) {
+      if (!isPlaying.value) {
         e.preventDefault()
         stepFrame(-1)
       }
       break
     case '.':
-      if (videoEl.value?.paused) {
+      if (!isPlaying.value) {
         e.preventDefault()
         stepFrame(1)
       }
@@ -452,46 +304,50 @@ const volumeIcon = computed(() => {
   return MdiVolumeHigh
 })
 
+// Mute synchronization with parent prop
+watch(
+  () => props.muted,
+  () => {
+    if (props.muted) {
+      isMuted.value = props.muted
+    }
+  },
+  { immediate: true },
+)
+
 onMounted(() => {
   document.addEventListener('fullscreenchange', onFullscreenChange)
-  if (videoEl.value && isPlaying.value === false && props.autoplay) {
-    playVideo()
-  }
 })
 
 onUnmounted(() => {
+  emit('buffering', false)
   document.removeEventListener('fullscreenchange', onFullscreenChange)
-  if (animationFrameId !== null) {
-    cancelAnimationFrame(animationFrameId)
-  }
 })
 
-// Listen globally for media controls keyboard shortcuts
 useEventListener(window, 'keydown', handleKeyDown)
 </script>
 
 <template>
   <div class="video-viewer" ref="videoViewer">
-    <video
+    <VideoPlayer
       v-if="videoUrl"
-      ref="videoElement"
-      class="video-element"
+      ref="videoPlayer"
       :src="videoUrl"
+      :media-item-id="mediaItemId"
       :muted="isMuted"
+      :volume="savedVolume"
+      :playback-rate="currentPlaybackRate"
       :crossorigin="currentQuality === 'source' ? 'use-credentials' : undefined"
-      :style="{
-        opacity: isVideoLoaded || !showBlank ? 1 : 0,
-      }"
-      loop
-      playsinline
-      @loadeddata="isVideoLoaded = true"
-      @loadedmetadata="onLoadedMetadata"
-      @timeupdate="onTimeUpdate"
-      @progress="onProgress"
-      @play="onPlay"
-      @pause="onPause"
-      @click="togglePlay(true)"
-      @dblclick="toggleFullscreen"
+      :autoplay="autoplay"
+      :fps="fps"
+      @update:current-time="currentTime = $event"
+      @update:duration="duration = $event"
+      @update:is-playing="isPlaying = $event"
+      @update:is-buffering="isBuffering = $event"
+      @update:is-video-loaded="isVideoLoaded = $event"
+      @update:buffered-ranges="bufferedRanges = $event"
+      @click-video="togglePlay(true)"
+      @dblclick-video="toggleFullscreen"
     />
     <div v-else class="still-processing">
       <span>Video is still processing, check back later to watch it</span>
@@ -506,7 +362,7 @@ useEventListener(window, 'keydown', handleKeyDown)
 
     <!-- Custom Player Controls Bar -->
     <div class="video-controls-container" :class="{ 'hide-ui': !showUi }">
-      <!-- Custom Progress Slider with hover tooltip and buffered segments -->
+      <!-- Progress Slider -->
       <div class="seekbar-row">
         <VideoProgressSlider
           :model-value="currentTime"
@@ -520,7 +376,6 @@ useEventListener(window, 'keydown', handleKeyDown)
       <div class="controls-row">
         <!-- Left Island Capsule -->
         <div class="control-island left-island">
-          <!-- Clicking bottom-left control capsule buttons will play/pause silently without screen overlay feedback -->
           <v-btn
             variant="plain"
             :icon="isPlaying ? MdiPause : MdiPlay"
@@ -528,7 +383,7 @@ useEventListener(window, 'keydown', handleKeyDown)
             @click="togglePlay()"
           />
 
-          <!-- Hover-revealed volume controls container -->
+          <!-- Hover-revealed volume controls -->
           <div class="volume-container">
             <v-btn variant="plain" :icon="volumeIcon" rounded="xl" @click="toggleMute" />
             <div class="volume-slider-wrapper">
@@ -560,8 +415,13 @@ useEventListener(window, 'keydown', handleKeyDown)
             location="top center"
             :close-on-content-click="false"
           >
-            <template v-slot:activator="{ props }">
-              <v-btn variant="plain" :icon="MdiCogOutline" rounded="xl" v-bind="props" />
+            <template v-slot:activator="{ props: menuActivatorProps }">
+              <v-btn
+                variant="plain"
+                :icon="MdiCogOutline"
+                rounded="xl"
+                v-bind="menuActivatorProps"
+              />
             </template>
             <v-list class="settings-menu-list">
               <!-- Submenu 1: Playback Speed -->
@@ -672,12 +532,6 @@ useEventListener(window, 'keydown', handleKeyDown)
   --fg: var(--v-theme-on-surface-container-lowest);
 }
 
-.video-element {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-}
-
 .still-processing {
   width: 100%;
   height: 100%;
@@ -782,7 +636,6 @@ body.backdrop-blur .control-island:hover {
   align-items: center;
 }
 
-/* Transitions the container width and opacity when hovering */
 .volume-slider-wrapper {
   display: flex;
   align-items: center;
@@ -846,8 +699,6 @@ body.backdrop-blur .control-island:hover {
   font-weight: 400;
   margin-left: 4px;
 }
-
-/* Custom Grayscale / Color-Neutral overrides for remaining Sliders (Decoupled) */
 
 /* Volume Slider Customization */
 :deep(.volume-slider .v-slider-thumb) {
