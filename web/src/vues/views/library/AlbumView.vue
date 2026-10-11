@@ -33,12 +33,12 @@ import { useResponsive } from '@/scripts/composables/useResponsive.ts'
 
 const route = useRoute()
 const router = useRouter()
-const simpleTimeline = useTemplateRef('simpleTimeline')
+const simpleTimelineRef = useTemplateRef('simpleTimelineRef')
 const albumStore = useAlbumStore()
 const snackbars = useSnackbarsStore()
 const dialogs = useDialogStore()
 const authStore = useAuthStore()
-const { isMobile, width: windowWidth } = useResponsive()
+const { isMobile } = useResponsive()
 
 const isInitialLoad = ref(true)
 const isManualOrderMode = ref(false)
@@ -218,7 +218,7 @@ async function fetchSortedPreview(mode: AlbumSort) {
   const response = await albumService.getSortedMedia(id.value, mode)
   localItems.value = response.items
   pendingSortMode.value = mode
-  simpleTimeline.value?.setOrder(localItems.value)
+  simpleTimelineRef.value?.setOrder(localItems.value)
 }
 
 async function confirmRouteLeave() {
@@ -326,7 +326,7 @@ watch(
     albumTitle.value = null
     albumDescription.value = null
     console.log('Album ID change', id.value)
-    simpleTimeline.value?.scrollToTop()
+    simpleTimelineRef.value?.scrollToTop()
     if (!id.value) return
     albumStore.fetchAlbumMedia(id.value, false)
   },
@@ -385,7 +385,7 @@ useRefreshFunction(() => {
       @save="saveReorder"
     />
     <simple-timeline
-      ref="simpleTimeline"
+      ref="simpleTimelineRef"
       :timeline-items="displayedItems"
       :view-link="`/album/${id}/view/`"
       v-if="id"
@@ -393,7 +393,7 @@ useRefreshFunction(() => {
       :is-manual-order-mode="isManualOrderMode"
       @reorder="onReorder"
     >
-      <div class="album-header" :class="{ 'is-mobile-header': isMobile }">
+      <div class="album-header">
         <div class="album-header-left">
           <glow-thumbnail
             v-if="thumbnailId"
@@ -561,7 +561,7 @@ useRefreshFunction(() => {
   width: 100%;
 }
 
-.album-header.is-mobile-header {
+.is-mobile .album-header {
   flex-direction: column;
 }
 
@@ -569,7 +569,7 @@ useRefreshFunction(() => {
   padding: 10px;
 }
 
-.is-mobile-header .album-header-left {
+.is-mobile .album-header-left {
   padding: 20px 20px 0 20px;
   display: flex;
   justify-content: center;
@@ -581,7 +581,7 @@ useRefreshFunction(() => {
   min-width: 0;
 }
 
-.is-mobile-header .album-header-right {
+.is-mobile .album-header-right {
   padding: 10px 20px 20px 20px;
 }
 
@@ -592,7 +592,7 @@ useRefreshFunction(() => {
   max-width: 100%;
 }
 
-.is-mobile-header .album-header-first-row {
+.is-mobile .album-header-first-row {
   align-items: center;
 }
 
@@ -607,7 +607,7 @@ useRefreshFunction(() => {
   min-width: 0;
 }
 
-.is-mobile-header .editable-header {
+.is-mobile .editable-header {
   margin-left: -10px;
   width: calc(100% + 10px);
 }
@@ -625,7 +625,7 @@ useRefreshFunction(() => {
   flex-grow: 1;
 }
 
-.is-mobile-header .non-owner-title {
+.is-mobile .non-owner-title {
   font-size: 32px;
 }
 
