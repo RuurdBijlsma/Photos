@@ -1,18 +1,11 @@
 <script setup lang="ts">
-import MdiCheck from '~icons/mdi/check'
 import MdiClose from '~icons/mdi/close'
-import MdiCloudUpload from '~icons/mdi/cloud-upload'
 import MdiDelete from '~icons/mdi/delete'
 import MdiDotsHorizontal from '~icons/mdi/dots-horizontal'
 import MdiEarth from '~icons/mdi/earth'
-import MdiImageAlbum from '~icons/mdi/image-album'
 import MdiLock from '~icons/mdi/lock'
-import MdiMinus from '~icons/mdi/minus'
-import MdiPencil from '~icons/mdi/pencil'
 import MdiPencilOutline from '~icons/mdi/pencil-outline'
 import MdiPlus from '~icons/mdi/plus'
-import MdiShare from '~icons/mdi/share'
-import MdiSort from '~icons/mdi/sort'
 import MdiSortCalendarAscending from '~icons/mdi/sort-calendar-ascending'
 import MdiSortCalendarDescending from '~icons/mdi/sort-calendar-descending'
 import MdiSortClockAscendingOutline from '~icons/mdi/sort-clock-ascending-outline'
@@ -25,19 +18,17 @@ import type { SimpleTimelineItem } from '@/scripts/types/generated/timeline.ts'
 import { useSnackbarsStore } from '@/scripts/stores/snackbarStore.ts'
 import { useDialogStore } from '@/scripts/stores/dialogStore.ts'
 import { useDebounceFn, useTextareaAutosize } from '@vueuse/core'
-import EditableTitle from '@/vues/components/ui/EditableTitle.vue'
 import { CURRENT_YEAR, MONTHS } from '@/scripts/constants.ts'
 import albumService from '@/scripts/services/albumService.ts'
-// eslint-disable-next-line
 import SimpleTimeline from '@/vues/components/timeline/simple-timeline/SimpleTimeline.vue'
 import GlowThumbnail from '@/vues/components/ui/GlowThumbnail.vue'
-import UserAvatar from '@/vues/components/ui/UserAvatar.vue'
-import userService from '@/scripts/services/userService.ts'
-import type { SmallUser } from '@/scripts/types/api/user.ts'
 import { useAuthStore } from '@/scripts/stores/authStore.ts'
-import { copyToClipboard } from '@/scripts/utils.ts'
 import { useRefreshFunction } from '@/scripts/composables/useRefreshFunction.ts'
 import { usePageTitle } from '@/scripts/composables/usePageTitle.ts'
+import AlbumReorderHeader from '@/vues/components/library/album/AlbumReorderHeader.vue'
+import AlbumCollaborators from '@/vues/components/library/album/AlbumCollaborators.vue'
+import AlbumEmptyState from '@/vues/components/library/album/AlbumEmptyState.vue'
+import EditableTitle from '@/vues/components/library/album/EditableTitle.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -49,13 +40,9 @@ const authStore = useAuthStore()
 
 const isInitialLoad = ref(true)
 const isManualOrderMode = ref(false)
-const collabMenuOpen = ref(false)
 const localItems = ref<SimpleTimelineItem[]>([])
 const pendingSortMode = ref<AlbumSort>('None')
-const allUsers = ref<SmallUser[]>([])
-const otherUsers = computed(() =>
-  allUsers.value.filter((u) => !album.value?.collaborators.map((c) => c.userId).includes(u.id)),
-)
+
 const currentUserCollaborator = computed(() => {
   if (!album.value) return undefined
   return album.value.collaborators.find((c) => c.userId === authStore.user?.id)
@@ -184,9 +171,9 @@ function removeDescription() {
 }
 
 async function deleteAlbum() {
-  const id = album.value?.id
-  if (!id) return
-  const deleted = await albumStore.deleteAlbum(id)
+  const albumId = album.value?.id
+  if (!albumId) return
+  const deleted = await albumStore.deleteAlbum(albumId)
   if (deleted) await router.push({ name: 'albums' })
 }
 
@@ -217,8 +204,8 @@ async function saveReorder() {
   isManualOrderMode.value = false
 }
 
-function onReorder(items: SimpleTimelineItem[]) {
-  localItems.value = items
+function onReorder(newOrderItems: SimpleTimelineItem[]) {
+  localItems.value = newOrderItems
   pendingSortMode.value = 'None'
 }
 
@@ -248,58 +235,6 @@ async function confirmRouteLeave() {
     }
   } else {
     return true
-  }
-}
-
-async function fetchUserList() {
-  try {
-    const { data } = await userService.listUsers()
-    allUsers.value = data
-  } catch (e) {
-    snackbars.error("Can't fetch other users", e)
-  }
-}
-
-async function addCollaborator(userId: number) {
-  if (!album.value) return
-
-  try {
-    await albumService.addCollaborator(album.value.id, {
-      userId,
-      role: 'Contributor',
-    })
-    requestIdleCallback(() => {
-      if (album.value) albumStore.fetchAlbumMedia(album.value.id, false)
-    })
-  } catch (e) {
-    snackbars.error('Could not add collaborator', e)
-  }
-}
-
-async function crossServerInvite() {
-  if (!album.value) return
-  try {
-    const { data: token } = await albumService.generateInvite(album.value.id)
-    await dialogs.alert({
-      title: 'Cross-Server Share',
-      description: `
-        <div>
-          <p>Send this token to someone. They can paste it into the search bar on their own Ruurd Photos instance to import this album.</p>
-          <br>
-          <code class="share-link">${token}</code>
-        </div>
-      `,
-      actions: [
-        {
-          action: () => copyToClipboard(token),
-          name: 'Copy Token',
-        },
-        { action: () => ({}), name: 'Done' },
-      ],
-    })
-  } catch (e) {
-    snackbars.error("Can't generate invite", e)
-    return
   }
 }
 
@@ -432,11 +367,6 @@ watch(
   },
 )
 
-watch(collabMenuOpen, () => {
-  if (!collabMenuOpen.value) return
-  fetchUserList()
-})
-
 usePageTitle(albumTitle, { fallback: 'Album' })
 useRefreshFunction(() => {
   if (id.value) albumStore.fetchAlbumMedia(id.value, false)
@@ -445,69 +375,13 @@ useRefreshFunction(() => {
 
 <template>
   <div class="album-container">
-    <div class="album-reorder-header" v-if="isManualOrderMode">
-      <div class="reorder-header-title">
-        <v-icon :icon="MdiPencil" class="mr-5" size="25" />
-        <p>Edit album order</p>
-      </div>
-      <div>
-        <v-menu location="bottom start">
-          <template v-slot:activator="{ props }">
-            <v-btn
-              v-bind="props"
-              class="mr-5"
-              variant="text"
-              rounded
-              color="primary"
-              :prepend-icon="MdiSort"
-            >
-              Sort photos
-            </v-btn>
-          </template>
-          <v-list density="compact" bg-color="surface-container-high">
-            <v-list-item
-              v-if="album"
-              :active="album.sortMode == 'DateDesc'"
-              @click="fetchSortedPreview('DateDesc')"
-              :prepend-icon="MdiSortCalendarDescending"
-            >
-              <v-list-item-title>Newest first</v-list-item-title>
-            </v-list-item>
-            <v-list-item
-              v-if="album"
-              :active="album.sortMode == 'DateAsc'"
-              @click="fetchSortedPreview('DateAsc')"
-              :prepend-icon="MdiSortCalendarAscending"
-            >
-              <v-list-item-title>Oldest first</v-list-item-title>
-            </v-list-item>
-            <v-divider />
-            <v-list-item
-              @click="fetchSortedPreview('AddedDesc')"
-              :prepend-icon="MdiSortClockDescendingOutline"
-            >
-              <v-list-item-title>Recently added</v-list-item-title>
-            </v-list-item>
-            <v-list-item
-              @click="fetchSortedPreview('AddedAsc')"
-              :prepend-icon="MdiSortClockAscendingOutline"
-            >
-              <v-list-item-title>Oldest added</v-list-item-title>
-            </v-list-item>
-          </v-list>
-        </v-menu>
-        <v-btn variant="text" rounded class="mr-2" @click="cancelReorder">Cancel</v-btn>
-        <v-btn
-          variant="tonal"
-          color="primary"
-          rounded
-          @click="saveReorder"
-          :prepend-icon="MdiCheck"
-        >
-          Save
-        </v-btn>
-      </div>
-    </div>
+    <album-reorder-header
+      v-if="isManualOrderMode"
+      :album="album"
+      @preview-sort="fetchSortedPreview"
+      @cancel="cancelReorder"
+      @save="saveReorder"
+    />
     <simple-timeline
       ref="simpleTimeline"
       :timeline-items="displayedItems"
@@ -652,165 +526,32 @@ useRefreshFunction(() => {
                 :style="{
                   opacity: descTextAreaFocus ? 'inherit' : 0,
                 }"
-              ></v-btn>
+              />
             </div>
           </div>
-          <div class="album-collaborators" v-if="album">
-            <v-menu v-for="collaborator in album.collaborators" :key="collaborator.id">
-              <template v-slot:activator="{ props }">
-                <user-avatar
-                  v-bind="collaborator.userId !== album.ownerId && isOwner ? props : undefined"
-                  :name="collaborator.name"
-                  :avatar-id="collaborator.avatarId"
-                  class="collaborator-avatar"
-                  v-tooltip:top="
-                    `${collaborator.name}${collaborator.userId === album.ownerId ? ' (Owner)' : ''}`
-                  "
-                />
-              </template>
-              <v-list density="compact">
-                <v-list-item
-                  @click="albumStore.removeCollaborator(album.id, collaborator.id, false)"
-                >
-                  <v-list-item-title>Remove {{ collaborator.name }}</v-list-item-title>
-                </v-list-item>
-              </v-list>
-            </v-menu>
-            <v-menu v-model="collabMenuOpen" v-if="isOwner">
-              <template v-slot:activator="{ props }">
-                <v-btn
-                  v-bind="props"
-                  v-tooltip:top="'Add collaborator'"
-                  :icon="MdiShare"
-                  variant="tonal"
-                  color="primary"
-                  size="40"
-                  :loading="allUsers.length === 0 && collabMenuOpen"
-                ></v-btn>
-              </template>
-              <v-list density="compact">
-                <template v-if="otherUsers.length > 0">
-                  <v-list-subheader class="mb-1">Add a collaborator</v-list-subheader>
-                  <v-list-item
-                    @click="addCollaborator(user.id)"
-                    v-for="user in otherUsers"
-                    :key="user.id"
-                    class="collab-list-item"
-                  >
-                    <user-avatar :name="user.name" :avatar-id="user.avatarId" />
-                    <v-list-item-title>{{ user.name }}</v-list-item-title>
-                  </v-list-item>
-                  <v-divider class="mt-2 mb-1" />
-                </template>
-                <v-list-item
-                  :prepend-icon="MdiLock"
-                  @click="privatize"
-                  v-if="album.isPublic"
-                  v-tooltip="{
-                    location: 'top',
-                    text: 'Only invited people will be able to access this album.',
-                  }"
-                >
-                  <v-list-item-title>Make private</v-list-item-title>
-                </v-list-item>
-                <v-list-item
-                  :prepend-icon="MdiEarth"
-                  @click="publicize"
-                  v-else
-                  v-tooltip="{
-                    location: 'top',
-                    text: 'Anyone with the link will be able to view this album.',
-                  }"
-                >
-                  <v-list-item-title>Make public</v-list-item-title>
-                </v-list-item>
-                <v-list-item
-                  :prepend-icon="MdiCloudUpload"
-                  @click="crossServerInvite"
-                  v-tooltip="{
-                    location: 'top',
-                    text: 'Export this album to another server.',
-                  }"
-                >
-                  <v-list-item-title>Share with other server</v-list-item-title>
-                </v-list-item>
-              </v-list>
-            </v-menu>
-            <v-menu v-else-if="currentUserCollaborator">
-              <template v-slot:activator="{ props }">
-                <v-btn
-                  v-bind="props"
-                  v-tooltip:top="'Leave album'"
-                  :icon="MdiMinus"
-                  variant="tonal"
-                  color="primary"
-                  size="40"
-                ></v-btn>
-              </template>
-              <v-list density="compact">
-                <v-list-item
-                  @click="albumStore.removeCollaborator(album.id, currentUserCollaborator.id, true)"
-                  class="collab-list-item"
-                >
-                  <v-list-item-title>Leave album</v-list-item-title>
-                </v-list-item>
-              </v-list>
-            </v-menu>
-          </div>
+          <album-collaborators
+            v-if="album"
+            :album="album"
+            :is-owner="isOwner"
+            :current-user-collaborator="currentUserCollaborator"
+            @publicize="publicize"
+            @privatize="privatize"
+          />
         </div>
       </div>
-      <div class="empty-album" v-if="displayedItems.length === 0 && !isInitialLoad">
-        <v-icon color="on-surface-variant" size="200" :icon="MdiImageAlbum" />
-        <h2>This album is empty</h2>
-        <template v-if="route.query.importing === 'true'">
-          <p>Importing media from remote server...</p>
-          <v-progress-circular class="mt-5" indeterminate size="50" />
-        </template>
-      </div>
+      <album-empty-state
+        v-if="displayedItems.length === 0 && !isInitialLoad"
+        :is-importing="route.query.importing === 'true'"
+      />
     </simple-timeline>
   </div>
 </template>
 
 <style scoped>
-.empty-album {
-  height: 700px;
-  width: 100%;
-  display: flex;
-  place-items: center;
-  place-content: center;
-  flex-direction: column;
-  color: rgb(var(--v-theme-on-surface-variant));
-}
-
 .album-container {
   display: flex;
   flex-direction: column;
   width: 100%;
-}
-
-.album-reorder-header {
-  display: flex;
-  padding: 20px 25px;
-  border-radius: 50px;
-  width: calc(100% - 50px);
-  margin-right: 50px;
-  margin-top: 10px;
-  margin-bottom: 10px;
-  background-color: rgb(var(--v-theme-background));
-  box-shadow: inset 0 0 0 1px rgba(var(--v-theme-primary), 0.1);
-  justify-content: space-between;
-  align-items: center;
-}
-
-.reorder-header-title {
-  display: flex;
-  align-items: center;
-}
-
-.reorder-header-title p {
-  font-size: 20px;
-  font-weight: 600;
-  margin: 0;
 }
 
 .album-header {
@@ -896,21 +637,5 @@ useRefreshFunction(() => {
 
 .album-description:focus {
   outline: 1px solid rgb(var(--v-theme-primary));
-}
-
-.album-collaborators {
-  margin-top: 5px;
-  display: flex;
-  gap: 10px;
-}
-
-.collaborator-avatar {
-  font-weight: 600;
-}
-
-.collab-list-item:deep(.v-list-item__content) {
-  display: flex;
-  align-items: center;
-  gap: 20px;
 }
 </style>
