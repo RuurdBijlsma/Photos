@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, watch, nextTick, onMounted } from 'vue'
 import { useTextareaAutosize } from '@vueuse/core'
+import { useResponsive } from '@/scripts/composables/useResponsive.ts'
 
 const props = defineProps<{
   name: string
@@ -8,6 +9,7 @@ const props = defineProps<{
   modelValue: string
 }>()
 const emit = defineEmits(['update:modelValue', 'submit'])
+const { isMobile } = useResponsive()
 
 const value = computed({
   get: () => props.modelValue,
@@ -47,6 +49,7 @@ onMounted(() => {
     :name="name"
     ref="textarea"
     class="editable-title"
+    :class="{ 'is-mobile-title': isMobile }"
     v-model="value"
     rows="1"
     placeholder="Unnamed"
@@ -75,6 +78,11 @@ onMounted(() => {
   border-radius: 20px;
   transition: background-color 0.2s;
   box-sizing: border-box;
+}
+
+.editable-title.is-mobile-title {
+  font-size: 32px;
+  padding: 5px 10px;
 }
 
 .editable-title:hover {

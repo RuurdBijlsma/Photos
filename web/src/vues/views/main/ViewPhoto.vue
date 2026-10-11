@@ -88,6 +88,7 @@ const isZoomed = ref(false)
 const isPanoActive = ref(false)
 const showAddToAlbum = ref(false)
 const isSharing = ref(false)
+const isVideoBuffering = ref(false)
 
 const photoGalleryHeight = useStorage('view-photo-gallery-height', 100)
 const showGallery = useStorage('show-view-photo-gallery', false)
@@ -127,7 +128,7 @@ useEventListener(window, 'pointerup', stopResize)
 useEventListener(document, 'keydown', handleKeyDown)
 
 const { showUI } = useUiHider(10, () => {
-  return infoMenuOpen.value || optionsOpen.value
+  return infoMenuOpen.value || optionsOpen.value || (isVideo.value && isVideoBuffering.value)
 })
 
 const id = computed(() => {
@@ -377,6 +378,7 @@ watch(
   () => {
     isZoomed.value = false
     isPanoActive.value = false
+    isVideoBuffering.value = false
     initialize()
   },
   { immediate: true },
@@ -385,6 +387,7 @@ watch(
 watch(isVideo, () => {
   isZoomed.value = false
   isPanoActive.value = false
+  isVideoBuffering.value = false
 })
 
 useDetailTitle(mediaDetailTitle, { fallback: 'Photo' })
@@ -414,6 +417,7 @@ useDetailTitle(mediaDetailTitle, { fallback: 'Photo' })
       class="photo-viewer"
       @zoom-change="isZoomed = $event"
       @pano-active="isPanoActive = $event"
+      @buffering="isVideoBuffering = $event"
       :elemental-fullscreen="false"
       :style="{
         height: `calc(100% - ${showGallery ? photoGalleryHeight : 0}px)`,
@@ -855,7 +859,7 @@ useDetailTitle(mediaDetailTitle, { fallback: 'Photo' })
   right: 0;
   top: 150px;
   height: calc(100% - 360px);
-  width: 30%;
+  width: 15%;
   min-width: 92px;
   cursor: pointer;
   display: flex;
@@ -870,7 +874,7 @@ useDetailTitle(mediaDetailTitle, { fallback: 'Photo' })
   left: 0;
   top: 150px;
   height: calc(100% - 360px);
-  width: 30%;
+  width: 15%;
   min-width: 92px;
   cursor: pointer;
   display: flex;

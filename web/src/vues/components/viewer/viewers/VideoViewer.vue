@@ -1,22 +1,14 @@
 <script setup lang="ts">
-import MdiChevronRight from '~icons/mdi/chevron-right'
-import MdiCogOutline from '~icons/mdi/cog-outline'
-import MdiFullscreen from '~icons/mdi/fullscreen'
-import MdiFullscreenExit from '~icons/mdi/fullscreen-exit'
-import MdiPause from '~icons/mdi/pause'
-import MdiPlay from '~icons/mdi/play'
-import MdiVolumeHigh from '~icons/mdi/volume-high'
-import MdiVolumeMedium from '~icons/mdi/volume-medium'
-import MdiVolumeMute from '~icons/mdi/volume-mute'
 import { computed, nextTick, onMounted, onUnmounted, ref, useTemplateRef, watch } from 'vue'
 import { useEventListener, useStorage } from '@vueuse/core'
 import { useMediaItemStore } from '@/scripts/stores/timeline/mediaItemStore.ts'
 import mediaItemService from '@/scripts/services/mediaItemService.ts'
 import { VIDEO_SIZES } from '@/scripts/constants.ts'
-import { getVideoHeight, toHms, useObjStorage } from '@/scripts/utils.ts'
-import VideoProgressSlider from '@/vues/components/viewer/components/VideoProgressSlider.vue'
+import { getVideoHeight, useObjStorage } from '@/scripts/utils.ts'
 import { useAuthStore } from '@/scripts/stores/authStore.ts'
 import { useDelayedBoolean } from '@/scripts/composables/useDelayedBoolean.ts'
+import VideoPlayPauseOverlay from '@/vues/components/viewer/components/video/VideoPlayPauseOverlay.vue'
+import VideoControls from '@/vues/components/viewer/components/video/VideoControls.vue'
 
 const props = withDefaults(
   defineProps<{
@@ -32,22 +24,42 @@ const props = withDefaults(
   },
 )
 
+const emit = defineEmits<{
+  (e: 'buffering', isBuffering: boolean): void
+}>()
+
 const mediaItemStore = useMediaItemStore()
 const authStore = useAuthStore()
 
 // Video Element Reference
 const videoEl = useTemplateRef('videoElement')
 const videoContainerEl = useTemplateRef('videoViewer')
+
+// Metadata & Capabilities
+const fullImage = computed(() => mediaItemStore.anyMediaItems.get(props.mediaItemId))
 const fps = computed(() => fullImage.value?.media_features?.video_fps || 30)
+const hasThumbnails = computed(() => fullImage.value?.has_thumbnails ?? true)
+
+const isSourceAvailable = computed(() => {
+  if (!authStore.isAuthenticated) return false
+  const mimeType = fullImage.value?.media_features?.mime_type
+  return isVideoStreamable(mimeType)
+})
+
+const sourceHeight = computed(() => {
+  if (!fullImage.value) return 0
+  return Math.min(fullImage.value.width, fullImage.value.height)
+})
 
 // Playback States
 const isPlaying = ref(false)
 const isVideoLoaded = ref(false)
+const isBuffering = ref(false)
 const currentTime = ref(0)
 const duration = ref(0)
 const bufferedRanges = ref<Array<{ start: number; end: number }>>([])
 
-// Track loading state for delayed blanking (swaps fast path without flicker, unloads on slow path)
+// Track loading state for delayed blanking
 const isPendingLoad = computed(() => !isVideoLoaded.value)
 const showBlank = useDelayedBoolean(isPendingLoad, 100)
 
@@ -56,11 +68,11 @@ const overlayAction = ref<'play' | 'pause' | null>(null)
 const overlayTrigger = ref(0)
 let overlayTimeout: ReturnType<typeof setTimeout> | null = null
 
-// Volume State (Persisted with useStorage)
+// Volume State
 const savedVolume = useStorage<number>('video-player-volume', 1.0)
 const isMuted = useStorage<boolean>('video-player-muted', false)
 
-// Playback Speed State (Persisted with useStorage)
+// Playback Speed State
 const savedPlaybackRate = useStorage<number>('video-player-playback-rate', 1.0)
 const playbackRates = [3.0, 2.0, 1.5, 1.0, 0.5, 0.25]
 
@@ -76,28 +88,10 @@ const currentPlaybackRate = computed<number>({
   },
 })
 
-// Settings Menu Open State
-const settingsMenuOpen = ref(false)
-
 // Fullscreen State
 const isFullscreen = ref(false)
 
-// Fetch metadata from the Pinia store if it is missing
-const fullImage = computed(() => mediaItemStore.anyMediaItems.get(props.mediaItemId))
-const hasThumbnails = computed(() => fullImage.value?.has_thumbnails ?? true)
-
-const isSourceAvailable = computed(() => {
-  if (!authStore.isAuthenticated) return false
-  const mimeType = fullImage.value?.media_features?.mime_type
-  return isVideoStreamable(mimeType)
-})
-
-const sourceHeight = computed(() => {
-  if (!fullImage.value) return 0
-  return Math.min(fullImage.value.width, fullImage.value.height)
-})
-
-// Quality State (Persisted with useStorage)
+// Quality State
 const defaultQuality = getVideoHeight(screen.height)
 const savedQuality = useObjStorage<number | 'source'>('video-player-quality', defaultQuality)
 const sortedVideoSizes = [...VIDEO_SIZES].sort((a, b) => b - a)
@@ -106,7 +100,6 @@ const currentQuality = computed<number | 'source'>({
   get() {
     const saved = savedQuality.value
     if (!fullImage.value) {
-      // If metadata is not loaded yet, assume the saved quality is available
       return saved || defaultQuality
     }
 
@@ -126,7 +119,7 @@ const currentQuality = computed<number | 'source'>({
   },
 })
 
-// Computed video source URL based on quality and thumbnail generation availability
+// Video Source URL
 const videoUrl = computed(() => {
   if (currentQuality.value === 'source') {
     return mediaItemService.getVideo(props.mediaItemId, 0, true)
@@ -138,7 +131,20 @@ const videoUrl = computed(() => {
   return mediaItemService.getVideo(props.mediaItemId, currentQuality.value as number, onDemand)
 })
 
-// Keep track of the position and play state to restore across source swaps
+const isBufferingOrLoading = computed(() => {
+  if (!videoUrl.value) return false
+  return !isVideoLoaded.value || isBuffering.value
+})
+
+watch(
+  isBufferingOrLoading,
+  (val) => {
+    emit('buffering', val)
+  },
+  { immediate: true },
+)
+
+// Position and play state restoration across quality change
 const timeToRestore = ref<number | null>(null)
 const isPlayingOnQualityChange = ref<boolean | null>(null)
 
@@ -148,15 +154,12 @@ function onQualitySelect(size: number | 'source') {
     isPlayingOnQualityChange.value = !videoEl.value.paused
   }
   currentQuality.value = size
-  settingsMenuOpen.value = false
 }
 
 function onPlaybackRateSelect(rate: number) {
   currentPlaybackRate.value = rate
-  settingsMenuOpen.value = false
 }
 
-// Native browser-streamable support check
 function isVideoStreamable(mimeType?: string): boolean {
   if (!mimeType) return false
   const lower = mimeType.toLowerCase()
@@ -168,7 +171,6 @@ function isVideoStreamable(mimeType?: string): boolean {
   )
 }
 
-// Triggers the temporary play/pause animation overlay in the middle of the screen
 function triggerOverlay(action: 'play' | 'pause') {
   overlayAction.value = action
   overlayTrigger.value++
@@ -179,7 +181,6 @@ function triggerOverlay(action: 'play' | 'pause') {
   }, 750)
 }
 
-// Queries current media buffering intervals directly from the browser instance
 function updateBufferedProgress() {
   if (videoEl.value) {
     const b = videoEl.value.buffered
@@ -192,6 +193,45 @@ function updateBufferedProgress() {
     }
     bufferedRanges.value = ranges
   }
+}
+
+function onLoadStart() {
+  isVideoLoaded.value = false
+  isBuffering.value = true
+}
+
+function onLoadedData() {
+  isVideoLoaded.value = true
+  isBuffering.value = false
+}
+
+function onWaiting() {
+  isBuffering.value = true
+}
+
+function onPlaying() {
+  isBuffering.value = false
+}
+
+function onCanPlay() {
+  isBuffering.value = false
+}
+
+function onSeeking() {
+  if (videoEl.value && videoEl.value.readyState < 3) {
+    isBuffering.value = true
+  }
+}
+
+function onSeeked() {
+  if (videoEl.value && videoEl.value.readyState >= 3) {
+    isBuffering.value = false
+  }
+}
+
+function onError() {
+  isVideoLoaded.value = true
+  isBuffering.value = false
 }
 
 function onLoadedMetadata() {
@@ -207,7 +247,6 @@ function onLoadedMetadata() {
   }
 }
 
-// Helper to trigger safe programmatic playback
 function playVideo() {
   if (videoEl.value) {
     videoEl.value.play().catch((err) => {
@@ -216,11 +255,14 @@ function playVideo() {
   }
 }
 
-// Trigger reload on source changes
 watch(
   videoUrl,
-  () => {
-    bufferedRanges.value = [] // Reset buffering indicator layout
+  (newUrl) => {
+    bufferedRanges.value = []
+    if (newUrl) {
+      isVideoLoaded.value = false
+      isBuffering.value = true
+    }
     nextTick(() => {
       if (videoEl.value) {
         const shouldPlay =
@@ -234,7 +276,6 @@ watch(
           videoEl.value.pause()
         }
         videoEl.value.playbackRate = currentPlaybackRate.value
-
         isPlayingOnQualityChange.value = null
       }
     })
@@ -242,7 +283,6 @@ watch(
   { immediate: true },
 )
 
-// Volume & Mute Synchronization
 watch(
   [savedVolume, isMuted],
   () => {
@@ -253,6 +293,7 @@ watch(
   },
   { immediate: true },
 )
+
 watch(
   () => props.muted,
   () => {
@@ -263,15 +304,14 @@ watch(
   { immediate: true },
 )
 
-// Reset loaded state on media item id changes
 watch(
   () => props.mediaItemId,
   () => {
     isVideoLoaded.value = false
+    isBuffering.value = true
   },
 )
 
-// Animation loop to ensure smooth, high-precision progress updates during active playback
 let animationFrameId: number | null = null
 
 function updateProgressSmoothly() {
@@ -284,6 +324,7 @@ function updateProgressSmoothly() {
 
 function onPlay() {
   isPlaying.value = true
+  isBuffering.value = false
   if (animationFrameId === null) {
     animationFrameId = requestAnimationFrame(updateProgressSmoothly)
   }
@@ -297,7 +338,6 @@ function onPause() {
   }
 }
 
-// Fallback listener for captures while paused
 function onTimeUpdate() {
   if (videoEl.value && videoEl.value.paused) {
     currentTime.value = videoEl.value.currentTime
@@ -309,7 +349,6 @@ function onProgress() {
   updateBufferedProgress()
 }
 
-// Playback Controls
 function togglePlay(showOverlay = false) {
   if (!videoEl.value) return
   if (videoEl.value.paused) {
@@ -321,7 +360,6 @@ function togglePlay(showOverlay = false) {
   }
 }
 
-// Seeking Control Helpers
 function seekBy(seconds: number) {
   if (!videoEl.value) return
   let target = videoEl.value.currentTime + seconds
@@ -359,7 +397,6 @@ function onVolumeChange(val: number) {
   }
 }
 
-// Volume Keyboard Helper
 function adjustVolume(amount: number) {
   let target = savedVolume.value + amount
   if (target < 0) target = 0
@@ -370,7 +407,6 @@ function adjustVolume(amount: number) {
   }
 }
 
-// Fullscreen API Handling (Syncs state on browser escape/system fullscreen change)
 function toggleFullscreen() {
   if (!document.fullscreenElement) {
     if (props.elementalFullscreen && videoContainerEl.value) {
@@ -391,7 +427,6 @@ function onFullscreenChange() {
   isFullscreen.value = !!document.fullscreenElement
 }
 
-// Keyboard shortcuts logic
 function handleKeyDown(e: KeyboardEvent) {
   const target = e.target as HTMLElement
   if (target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA' || target?.isContentEditable) {
@@ -401,7 +436,7 @@ function handleKeyDown(e: KeyboardEvent) {
   switch (e.key.toLowerCase()) {
     case ' ':
       e.preventDefault()
-      togglePlay(true) // Triggers play/pause with screen animation feedback
+      togglePlay(true)
       break
     case 'arrowleft':
       e.preventDefault()
@@ -446,12 +481,6 @@ function handleKeyDown(e: KeyboardEvent) {
   }
 }
 
-const volumeIcon = computed(() => {
-  if (isMuted.value || savedVolume.value === 0) return MdiVolumeMute
-  if (savedVolume.value < 0.5) return MdiVolumeMedium
-  return MdiVolumeHigh
-})
-
 onMounted(() => {
   document.addEventListener('fullscreenchange', onFullscreenChange)
   if (videoEl.value && isPlaying.value === false && props.autoplay) {
@@ -460,13 +489,13 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  emit('buffering', false)
   document.removeEventListener('fullscreenchange', onFullscreenChange)
   if (animationFrameId !== null) {
     cancelAnimationFrame(animationFrameId)
   }
 })
 
-// Listen globally for media controls keyboard shortcuts
 useEventListener(window, 'keydown', handleKeyDown)
 </script>
 
@@ -479,13 +508,18 @@ useEventListener(window, 'keydown', handleKeyDown)
       :src="videoUrl"
       :muted="isMuted"
       :crossorigin="currentQuality === 'source' ? 'use-credentials' : undefined"
-      :style="{
-        opacity: isVideoLoaded || !showBlank ? 1 : 0,
-      }"
+      :style="{ opacity: isVideoLoaded || !showBlank ? 1 : 0 }"
       loop
       playsinline
-      @loadeddata="isVideoLoaded = true"
+      @loadstart="onLoadStart"
+      @loadeddata="onLoadedData"
       @loadedmetadata="onLoadedMetadata"
+      @waiting="onWaiting"
+      @playing="onPlaying"
+      @canplay="onCanPlay"
+      @seeking="onSeeking"
+      @seeked="onSeeked"
+      @error="onError"
       @timeupdate="onTimeUpdate"
       @progress="onProgress"
       @play="onPlay"
@@ -497,161 +531,40 @@ useEventListener(window, 'keydown', handleKeyDown)
       <span>Video is still processing, check back later to watch it</span>
     </div>
 
-    <!-- Play/Pause Overlay Indication -->
-    <div v-if="overlayAction" :key="overlayTrigger" class="play-pause-overlay">
-      <div class="overlay-circle">
-        <v-icon :icon="overlayAction === 'play' ? MdiPlay : MdiPause" size="40" />
-      </div>
+    <!-- Buffering Spinner Indicator -->
+    <div v-if="isBufferingOrLoading" class="buffering-spinner">
+      <v-progress-circular indeterminate size="56" width="4" color="white" />
     </div>
+
+    <!-- Center Play/Pause Ripple Indicator -->
+    <VideoPlayPauseOverlay :action="overlayAction" :trigger="overlayTrigger" />
 
     <!-- Custom Player Controls Bar -->
-    <div class="video-controls-container" :class="{ 'hide-ui': !showUi }">
-      <!-- Custom Progress Slider with hover tooltip and buffered segments -->
-      <div class="seekbar-row">
-        <VideoProgressSlider
-          :model-value="currentTime"
-          @update:model-value="onSeekInput"
-          :max="duration"
-          :buffered="bufferedRanges"
-        />
-      </div>
-
-      <!-- Controls Floating Capsules Row -->
-      <div class="controls-row">
-        <!-- Left Island Capsule -->
-        <div class="control-island left-island">
-          <!-- Clicking bottom-left control capsule buttons will play/pause silently without screen overlay feedback -->
-          <v-btn
-            variant="plain"
-            :icon="isPlaying ? MdiPause : MdiPlay"
-            rounded="xl"
-            @click="togglePlay()"
-          />
-
-          <!-- Hover-revealed volume controls container -->
-          <div class="volume-container">
-            <v-btn variant="plain" :icon="volumeIcon" rounded="xl" @click="toggleMute" />
-            <div class="volume-slider-wrapper">
-              <v-slider
-                class="volume-slider"
-                :model-value="isMuted ? 0 : savedVolume"
-                @update:model-value="onVolumeChange"
-                min="0"
-                max="1"
-                step="0.05"
-                thumb-size="15"
-                track-size="3"
-                hide-details
-                density="compact"
-              />
-            </div>
-          </div>
-
-          <div class="time-display">{{ toHms(currentTime) }} / {{ toHms(duration) }}</div>
-        </div>
-
-        <!-- Right Island Capsule -->
-        <div class="control-island right-island">
-          <!-- Quality & Speed Settings Menu -->
-          <v-menu
-            :attach="elementalFullscreen && isFullscreen"
-            v-if="hasThumbnails || isSourceAvailable"
-            v-model="settingsMenuOpen"
-            location="top center"
-            :close-on-content-click="false"
-          >
-            <template v-slot:activator="{ props }">
-              <v-btn variant="plain" :icon="MdiCogOutline" rounded="xl" v-bind="props" />
-            </template>
-            <v-list class="settings-menu-list">
-              <!-- Submenu 1: Playback Speed -->
-              <v-menu
-                location="left top"
-                open-on-hover
-                :close-on-content-click="true"
-                :attach="elementalFullscreen && isFullscreen"
-              >
-                <template v-slot:activator="{ props: speedMenuProps }">
-                  <v-list-item v-bind="speedMenuProps" class="menu-item-with-chevron">
-                    <v-list-item-title class="menu-text">Playback speed</v-list-item-title>
-                    <template v-slot:append>
-                      <span class="current-setting-label">{{ currentPlaybackRate }}x</span>
-                      <v-icon :icon="MdiChevronRight" size="small" class="ml-1" />
-                    </template>
-                  </v-list-item>
-                </template>
-                <v-list class="submenu-list">
-                  <v-list-item
-                    v-for="rate in playbackRates"
-                    :key="rate"
-                    :value="rate"
-                    @click="onPlaybackRateSelect(rate)"
-                    :active="currentPlaybackRate === rate"
-                  >
-                    <v-list-item-title class="menu-text">{{ rate }}x</v-list-item-title>
-                  </v-list-item>
-                </v-list>
-              </v-menu>
-
-              <!-- Submenu 2: Quality -->
-              <v-menu
-                location="left top"
-                open-on-hover
-                :close-on-content-click="true"
-                :attach="elementalFullscreen && isFullscreen"
-              >
-                <template v-slot:activator="{ props: qualityMenuProps }">
-                  <v-list-item v-bind="qualityMenuProps" class="menu-item-with-chevron">
-                    <v-list-item-title class="menu-text">Quality</v-list-item-title>
-                    <template v-slot:append>
-                      <span class="current-setting-label">
-                        {{
-                          currentQuality === 'source' ? `${sourceHeight}p` : `${currentQuality}p`
-                        }}
-                      </span>
-                      <v-icon :icon="MdiChevronRight" size="small" class="ml-1" />
-                    </template>
-                  </v-list-item>
-                </template>
-                <v-list class="submenu-list">
-                  <v-list-item
-                    v-if="isSourceAvailable"
-                    value="source"
-                    @click="onQualitySelect('source')"
-                    :active="currentQuality === 'source'"
-                  >
-                    <v-list-item-title class="menu-text">
-                      {{ sourceHeight }}p <span class="source-label">(source)</span>
-                    </v-list-item-title>
-                  </v-list-item>
-
-                  <template v-if="hasThumbnails">
-                    <v-list-item
-                      v-for="size in sortedVideoSizes"
-                      :key="size"
-                      :value="size"
-                      @click="onQualitySelect(size)"
-                      :active="currentQuality === size"
-                    >
-                      <v-list-item-title class="menu-text">{{ size }}p</v-list-item-title>
-                    </v-list-item>
-                  </template>
-                </v-list>
-              </v-menu>
-            </v-list>
-          </v-menu>
-          <v-btn v-else variant="plain" :icon="MdiCogOutline" rounded="xl" disabled />
-
-          <!-- Fullscreen Button -->
-          <v-btn
-            variant="plain"
-            :icon="isFullscreen ? MdiFullscreenExit : MdiFullscreen"
-            rounded="xl"
-            @click="toggleFullscreen"
-          />
-        </div>
-      </div>
-    </div>
+    <VideoControls
+      :current-time="currentTime"
+      :duration="duration"
+      :buffered="bufferedRanges"
+      :is-playing="isPlaying"
+      :is-muted="isMuted"
+      :volume="savedVolume"
+      :show-ui="showUi"
+      :is-fullscreen="isFullscreen"
+      :quality="currentQuality"
+      :sorted-video-sizes="sortedVideoSizes"
+      :source-height="sourceHeight"
+      :is-source-available="isSourceAvailable"
+      :has-thumbnails="hasThumbnails"
+      :current-playback-rate="currentPlaybackRate"
+      :playback-rates="playbackRates"
+      :attach-fullscreen="elementalFullscreen && isFullscreen"
+      @toggle-play="togglePlay()"
+      @toggle-mute="toggleMute"
+      @toggle-fullscreen="toggleFullscreen"
+      @seek="onSeekInput"
+      @update:volume="onVolumeChange"
+      @update:quality="onQualitySelect"
+      @update:playback-rate="onPlaybackRateSelect"
+    />
   </div>
 </template>
 
@@ -686,187 +599,19 @@ useEventListener(window, 'keydown', handleKeyDown)
   place-content: center;
 }
 
-/* Play/Pause Center Indicator */
-.play-pause-overlay {
+.buffering-spinner {
   position: absolute;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  z-index: 1505;
+  z-index: 1500;
   pointer-events: none;
-  animation: fade-out-overlay 750ms cubic-bezier(0.25, 1, 0.5, 1) forwards;
-}
-
-.overlay-circle {
-  width: 80px;
-  height: 80px;
-  background-color: rgba(0, 0, 0, 0.3);
-  color: rgba(255, 255, 255, 0.8);
-  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
-@keyframes fade-out-overlay {
-  0% {
-    opacity: 1;
-    transform: translate(-50%, -50%) scale(0.85);
-  }
-  15% {
-    opacity: 1;
-    transform: translate(-50%, -50%) scale(1.1);
-  }
-  100% {
-    opacity: 0;
-    transform: translate(-50%, -50%) scale(1);
-  }
-}
-
-.video-controls-container {
-  position: absolute;
-  bottom: 10px;
-  left: 0;
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  z-index: 1510;
-  transition:
-    transform 0.2s ease,
-    opacity 0.2s ease;
-}
-
-.video-controls-container.hide-ui {
-  transform: translateY(80px);
-  opacity: 0;
-  pointer-events: none;
-}
-
-.seekbar-row {
-  width: 100%;
-  padding: 0 10px;
-}
-
-.controls-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 10px;
-}
-
-.control-island {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 0 24px;
-  border-radius: 30px;
-  height: 52px;
-  background-color: rgba(var(--bg), 0.8);
-  box-shadow: 0 3px 12px rgba(var(--bg), 0.15);
-  border: 1px solid transparent;
-}
-
-body.backdrop-blur .control-island {
-  backdrop-filter: blur(30px) saturate(150%) brightness(90%) contrast(90%);
-  background-color: rgba(var(--bg), 0.5);
-  border: 1px solid rgba(var(--fg), 0.1);
-}
-
-body.backdrop-blur .control-island:hover {
-  background-color: rgba(var(--bg), 0.7);
-}
-
-.volume-container {
-  display: flex;
-  align-items: center;
-}
-
-/* Transitions the container width and opacity when hovering */
-.volume-slider-wrapper {
-  display: flex;
-  align-items: center;
-  width: 0;
-  opacity: 0;
-  overflow: hidden;
-  transition:
-    width 0.25s ease-in-out,
-    opacity 0.2s ease-in-out,
-    margin 0.25s ease-in-out;
-  pointer-events: none;
-  margin-left: 0;
-}
-
-.volume-container:hover .volume-slider-wrapper,
-.volume-container:focus-within .volume-slider-wrapper {
-  width: 96px;
-  opacity: 1;
-  pointer-events: auto;
-  margin-left: 0;
-  padding-left: 8px;
-}
-
-.volume-slider {
-  width: 80px;
-  flex: none;
-}
-
-.time-display {
-  font-family: Jost, sans-serif;
-  font-size: 13px;
-  color: rgba(var(--fg), 0.8);
-  user-select: none;
-  font-weight: 400;
-  margin-left: 10px;
-  margin-right: 15px;
-}
-
-.settings-menu-list {
-  min-width: 220px;
-}
-
-.submenu-list {
-  min-width: 140px;
-}
-
-.menu-text {
-  font-family: Jost, sans-serif;
-  font-weight: 500;
-}
-
-.current-setting-label {
-  font-family: Jost, sans-serif;
-  font-size: 13px;
-  opacity: 0.6;
-}
-
-.source-label {
-  opacity: 0.6;
-  font-size: 0.85em;
-  font-weight: 400;
-  margin-left: 4px;
-}
-
-/* Custom Grayscale / Color-Neutral overrides for remaining Sliders (Decoupled) */
-
-/* Volume Slider Customization */
-:deep(.volume-slider .v-slider-thumb) {
-  color: rgba(var(--fg), 0.9) !important;
-}
-
-:deep(.volume-slider .v-slider-track__fill) {
-  background: rgba(var(--fg), 0.5) !important;
-}
-
-:deep(.volume-slider .v-slider-track__background) {
-  background: rgba(var(--fg), 0.5) !important;
-}
-
-:deep(.volume-slider .v-slider-thumb__ripple) {
-  color: rgba(var(--fg), 0.3) !important;
-}
-
-:deep(.volume-slider .v-slider-thumb--focused .v-slider-thumb__surface::before) {
-  opacity: 0;
+.buffering-spinner :deep(.v-progress-circular) {
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.4));
 }
 </style>

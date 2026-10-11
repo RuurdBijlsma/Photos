@@ -627,6 +627,7 @@ function clearFilter() {
   align-items: center;
   justify-content: center;
   flex-wrap: wrap;
+  gap: 4px;
   font-size: 14px;
   font-weight: 500;
   color: rgb(var(--v-theme-on-surface));
@@ -776,5 +777,23 @@ function clearFilter() {
   align-items: center;
   height: 48px;
   width: 100%;
+}
+
+.is-mobile .histogram-slider-area {
+  gap: 6px;
+}
+
+.is-mobile .bounds-label {
+  min-width: 46px;
+  font-size: 9px;
+}
+
+.is-mobile .panel-header {
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+
+.is-mobile .date-button {
+  font-size: 12px !important;
 }
 </style>
