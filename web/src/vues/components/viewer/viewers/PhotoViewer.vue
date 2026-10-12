@@ -185,7 +185,7 @@ async function onFullResLoad(e: Event) {
     if (fullResUrl.value === currentSrc) {
       fullResLoaded.value = true
     }
-  } catch (err: any) {
+  } catch (err) {
     if (fullResUrl.value !== currentSrc) {
       return
     }
