@@ -23,6 +23,7 @@ withDefaults(
   }>(),
   {
     active: true,
+    autoplay: true,
   },
 )
 

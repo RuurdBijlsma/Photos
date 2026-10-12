@@ -16,6 +16,7 @@ const props = withDefaults(
     disableEventCapture?: boolean
     muted?: boolean
     showUi?: boolean
+    autoplay?: boolean
     elementalFullscreen?: boolean
     forcePano?: PannellumConfig | undefined
     photoGalleryHeight?: number
@@ -28,6 +29,7 @@ const props = withDefaults(
     disableEventCapture: false,
     muted: false,
     showUi: true,
+    autoplay: true,
     elementalFullscreen: false,
     forcePano: undefined,
     photoGalleryHeight: 100,
@@ -387,6 +389,7 @@ onBeforeUnmount(() => {
           :is-video="isCurrentVideo"
           :show-ui="showUi"
           :muted="muted"
+          :autoplay="autoplay"
           :elemental-fullscreen="elementalFullscreen"
           :force-pano="forcePano"
           :disable-event-capture="disableEventCapture"

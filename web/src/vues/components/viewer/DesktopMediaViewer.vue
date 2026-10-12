@@ -15,6 +15,7 @@ withDefaults(
     disableEventCapture?: boolean
     muted?: boolean
     showUi?: boolean
+    autoplay?: boolean
     elementalFullscreen?: boolean
     forcePano?: PannellumConfig | undefined
     photoGalleryHeight?: number
@@ -27,6 +28,7 @@ withDefaults(
     disableEventCapture: false,
     muted: false,
     showUi: true,
+    autoplay: true,
     elementalFullscreen: false,
     forcePano: undefined,
     photoGalleryHeight: 100,
@@ -96,6 +98,7 @@ function forwardWheel(e: WheelEvent) {
       :show-ui="showUi"
       :elemental-fullscreen="elementalFullscreen"
       :force-pano="forcePano"
+      :autoplay="autoplay"
       :active="true"
       class="photo-viewer"
       @zoom-change="onZoomChange"
