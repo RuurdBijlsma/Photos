@@ -665,7 +665,7 @@ useDetailTitle(mediaDetailTitle, { fallback: 'Photo' })
   height: 100%;
   z-index: 1400;
   overflow: hidden;
-  overscroll-behavior-x: none;
+  overscroll-behavior: none;
   --bg: var(--v-theme-surface-container-lowest);
   --fg: var(--v-theme-on-surface-container-lowest);
 }

@@ -424,7 +424,7 @@ onBeforeUnmount(() => {
   left: 0;
   z-index: 1500;
   overflow: hidden;
-  touch-action: pan-y;
+  touch-action: none;
   user-select: none;
   background-color: rgb(var(--bg));
 }

@@ -607,6 +607,7 @@ useEventListener(window, 'keydown', handleKeyDown)
   place-items: center;
   justify-content: center;
   overflow: hidden;
+  touch-action: none;
   --bg: var(--v-theme-surface-container-lowest);
   --fg: var(--v-theme-on-surface-container-lowest);
 }
