@@ -34,7 +34,6 @@ export function useResponsive() {
     { immediate: true },
   )
 
-
   watch(
     useTouchControls,
     () => {
