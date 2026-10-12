@@ -179,10 +179,16 @@ async function loadFullResBlob(item: FullMediaItem) {
 // Async decoding to prevent main thread "image decode" frame drops during zoom
 async function onFullResLoad(e: Event) {
   const img = e.target as HTMLImageElement
+  const currentSrc = img.src
   try {
     await img.decode()
-    fullResLoaded.value = true
-  } catch (err) {
+    if (fullResUrl.value === currentSrc) {
+      fullResLoaded.value = true
+    }
+  } catch (err: any) {
+    if (fullResUrl.value !== currentSrc) {
+      return
+    }
     console.warn('Background image decoding failed, displaying immediately:', err)
     fullResLoaded.value = true
   }
@@ -195,6 +201,7 @@ function onThumbLoad() {
 
 // Motion Photo Settings & Logic
 const showingMotionVideo = ref(false)
+const hasAutoplayedMotion = ref(false)
 const videoPlayerRef = ref<HTMLVideoElement | null>(null)
 const motionVideoUrl = computed(() => mediaItemService.getMotionVideo(props.mediaItemId))
 
@@ -252,6 +259,7 @@ watch(
     is3DMode.value = false
     thumbErrored.value = false
     isThumbLoaded.value = false
+    hasAutoplayedMotion.value = false
     showingMotionVideo.value = false
     stopMonitoring()
     cleanup()
@@ -260,7 +268,24 @@ watch(
   { immediate: true },
 )
 
-// Drive Media Content Loading Lifecycle
+// Motion Photo Autoplay: only runs once when the photo becomes active
+watch(
+  [fullImage, () => props.active],
+  ([item, active]) => {
+    if (
+      active &&
+      item?.media_features?.is_motion_photo &&
+      settings.playMotionPhotos &&
+      !hasAutoplayedMotion.value
+    ) {
+      hasAutoplayedMotion.value = true
+      playMotionPhoto()
+    }
+  },
+  { immediate: true },
+)
+
+// Full-Resolution Blob Loader: watches zoom scale & idle state
 watch(
   [fullImage, () => props.active, scale, isDesktopIdle],
   ([item, active, currentScale, isIdle]) => {
@@ -280,11 +305,7 @@ watch(
       return
     }
 
-    if (settings.playMotionPhotos && item.media_features?.is_motion_photo) {
-      playMotionPhoto()
-    }
-
-    if (fullResLoaded.value && fullResUrl.value) return
+    if (fullResUrl.value) return
 
     const hasPreloaded = viewPhotoStore.preloadedBlobs.has(item.id)
     const isZoomed = currentScale > 1
@@ -685,7 +706,6 @@ useEventListener(containerRef, 'wheel', handleWheel, { passive: false })
           :src="fullResUrl"
           alt="Full resolution image"
           decoding="async"
-          loading="lazy"
           :style="{
             opacity: fullResLoaded ? 1 : 0,
             pointerEvents: fullResLoaded ? 'auto' : 'none',

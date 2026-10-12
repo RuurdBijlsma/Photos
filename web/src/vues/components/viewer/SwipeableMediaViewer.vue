@@ -134,6 +134,7 @@ const trackStyle = computed(() => {
   return {
     transform: `translate3d(${currentTranslateX}px, 0, 0)`,
     transition: isAnimating.value ? 'transform 0.22s cubic-bezier(0.2, 0.9, 0.3, 1)' : 'none',
+    willChange: isDragging.value || isAnimating.value ? 'transform' : 'auto',
   }
 })
 
@@ -433,7 +434,6 @@ onBeforeUnmount(() => {
   display: flex;
   width: 300%;
   height: 100%;
-  will-change: transform;
 }
 
 .swipe-slide {
