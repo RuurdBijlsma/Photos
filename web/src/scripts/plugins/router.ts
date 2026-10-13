@@ -268,6 +268,13 @@ const router = createRouter({
       component: () => import('@/vues/views/auth/RegisterView.vue'),
     },
     {
+      path: '/google-photos-callback',
+      name: 'google-photos-callback',
+      // perhaps moet hier guest?
+      meta: { requiresAuth: false, title: 'Google Photos Callback' },
+      component: () => import('@/vues/views/auth/GooglePhotosCallbackView.vue'),
+    },
+    {
       path: '/onboarding',
       name: 'onboarding',
       meta: { requiresAuth: true, requiresAdmin: true, title: 'Setup' },

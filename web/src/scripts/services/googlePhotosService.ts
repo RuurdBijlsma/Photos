@@ -4,6 +4,7 @@ import type {
   CommitImportRequest,
   ExchangeCodeRequest,
   GooglePhotosConfigStatus,
+  GooglePhotosStatus,
   PollResult,
   SaveGoogleConfigRequest,
   StartPickerResponse,
@@ -19,6 +20,11 @@ const googlePhotosService = {
   /** Save (overwrite) the Google OAuth client credentials (admin only). */
   saveConfig(payload: SaveGoogleConfigRequest): Promise<AxiosResponse<void>> {
     return apiClient.post<void>('/admin/google-photos/config', payload)
+  },
+
+  /** Get whether Google Photos integration is enabled and retrieve the public client ID (any logged-in user). */
+  getUserStatus(): Promise<AxiosResponse<GooglePhotosStatus>> {
+    return apiClient.get<GooglePhotosStatus>('/google-photos/status')
   },
 
   /**

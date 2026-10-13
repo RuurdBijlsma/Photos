@@ -3,6 +3,11 @@ export interface GooglePhotosConfigStatus {
   clientId?: string
 }
 
+export interface GooglePhotosStatus {
+  configured: boolean
+  clientId?: string
+}
+
 export interface SaveGoogleConfigRequest {
   clientId: string
   clientSecret: string

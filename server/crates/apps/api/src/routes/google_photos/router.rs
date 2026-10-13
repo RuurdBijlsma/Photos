@@ -5,6 +5,7 @@ use crate::routes::google_photos::handlers::{
 };
 use axum::routing::{get, post};
 use axum::Router;
+use crate::google_photos::handlers::get_user_status_handler;
 
 /// Routes that require admin role.
 pub fn google_photos_admin_router() -> Router<ApiContext> {
@@ -18,6 +19,7 @@ pub fn google_photos_admin_router() -> Router<ApiContext> {
 /// Routes that require authentication (any user).
 pub fn google_photos_protected_router() -> Router<ApiContext> {
     Router::new()
+        .route("/google-photos/status", get(get_user_status_handler))
         .route("/google-photos/start", post(start_picker_handler))
         .route(
             "/google-photos/poll/{import_session_id}",

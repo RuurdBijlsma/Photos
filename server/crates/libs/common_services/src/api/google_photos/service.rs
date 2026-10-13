@@ -1,13 +1,13 @@
-use super::interfaces::{CommitImportRequest, ExchangeCodeRequest, GooglePhotosConfig, GooglePhotosConfigStatus, GooglePhotosUserStatus, MatchedItem, PickedMediaItem, PickedMediaItemsResponse, PickerSession, PollResult, StartPickerResponse, TokenResponse, UnmatchedItem};
-use crate::api::album::interfaces::AlbumSort;
+use super::interfaces::{
+    CommitImportRequest, ExchangeCodeRequest, GooglePhotosConfig, GooglePhotosConfigStatus,
+    GooglePhotosUserStatus, MatchedItem, PickedMediaItem, PickedMediaItemsResponse, PickerSession,
+    PollResult, StartPickerResponse, TokenResponse, UnmatchedItem,
+};
 use crate::api::album::service::create_album;
 use crate::api::app_error::AppError;
-use crate::database::CreateAlbumPayload;
-use crate::database::album::album::{Album, AlbumRole};
-use crate::database::album_store::AlbumStore;
+use crate::database::album::album::Album;
 use crate::database::key_json_store::KeyJsonStore;
 use crate::utils::nice_id;
-use app_state::constants;
 use chrono::Utc;
 use color_eyre::eyre::eyre;
 use sqlx::PgPool;
@@ -15,7 +15,6 @@ use tracing::instrument;
 
 const GOOGLE_PHOTOS_CONFIG_KEY: &str = "google_photos_config";
 const PICKER_API_BASE: &str = "https://photospicker.googleapis.com/v1";
-const DEFAULT_ALBUM_SORT: AlbumSort = AlbumSort::DateAsc;
 
 // ─── Admin: config management ────────────────────────────────────────────────
 
@@ -45,15 +44,12 @@ pub async fn get_google_config_status(pool: &PgPool) -> Result<GooglePhotosConfi
     Ok(match config {
         None => GooglePhotosConfigStatus {
             configured: false,
-            client_id_preview: None,
+            client_id: None,
         },
-        Some(c) => {
-            let preview = c.client_id.chars().take(8).collect::<String>();
-            GooglePhotosConfigStatus {
-                configured: true,
-                client_id_preview: Some(format!("{preview}...")),
-            }
-        }
+        Some(c) => GooglePhotosConfigStatus {
+            configured: true,
+            client_id: Some(c.client_id),
+        },
     })
 }
 
@@ -450,9 +446,7 @@ pub async fn commit_import(
     Ok(album)
 }
 
-pub async fn get_google_user_status(
-    pool: &PgPool,
-) -> Result<GooglePhotosUserStatus, AppError> {
+pub async fn get_google_user_status(pool: &PgPool) -> Result<GooglePhotosUserStatus, AppError> {
     let config = get_google_config(pool).await?;
     Ok(match config {
         None => GooglePhotosUserStatus {

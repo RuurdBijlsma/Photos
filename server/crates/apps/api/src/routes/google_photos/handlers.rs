@@ -4,14 +4,8 @@ use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::{Extension, Json};
 use common_services::api::app_error::AppError;
-use common_services::api::google_photos::interfaces::{
-    CommitImportRequest, ExchangeCodeRequest, GooglePhotosConfig, GooglePhotosConfigStatus,
-    PollResult, SaveGoogleConfigRequest, StartPickerResponse,
-};
-use common_services::api::google_photos::service::{
-    commit_import, get_google_config_status, poll_import_session, save_google_config,
-    start_picker,
-};
+use common_services::api::google_photos::interfaces::{CommitImportRequest, ExchangeCodeRequest, GooglePhotosConfig, GooglePhotosConfigStatus, GooglePhotosUserStatus, PollResult, SaveGoogleConfigRequest, StartPickerResponse};
+use common_services::api::google_photos::service::{commit_import, get_google_config_status, get_google_user_status, poll_import_session, save_google_config, start_picker};
 use common_services::database::album::album::Album;
 
 
@@ -70,4 +64,12 @@ pub async fn commit_import_handler(
 ) -> Result<Json<Album>, AppError> {
     let album = commit_import(&context.pool, user.id, payload).await?;
     Ok(Json(album))
+}
+
+/// Returns whether Google Photos is configured and the client ID for OAuth initiation (any logged-in user).
+pub async fn get_user_status_handler(
+    State(context): State<ApiContext>,
+) -> Result<Json<GooglePhotosUserStatus>, AppError> {
+    let status = get_google_user_status(&context.pool).await?;
+    Ok(Json(status))
 }
