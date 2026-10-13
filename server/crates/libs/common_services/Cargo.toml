@@ -27,7 +27,7 @@ fastrand = "2.5.0"
 mime_guess = "2.0.5"
 tokio-util = { version = "0.7.19", features = ["codec"] }
 http = "1.5.0"
-reqwest = { version = "0.13.5", features = ["json", "stream"] }
+reqwest = { version = "0.13.5", features = ["json", "stream", "form"] }
 url = { version = "2.5.8", features = ["serde"] }
 bon = "3.10.2"
 pgvector = { version = "0.4.2", features = ["sqlx", "serde"] }

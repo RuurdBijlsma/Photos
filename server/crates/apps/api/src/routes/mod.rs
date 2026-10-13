@@ -4,6 +4,7 @@ pub mod auth;
 pub mod camera;
 pub mod daily_cards;
 pub mod explore;
+pub mod google_photos;
 pub mod jobs;
 pub mod people;
 pub mod photos;
@@ -31,6 +32,7 @@ use crate::auth::router::{auth_admin_routes, auth_protected_router, auth_public_
 use crate::camera::router::camera_protected_router;
 use crate::daily_cards::router::daily_cards_protected_router;
 use crate::explore::router::explore_protected_router;
+use crate::google_photos::router::{google_photos_admin_router, google_photos_protected_router};
 use crate::jobs::router::{jobs_admin_router, jobs_protected_router};
 use crate::photos::router::{photos_protected_router, photos_public_router};
 use crate::root::router::root_public_router;
@@ -101,6 +103,7 @@ fn protected_routes(api_state: ApiContext) -> Router<ApiContext> {
         .merge(jobs_protected_router())
         .merge(upload_protected_router())
         .merge(explore_protected_router())
+        .merge(google_photos_protected_router())
         .route_layer(from_extractor_with_state::<ApiUser, ApiContext>(api_state))
 }
 
@@ -109,6 +112,7 @@ fn admin_routes(api_state: ApiContext) -> Router<ApiContext> {
         .merge(admin_admin_routes())
         .merge(auth_admin_routes())
         .merge(jobs_admin_router())
+        .merge(google_photos_admin_router())
         .route_layer(from_fn_with_state(UserRole::Admin, require_role))
         .route_layer(from_extractor_with_state::<ApiUser, ApiContext>(api_state))
 }

@@ -38,7 +38,7 @@ const rules = {
   min: (v: string) => v.length >= 6 || `Min 6 characters`,
 }
 
-const isDev = useStorage('isDev', true)
+const isDev = useStorage('isDev', location.href.includes('localhost'))
 const showPassword = ref(false)
 const email = ref('')
 const password = ref('')

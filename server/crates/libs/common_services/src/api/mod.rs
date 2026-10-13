@@ -5,6 +5,7 @@ pub mod auth;
 pub mod camera;
 pub mod daily_cards;
 pub mod explore;
+pub mod google_photos;
 pub mod jobs;
 pub mod people;
 pub mod photos;
@@ -16,3 +17,4 @@ pub mod timeline;
 pub mod trash;
 pub mod upload;
 pub mod user;
+

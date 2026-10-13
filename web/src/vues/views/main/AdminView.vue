@@ -2,6 +2,7 @@
 import MainLayoutContainer from '@/vues/components/MainLayoutContainer.vue'
 import UserAdmin from '@/vues/components/admin/UserAdmin.vue'
 import JobsAdmin from '@/vues/components/admin/JobsAdmin.vue'
+import GooglePhotosAdmin from '@/vues/components/admin/GooglePhotosAdmin.vue'
 </script>
 
 <template>
@@ -22,6 +23,13 @@ import JobsAdmin from '@/vues/components/admin/JobsAdmin.vue'
         <v-divider />
       </div>
       <jobs-admin />
+
+      <div class="divider-flex">
+        <v-divider />
+        <span>Google Photos Import</span>
+        <v-divider />
+      </div>
+      <google-photos-admin/>
     </div>
   </main-layout-container>
 </template>

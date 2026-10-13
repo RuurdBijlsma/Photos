@@ -16,25 +16,24 @@
 * improve messaging when you load the website and the server is off
 * on login redirect to where you were
 * don't allow user to go to /onboarding if onboarding is done already.
-* Make ViewPhoto handle swipes and such for next/prev (mobile)
 * Make selecting photos work better on mobile
 * Fix Card collection viewer on mobile
 
 # SERVER
 
 * email password reset?
-* backup (met export jsons / import?)
-* import albums from google photos
 * duplicate photo remover tool
 * better error if exiftool isnt there (worker wont work then)
 * apply rotation immidiately when going next/prev to other media item.
-* AVI toevoegen aan settings video_extensions
 * The original `PXL_20260911_122108760.jpg` puts exiftool in an infinite loop.
   * possible solution -> if hangs (in media analyzer), then run:
     * `exiftool -HDRPlusMakerNote= -overwrite_original <temp_file>`
     * might as well also delete: `MakerNotes`
   * on a temp file to get the exif data
   * On a detected hang it should kill & restart the exiftool daemon
+[ HIGHER PRIO ]
+* backup (met export jsons / import?)
+* import albums from google photos (Google Photos Picker API)
 
 # INFRASTRUCTURE:
 
