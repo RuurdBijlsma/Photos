@@ -1,0 +1,311 @@
+{
+  "version": 2,
+  "meta": {
+    "timestamp": "2026-10-15T17:05:15.562Z",
+    "commit": "d3e38fd74ca1bcef124b9d11b087f9371fa65b28",
+    "branch": "develop",
+    "url": "http://localhost:4173",
+    "viewport": "1920x1080",
+    "headed": true,
+    "runs": 5,
+    "scrollPxPerSec": 33000,
+    "chrome": "channel=chrome-or-chromium",
+    "user": "ruurd@example.com"
+  },
+  "metrics": {
+    "timelineLcpMs": {
+      "median": 252,
+      "values": [
+        584,
+        252,
+        244,
+        500,
+        236
+      ]
+    },
+    "exploreLcpMs": {
+      "median": 216,
+      "values": [
+        216,
+        236,
+        208,
+        220,
+        208
+      ]
+    },
+    "photoOpen": {
+      "medianOpenMs": 30076,
+      "medianLcpMs": -1,
+      "values": [
+        {
+          "openMs": 30117,
+          "lcpMs": -1
+        },
+        {
+          "openMs": 30073,
+          "lcpMs": -1
+        },
+        {
+          "openMs": 30084,
+          "lcpMs": -1
+        },
+        {
+          "openMs": 30073,
+          "lcpMs": -1
+        },
+        {
+          "openMs": 30076,
+          "lcpMs": -1
+        }
+      ]
+    },
+    "scroll": {
+      "medianFps": 177,
+      "medianP95Frame": 7.3,
+      "medianMaxFrame": 39.8,
+      "medianSpikes100": 0,
+      "values": [
+        {
+          "frames": 951,
+          "meanFps": 176,
+          "p50Frame": 5.5,
+          "p95Frame": 7.3,
+          "maxFrame": 26.5,
+          "dropped50ms": 0,
+          "spikes100ms": 0,
+          "detail": {
+            "loafSpikes": 0,
+            "itemsSeen": 1559,
+            "distancePx": 160600,
+            "wraps": 0
+          }
+        },
+        {
+          "frames": 957,
+          "meanFps": 177,
+          "p50Frame": 5.5,
+          "p95Frame": 7.3,
+          "maxFrame": 39.8,
+          "dropped50ms": 0,
+          "spikes100ms": 0,
+          "detail": {
+            "loafSpikes": 0,
+            "itemsSeen": 1559,
+            "distancePx": 160050,
+            "wraps": 0
+          }
+        },
+        {
+          "frames": 959,
+          "meanFps": 177,
+          "p50Frame": 5.5,
+          "p95Frame": 7.3,
+          "maxFrame": 44.3,
+          "dropped50ms": 0,
+          "spikes100ms": 0,
+          "detail": {
+            "loafSpikes": 0,
+            "itemsSeen": 1559,
+            "distancePx": 161700,
+            "wraps": 0
+          }
+        },
+        {
+          "frames": 886,
+          "meanFps": 164,
+          "p50Frame": 5.6,
+          "p95Frame": 7.4,
+          "maxFrame": 415.7,
+          "dropped50ms": 1,
+          "spikes100ms": 1,
+          "detail": {
+            "loafSpikes": 1,
+            "itemsSeen": 1467,
+            "distancePx": 161700,
+            "wraps": 0
+          }
+        },
+        {
+          "frames": 967,
+          "meanFps": 179,
+          "p50Frame": 5.5,
+          "p95Frame": 6.8,
+          "maxFrame": 22.6,
+          "dropped50ms": 0,
+          "spikes100ms": 0,
+          "detail": {
+            "loafSpikes": 0,
+            "itemsSeen": 1559,
+            "distancePx": 163900,
+            "wraps": 0
+          }
+        }
+      ],
+      "medianDistancePx": 161700,
+      "medianItemsSeen": 1559
+    },
+    "navigation": {
+      "medianFps": 180,
+      "medianP95Frame": 5.7,
+      "medianMaxFrame": 34.4,
+      "medianSpikes100": 0,
+      "values": [
+        {
+          "frames": 1335,
+          "meanFps": 178,
+          "p50Frame": 5.6,
+          "p95Frame": 5.7,
+          "maxFrame": 72.4,
+          "dropped50ms": 2,
+          "spikes100ms": 0,
+          "perRoute": {
+            "/": {
+              "fps": 181,
+              "p95Frame": 6.1,
+              "maxFrame": 7.7
+            },
+            "/explore": {
+              "fps": 181,
+              "p95Frame": 5.6,
+              "maxFrame": 5.7
+            },
+            "/map": {
+              "fps": 165,
+              "p95Frame": 5.7,
+              "maxFrame": 72.4
+            },
+            "/search": {
+              "fps": 181,
+              "p95Frame": 5.7,
+              "maxFrame": 7.1
+            }
+          }
+        },
+        {
+          "frames": 1353,
+          "meanFps": 180,
+          "p50Frame": 5.6,
+          "p95Frame": 5.7,
+          "maxFrame": 34.4,
+          "dropped50ms": 0,
+          "spikes100ms": 0,
+          "perRoute": {
+            "/": {
+              "fps": 181,
+              "p95Frame": 5.7,
+              "maxFrame": 6.7
+            },
+            "/explore": {
+              "fps": 181,
+              "p95Frame": 5.6,
+              "maxFrame": 6.3
+            },
+            "/map": {
+              "fps": 176,
+              "p95Frame": 5.7,
+              "maxFrame": 34.4
+            },
+            "/search": {
+              "fps": 181,
+              "p95Frame": 5.7,
+              "maxFrame": 7.7
+            }
+          }
+        },
+        {
+          "frames": 1359,
+          "meanFps": 180,
+          "p50Frame": 5.6,
+          "p95Frame": 5.7,
+          "maxFrame": 28.1,
+          "dropped50ms": 0,
+          "spikes100ms": 0,
+          "perRoute": {
+            "/": {
+              "fps": 181,
+              "p95Frame": 5.7,
+              "maxFrame": 7.5
+            },
+            "/explore": {
+              "fps": 181,
+              "p95Frame": 5.6,
+              "maxFrame": 7.7
+            },
+            "/map": {
+              "fps": 179,
+              "p95Frame": 5.6,
+              "maxFrame": 28.1
+            },
+            "/search": {
+              "fps": 181,
+              "p95Frame": 5.7,
+              "maxFrame": 6.3
+            }
+          }
+        },
+        {
+          "frames": 1344,
+          "meanFps": 178,
+          "p50Frame": 5.6,
+          "p95Frame": 5.7,
+          "maxFrame": 79.7,
+          "dropped50ms": 1,
+          "spikes100ms": 0,
+          "perRoute": {
+            "/": {
+              "fps": 181,
+              "p95Frame": 5.7,
+              "maxFrame": 7.2
+            },
+            "/explore": {
+              "fps": 181,
+              "p95Frame": 6,
+              "maxFrame": 10.2
+            },
+            "/map": {
+              "fps": 169,
+              "p95Frame": 5.7,
+              "maxFrame": 79.7
+            },
+            "/search": {
+              "fps": 181,
+              "p95Frame": 5.6,
+              "maxFrame": 6.9
+            }
+          }
+        },
+        {
+          "frames": 1357,
+          "meanFps": 181,
+          "p50Frame": 5.6,
+          "p95Frame": 6.1,
+          "maxFrame": 17.3,
+          "dropped50ms": 0,
+          "spikes100ms": 0,
+          "perRoute": {
+            "/": {
+              "fps": 181,
+              "p95Frame": 6.1,
+              "maxFrame": 7.3
+            },
+            "/explore": {
+              "fps": 181,
+              "p95Frame": 6.6,
+              "maxFrame": 15.9
+            },
+            "/map": {
+              "fps": 180,
+              "p95Frame": 5.7,
+              "maxFrame": 17.3
+            },
+            "/search": {
+              "fps": 181,
+              "p95Frame": 6.3,
+              "maxFrame": 7.3
+            }
+          }
+        }
+      ]
+    }
+  }
+}
