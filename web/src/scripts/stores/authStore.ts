@@ -133,10 +133,11 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.removeItem('dailyCompletedCards')
 
     // Redirect to the login page only if the current route requires authentication.
+    // NOTE: use merged `meta` (child overrides parent) so public children like
+    // `share` / `album-view` under `/` (which sets requiresAuth: true) don't
+    // redirect guests to login.
     if (redirect) {
-      const requiresAuth = router.currentRoute.value.matched.some(
-        (record) => record.meta.requiresAuth,
-      )
+      const requiresAuth = router.currentRoute.value.meta.requiresAuth
       if (requiresAuth) {
         console.warn('[logout function] redirect to /login')
         await router.push({ name: 'login' })
