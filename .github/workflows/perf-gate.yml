@@ -1,0 +1,91 @@
+name: Perf Gate
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'web/**'
+
+jobs:
+  perf-gate:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./web
+    steps:
+      - name: Checkout PR
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: 'web/package.json'
+
+      - name: Find perf result files
+        id: find
+        run: |
+          # New/changed result files in this PR vs main.
+          NEW_FILES=$(git diff --name-only --diff-filter=ACMRT origin/main...HEAD -- 'web/tests/perf/results/*.json' | grep -v '.gitkeep.json' || true)
+          echo "new_files<<EOF" >> $GITHUB_OUTPUT
+          echo "$NEW_FILES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+          if [ -z "$NEW_FILES" ]; then
+            echo "::error::No new perf result file found. Run 'npm run perf' locally and commit web/tests/perf/results/<date>_<branch>_<sha>.json"
+            exit 1
+          fi
+
+          # If several were added, take the latest by meta.timestamp.
+          LATEST=""
+          LATEST_TS=""
+          for f in $NEW_FILES; do
+            TS=$(node -e "try{console.log(JSON.parse(require('fs').readFileSync('$f','utf8')).meta.timestamp||'')}catch{console.log('')}")
+            if [ -z "$LATEST" ] || [[ "$TS" > "$LATEST_TS" ]]; then
+              LATEST="$f"
+              LATEST_TS="$TS"
+            fi
+          done
+          echo "current=$LATEST" >> $GITHUB_OUTPUT
+          echo "Picked current: $LATEST ($LATEST_TS)"
+
+          # Baseline: newest results file already on main (by meta.timestamp).
+          git fetch origin main --depth 50
+          BASELINE=$(git ls-tree -r --name-only origin/main -- 'web/tests/perf/results/' | grep '\.json$' | grep -v '.gitkeep.json' || true)
+          if [ -z "$BASELINE" ]; then
+            echo "has_baseline=false" >> $GITHUB_OUTPUT
+            echo "No baseline on main yet — accepting first result without comparison."
+          else
+            BEST=""; BEST_TS=""
+            for f in $BASELINE; do
+              TS=$(git show origin/main:"$f" | node -e "let d='';try{d=JSON.parse(require('fs').readFileSync(0,'utf8')).meta.timestamp||''}catch{}console.log(d)")
+              if [ -z "$BEST" ] || [[ "$TS" > "$BEST_TS" ]]; then
+                BEST="$f"; BEST_TS="$TS"
+              fi
+            done
+            # Materialize baseline file content for the checker.
+            git show origin/main:"$BEST" > /tmp/perf-baseline.json
+            echo "has_baseline=true" >> $GITHUB_OUTPUT
+            echo "baseline_ref=$BEST" >> $GITHUB_OUTPUT
+            echo "Baseline: $BEST ($BEST_TS)"
+          fi
+
+      - name: Validate current result schema
+        run: |
+          node -e "
+            const fs = require('fs');
+            const f = '${{ steps.find.outputs.current }}';
+            const j = JSON.parse(fs.readFileSync(f, 'utf8'));
+            for (const k of ['version','meta','metrics']) if (!j[k]) throw new Error('missing ' + k);
+            if (j.version !== 1) throw new Error('bad version');
+            for (const k of ['timestamp','commit','branch']) if (!j.meta[k]) throw new Error('meta.' + k + ' missing');
+            console.log('schema ok:', f, j.meta.commit, j.meta.timestamp);
+          "
+
+      - name: Compare against baseline
+        if: steps.find.outputs.has_baseline == 'true'
+        run: |
+          node tests/perf/check-perf-regression.mjs \
+            --current "${{ steps.find.outputs.current }}" \
+            --baseline /tmp/perf-baseline.json
