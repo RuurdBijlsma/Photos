@@ -28,6 +28,7 @@ fn get_tus_handler(context: &ApiContext) -> TusHandler<FileStore, FileLocker> {
     let create_context = context.clone();
     let config = Config {
         base_path: "/api/files".to_string(),
+        trust_forwarded_headers: true,
         extensions,
         hooks: HookConfig {
             channel_capacity: 2048,
