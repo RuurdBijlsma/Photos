@@ -1,4 +1,4 @@
-name: Perf Gate
+name: Frontend Performance Regression
 
 on:
   pull_request:
@@ -7,11 +7,11 @@ on:
       - 'web/**'
 
 jobs:
-  perf-gate:
+  perf-check:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./web
+    # NOTE: steps must run at the repo root (no working-directory override):
+    # git pathspecs like 'web/tests/...' are resolved relative to cwd,
+    # so running under ./web silently matches nothing.
     steps:
       - name: Checkout PR
         uses: actions/checkout@v5
@@ -78,7 +78,7 @@ jobs:
             const f = '${{ steps.find.outputs.current }}';
             const j = JSON.parse(fs.readFileSync(f, 'utf8'));
             for (const k of ['version','meta','metrics']) if (!j[k]) throw new Error('missing ' + k);
-            if (j.version !== 1) throw new Error('bad version');
+            if (j.version !== 2) throw new Error('bad version, expected 2');
             for (const k of ['timestamp','commit','branch']) if (!j.meta[k]) throw new Error('meta.' + k + ' missing');
             console.log('schema ok:', f, j.meta.commit, j.meta.timestamp);
           "
@@ -86,6 +86,6 @@ jobs:
       - name: Compare against baseline
         if: steps.find.outputs.has_baseline == 'true'
         run: |
-          node tests/perf/check-perf-regression.mjs \
+          node web/tests/perf/check-perf-regression.mjs \
             --current "${{ steps.find.outputs.current }}" \
             --baseline /tmp/perf-baseline.json
