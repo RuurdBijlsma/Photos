@@ -1,9 +1,6 @@
-# Perf regression tests (local run, CI validates)
+# Perf regression tests
 
-Numbers must come from your machine (same hardware), not CI.
-CI never re-runs perf — it only checks the JSON you commit.
-Run headed (the default): headless Chromium doesn't vsync-lock
-`requestAnimationFrame`, so FPS reads ~3x too high there.
+Numbers must come from your machine (same hardware)
 
 ## One-time setup
 
@@ -22,7 +19,7 @@ npm run build-only
 # terminal A: serve prod build (proxies /api -> 127.0.0.1:5272)
 npm run preview # -> http://localhost:4173
 # terminal B:
-PERF_USER_EMAIL=ruurd@example.com PERF_USER_PASSWORD=kibbeling npm run perf
+npm run perf
 ```
 
 This runs 5 measured runs (plus warmup) of:
@@ -32,8 +29,7 @@ This runs 5 measured runs (plus warmup) of:
 * page-to-page (`/ -> /explore -> /map -> /search`) FPS
 
 Output: `web/tests/perf/results/YYYY-MM-DD_<branch>_<sha>.json`.
-Commit it with your MR. Multiple new files are fine — CI picks the latest
-by `meta.timestamp`.
+Commit this file.
 
 ## Tolerances (`check-perf-regression.mjs`)
 
@@ -43,8 +39,6 @@ Regression = worse than baseline + tolerance:
 * p95 frame: +15% or +5ms
 * scroll spikes>100ms: must not increase
 * FPS: -5% or -2fps
-
-First result on main has no baseline and is accepted as-is.
 
 ## Files
 

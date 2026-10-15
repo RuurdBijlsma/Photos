@@ -1,8 +1,8 @@
 {
   "version": 2,
   "meta": {
-    "timestamp": "2026-10-15T17:05:15.562Z",
-    "commit": "d3e38fd74ca1bcef124b9d11b087f9371fa65b28",
+    "timestamp": "2026-10-15T17:10:33.650Z",
+    "commit": "6926db82154c2784423210cbd6468a796fd660e8",
     "branch": "develop",
     "url": "http://localhost:4173",
     "viewport": "1920x1080",
@@ -14,129 +14,139 @@
   },
   "metrics": {
     "timelineLcpMs": {
-      "median": 252,
+      "median": 228,
       "values": [
-        584,
-        252,
-        244,
-        500,
-        236
+        228,
+        200,
+        256,
+        264,
+        212
       ]
     },
     "exploreLcpMs": {
       "median": 216,
       "values": [
+        204,
+        184,
         216,
-        236,
-        208,
-        220,
-        208
+        228,
+        216
       ]
     },
     "photoOpen": {
-      "medianOpenMs": 30076,
+      "medianOpenMs": 75,
       "medianLcpMs": -1,
       "values": [
         {
-          "openMs": 30117,
-          "lcpMs": -1
+          "openMs": 101,
+          "lcpMs": -1,
+          "photoOnly": true,
+          "mediaId": "wk2nuxTjzk"
         },
         {
-          "openMs": 30073,
-          "lcpMs": -1
+          "openMs": 64,
+          "lcpMs": -1,
+          "photoOnly": true,
+          "mediaId": "wk2nuxTjzk"
         },
         {
-          "openMs": 30084,
-          "lcpMs": -1
+          "openMs": 75,
+          "lcpMs": -1,
+          "photoOnly": true,
+          "mediaId": "wk2nuxTjzk"
         },
         {
-          "openMs": 30073,
-          "lcpMs": -1
+          "openMs": 65,
+          "lcpMs": -1,
+          "photoOnly": true,
+          "mediaId": "wk2nuxTjzk"
         },
         {
-          "openMs": 30076,
-          "lcpMs": -1
+          "openMs": 79,
+          "lcpMs": -1,
+          "photoOnly": true,
+          "mediaId": "wk2nuxTjzk"
         }
       ]
     },
     "scroll": {
-      "medianFps": 177,
+      "medianFps": 176,
       "medianP95Frame": 7.3,
-      "medianMaxFrame": 39.8,
+      "medianMaxFrame": 25.8,
       "medianSpikes100": 0,
       "values": [
         {
-          "frames": 951,
-          "meanFps": 176,
-          "p50Frame": 5.5,
-          "p95Frame": 7.3,
-          "maxFrame": 26.5,
-          "dropped50ms": 0,
-          "spikes100ms": 0,
-          "detail": {
-            "loafSpikes": 0,
-            "itemsSeen": 1559,
-            "distancePx": 160600,
-            "wraps": 0
-          }
-        },
-        {
-          "frames": 957,
-          "meanFps": 177,
-          "p50Frame": 5.5,
-          "p95Frame": 7.3,
-          "maxFrame": 39.8,
-          "dropped50ms": 0,
-          "spikes100ms": 0,
-          "detail": {
-            "loafSpikes": 0,
-            "itemsSeen": 1559,
-            "distancePx": 160050,
-            "wraps": 0
-          }
-        },
-        {
-          "frames": 959,
-          "meanFps": 177,
-          "p50Frame": 5.5,
-          "p95Frame": 7.3,
-          "maxFrame": 44.3,
-          "dropped50ms": 0,
-          "spikes100ms": 0,
-          "detail": {
-            "loafSpikes": 0,
-            "itemsSeen": 1559,
-            "distancePx": 161700,
-            "wraps": 0
-          }
-        },
-        {
-          "frames": 886,
-          "meanFps": 164,
-          "p50Frame": 5.6,
-          "p95Frame": 7.4,
-          "maxFrame": 415.7,
-          "dropped50ms": 1,
-          "spikes100ms": 1,
-          "detail": {
-            "loafSpikes": 1,
-            "itemsSeen": 1467,
-            "distancePx": 161700,
-            "wraps": 0
-          }
-        },
-        {
-          "frames": 967,
+          "frames": 972,
           "meanFps": 179,
           "p50Frame": 5.5,
-          "p95Frame": 6.8,
-          "maxFrame": 22.6,
+          "p95Frame": 6.9,
+          "maxFrame": 15.2,
           "dropped50ms": 0,
           "spikes100ms": 0,
           "detail": {
             "loafSpikes": 0,
             "itemsSeen": 1559,
             "distancePx": 163900,
+            "wraps": 0
+          }
+        },
+        {
+          "frames": 942,
+          "meanFps": 174,
+          "p50Frame": 5.5,
+          "p95Frame": 7.2,
+          "maxFrame": 25.8,
+          "dropped50ms": 0,
+          "spikes100ms": 0,
+          "detail": {
+            "loafSpikes": 0,
+            "itemsSeen": 1559,
+            "distancePx": 161150,
+            "wraps": 0
+          }
+        },
+        {
+          "frames": 958,
+          "meanFps": 177,
+          "p50Frame": 5.5,
+          "p95Frame": 7.4,
+          "maxFrame": 22,
+          "dropped50ms": 0,
+          "spikes100ms": 0,
+          "detail": {
+            "loafSpikes": 0,
+            "itemsSeen": 1559,
+            "distancePx": 161700,
+            "wraps": 0
+          }
+        },
+        {
+          "frames": 888,
+          "meanFps": 164,
+          "p50Frame": 5.5,
+          "p95Frame": 7.3,
+          "maxFrame": 401.2,
+          "dropped50ms": 2,
+          "spikes100ms": 1,
+          "detail": {
+            "loafSpikes": 1,
+            "itemsSeen": 1451,
+            "distancePx": 160600,
+            "wraps": 0
+          }
+        },
+        {
+          "frames": 952,
+          "meanFps": 176,
+          "p50Frame": 5.6,
+          "p95Frame": 7.3,
+          "maxFrame": 27,
+          "dropped50ms": 0,
+          "spikes100ms": 0,
+          "detail": {
+            "loafSpikes": 0,
+            "itemsSeen": 1559,
+            "distancePx": 162800,
             "wraps": 0
           }
         }
@@ -147,77 +157,108 @@
     "navigation": {
       "medianFps": 180,
       "medianP95Frame": 5.7,
-      "medianMaxFrame": 34.4,
+      "medianMaxFrame": 27.4,
       "medianSpikes100": 0,
       "values": [
         {
-          "frames": 1335,
-          "meanFps": 178,
-          "p50Frame": 5.6,
-          "p95Frame": 5.7,
-          "maxFrame": 72.4,
-          "dropped50ms": 2,
-          "spikes100ms": 0,
-          "perRoute": {
-            "/": {
-              "fps": 181,
-              "p95Frame": 6.1,
-              "maxFrame": 7.7
-            },
-            "/explore": {
-              "fps": 181,
-              "p95Frame": 5.6,
-              "maxFrame": 5.7
-            },
-            "/map": {
-              "fps": 165,
-              "p95Frame": 5.7,
-              "maxFrame": 72.4
-            },
-            "/search": {
-              "fps": 181,
-              "p95Frame": 5.7,
-              "maxFrame": 7.1
-            }
-          }
-        },
-        {
-          "frames": 1353,
+          "frames": 1356,
           "meanFps": 180,
           "p50Frame": 5.6,
           "p95Frame": 5.7,
-          "maxFrame": 34.4,
+          "maxFrame": 27.4,
           "dropped50ms": 0,
           "spikes100ms": 0,
           "perRoute": {
             "/": {
               "fps": 181,
               "p95Frame": 5.7,
-              "maxFrame": 6.7
+              "maxFrame": 6.9
             },
             "/explore": {
               "fps": 181,
-              "p95Frame": 5.6,
-              "maxFrame": 6.3
+              "p95Frame": 5.7,
+              "maxFrame": 6.9
             },
             "/map": {
-              "fps": 176,
+              "fps": 178,
+              "p95Frame": 5.8,
+              "maxFrame": 27.4
+            },
+            "/search": {
+              "fps": 181,
+              "p95Frame": 5.6,
+              "maxFrame": 7.5
+            }
+          }
+        },
+        {
+          "frames": 1357,
+          "meanFps": 180,
+          "p50Frame": 5.6,
+          "p95Frame": 5.7,
+          "maxFrame": 14.9,
+          "dropped50ms": 0,
+          "spikes100ms": 0,
+          "perRoute": {
+            "/": {
+              "fps": 181,
               "p95Frame": 5.7,
-              "maxFrame": 34.4
+              "maxFrame": 7.7
+            },
+            "/explore": {
+              "fps": 181,
+              "p95Frame": 5.7,
+              "maxFrame": 7.3
+            },
+            "/map": {
+              "fps": 178,
+              "p95Frame": 5.6,
+              "maxFrame": 14.9
             },
             "/search": {
               "fps": 181,
               "p95Frame": 5.7,
-              "maxFrame": 7.7
+              "maxFrame": 7.2
+            }
+          }
+        },
+        {
+          "frames": 1357,
+          "meanFps": 180,
+          "p50Frame": 5.6,
+          "p95Frame": 5.7,
+          "maxFrame": 38.1,
+          "dropped50ms": 0,
+          "spikes100ms": 0,
+          "perRoute": {
+            "/": {
+              "fps": 181,
+              "p95Frame": 5.7,
+              "maxFrame": 6.9
+            },
+            "/explore": {
+              "fps": 181,
+              "p95Frame": 5.6,
+              "maxFrame": 6.4
+            },
+            "/map": {
+              "fps": 177,
+              "p95Frame": 5.6,
+              "maxFrame": 38.1
+            },
+            "/search": {
+              "fps": 181,
+              "p95Frame": 6.1,
+              "maxFrame": 7.4
             }
           }
         },
         {
           "frames": 1359,
-          "meanFps": 180,
+          "meanFps": 181,
           "p50Frame": 5.6,
           "p95Frame": 5.7,
-          "maxFrame": 28.1,
+          "maxFrame": 17.9,
           "dropped50ms": 0,
           "spikes100ms": 0,
           "perRoute": {
@@ -228,80 +269,49 @@
             },
             "/explore": {
               "fps": 181,
-              "p95Frame": 5.6,
-              "maxFrame": 7.7
-            },
-            "/map": {
-              "fps": 179,
-              "p95Frame": 5.6,
-              "maxFrame": 28.1
-            },
-            "/search": {
-              "fps": 181,
               "p95Frame": 5.7,
-              "maxFrame": 6.3
-            }
-          }
-        },
-        {
-          "frames": 1344,
-          "meanFps": 178,
-          "p50Frame": 5.6,
-          "p95Frame": 5.7,
-          "maxFrame": 79.7,
-          "dropped50ms": 1,
-          "spikes100ms": 0,
-          "perRoute": {
-            "/": {
-              "fps": 181,
-              "p95Frame": 5.7,
-              "maxFrame": 7.2
-            },
-            "/explore": {
-              "fps": 181,
-              "p95Frame": 6,
-              "maxFrame": 10.2
-            },
-            "/map": {
-              "fps": 169,
-              "p95Frame": 5.7,
-              "maxFrame": 79.7
-            },
-            "/search": {
-              "fps": 181,
-              "p95Frame": 5.6,
-              "maxFrame": 6.9
-            }
-          }
-        },
-        {
-          "frames": 1357,
-          "meanFps": 181,
-          "p50Frame": 5.6,
-          "p95Frame": 6.1,
-          "maxFrame": 17.3,
-          "dropped50ms": 0,
-          "spikes100ms": 0,
-          "perRoute": {
-            "/": {
-              "fps": 181,
-              "p95Frame": 6.1,
-              "maxFrame": 7.3
-            },
-            "/explore": {
-              "fps": 181,
-              "p95Frame": 6.6,
-              "maxFrame": 15.9
+              "maxFrame": 6.5
             },
             "/map": {
               "fps": 180,
               "p95Frame": 5.7,
-              "maxFrame": 17.3
+              "maxFrame": 17.9
             },
             "/search": {
               "fps": 181,
-              "p95Frame": 6.3,
-              "maxFrame": 7.3
+              "p95Frame": 5.7,
+              "maxFrame": 6.6
+            }
+          }
+        },
+        {
+          "frames": 1361,
+          "meanFps": 180,
+          "p50Frame": 5.6,
+          "p95Frame": 5.7,
+          "maxFrame": 31.5,
+          "dropped50ms": 0,
+          "spikes100ms": 0,
+          "perRoute": {
+            "/": {
+              "fps": 180,
+              "p95Frame": 5.7,
+              "maxFrame": 17.1
+            },
+            "/explore": {
+              "fps": 181,
+              "p95Frame": 5.7,
+              "maxFrame": 7.4
+            },
+            "/map": {
+              "fps": 179,
+              "p95Frame": 5.7,
+              "maxFrame": 31.5
+            },
+            "/search": {
+              "fps": 181,
+              "p95Frame": 5.8,
+              "maxFrame": 7.5
             }
           }
         }

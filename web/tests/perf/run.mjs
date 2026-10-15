@@ -244,11 +244,21 @@ async function scrollTest(page) {
  * Clicks the inner router-link (GridItem renders a .view-link anchor;
  * the outer .virtual-scroll-item div itself is not clickable) and
  * measures click -> viewer image loaded latency plus viewer LCP.
+ * Skips videos: a video item has no LCP <img> and the loaded-wait would
+ * stall while it plays (GridItem marks videos with .video-info).
  */
 async function photoOpenTest(page) {
   await page.goto(`${URL}/`, { waitUntil: 'networkidle' })
   await page.waitForSelector('.scroll-container .virtual-scroll-item .view-link', { timeout: 20000 })
   await sleep(1000)
+  const photoLink = page.locator(
+    '.scroll-container .virtual-scroll-item:not(:has(.video-info)) .view-link',
+  )
+  const photoOnly = (await photoLink.count()) > 0
+  const link = photoOnly ? photoLink.first() : page.locator('.scroll-container .virtual-scroll-item .view-link').first()
+  const mediaId = await link.evaluate(
+    (el) => el.closest('.virtual-scroll-item')?.getAttribute('data-id') ?? null,
+  )
   // Arm a buffered LCP observer before the SPA navigation happens.
   const installMark = await page.evaluate(() => {
     window.__lcpEntries = []
@@ -264,7 +274,7 @@ async function photoOpenTest(page) {
     return performance.now()
   })
   const t0 = Date.now()
-  await page.locator('.scroll-container .virtual-scroll-item .view-link').first().click()
+  await link.click()
   await page.waitForURL(/\/view\//, { timeout: 15000 })
   await page.waitForSelector('.view-container', { timeout: 15000 })
   await page
@@ -272,7 +282,7 @@ async function photoOpenTest(page) {
       () =>
         [...document.querySelectorAll('.view-container img')].some(
           (img) => img.complete && img.naturalWidth > 0,
-        ),
+        ) || !!document.querySelector('.view-container video'),
       { timeout: 15000 },
     )
     .catch(() => {})
@@ -290,7 +300,7 @@ async function photoOpenTest(page) {
   // Close viewer for the next test.
   await page.keyboard.press('Escape').catch(() => {})
   await sleep(500)
-  return { openMs, lcpMs }
+  return { openMs, lcpMs, photoOnly, mediaId }
 }
 
 /**
