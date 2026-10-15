@@ -21,7 +21,7 @@
  * visible headless, but use headed numbers for the committed baseline.
  */
 
-import { execSync } from 'node:child_process'
+import { execSync, spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -397,6 +397,42 @@ async function main() {
   fs.writeFileSync(outFile, JSON.stringify(result, null, 2))
   console.log(`Wrote ${outFile}`)
   console.log(JSON.stringify(result.metrics, null, 2))
+  printDiffVsPrevious(outFile)
+}
+
+/** Compare the fresh result against the newest previous file in results/. */
+function printDiffVsPrevious(outFile) {
+  const dir = path.dirname(outFile)
+  let entries = []
+  try {
+    entries = fs.readdirSync(dir).filter((f) => f.endsWith('.json'))
+  } catch {
+    entries = []
+  }
+  const prev = entries
+    .map((f) => path.join(dir, f))
+    .filter((p) => path.resolve(p) !== path.resolve(outFile))
+    .map((p) => {
+      try {
+        const j = JSON.parse(fs.readFileSync(p, 'utf8'))
+        return { path: p, ts: j.meta?.timestamp ?? '' }
+      } catch {
+        return null
+      }
+    })
+    .filter(Boolean)
+    .sort((a, b) => (a.ts < b.ts ? 1 : -1))[0]
+  console.log('')
+  if (!prev) {
+    console.log('No previous result to compare against — this run becomes the baseline.')
+    return
+  }
+  console.log(`— vs previous: ${path.basename(prev.path)} —`)
+  spawnSync(
+    process.execPath,
+    [path.join(__dirname, 'check-perf-regression.mjs'), '--current', outFile, '--baseline', prev.path],
+    { stdio: 'inherit' },
+  )
 }
 
 main().catch((e) => {
