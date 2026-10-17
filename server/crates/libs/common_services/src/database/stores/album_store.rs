@@ -531,7 +531,7 @@ impl AlbumStore {
                 FROM album_media_item ami
                 JOIN album a ON a.id = ami.album_id
                 JOIN media_item mi ON mi.id = ami.media_item_id
-                WHERE ami.album_id = $1
+                WHERE ami.album_id = $1 AND mi.deleted = false
             ) t
             WHERE rn = (total_count / 2) + 1
             LIMIT 1
