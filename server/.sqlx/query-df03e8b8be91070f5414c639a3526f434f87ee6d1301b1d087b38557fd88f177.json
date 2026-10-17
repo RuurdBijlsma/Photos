@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            SELECT\n                mi.id,\n                is_video,\n                has_thumbnails,\n                duration_ms::INT as duration_ms,\n                (width::real / height::real) as \"ratio!\"\n            FROM album_media_item as ami\n            JOIN media_item mi ON mi.id = ami.media_item_id\n            WHERE ami.album_id = $1 AND mi.deleted = false\n            ORDER BY\n                CASE WHEN $2 = 'date_asc' THEN mi.sort_timestamp END ASC,\n                CASE WHEN $2 = 'date_asc' THEN mi.created_at END ASC,\n                CASE WHEN $2 = 'date_desc' THEN mi.sort_timestamp END DESC,\n                CASE WHEN $2 = 'date_desc' THEN mi.created_at END DESC,\n                CASE WHEN $2 = 'added_asc' THEN ami.added_at END ASC,\n                CASE WHEN $2 = 'added_desc' THEN ami.added_at END DESC,\n                ami.rank ASC\n            ",
+  "query": "\n            SELECT\n                mi.id,\n                is_video,\n                has_thumbnails,\n                duration_ms::INT as duration_ms,\n                (width::real / height::real) as \"ratio!\"\n            FROM album_media_item as ami\n            JOIN media_item mi ON mi.id = ami.media_item_id\n            WHERE ami.album_id = $1 AND mi.deleted = false\n            ORDER BY\n                CASE WHEN $2 = 'date_asc' THEN mi.sort_timestamp END ASC,\n                CASE WHEN $2 = 'date_asc' THEN mi.created_at END ASC,\n                CASE WHEN $2 = 'date_desc' THEN mi.sort_timestamp END DESC,\n                CASE WHEN $2 = 'date_desc' THEN mi.created_at END DESC,\n                CASE WHEN $2 = 'added_asc' THEN ami.added_at END ASC,\n                CASE WHEN $2 = 'added_desc' THEN ami.added_at END DESC,\n                CASE WHEN $2 = 'none' THEN ami.rank END ASC,\n                ami.added_at ASC,\n                ami.media_item_id ASC\n            ",
   "describe": {
     "columns": [
       {
@@ -63,5 +63,5 @@
       null
     ]
   },
-  "hash": "30ad57eb03eaf0c5ba7625abbec41b69111ea6bf58b2e69710f022ddb6f7de14"
+  "hash": "df03e8b8be91070f5414c639a3526f434f87ee6d1301b1d087b38557fd88f177"
 }

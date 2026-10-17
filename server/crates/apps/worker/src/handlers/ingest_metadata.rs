@@ -6,7 +6,6 @@ use crate::handlers::common::utils::result_if_source_missing;
 use crate::jobs::management::is_job_cancelled;
 use color_eyre::eyre::Context;
 use color_eyre::{Result, eyre::eyre};
-use common_services::api::album::interfaces::AlbumSort;
 use common_services::caching::hash_file;
 use common_services::database::UpdateField;
 use common_services::database::album_store::AlbumStore;
@@ -108,6 +107,9 @@ async fn store_media_item(
     )
     .await?;
     if let Some(info) = &pending_payload {
+        // Pure append: display order is derived from data columns at read
+        // time (mode-aware), so nothing here rewrites rank rows. Ingest can
+        // therefore never deadlock or degrade with album size.
         AlbumStore::add_media_items(
             &mut *tx,
             &info.album_id,
@@ -115,11 +117,6 @@ async fn store_media_item(
             user_id,
         )
         .await?;
-        if let Some(album) = AlbumStore::find_by_id(&mut *tx, &info.album_id).await?
-            && album.sort_mode != AlbumSort::None
-        {
-            AlbumStore::sort_media_items(&mut tx, &info.album_id, album.sort_mode).await?;
-        }
         if let Some(album) = AlbumStore::find_by_id(&mut *tx, &info.album_id).await?
             && album.thumbnail_id.is_none()
         {

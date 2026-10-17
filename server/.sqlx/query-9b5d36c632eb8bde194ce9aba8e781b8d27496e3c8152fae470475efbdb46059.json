@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            SELECT\n                mi.id,\n                mi.is_video,\n                mi.has_thumbnails,\n                mi.duration_ms::INT as duration_ms,\n                mi.taken_at_local::TEXT as \"timestamp!\",\n                ami.added_at\n            FROM album_media_item ami\n            JOIN media_item mi ON ami.media_item_id = mi.id\n            WHERE ami.album_id = $1\n            AND mi.deleted = false\n            ORDER BY ami.rank ASC\n            ",
+  "query": "\n            SELECT\n                mi.id,\n                mi.is_video,\n                mi.has_thumbnails,\n                mi.duration_ms::INT as duration_ms,\n                mi.taken_at_local::TEXT as \"timestamp!\",\n                ami.added_at\n            FROM album_media_item ami\n            JOIN media_item mi ON ami.media_item_id = mi.id\n            WHERE ami.album_id = $1\n            AND mi.deleted = false\n            ORDER BY\n                CASE WHEN $2 = 'date_asc' THEN mi.sort_timestamp END ASC,\n                CASE WHEN $2 = 'date_asc' THEN mi.created_at END ASC,\n                CASE WHEN $2 = 'date_desc' THEN mi.sort_timestamp END DESC,\n                CASE WHEN $2 = 'date_desc' THEN mi.created_at END DESC,\n                CASE WHEN $2 = 'added_asc' THEN ami.added_at END ASC,\n                CASE WHEN $2 = 'added_desc' THEN ami.added_at END DESC,\n                CASE WHEN $2 = 'none' THEN ami.rank END ASC,\n                ami.added_at ASC,\n                ami.media_item_id ASC\n            ",
   "describe": {
     "columns": [
       {
@@ -62,6 +62,7 @@
     ],
     "parameters": {
       "Left": [
+        "Text",
         "Text"
       ]
     },
@@ -74,5 +75,5 @@
       false
     ]
   },
-  "hash": "4f04ff85203a1b7ff38a8122e5fe5170c3fadeab1d9dff924eedddbb0d8e3bdd"
+  "hash": "9b5d36c632eb8bde194ce9aba8e781b8d27496e3c8152fae470475efbdb46059"
 }

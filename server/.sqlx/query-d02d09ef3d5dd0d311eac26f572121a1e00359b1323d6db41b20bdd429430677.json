@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT media_item_id as id\n            FROM (\n                SELECT\n                    ami.media_item_id,\n                    ROW_NUMBER() OVER (ORDER BY\n                        CASE WHEN a.sort_mode = 'date_asc' THEN mi.sort_timestamp END ASC,\n                        CASE WHEN a.sort_mode = 'date_desc' THEN mi.sort_timestamp END DESC,\n                        CASE WHEN a.sort_mode = 'added_asc' THEN ami.added_at END ASC,\n                        CASE WHEN a.sort_mode = 'added_desc' THEN ami.added_at END DESC,\n                        CASE WHEN a.sort_mode = 'none' THEN ami.rank END ASC,\n                        ami.added_at ASC,\n                        ami.media_item_id ASC\n                    ) as rn,\n                    COUNT(*) OVER () as total_count\n                FROM album_media_item ami\n                JOIN album a ON a.id = ami.album_id\n                JOIN media_item mi ON mi.id = ami.media_item_id\n                WHERE ami.album_id = $1\n            ) t\n            WHERE rn = (total_count / 2) + 1\n            LIMIT 1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "album_media_item",
+            "name": "media_item_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "d02d09ef3d5dd0d311eac26f572121a1e00359b1323d6db41b20bdd429430677"
+}

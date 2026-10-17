@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE album_media_item\n            SET rank = NULL\n            WHERE album_id = $1\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "290630a110257b21a7fc32eba531ab191a51f321ad04aa86119f884a56f96862"
+}

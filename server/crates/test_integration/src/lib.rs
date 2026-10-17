@@ -18,7 +18,8 @@ mod test_runner {
     use crate::runner::context::test_context::TestContext;
     use crate::runner::orchestration_utils::setup_tracing_and_panic_handling;
     use crate::tests::test_album::{
-        test_album_lifecycle, test_album_media_management, test_album_sharing, test_update_album,
+        test_album_lifecycle, test_album_media_management, test_album_rank_override,
+        test_album_sharing, test_update_album,
     };
     use crate::tests::test_auth::{
         test_login, test_logout, test_refresh, test_register, test_second_register_attempt,
@@ -66,6 +67,7 @@ mod test_runner {
                 test_update_album,
                 test_album_media_management,
                 test_album_sharing,
+                test_album_rank_override,
                 // -- Photos --
                 test_photo_download,
                 test_get_full_item,

@@ -198,8 +198,6 @@ pub async fn create_album(
         }
     }
 
-    AlbumStore::sort_media_items(&mut tx, &album_id, DEFAULT_ALBUM_SORT).await?;
-
     tx.commit().await?;
 
     Ok(album)
@@ -225,13 +223,8 @@ pub async fn add_media_to_album(
         return Err(AppError::NotFound("Album not found.".to_string()));
     };
 
-    // Add the items
+    // Add the items (pure append; display order is mode-aware, no resort needed)
     AlbumStore::add_media_items(&mut *tx, album_id, media_item_ids, user_id).await?;
-
-    // If NOT manually sorted, run the reorder logic immediately to interleave them
-    if album.sort_mode != AlbumSort::None {
-        AlbumStore::sort_media_items(&mut tx, album_id, album.sort_mode).await?;
-    }
 
     if album.thumbnail_id.is_none()
         && let Some(tid) = get_representative_thumbnail(&mut tx, media_item_ids).await?
@@ -540,7 +533,8 @@ pub async fn get_album_media(
             return Err(AppError::NotFound(album_id.to_string()));
         }
     }
-    let items_future = AlbumStore::list_sorted_media_items(pool, album_id, AlbumSort::None);
+    // Serve in the album's own sort mode; `none` albums render by manual ranks
+    let items_future = AlbumStore::list_sorted_media_items(pool, album_id, album.sort_mode);
     let collaborators_future = AlbumStore::list_collaborators(pool, album_id);
     let (items, collaborators) = tokio::try_join!(items_future, collaborators_future)?;
 
@@ -600,42 +594,6 @@ pub async fn get_sorted_album_media(
 }
 
 #[instrument(skip(pool))]
-pub async fn move_album_item(
-    pool: &PgPool,
-    album_id: &str,
-    user_id: i32,
-    media_item_id: &str,
-    new_rank: f64,
-) -> Result<(), AppError> {
-    if !can_edit_album(pool, user_id, album_id).await? {
-        return Err(AppError::Forbidden("Permission denied".into()));
-    }
-
-    let mut tx = pool.begin().await?;
-
-    // Update the rank
-    sqlx::query!(
-        "UPDATE album_media_item SET rank = $1 WHERE album_id = $2 AND media_item_id = $3",
-        new_rank,
-        album_id,
-        media_item_id
-    )
-    .execute(&mut *tx)
-    .await?;
-
-    // Mark album as manually sorted
-    sqlx::query!(
-        "UPDATE album SET sort_mode = 'date_asc' WHERE id = $1",
-        album_id
-    )
-    .execute(&mut *tx)
-    .await?;
-
-    tx.commit().await?;
-    Ok(())
-}
-
-#[instrument(skip(pool))]
 pub async fn reorder_media_items(
     pool: &PgPool,
     album_id: &str,
@@ -649,9 +607,15 @@ pub async fn reorder_media_items(
 
     let mut tx = pool.begin().await?;
 
-    AlbumStore::reorder_media_items(&mut tx, album_id, media_item_ids).await?;
+    if sort_mode == AlbumSort::None {
+        // Manual order: materialize the position of every provided item.
+        AlbumStore::reorder_media_items(&mut tx, album_id, media_item_ids).await?;
+    } else {
+        // Drop all manual positions (invariant: `rank` populated iff `sort_mode = 'none'`).
+        AlbumStore::clear_ranks(&mut *tx, album_id).await?;
+    }
 
-    // Mark album as manually sorted
+    // Mark album's sort mode
     sqlx::query!(
         "UPDATE album SET sort_mode = $2 WHERE id = $1",
         album_id,
