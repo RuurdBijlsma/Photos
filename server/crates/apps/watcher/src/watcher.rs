@@ -1,14 +1,11 @@
 use crate::handlers::handle_create;
 use app_state::IngestSettings;
-use app_state::constants::{ALBUM_IMPORT_FOLDER, TAKEOUT_FOLDER};
+use app_state::constants::{MANAGED_FOLDERS, path_enters_managed_folder};
 use color_eyre::eyre::Result;
 use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use sqlx::PgPool;
-use std::path::Component;
 use tokio::sync::{mpsc, watch};
 use tracing::{error, info, warn};
-
-const EXCLUDED_WATCH_FOLDER: [&str; 2] = [ALBUM_IMPORT_FOLDER, TAKEOUT_FOLDER];
 
 /// Runs the file system watcher.
 ///
@@ -84,12 +81,9 @@ async fn process_event(pool: &PgPool, settings: &IngestSettings, event: Event) -
     }
 
     let rel_path = path.strip_prefix(&settings.media_root)?;
-    // Matches special folders anywhere below the media root: takeout/import
-    // contents inside a user's media folder are managed by their own pipelines.
-    if rel_path.components().any(|component| {
-        matches!(&component, Component::Normal(name)
-                if EXCLUDED_WATCH_FOLDER.contains(&name.to_string_lossy().as_ref()))
-    }) {
+    // Files appearing inside managed folders are created by their own
+    // pipelines, which enqueue ingest jobs themselves.
+    if path_enters_managed_folder(rel_path, &MANAGED_FOLDERS) {
         return Ok(());
     }
 

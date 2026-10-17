@@ -1,3 +1,5 @@
+use std::path::{Component, Path};
+
 pub const WORKER_HEARTBEAT_SECONDS: f64 = 150.;
 
 // assets folder subfolders
@@ -9,6 +11,31 @@ pub const VOCAB_CACHE_FOLDER: &str = "assets/static-cache/tag-vocab";
 pub const ALBUM_IMPORT_FOLDER: &str = "import";
 pub const USER_UPLOAD_FOLDER: &str = "uploads";
 pub const TAKEOUT_FOLDER: &str = "takeout";
+
+/// Subfolders owned by a dedicated pipeline (album import, takeout import).
+///
+/// These folder names live directly inside a user's media folder. Those
+/// pipelines create the media items and enqueue their ingest jobs themselves;
+/// generic file-discovery paths (watcher events, scheduled scans) must not
+/// pick these files up while the pipeline has not run yet.
+pub const MANAGED_FOLDERS: [&str; 2] = [ALBUM_IMPORT_FOLDER, TAKEOUT_FOLDER];
+
+/// Returns true when `path` points inside one of the `managed` folders.
+///
+/// Managed folders always sit directly below a user's media folder, which is
+/// itself a single directory name below the media root — possibly empty. So
+/// the managed name can only be the first or second [`Path`] component; a
+/// deeper same-named folder belongs to the user and is *not* managed.
+#[must_use]
+pub fn path_enters_managed_folder(path: &Path, managed: &[&str]) -> bool {
+    path.components()
+        .filter(|c| matches!(c, Component::Normal(_)))
+        .take(2)
+        .any(|c| {
+            matches!(&c, Component::Normal(name)
+            if managed.iter().any(|m| name.eq_ignore_ascii_case(m)))
+        })
+}
 
 // app_data folders
 pub const CACHE_FOLDER: &str = "cache";

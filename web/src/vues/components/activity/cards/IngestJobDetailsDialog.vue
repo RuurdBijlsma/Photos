@@ -5,6 +5,7 @@ import MdiCached from '~icons/mdi/cached'
 import MdiClose from '~icons/mdi/close'
 import MdiDownloadOutline from '~icons/mdi/download-outline'
 import MdiInformation from '~icons/mdi/information'
+import { formatJobType } from '@/scripts/utils.ts'
 
 defineProps<{
   modelValue: boolean
@@ -18,19 +19,6 @@ const emit = defineEmits<{
   (e: 'retry', jobId: number): void
   (e: 'download', path: string, jobId: number): void
 }>()
-
-function formatJobType(jobType: string) {
-  switch (jobType) {
-    case 'ingest_metadata':
-      return 'Metadata'
-    case 'ingest_thumbnails':
-      return 'Thumbnails'
-    case 'ingest_analysis':
-      return 'Analysis'
-    default:
-      return jobType.replace('_', ' ')
-  }
-}
 
 function formatDate(dateStr: string | null) {
   if (!dateStr) return '-'

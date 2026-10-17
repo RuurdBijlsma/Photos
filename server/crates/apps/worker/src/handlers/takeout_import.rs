@@ -34,10 +34,11 @@ pub struct TakeoutImportPayload {
     pub batch_id: String,
 }
 
-/// Advisory lock domain for takeout registration transactions. Serializes the
-/// registration of concurrently arriving zips per user so that two zips
-/// containing the same filename cannot both claim it.
-const TAKEOUT_LOCK_OFFSET: i64 = 0x676F_6F64_0000_0000;
+/// First half of the two-key advisory lock that serializes takeout
+/// registration transactions. Unique per (domain, user), in a namespace
+/// reserved for the takeout feature so a future advisory lock elsewhere can
+/// never collide with it.
+const TAKEOUT_LOCK_DOMAIN: i32 = 0x676F_6F64; // ASCII "good"
 
 const ALBUM_METADATA_FILE: &str = "metadata.json";
 
@@ -297,8 +298,9 @@ async fn register_extracted_items(
     // Advisory lock: two takeout registrations for the same user arriving
     // concurrently must not both claim the same filename.
     sqlx::query!(
-        "SELECT pg_advisory_xact_lock($1)",
-        TAKEOUT_LOCK_OFFSET + i64::from(user_id)
+        "SELECT pg_advisory_xact_lock($1, $2)",
+        TAKEOUT_LOCK_DOMAIN,
+        user_id
     )
     .execute(&mut *tx)
     .await?;

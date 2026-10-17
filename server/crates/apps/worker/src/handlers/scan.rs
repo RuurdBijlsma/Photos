@@ -1,7 +1,7 @@
 use crate::context::WorkerContext;
 use crate::handlers::JobResult;
 use crate::handlers::common::utils::require_media_mounted;
-use app_state::constants::TAKEOUT_FOLDER;
+use app_state::constants::{TAKEOUT_FOLDER, path_enters_managed_folder};
 use app_state::{IngestSettings, MakeRelativePath};
 use color_eyre::eyre::Result;
 use common_services::database::jobs::{Job, JobType};
@@ -26,16 +26,10 @@ fn has_allowed_ext(path: &Path, allowed: &HashSet<&str>) -> bool {
 fn get_media_files(folder: &Path, allowed_exts: &HashSet<&str>) -> Vec<std::path::PathBuf> {
     let mut files = Vec::new();
     for entry in WalkDir::new(folder).into_iter().filter_map(Result::ok) {
-        // Takeout contents live in their own folder and are managed by the
-        // takeout import pipeline; a scheduled scan must not enqueue them
-        // before their registration has even created the media items.
-        if entry
-            .path()
-            .components()
-            .any(|c| c.as_os_str().eq_ignore_ascii_case(TAKEOUT_FOLDER))
-        {
-            continue;
-        }
+        // Managed folders (takeout, import) stay in the walk: their items are
+        // ordinary library items afterwards, so the reconciliation below must
+        // still see them. Only *enqueueing* them behind the pipeline's back is
+        // forbidden — see the filter on `to_ingest`.
         if entry.file_type().is_file()
             && entry.metadata().is_ok_and(|m| m.len() > 0)
             && has_allowed_ext(entry.path(), allowed_exts)
@@ -133,8 +127,15 @@ pub async fn sync_user_files_to_db(
         return Ok(());
     }
 
-    // New files on disk -> Enqueue ingest
-    let to_ingest: Vec<_> = fs_paths.difference(&db_all_paths).cloned().collect();
+    // New files on disk -> Enqueue ingest. Files inside managed folders are
+    // owned by their own pipeline: e.g. takeout registration inserts the
+    // pending album links and enqueues ingest atomically, so a scheduled scan
+    // racing ahead would ingest the file and leave the links dangling.
+    let to_ingest: Vec<_> = fs_paths
+        .difference(&db_all_paths)
+        .filter(|fs_path| !path_enters_managed_folder(Path::new(fs_path), &[TAKEOUT_FOLDER]))
+        .cloned()
+        .collect();
 
     // Previously present files that are now missing -> Set missing_since = NOW()
     let to_mark_missing: Vec<_> = db_present_paths.difference(&fs_paths).cloned().collect();

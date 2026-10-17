@@ -212,80 +212,26 @@ async fn cancel_ingest_analysis_jobs(
     Ok(())
 }
 
+/// Enqueues the ingest pipeline jobs for many paths in one pooled connection.
+///
+/// Thin wrapper around [`bulk_enqueue_full_ingest_in_tx`] that runs inside its
+/// own committed transaction.
 pub async fn bulk_enqueue_full_ingest(
     pool: &PgPool,
     ingest_settings: &IngestSettings,
     relative_paths: &[String],
     user_id: i32,
 ) -> Result<()> {
-    if relative_paths.is_empty() {
-        return Ok(());
-    }
-
-    let job_types = [
-        JobType::IngestMetadata,
-        JobType::IngestThumbnails,
-        JobType::IngestAnalysis,
-    ];
-    let capacity = relative_paths.len() * job_types.len();
-
-    let mut all_paths = Vec::with_capacity(capacity);
-    let mut all_types = Vec::with_capacity(capacity);
-    let mut all_scopes = Vec::with_capacity(capacity);
-    let mut all_phases = Vec::with_capacity(capacity);
-    let mut all_priorities = Vec::with_capacity(capacity);
-
-    for path in relative_paths {
-        let file_path = ingest_settings.media_root.join(path);
-        let is_video = ingest_settings.is_video_file(&file_path);
-
-        for job_type in job_types {
-            all_paths.push(path.clone());
-            all_types.push(job_type);
-            all_scopes.push(job_type.scope());
-            all_phases.push(job_type.phase());
-            all_priorities.push(job_type.get_priority(is_video));
-        }
-    }
-
-    let status_str = format!("{:?}", JobStatus::Queued).to_lowercase();
-    let statuses = vec![status_str; capacity];
-
-    sqlx::query!(
-        r#"
-        INSERT INTO jobs (relative_path, job_type, priority, scope, phase, user_id, status)
-        SELECT
-            u.path,
-            u.jt::job_type,
-            u.pri,
-            u.sc::job_scope,
-            u.ph,
-            u.uid,
-            u.stat::job_status
-        FROM UNNEST($1::text[], $2::text[], $3::int[], $4::job_scope[], $5::int[], $6::int[], $7::text[])
-          AS u(path, jt, pri, sc, ph, uid, stat)
-        ON CONFLICT (job_type, coalesce(user_id, -1), coalesce(md5(payload::text), ''), coalesce(relative_path, ''))
-        WHERE (status IN ('queued', 'running'))
-        DO NOTHING
-        "#,
-        &all_paths,
-        &all_types as &[_],
-        &all_priorities,
-        &all_scopes as &[_],
-        &all_phases,
-        &vec![user_id; capacity],
-        &statuses,
-    )
-        .execute(pool)
-        .await?;
-
+    let mut tx = pool.begin().await?;
+    bulk_enqueue_full_ingest_in_tx(&mut tx, ingest_settings, relative_paths, user_id).await?;
+    tx.commit().await?;
     Ok(())
 }
 
-/// Transaction-scoped variant of [`bulk_enqueue_full_ingest`]: inserts the
-/// ingest pipeline jobs for many paths within the caller's transaction.
+/// Inserts the ingest pipeline jobs for many paths within the caller's
+/// transaction.
 ///
-/// Used by takeout registration so that "playing file X for ingest" and the
+/// Used by takeout registration so that "claiming file X for ingest" and the
 /// album links recording that decision commit atomically — a crash between the
 /// two would otherwise leave links pending forever.
 pub async fn bulk_enqueue_full_ingest_in_tx(

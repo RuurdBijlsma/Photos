@@ -3,7 +3,7 @@ import MdiCached from '~icons/mdi/cached'
 import MdiChevronDown from '~icons/mdi/chevron-down'
 import MdiChevronUp from '~icons/mdi/chevron-up'
 import { ref } from 'vue'
-import { caps } from '@/scripts/utils.ts'
+import { formatJobType } from '@/scripts/utils.ts'
 
 defineProps<{
   id: number
@@ -27,7 +27,7 @@ const expanded = ref(false)
     <div class="failed-main pa-4">
       <div class="job-info-left">
         <span class="job-type-badge">
-          {{ caps(jobType.replace('ingest_', '').replace('_', ' ')) }}
+          {{ formatJobType(jobType) }}
         </span>
         <span class="job-path" :title="relativePath || ''">
           {{ relativePath ? relativePath.split('/').pop() : 'System Task' }}
