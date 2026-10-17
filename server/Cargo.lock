@@ -10156,6 +10156,7 @@ dependencies = [
  "plotters",
  "rand 0.10.3",
  "rayon",
+ "regex",
  "reqwest 0.13.5",
  "rkyv",
  "sanitize-filename",

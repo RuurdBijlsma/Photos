@@ -10,9 +10,11 @@ use common_services::database::jobs::{Job, JobType};
 use common_services::database::user_store::UserStore;
 use common_services::job_queue::{enqueue_full_ingest, enqueue_job};
 use fileloft_core::UploadInfo;
+use regex::Regex;
 use sanitize_filename::sanitize;
 use serde_json::from_value;
 use std::path::{Path, PathBuf};
+use std::sync::LazyLock;
 use tokio::fs;
 
 async fn get_unique_filename(dest_folder: &Path, destination_path: &Path) -> PathBuf {
@@ -145,38 +147,24 @@ pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
 }
 
 /// Recognizes a Google Takeout zip by its filename (`takeout-*.zip`).
-///
-/// Names deviating from the standard Google pattern are also accepted — they
-/// just get the fallback batch id `"takeout"`.
 fn is_takeout_zip(filename: &str) -> bool {
     let lower = filename.to_ascii_lowercase();
     lower.starts_with("takeout") && lower.rsplit_once('.').is_some_and(|(_, ext)| ext == "zip")
 }
 
+static TAKEOUT_RE: LazyLock<Regex> = LazyLock::new(|| {
+    // Matches "takeout-<8 digits>T<6 digits>Z-" case-insensitively
+    Regex::new(r"(?i)^takeout-(\d{8}t\d{6}z)-").expect("Regex didn't compile")
+});
+
 /// Parses the takeout batch id (the export timestamp) from a filename like
 /// `takeout-20261015T162830Z-1-001.zip`.
-///
-/// Anything that deviates from the standard Google naming falls back to the
-/// literal `"takeout"`, so all such zips are grouped into a single batch.
 #[must_use]
 pub fn takeout_batch_id(filename: &str) -> String {
-    let lower = filename.to_ascii_lowercase();
-    let Some(rest) = lower.strip_prefix("takeout-") else {
-        return "takeout".to_owned();
-    };
-    // Rest is "<20261015T162830Z>-<export#>-<chunk#>.zip" (case-insensitively).
-    let stamp = rest.split('-').next().unwrap_or_default();
-    let bytes = stamp.as_bytes();
-    let timestamp_like = stamp.len() == 16
-        && bytes[..8].iter().all(u8::is_ascii_digit)
-        && bytes[8].eq_ignore_ascii_case(&b'T')
-        && bytes[9..15].iter().all(u8::is_ascii_digit)
-        && bytes[15].eq_ignore_ascii_case(&b'Z');
-    if timestamp_like {
-        stamp.to_ascii_uppercase()
-    } else {
-        "takeout".to_owned()
-    }
+    TAKEOUT_RE
+        .captures(filename)
+        .and_then(|caps| caps.get(1))
+        .map_or_else(|| "takeout".to_owned(), |m| m.as_str().to_ascii_uppercase())
 }
 
 /// Moves a finished takeout zip out of the tus upload area and enqueues the
