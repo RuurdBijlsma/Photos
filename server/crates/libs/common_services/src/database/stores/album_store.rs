@@ -296,10 +296,6 @@ impl AlbumStore {
     }
 
     /// Resets the ranks of all items in an album based on specified criteria.
-    ///
-    /// O(album) by design; call only from explicit user actions (album
-    /// reorder save), never from ingest/appends. The ingest path no longer
-    /// maintains rank at all — see [`Self::add_media_items`].
     pub async fn sort_media_items(
         executor: &mut PgConnection,
         album_id: &str,
@@ -392,8 +388,6 @@ impl AlbumStore {
     }
 
     /// Drops all manual-order positions of an album.
-    /// Called when saving a non-manual sort mode, so that the invariant
-    /// "`rank` is populated iff `sort_mode = 'none`" holds after every save.
     pub async fn clear_ranks(
         executor: impl PgExecutor<'_>,
         album_id: &str,
@@ -428,7 +422,7 @@ impl AlbumStore {
     }
 
     /// Retrieves all media items associated with an album, joined with their metadata.
-    /// Ordered by the album's `sort_mode` (see `list_sorted_media_items`).
+    /// Ordered by the album's `sort_mode`.
     pub async fn list_media_items(
         executor: impl PgExecutor<'_>,
         album_id: &str,
@@ -507,8 +501,8 @@ impl AlbumStore {
         Ok(result.is_some())
     }
 
-    /// Finds the media item ID located at the middle of the album's
-    /// effective display order. Useful for generating a representative thumbnail.
+    /// Finds the media item ID located at the middle of the album.
+    /// Useful for generating a representative thumbnail.
     pub async fn find_middle_media_item_id(
         executor: impl PgExecutor<'_>,
         album_id: &str,

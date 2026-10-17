@@ -107,9 +107,6 @@ async fn store_media_item(
     )
     .await?;
     if let Some(info) = &pending_payload {
-        // Pure append: display order is derived from data columns at read
-        // time (mode-aware), so nothing here rewrites rank rows. Ingest can
-        // therefore never deadlock or degrade with album size.
         AlbumStore::add_media_items(
             &mut *tx,
             &info.album_id,

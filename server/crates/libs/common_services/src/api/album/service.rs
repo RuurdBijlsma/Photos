@@ -223,7 +223,7 @@ pub async fn add_media_to_album(
         return Err(AppError::NotFound("Album not found.".to_string()));
     };
 
-    // Add the items (pure append; display order is mode-aware, no resort needed)
+    // Add the items
     AlbumStore::add_media_items(&mut *tx, album_id, media_item_ids, user_id).await?;
 
     if album.thumbnail_id.is_none()
@@ -611,7 +611,7 @@ pub async fn reorder_media_items(
         // Manual order: materialize the position of every provided item.
         AlbumStore::reorder_media_items(&mut tx, album_id, media_item_ids).await?;
     } else {
-        // Drop all manual positions (invariant: `rank` populated iff `sort_mode = 'none'`).
+        // Drop all manual positions
         AlbumStore::clear_ranks(&mut *tx, album_id).await?;
     }
 
