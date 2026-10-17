@@ -34,14 +34,20 @@ CREATE INDEX idx_album_is_public ON album (id) WHERE is_public = true;
 
 -- A many-to-many join table connecting albums and media_items.
 -- Ranks are strictly doubles to allow insertion between existing items without full rebalancing.
+-- Ingest/appends into non-manual albums do not write rank at all (no O(album) rank
+-- rewrites, no ordering deadlocks under concurrent ingest); rank is only materialized
+-- by explicit user actions (album reorder save).
 CREATE TABLE album_media_item
 (
-    album_id      VARCHAR(10)      NOT NULL REFERENCES album (id) ON DELETE CASCADE,
-    media_item_id VARCHAR(10)      NOT NULL REFERENCES media_item (id) ON DELETE CASCADE,
-    added_by_user INT              REFERENCES app_user (id) ON DELETE SET NULL,
-    added_at      TIMESTAMPTZ      NOT NULL DEFAULT now(),
-    -- The user can manually sort items, so sort by rank
-    rank          DOUBLE PRECISION NOT NULL,
+    album_id      VARCHAR(10) NOT NULL REFERENCES album (id) ON DELETE CASCADE,
+    media_item_id VARCHAR(10) NOT NULL REFERENCES media_item (id) ON DELETE CASCADE,
+    added_by_user INT         REFERENCES app_user (id) ON DELETE SET NULL,
+    added_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    -- rank is an optional manual-ordering override: `rank IS NOT NULL` <=>
+    -- `album.sort_mode = 'none'` (the album has a user-defined order).
+    -- Date/added-sorted albums derive their display order from data columns
+    -- (`media_item.sort_timestamp`, `album_media_item.added_at`) at read time.
+    rank          DOUBLE PRECISION,
     PRIMARY KEY (album_id, media_item_id),
     CONSTRAINT uq_album_media_rank UNIQUE (album_id, rank) DEFERRABLE INITIALLY DEFERRED
 );
