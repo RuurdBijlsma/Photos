@@ -15,8 +15,10 @@ use tracing::info;
 
 const BATCH_1: &str = "20261015T162830Z";
 const BATCH_2: &str = "20261016T000000Z";
+const BATCH_3: &str = "20261018T000000Z";
 const ZIP_1_NAME: &str = "takeout-20261015T162830Z-1-001.zip";
 const ZIP_RENAMED_NAME: &str = "takeout-renamed.zip";
+const ZIP_3_NAME: &str = "takeout-20261018T000000Z-1-001.zip";
 
 const SOURCE_PHOTO_A: &str = "PXL_20221007_193358147.NIGHT.jpg";
 const SOURCE_PHOTO_B: &str = "PXL_20250916_155329360.jpg";
@@ -29,6 +31,7 @@ const TAKE_C: &str = "TAKEOUT_C.JPG";
 const TESTIMG_A: &str = "TESTIMG_001.JPG";
 const TESTIMG_CHUNK_1: &str = "TESTIMG_002.JPG";
 const TESTIMG_CHUNK_2: &str = "TESTIMG_003.JPG";
+const TAKE_SPACE: &str = "TAKEOUT_SPACE.JPG";
 
 /// Zip root inside an export: Google wraps every product in a `Takeout` folder.
 const TAKEOUT_ROOT: &str = "Takeout/Google Photos";
@@ -613,5 +616,82 @@ pub async fn test_takeout_chunked_batches(context: &TestContext) -> Result<()> {
     assert_eq!(testimg_ids.len(), 1, "cross-batch dedup failed");
 
     info!("test_takeout_chunked_batches OK");
+    Ok(())
+}
+
+/// Album folders with names Windows cannot address mid-path (trailing space /
+/// trailing dot) must be renamed while extracting, e.g. export folder
+/// `"Vakantie Litouwen "`: `create_dir_all` creates it with the trailing
+/// character silently stripped, but writing a file into the unsanitized path
+/// fails with `ERROR_PATH_NOT_FOUND` and the whole album would silently be
+/// skipped.
+pub async fn test_takeout_unsafe_folder_names(context: &TestContext) -> Result<()> {
+    login(context).await?;
+    let user = user_media_folder(context).await?;
+    let prefix = path_prefix(&user.1);
+
+    let photo_a = read_source_photo(context, SOURCE_PHOTO_A).await?;
+    let photo_b = read_source_photo(context, SOURCE_PHOTO_B).await?;
+
+    let staging = context
+        .settings
+        .ingest
+        .app_data_root
+        .join("takeout")
+        .join(BATCH_3);
+    std::fs::create_dir_all(&staging)?;
+    write_zip(
+        &staging.join(ZIP_3_NAME),
+        &[
+            (
+                format!("{TAKEOUT_ROOT}/Vakantie Litouwen /metadata.json"),
+                r#"{"title":"Vakantie Litouwen"}"#.as_bytes().to_vec(),
+            ),
+            (
+                format!("{TAKEOUT_ROOT}/Vakantie Litouwen /{TAKE_SPACE}"),
+                photo_a,
+            ),
+            (
+                // The space here trails the extension: the whole filename
+                // component is unaddressable through normal Win32 paths and
+                // must be renamed too.
+                format!("{TAKEOUT_ROOT}/Vakantie Litouwen /long exposure.jpg "),
+                photo_b,
+            ),
+        ],
+    )?;
+
+    let contents = fs::read(staging.join(ZIP_3_NAME)).await?;
+    upload_file(context, ZIP_3_NAME, &contents).await?;
+    wait_import_done(context, BATCH_3, 1).await?;
+
+    // The files landed under the sanitized folder name instead of being lost.
+    let relative_main = format!("{prefix}takeout/Vakantie Litouwen/{TAKE_SPACE}");
+    let relative_dot = format!("{prefix}takeout/Vakantie Litouwen/long exposure.jpg");
+    wait_item_ingested(context, &relative_main).await?;
+    wait_item_ingested(context, &relative_dot).await?;
+
+    let space_file = context
+        .settings
+        .ingest
+        .media_root
+        .join("takeout")
+        .join("Vakantie Litouwen")
+        .join(TAKE_SPACE);
+    assert!(
+        std::fs::exists(&space_file)?,
+        "file was not extracted to the sanitized path"
+    );
+
+    let litouwen = takeout_album(context, "Vakantie Litouwen").await?;
+    assert_eq!(litouwen.takeout_id.as_deref(), Some(BATCH_3));
+    let item_ids = media_item_ids_for_filename(context, TAKE_SPACE).await?;
+    assert_eq!(item_ids.len(), 1);
+    assert_eq!(
+        takeout_album_ids_for_item(context, &item_ids[0]).await?,
+        vec![litouwen.id]
+    );
+
+    info!("test_takeout_unsafe_folder_names OK");
     Ok(())
 }

@@ -231,12 +231,24 @@ fn extract_zip(
     Ok((items, album_metadata))
 }
 
+/// Strips trailing spaces and dots from a path name. NTFS refuses to create or
+/// address names with trailing ` `/`.` through normal Win32 paths (only the
+/// `\\?\` prefix form can hold them): Google exports regularly contain album
+/// folders like `"Vakantie Litouwen "`, and while `create_dir_all` silently
+/// creates the trailing-space-stripped future name, extracting a file *into*
+/// the trailing-space path fails with `ERROR_PATH_NOT_FOUND` — so every file
+/// of such an album would be lost. The component is simply renamed without
+/// the trailing characters instead.
+fn sanitize_component(component: &str) -> String {
+    component.trim_end_matches([' ', '.']).to_owned()
+}
+
 /// Reduces an entry path to the part below `Google Photos/`, stripping the
 /// usual `Takeout/` wrapper. Returns `None` for other takeout products.
 fn photos_relative_path(entry_path: &Path) -> Option<String> {
     let components: Vec<String> = entry_path
         .components()
-        .map(|c| c.as_os_str().to_string_lossy().into_owned())
+        .map(|c| sanitize_component(&c.as_os_str().to_string_lossy()))
         .collect();
 
     let inner = if components.len() >= 2 && components[0].eq_ignore_ascii_case("Takeout") {
@@ -252,6 +264,7 @@ fn photos_relative_path(entry_path: &Path) -> Option<String> {
     } else {
         inner
     };
+    let relative: Vec<String> = relative.iter().filter(|c| !c.is_empty()).cloned().collect();
     if relative.is_empty() {
         None
     } else {
