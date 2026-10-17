@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { formatJobType } from '@/scripts/utils.ts'
+import { caps, formatJobType } from '@/scripts/utils.ts'
 
 defineProps<{
   jobType: string
@@ -18,7 +18,7 @@ defineProps<{
   >
     <div class="job-info-left">
       <span class="job-type-badge" :class="{ 'text-caption mb-1': !compact }">
-        {{ formatJobType(jobType) }}
+        {{ caps(formatJobType(jobType)) }}
       </span>
       <span
         class="job-path"

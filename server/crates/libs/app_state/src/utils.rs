@@ -1,6 +1,25 @@
 use color_eyre::eyre::Result;
 use std::fs::canonicalize;
+use std::path::Component;
 use std::path::{Path, absolute};
+
+/// Returns true when `path` points inside one of the `managed` folders.
+///
+/// Managed folders ("import", "takeout") always sit directly below a user's
+/// media folder, which is itself a single directory name below the media root
+/// — possibly empty. So the managed name can only be the first or second
+/// [`Path`] component; a deeper same-named folder belongs to the user and is
+/// *not* managed.
+#[must_use]
+pub fn path_enters_managed_folder(path: &Path, managed: &[&str]) -> bool {
+    path.components()
+        .filter(|c| matches!(c, Component::Normal(_)))
+        .take(2)
+        .any(|c| {
+            matches!(&c, Component::Normal(name)
+            if managed.iter().any(|m| name.eq_ignore_ascii_case(m)))
+        })
+}
 
 /// Converts a path to a POSIX-style string, replacing backslashes with forward slashes.
 #[must_use]

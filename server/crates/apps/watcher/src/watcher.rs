@@ -1,6 +1,7 @@
 use crate::handlers::handle_create;
 use app_state::IngestSettings;
-use app_state::constants::{MANAGED_FOLDERS, path_enters_managed_folder};
+use app_state::constants::MANAGED_FOLDERS;
+use app_state::path_enters_managed_folder;
 use color_eyre::eyre::Result;
 use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use sqlx::PgPool;

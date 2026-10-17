@@ -1,7 +1,8 @@
 use crate::context::WorkerContext;
 use crate::handlers::JobResult;
 use crate::handlers::common::utils::require_media_mounted;
-use app_state::constants::{TAKEOUT_FOLDER, path_enters_managed_folder};
+use app_state::constants::MANAGED_FOLDERS;
+use app_state::path_enters_managed_folder;
 use app_state::{IngestSettings, MakeRelativePath};
 use color_eyre::eyre::Result;
 use common_services::database::jobs::{Job, JobType};
@@ -133,7 +134,7 @@ pub async fn sync_user_files_to_db(
     // racing ahead would ingest the file and leave the links dangling.
     let to_ingest: Vec<_> = fs_paths
         .difference(&db_all_paths)
-        .filter(|fs_path| !path_enters_managed_folder(Path::new(fs_path), &[TAKEOUT_FOLDER]))
+        .filter(|fs_path| !path_enters_managed_folder(Path::new(fs_path), &MANAGED_FOLDERS))
         .cloned()
         .collect();
 

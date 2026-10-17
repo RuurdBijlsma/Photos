@@ -226,7 +226,7 @@ const JOB_TYPE_LABELS: Record<string, string> = {
 export function formatJobType(jobType: string) {
   const label = JOB_TYPE_LABELS[jobType]
   if (label) return label
-  return caps(jobType.replace(/_/g, ' '))
+  return jobType.replace(/_/g, ' ')
 }
 
 export function arrayToMap<T extends { id: string }>(items: readonly T[]): Map<string, T> {
