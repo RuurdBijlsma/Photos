@@ -1,6 +1,7 @@
 use crate::context::WorkerContext;
 use crate::handlers::JobResult;
 use crate::handlers::common::utils::require_media_mounted;
+use app_state::constants::TAKEOUT_FOLDER;
 use app_state::{IngestSettings, MakeRelativePath};
 use color_eyre::eyre::Result;
 use common_services::database::jobs::{Job, JobType};
@@ -25,6 +26,16 @@ fn has_allowed_ext(path: &Path, allowed: &HashSet<&str>) -> bool {
 fn get_media_files(folder: &Path, allowed_exts: &HashSet<&str>) -> Vec<std::path::PathBuf> {
     let mut files = Vec::new();
     for entry in WalkDir::new(folder).into_iter().filter_map(Result::ok) {
+        // Takeout contents live in their own folder and are managed by the
+        // takeout import pipeline; a scheduled scan must not enqueue them
+        // before their registration has even created the media items.
+        if entry
+            .path()
+            .components()
+            .any(|c| c.as_os_str().eq_ignore_ascii_case(TAKEOUT_FOLDER))
+        {
+            continue;
+        }
         if entry.file_type().is_file()
             && entry.metadata().is_ok_and(|m| m.len() > 0)
             && has_allowed_ext(entry.path(), allowed_exts)

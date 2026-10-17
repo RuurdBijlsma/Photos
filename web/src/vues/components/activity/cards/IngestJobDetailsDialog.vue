@@ -28,7 +28,7 @@ function formatJobType(jobType: string) {
     case 'ingest_analysis':
       return 'Analysis'
     default:
-      return jobType
+      return jobType.replace('_', ' ')
   }
 }
 

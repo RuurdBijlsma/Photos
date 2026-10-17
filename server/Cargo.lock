@@ -8510,6 +8510,7 @@ name = "test_integration"
 version = "0.1.0"
 dependencies = [
  "app_state",
+ "base64 0.22.1",
  "chrono",
  "color-eyre",
  "colored",
@@ -8530,6 +8531,7 @@ dependencies = [
  "tracing-subscriber",
  "url",
  "walkdir",
+ "zip",
 ]
 
 [[package]]
@@ -10166,6 +10168,7 @@ dependencies = [
  "tracing-subscriber",
  "umap-rs",
  "walkdir",
+ "zip",
 ]
 
 [[package]]

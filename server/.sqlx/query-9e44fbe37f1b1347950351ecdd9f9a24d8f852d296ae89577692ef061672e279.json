@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            INSERT INTO album (id, owner_id, name, description, thumbnail_id, is_public, sort_mode)\n            VALUES ($1, $2, $3, $4, $5, $6, $7)\n            RETURNING\n                id,\n                owner_id,\n                name,\n                description,\n                thumbnail_id,\n                is_public,\n                media_count,\n                latest_media_item_timestamp,\n                earliest_media_item_timestamp,\n                updated_at,\n                created_at,\n                sort_mode as \"sort_mode: AlbumSort\"\n            ",
+  "query": "\n            SELECT\n                a.id,\n                a.owner_id,\n                a.name,\n                a.description,\n                a.thumbnail_id,\n                a.is_public,\n                a.sort_mode as \"sort_mode: AlbumSort\",\n                a.created_at,\n                a.updated_at,\n                a.media_count,\n                a.latest_media_item_timestamp,\n                a.earliest_media_item_timestamp,\n                a.takeout_id\n            FROM album a\n            LEFT JOIN album_collaborator ac ON a.id = ac.album_id AND ac.user_id = $1\n            WHERE a.owner_id = $1 OR ac.user_id = $1\n            ORDER BY\n                CASE WHEN $2 = 'name' AND $3 = 'ASC' THEN a.name END ASC,\n                CASE WHEN $2 = 'name' AND $3 = 'DESC' THEN a.name END DESC,\n                CASE WHEN $2 = 'updated_at' AND $3 = 'ASC' THEN a.updated_at END ASC,\n                CASE WHEN $2 = 'updated_at' AND $3 = 'DESC' THEN a.updated_at END DESC,\n                CASE WHEN $2 = 'latest_photo' AND $3 = 'ASC' THEN a.latest_media_item_timestamp END ASC NULLS LAST,\n                CASE WHEN $2 = 'latest_photo' AND $3 = 'DESC' THEN a.latest_media_item_timestamp END DESC NULLS LAST,\n                a.id\n        ",
   "describe": {
     "columns": [
       {
@@ -71,61 +71,6 @@
       },
       {
         "ordinal": 6,
-        "name": "media_count",
-        "type_info": "Int4",
-        "origin": {
-          "Table": {
-            "table": "album",
-            "name": "media_count"
-          }
-        }
-      },
-      {
-        "ordinal": 7,
-        "name": "latest_media_item_timestamp",
-        "type_info": "Timestamptz",
-        "origin": {
-          "Table": {
-            "table": "album",
-            "name": "latest_media_item_timestamp"
-          }
-        }
-      },
-      {
-        "ordinal": 8,
-        "name": "earliest_media_item_timestamp",
-        "type_info": "Timestamptz",
-        "origin": {
-          "Table": {
-            "table": "album",
-            "name": "earliest_media_item_timestamp"
-          }
-        }
-      },
-      {
-        "ordinal": 9,
-        "name": "updated_at",
-        "type_info": "Timestamptz",
-        "origin": {
-          "Table": {
-            "table": "album",
-            "name": "updated_at"
-          }
-        }
-      },
-      {
-        "ordinal": 10,
-        "name": "created_at",
-        "type_info": "Timestamptz",
-        "origin": {
-          "Table": {
-            "table": "album",
-            "name": "created_at"
-          }
-        }
-      },
-      {
-        "ordinal": 11,
         "name": "sort_mode: AlbumSort",
         "type_info": {
           "Custom": {
@@ -147,30 +92,79 @@
             "name": "sort_mode"
           }
         }
+      },
+      {
+        "ordinal": 7,
+        "name": "created_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "album",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "updated_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "album",
+            "name": "updated_at"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "media_count",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "album",
+            "name": "media_count"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "latest_media_item_timestamp",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "album",
+            "name": "latest_media_item_timestamp"
+          }
+        }
+      },
+      {
+        "ordinal": 11,
+        "name": "earliest_media_item_timestamp",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "album",
+            "name": "earliest_media_item_timestamp"
+          }
+        }
+      },
+      {
+        "ordinal": 12,
+        "name": "takeout_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "album",
+            "name": "takeout_id"
+          }
+        }
       }
     ],
     "parameters": {
       "Left": [
-        "Varchar",
         "Int4",
         "Text",
-        "Text",
-        "Varchar",
-        "Bool",
-        {
-          "Custom": {
-            "name": "album_sort",
-            "kind": {
-              "Enum": [
-                "date_desc",
-                "date_asc",
-                "added_desc",
-                "added_asc",
-                "none"
-              ]
-            }
-          }
-        }
+        "Text"
       ]
     },
     "nullable": [
@@ -181,12 +175,13 @@
       true,
       false,
       false,
-      true,
-      true,
       false,
       false,
-      false
+      false,
+      true,
+      true,
+      true
     ]
   },
-  "hash": "c0a8267c2c58e6efd59bd7715d0748bee78f98bc173ae593a60b88f512e04b94"
+  "hash": "9e44fbe37f1b1347950351ecdd9f9a24d8f852d296ae89577692ef061672e279"
 }

@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            UPDATE album\n            SET\n                name = COALESCE($2, name),\n                description = CASE WHEN $3::boolean THEN description ELSE $4 END,\n                thumbnail_id = CASE WHEN $5::boolean THEN thumbnail_id ELSE $6 END,\n                is_public = COALESCE($7, is_public),\n                updated_at = now()\n            WHERE id = $1\n            RETURNING\n                id,\n                owner_id,\n                name,\n                description,\n                thumbnail_id,\n                is_public,\n                media_count,\n                latest_media_item_timestamp,\n                earliest_media_item_timestamp,\n                updated_at,\n                created_at,\n                sort_mode as \"sort_mode: AlbumSort\"\n            ",
+  "query": "\n            SELECT\n                a.id,\n                owner_id,\n                name,\n                description,\n                thumbnail_id,\n                is_public,\n                media_count,\n                latest_media_item_timestamp,\n                earliest_media_item_timestamp,\n                updated_at,\n                created_at,\n                takeout_id,\n                sort_mode as \"sort_mode: AlbumSort\"\n            FROM album a\n            JOIN album_collaborator ac ON a.id = ac.album_id\n            WHERE ac.user_id = $1\n            ORDER BY a.updated_at DESC\n            ",
   "describe": {
     "columns": [
       {
@@ -126,6 +126,17 @@
       },
       {
         "ordinal": 11,
+        "name": "takeout_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "album",
+            "name": "takeout_id"
+          }
+        }
+      },
+      {
+        "ordinal": 12,
         "name": "sort_mode: AlbumSort",
         "type_info": {
           "Custom": {
@@ -151,13 +162,7 @@
     ],
     "parameters": {
       "Left": [
-        "Text",
-        "Text",
-        "Bool",
-        "Text",
-        "Bool",
-        "Varchar",
-        "Bool"
+        "Int4"
       ]
     },
     "nullable": [
@@ -172,8 +177,9 @@
       true,
       false,
       false,
+      true,
       false
     ]
   },
-  "hash": "103a96d439fa9abf0faa1cdbb3f08b1dd56d7e392b5c47e027e3e8f02fe2d049"
+  "hash": "44ea0bc3bbab073cf9719c055abdcfe343ab3e76b8081f4a3fd441e6052237ac"
 }

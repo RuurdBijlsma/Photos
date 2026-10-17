@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            SELECT\n                id,\n                owner_id,\n                name,\n                description,\n                thumbnail_id,\n                is_public,\n                media_count,\n                latest_media_item_timestamp,\n                earliest_media_item_timestamp,\n                updated_at,\n                created_at,\n                sort_mode as \"sort_mode: AlbumSort\"\n            FROM album\n            WHERE id = $1\n            ",
+  "query": "\n            UPDATE album\n            SET\n                name = COALESCE($2, name),\n                description = CASE WHEN $3::boolean THEN description ELSE $4 END,\n                thumbnail_id = CASE WHEN $5::boolean THEN thumbnail_id ELSE $6 END,\n                is_public = COALESCE($7, is_public),\n                updated_at = now()\n            WHERE id = $1\n            RETURNING\n                id,\n                owner_id,\n                name,\n                description,\n                thumbnail_id,\n                is_public,\n                media_count,\n                latest_media_item_timestamp,\n                earliest_media_item_timestamp,\n                updated_at,\n                created_at,\n                takeout_id,\n                sort_mode as \"sort_mode: AlbumSort\"\n            ",
   "describe": {
     "columns": [
       {
@@ -126,6 +126,17 @@
       },
       {
         "ordinal": 11,
+        "name": "takeout_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "album",
+            "name": "takeout_id"
+          }
+        }
+      },
+      {
+        "ordinal": 12,
         "name": "sort_mode: AlbumSort",
         "type_info": {
           "Custom": {
@@ -151,7 +162,13 @@
     ],
     "parameters": {
       "Left": [
-        "Text"
+        "Text",
+        "Text",
+        "Bool",
+        "Text",
+        "Bool",
+        "Varchar",
+        "Bool"
       ]
     },
     "nullable": [
@@ -166,8 +183,9 @@
       true,
       false,
       false,
+      true,
       false
     ]
   },
-  "hash": "a9a27014f6a8ec0ae8958c7d2c8128757b7e8dee5eab2ce1e063f5702e953f2c"
+  "hash": "25781dd49b9d11e29d507c5d259add72e40178f841e3bfb7629f649d07b1e02c"
 }

@@ -6,9 +6,11 @@ use crate::database::album::album::{Album, AlbumRole};
 use crate::database::album::album_collaborator::AlbumCollaborator;
 use crate::database::structs::CreateAlbumPayload;
 use crate::database::{DbError, UpdateField};
+use crate::utils::nice_id;
+use app_state::constants;
 use common_types::pb::api::{CollaboratorSummary, SimpleTimelineItem, TimelineItem};
 use sqlx::postgres::PgQueryResult;
-use sqlx::{PgConnection, PgExecutor};
+use sqlx::{PgConnection, PgExecutor, PgTransaction};
 
 pub struct AlbumStore;
 
@@ -51,6 +53,7 @@ impl AlbumStore {
                 earliest_media_item_timestamp,
                 updated_at,
                 created_at,
+                takeout_id,
                 sort_mode as "sort_mode: AlbumSort"
             "#,
             album_id,
@@ -111,6 +114,7 @@ impl AlbumStore {
                 earliest_media_item_timestamp,
                 updated_at,
                 created_at,
+                takeout_id,
                 sort_mode as "sort_mode: AlbumSort"
             "#,
             album_id,
@@ -122,6 +126,89 @@ impl AlbumStore {
             is_public,
         )
         .fetch_one(executor)
+        .await?)
+    }
+
+    /// Finds a takeout-created album by (owner, name, takeout batch), creating it if absent.
+    ///
+    /// The caller serializes takeout registration (e.g. via an advisory lock) so the
+    /// find-then-insert race cannot happen.
+    pub async fn find_or_create_takeout_album(
+        tx: &mut PgTransaction<'_>,
+        owner_id: i32,
+        name: &str,
+        description: Option<&str>,
+        takeout_id: &str,
+    ) -> Result<Album, DbError> {
+        if let Some(album) = Self::find_takeout_album(&mut **tx, owner_id, name, takeout_id).await?
+        {
+            return Ok(album);
+        }
+
+        let id = nice_id(constants().database.album_id_length);
+        let album = Self::create(
+            &mut **tx,
+            &id,
+            CreateAlbumPayload {
+                owner_id,
+                name: name.to_owned(),
+                description: description
+                    .map(str::trim)
+                    .filter(|d| !d.is_empty())
+                    .map(str::to_owned),
+                thumbnail_id: None,
+                sort_mode: AlbumSort::DateAsc,
+                is_public: false,
+            },
+        )
+        .await?;
+        // `create` is shared with user-driven album creation and leaves
+        // `takeout_id` alone; stamp it here so the album can be found again.
+        sqlx::query!(
+            "UPDATE album SET takeout_id = $1 WHERE id = $2",
+            takeout_id,
+            &album.id
+        )
+        .execute(&mut **tx)
+        .await?;
+        Ok(Album {
+            takeout_id: Some(takeout_id.to_owned()),
+            ..album
+        })
+    }
+
+    /// Finds an album created by a takeout import for the given (owner, name, batch).
+    pub async fn find_takeout_album(
+        executor: impl PgExecutor<'_>,
+        owner_id: i32,
+        name: &str,
+        takeout_id: &str,
+    ) -> Result<Option<Album>, DbError> {
+        Ok(sqlx::query_as!(
+            Album,
+            r#"
+            SELECT
+                id,
+                owner_id,
+                name,
+                description,
+                thumbnail_id,
+                is_public,
+                media_count,
+                latest_media_item_timestamp,
+                earliest_media_item_timestamp,
+                updated_at,
+                created_at,
+                takeout_id,
+                sort_mode as "sort_mode: AlbumSort"
+            FROM album
+            WHERE owner_id = $1 AND name = $2 AND takeout_id = $3
+            "#,
+            owner_id,
+            name,
+            takeout_id
+        )
+        .fetch_optional(executor)
         .await?)
     }
 
@@ -145,6 +232,7 @@ impl AlbumStore {
                 earliest_media_item_timestamp,
                 updated_at,
                 created_at,
+                takeout_id,
                 sort_mode as "sort_mode: AlbumSort"
             FROM album
             WHERE id = $1
@@ -175,6 +263,7 @@ impl AlbumStore {
                 earliest_media_item_timestamp,
                 updated_at,
                 created_at,
+                takeout_id,
                 sort_mode as "sort_mode: AlbumSort"
             FROM album a
             JOIN album_collaborator ac ON a.id = ac.album_id
@@ -209,7 +298,8 @@ impl AlbumStore {
                 a.updated_at,
                 a.media_count,
                 a.latest_media_item_timestamp,
-                a.earliest_media_item_timestamp
+                a.earliest_media_item_timestamp,
+                a.takeout_id
             FROM album a
             LEFT JOIN album_collaborator ac ON a.id = ac.album_id AND ac.user_id = $1
             WHERE a.owner_id = $1 OR ac.user_id = $1

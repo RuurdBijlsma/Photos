@@ -39,6 +39,8 @@ pub struct Album {
     pub earliest_media_item_timestamp: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+    /// Set when the album was created by a Google Takeout import (batch id).
+    pub takeout_id: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]

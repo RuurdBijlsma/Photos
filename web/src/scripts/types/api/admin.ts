@@ -66,6 +66,7 @@ export type JobType =
   | 'cluster_faces'
   | 'cluster_photos'
   | 'import_album_item'
+  | 'takeout_import'
   | 'update_global_centroid'
   | 'sync_thumbnails'
   | 'delayed_scan'

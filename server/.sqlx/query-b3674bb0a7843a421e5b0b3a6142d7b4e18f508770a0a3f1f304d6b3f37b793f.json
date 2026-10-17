@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO takeout_album_link (user_id, batch_id, album_id, filename)\n            SELECT $1, $2, $3, u.filename\n            FROM UNNEST($4::TEXT[]) AS u(filename)\n            ON CONFLICT (user_id, album_id, filename) DO NOTHING\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int4",
+        "Text",
+        "Varchar",
+        "TextArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "b3674bb0a7843a421e5b0b3a6142d7b4e18f508770a0a3f1f304d6b3f37b793f"
+}

@@ -92,7 +92,7 @@ pub async fn get_running_ingest_jobs(
             last_error
         FROM jobs
         WHERE user_id = $1
-          AND job_type IN ('ingest_metadata', 'ingest_thumbnails', 'ingest_analysis')
+          AND job_type IN ('ingest_metadata', 'ingest_thumbnails', 'ingest_analysis', 'takeout_import')
           AND (
               (status = 'running'::job_status AND last_heartbeat >= NOW() - INTERVAL '1 minute 30 seconds')
               OR (status = 'done'::job_status AND finished_at >= NOW() - INTERVAL '5 seconds')
@@ -133,7 +133,7 @@ pub async fn get_failed_ingest_jobs(pool: &PgPool, user_id: i32) -> Result<Vec<J
         FROM jobs
         WHERE user_id = $1
           AND status = 'failed'::job_status
-          AND job_type IN ('ingest_metadata', 'ingest_thumbnails', 'ingest_analysis')
+          AND job_type IN ('ingest_metadata', 'ingest_thumbnails', 'ingest_analysis', 'takeout_import')
         ORDER BY finished_at DESC NULLS LAST
         "#,
         user_id
@@ -190,7 +190,7 @@ pub async fn get_user_ingest_jobs(
     let mut count_builder =
         QueryBuilder::<Postgres>::new("SELECT COUNT(*) FROM jobs WHERE user_id = ");
     count_builder.push_bind(user_id);
-    count_builder.push(" AND job_type IN ('ingest_metadata'::job_type, 'ingest_thumbnails'::job_type, 'ingest_analysis'::job_type)");
+    count_builder.push(" AND job_type IN ('ingest_metadata'::job_type, 'ingest_thumbnails'::job_type, 'ingest_analysis'::job_type, 'takeout_import'::job_type)");
 
     // Add status filter
     if let Some(status) = &query.status {
@@ -231,7 +231,7 @@ pub async fn get_user_ingest_jobs(
          scheduled_at, last_heartbeat, last_error FROM jobs WHERE user_id = ",
     );
     select_builder.push_bind(user_id);
-    select_builder.push(" AND job_type IN ('ingest_metadata'::job_type, 'ingest_thumbnails'::job_type, 'ingest_analysis'::job_type)");
+    select_builder.push(" AND job_type IN ('ingest_metadata'::job_type, 'ingest_thumbnails'::job_type, 'ingest_analysis'::job_type, 'takeout_import'::job_type)");
 
     // Add status filter
     if let Some(status) = &query.status {

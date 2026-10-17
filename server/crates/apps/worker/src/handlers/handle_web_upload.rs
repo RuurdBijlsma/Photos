@@ -1,13 +1,14 @@
 use crate::context::WorkerContext;
 use crate::handlers::JobResult;
 use crate::handlers::common::utils::require_media_mounted;
+use crate::handlers::takeout_import::TakeoutImportPayload;
 use app_state::MakeRelativePath;
-use app_state::constants::{TUS_UPLOADS_FOLDER, USER_UPLOAD_FOLDER};
+use app_state::constants::{TAKEOUT_FOLDER, TUS_UPLOADS_FOLDER, USER_UPLOAD_FOLDER};
 use color_eyre::Result;
 use color_eyre::eyre::eyre;
-use common_services::database::jobs::Job;
+use common_services::database::jobs::{Job, JobType};
 use common_services::database::user_store::UserStore;
-use common_services::job_queue::enqueue_full_ingest;
+use common_services::job_queue::{enqueue_full_ingest, enqueue_job};
 use fileloft_core::UploadInfo;
 use sanitize_filename::sanitize;
 use serde_json::from_value;
@@ -67,6 +68,13 @@ pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
         .and_then(|opt| opt.as_ref())
         .ok_or_else(|| eyre!("HandleWebUpload payload metadata is missing filename"))?;
     let sanitized_filename = sanitize(user_provided_filename);
+
+    // Google Takeout exports arrive as chunked zips uploaded through the normal
+    // upload dropzone. They are not media: stage them and hand them to the
+    // takeout import pipeline instead of the file ingest.
+    if is_takeout_zip(&sanitized_filename) {
+        return stage_takeout_zip(context, user_id, payload.id.as_str(), &sanitized_filename).await;
+    }
 
     let tus_dir = context
         .settings
@@ -133,5 +141,104 @@ pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
     )
     .await?;
 
+    Ok(JobResult::Done)
+}
+
+/// Recognizes a Google Takeout zip by its filename (`takeout-*.zip`).
+///
+/// Names deviating from the standard Google pattern are also accepted — they
+/// just get the fallback batch id `"takeout"`.
+fn is_takeout_zip(filename: &str) -> bool {
+    let lower = filename.to_ascii_lowercase();
+    lower.starts_with("takeout") && lower.rsplit_once('.').is_some_and(|(_, ext)| ext == "zip")
+}
+
+/// Parses the takeout batch id (the export timestamp) from a filename like
+/// `takeout-20261015T162830Z-1-001.zip`.
+///
+/// Anything that deviates from the standard Google naming falls back to the
+/// literal `"takeout"`, so all such zips are grouped into a single batch.
+#[must_use]
+pub fn takeout_batch_id(filename: &str) -> String {
+    let lower = filename.to_ascii_lowercase();
+    let Some(rest) = lower.strip_prefix("takeout-") else {
+        return "takeout".to_owned();
+    };
+    // Rest is "<20261015T162830Z>-<export#>-<chunk#>.zip" (case-insensitively).
+    let stamp = rest.split('-').next().unwrap_or_default();
+    let bytes = stamp.as_bytes();
+    let timestamp_like = stamp.len() == 16
+        && bytes[..8].iter().all(u8::is_ascii_digit)
+        && bytes[8].eq_ignore_ascii_case(&b'T')
+        && bytes[9..15].iter().all(u8::is_ascii_digit)
+        && bytes[15].eq_ignore_ascii_case(&b'Z');
+    if timestamp_like {
+        stamp.to_ascii_uppercase()
+    } else {
+        "takeout".to_owned()
+    }
+}
+
+/// Moves a finished takeout zip out of the tus upload area and enqueues the
+/// import pipeline for it.
+async fn stage_takeout_zip(
+    context: &WorkerContext,
+    user_id: i32,
+    tus_upload_id: &str,
+    sanitized_filename: &str,
+) -> Result<JobResult> {
+    let tus_dir = context
+        .settings
+        .ingest
+        .app_data_root
+        .join(TUS_UPLOADS_FOLDER);
+    let uploaded_file = tus_dir.join(tus_upload_id);
+    let uploaded_metadata_file = tus_dir.join(format!("{tus_upload_id}.info"));
+
+    if !fs::try_exists(&uploaded_file).await.unwrap_or(false) {
+        return Err(eyre!(
+            "Takeout zip upload file is missing on disk: {tus_upload_id}"
+        ));
+    }
+
+    let batch_id = takeout_batch_id(sanitized_filename);
+    let staging_dir = context
+        .settings
+        .ingest
+        .app_data_root
+        .join(TAKEOUT_FOLDER)
+        .join(&batch_id);
+    fs::create_dir_all(&staging_dir).await?;
+    let staged_path = staging_dir.join(sanitized_filename);
+    fs::rename(&uploaded_file, &staged_path).await?;
+    // Best-effort metadata cleanup, same as the regular upload path.
+    if let Err(e) = fs::remove_file(&uploaded_metadata_file).await
+        && e.kind() != std::io::ErrorKind::NotFound
+    {
+        tracing::warn!(
+            "Failed to clean up metadata file {:?}: {}",
+            uploaded_metadata_file,
+            e
+        );
+    }
+
+    let staged_relative = staged_path.make_relative(&context.settings.ingest.app_data_root)?;
+    enqueue_job(
+        &context.pool,
+        &context.settings.ingest,
+        JobType::TakeoutImport,
+    )
+    .user_id(user_id)
+    .payload(&TakeoutImportPayload {
+        zip_relative_path: staged_relative,
+        batch_id: batch_id.clone(),
+    })
+    .call()
+    .await?;
+
+    tracing::info!(
+        "Staged takeout zip {:?} (batch {batch_id}) for import, user {user_id}",
+        staged_path
+    );
     Ok(JobResult::Done)
 }

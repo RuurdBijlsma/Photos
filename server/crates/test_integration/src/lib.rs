@@ -31,6 +31,9 @@ mod test_runner {
     };
     use crate::tests::test_root::test_health_endpoint;
     use crate::tests::test_search::test_search_filters;
+    use crate::tests::test_takeout::{
+        test_takeout_chunked_batches, test_takeout_dedup_and_fallback_batch, test_takeout_import,
+    };
     use crate::tests::test_timeline::{
         test_get_photos_by_month, test_get_timeline_ids, test_get_timeline_ratios,
     };
@@ -76,6 +79,10 @@ mod test_runner {
                 test_get_random_photo,
                 // -- Search --
                 test_search_filters,
+                // -- Takeout --
+                test_takeout_import,
+                test_takeout_dedup_and_fallback_batch,
+                test_takeout_chunked_batches,
             ]
         );
 

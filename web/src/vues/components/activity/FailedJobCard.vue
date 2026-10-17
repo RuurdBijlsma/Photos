@@ -27,7 +27,7 @@ const expanded = ref(false)
     <div class="failed-main pa-4">
       <div class="job-info-left">
         <span class="job-type-badge">
-          {{ caps(jobType.replace('ingest_', '')) }}
+          {{ caps(jobType.replace('ingest_', '').replace('_', ' ')) }}
         </span>
         <span class="job-path" :title="relativePath || ''">
           {{ relativePath ? relativePath.split('/').pop() : 'System Task' }}

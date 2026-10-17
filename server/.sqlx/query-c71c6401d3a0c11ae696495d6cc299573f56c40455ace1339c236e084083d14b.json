@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            SELECT\n                a.id,\n                owner_id,\n                name,\n                description,\n                thumbnail_id,\n                is_public,\n                media_count,\n                latest_media_item_timestamp,\n                earliest_media_item_timestamp,\n                updated_at,\n                created_at,\n                sort_mode as \"sort_mode: AlbumSort\"\n            FROM album a\n            JOIN album_collaborator ac ON a.id = ac.album_id\n            WHERE ac.user_id = $1\n            ORDER BY a.updated_at DESC\n            ",
+  "query": "\n            INSERT INTO album (id, owner_id, name, description, thumbnail_id, is_public, sort_mode)\n            VALUES ($1, $2, $3, $4, $5, $6, $7)\n            RETURNING\n                id,\n                owner_id,\n                name,\n                description,\n                thumbnail_id,\n                is_public,\n                media_count,\n                latest_media_item_timestamp,\n                earliest_media_item_timestamp,\n                updated_at,\n                created_at,\n                takeout_id,\n                sort_mode as \"sort_mode: AlbumSort\"\n            ",
   "describe": {
     "columns": [
       {
@@ -126,6 +126,17 @@
       },
       {
         "ordinal": 11,
+        "name": "takeout_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "album",
+            "name": "takeout_id"
+          }
+        }
+      },
+      {
+        "ordinal": 12,
         "name": "sort_mode: AlbumSort",
         "type_info": {
           "Custom": {
@@ -151,7 +162,26 @@
     ],
     "parameters": {
       "Left": [
-        "Int4"
+        "Varchar",
+        "Int4",
+        "Text",
+        "Text",
+        "Varchar",
+        "Bool",
+        {
+          "Custom": {
+            "name": "album_sort",
+            "kind": {
+              "Enum": [
+                "date_desc",
+                "date_asc",
+                "added_desc",
+                "added_asc",
+                "none"
+              ]
+            }
+          }
+        }
       ]
     },
     "nullable": [
@@ -166,8 +196,9 @@
       true,
       false,
       false,
+      true,
       false
     ]
   },
-  "hash": "891bb032b88d50ab06e441d933853fdeb92bc3b403308c0fd7f0368050933aca"
+  "hash": "c71c6401d3a0c11ae696495d6cc299573f56c40455ace1339c236e084083d14b"
 }

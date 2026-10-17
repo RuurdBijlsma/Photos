@@ -3,7 +3,8 @@ use crate::database::media_item::gps::Gps;
 use crate::database::media_item::location::Location;
 use crate::database::media_item::media_features::ReadMediaFeatures;
 use crate::database::media_item::media_item::{
-    CreateFullMediaItem, FullMediaItem, FullMediaItemRow, MediaItemIdAndHash,
+    CreateFullMediaItem, FullMediaItem, FullMediaItemRow, MediaItemIdAndFilename,
+    MediaItemIdAndHash,
 };
 use crate::database::media_item::time_details::TimeDetails;
 use crate::database::media_item::weather::Weather;
@@ -51,6 +52,31 @@ impl MediaItemStore {
             relative_path
         )
         .fetch_optional(executor)
+        .await?)
+    }
+
+    /// Looks up media item ids for a batch of filenames (basename match).
+    ///
+    /// Used by takeout import for filename-based dedup against the user's library.
+    pub async fn find_ids_by_filenames(
+        executor: impl Executor<'_, Database = Postgres>,
+        user_id: i32,
+        filenames: &[String],
+    ) -> Result<Vec<MediaItemIdAndFilename>, DbError> {
+        if filenames.is_empty() {
+            return Ok(Vec::new());
+        }
+        Ok(sqlx::query_as!(
+            MediaItemIdAndFilename,
+            r#"
+            SELECT id, filename, relative_path
+            FROM media_item
+            WHERE user_id = $1 AND filename = ANY($2) AND deleted = false
+            "#,
+            user_id,
+            filenames
+        )
+        .fetch_all(executor)
         .await?)
     }
 

@@ -29,6 +29,7 @@ ab_glyph = "0.2.32"
 reqwest = "0.13.5"
 sanitize-filename = "0.6.0"
 serde = { version = "1.0.229", features = ["derive"] }
+zip = { version = "9.0.0-pre3", default-features = false, features = ["deflate"] }
 tempfile = "3.27.0"
 itertools = "0.15.0"
 open_clip_inference = { version = "0.4.2" }

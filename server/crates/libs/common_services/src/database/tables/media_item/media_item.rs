@@ -15,6 +15,13 @@ pub struct MediaItemIdAndHash {
     pub hash: String,
 }
 
+#[derive(Debug)]
+pub struct MediaItemIdAndFilename {
+    pub id: String,
+    pub filename: String,
+    pub relative_path: String,
+}
+
 /// The root struct representing a '`media_item`' and all its available, nested information.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct CreateFullMediaItem {

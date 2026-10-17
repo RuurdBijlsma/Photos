@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT\n            id,\n            relative_path,\n            user_id,\n            job_type AS \"job_type: JobType\",\n            payload,\n            priority,\n            status AS \"status: JobStatus\",\n            attempts,\n            dependency_attempts,\n            max_attempts,\n            owner,\n            started_at,\n            finished_at,\n            created_at,\n            scheduled_at,\n            last_heartbeat,\n            last_error\n        FROM jobs\n        WHERE user_id = $1\n          AND job_type IN ('ingest_metadata', 'ingest_thumbnails', 'ingest_analysis')\n          AND (\n              (status = 'running'::job_status AND last_heartbeat >= NOW() - INTERVAL '1 minute 30 seconds')\n              OR (status = 'done'::job_status AND finished_at >= NOW() - INTERVAL '5 seconds')\n          )\n        ORDER BY started_at DESC NULLS LAST, finished_at DESC NULLS LAST\n        ",
+  "query": "\n        SELECT\n            id,\n            relative_path,\n            user_id,\n            job_type AS \"job_type: JobType\",\n            payload,\n            priority,\n            status AS \"status: JobStatus\",\n            attempts,\n            dependency_attempts,\n            max_attempts,\n            owner,\n            started_at,\n            finished_at,\n            created_at,\n            scheduled_at,\n            last_heartbeat,\n            last_error\n        FROM jobs\n        WHERE user_id = $1\n          AND job_type IN ('ingest_metadata', 'ingest_thumbnails', 'ingest_analysis', 'takeout_import')\n          AND (\n              (status = 'running'::job_status AND last_heartbeat >= NOW() - INTERVAL '1 minute 30 seconds')\n              OR (status = 'done'::job_status AND finished_at >= NOW() - INTERVAL '5 seconds')\n          )\n        ORDER BY started_at DESC NULLS LAST, finished_at DESC NULLS LAST\n        ",
   "describe": {
     "columns": [
       {
@@ -57,7 +57,8 @@
                 "sync_thumbnails",
                 "generate_daily_cards",
                 "calc_system_stats",
-                "handle_web_upload"
+                "handle_web_upload",
+                "takeout_import"
               ]
             }
           }
@@ -251,5 +252,5 @@
       true
     ]
   },
-  "hash": "a9762145cb5a84ce07a3ca0c8c84c852b7b2ab6e988142fbedf14b007030f4de"
+  "hash": "793cdc36811f8705a6e673535bce8423be3209e5e0e19120b9900949859c6a90"
 }

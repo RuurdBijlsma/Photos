@@ -42,6 +42,7 @@ pub enum JobType {
     ImportAlbumItem,
     CalcSystemStats,
     HandleWebUpload,
+    TakeoutImport,
     GenerateDailyCards,
     UpdateGlobalCentroid,
 }
@@ -60,7 +61,10 @@ impl JobType {
         match self {
             Self::Remove => 5,
             Self::HandleWebUpload => 10,
-            Self::IngestMetadata => 20,
+            // Global, same phase as the per-file ingest jobs: extracting a zip is
+            // IO-bound and can overlap with ingest work, and being global+phase-20
+            // it never starves them (their path check sees min_global_phase = 20).
+            Self::TakeoutImport | Self::IngestMetadata => 20,
             Self::IngestThumbnails => 30,
             Self::IngestAnalysis => 40,
             Self::ClusterFaces
@@ -83,6 +87,7 @@ impl JobType {
 
             Self::Scan
             | Self::HandleWebUpload
+            | Self::TakeoutImport
             | Self::ImportAlbumItem
             | Self::CleanDb
             | Self::UpdateGlobalCentroid
@@ -121,6 +126,7 @@ impl JobType {
             Self::Remove => 0,
             Self::CleanDb => 20,
             Self::ImportAlbumItem => 25,
+            Self::TakeoutImport => 30,
             Self::Scan => 70,
             Self::UpdateGlobalCentroid => 100,
             Self::CalcSystemStats => 110,

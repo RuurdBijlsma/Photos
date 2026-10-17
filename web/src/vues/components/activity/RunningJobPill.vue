@@ -18,7 +18,7 @@ defineProps<{
   >
     <div class="job-info-left">
       <span class="job-type-badge" :class="{ 'text-caption mb-1': !compact }">
-        {{ caps(jobType.replace('ingest_', '')) }}
+        {{ caps(jobType.replace('ingest_', '').replace('_', ' ')) }}
       </span>
       <span
         class="job-path"

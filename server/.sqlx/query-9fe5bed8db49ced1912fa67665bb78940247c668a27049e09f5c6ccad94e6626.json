@@ -1,0 +1,37 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO jobs (relative_path, job_type, priority, scope, phase, user_id, status)\n        SELECT\n            u.path,\n            u.jt::job_type,\n            u.pri,\n            u.sc::job_scope,\n            u.ph,\n            u.uid,\n            u.stat::job_status\n        FROM UNNEST($1::TEXT[], $2::TEXT[], $3::INT[], $4::JOB_SCOPE[], $5::INT[], $6::INT[], $7::TEXT[])\n          AS u(path, jt, pri, sc, ph, uid, stat)\n        ON CONFLICT (job_type, coalesce(user_id, -1), coalesce(md5(payload::text), ''), coalesce(relative_path, ''))\n        WHERE (status IN ('queued', 'running'))\n        DO NOTHING\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "TextArray",
+        "TextArray",
+        "Int4Array",
+        {
+          "Custom": {
+            "name": "job_scope[]",
+            "kind": {
+              "Array": {
+                "Custom": {
+                  "name": "job_scope",
+                  "kind": {
+                    "Enum": [
+                      "path",
+                      "global"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "Int4Array",
+        "Int4Array",
+        "TextArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "9fe5bed8db49ced1912fa67665bb78940247c668a27049e09f5c6ccad94e6626"
+}

@@ -7,10 +7,11 @@ use crate::jobs::management::is_job_cancelled;
 use color_eyre::eyre::Context;
 use color_eyre::{Result, eyre::eyre};
 use common_services::caching::hash_file;
-use common_services::database::UpdateField;
-use common_services::database::album_store::AlbumStore;
 use common_services::database::jobs::Job;
 use common_services::database::media_item_store::MediaItemStore;
+use common_services::database::takeout_link_store::{
+    TakeoutLinkStore, attach_media_item_to_albums,
+};
 use common_services::job_queue::IngestMetadataPayload;
 use media_analyzer::MediaMetadata;
 use serde_json::from_value;
@@ -107,26 +108,24 @@ async fn store_media_item(
     )
     .await?;
     if let Some(info) = &pending_payload {
-        AlbumStore::add_media_items(
-            &mut *tx,
-            &info.album_id,
-            std::slice::from_ref(&item_id),
+        attach_media_item_to_albums(
+            &mut tx,
             user_id,
+            &item_id,
+            std::slice::from_ref(&info.album_id),
         )
         .await?;
-        if let Some(album) = AlbumStore::find_by_id(&mut *tx, &info.album_id).await?
-            && album.thumbnail_id.is_none()
-        {
-            AlbumStore::update(
-                &mut *tx,
-                &info.album_id,
-                None,
-                UpdateField::Ignore,
-                UpdateField::Value(item_id),
-                None,
-            )
-            .await?;
-        }
+    }
+    // File previously registered by a takeout import: attach all albums the
+    // filename appeared in, atomically with the media item itself.
+    let filename = Path::new(relative_path).file_name().map_or_else(
+        || relative_path.to_owned(),
+        |f| f.to_string_lossy().into_owned(),
+    );
+    let takeout_album_ids =
+        TakeoutLinkStore::consume_pending(&mut tx, user_id, &filename, &item_id).await?;
+    if !takeout_album_ids.is_empty() {
+        attach_media_item_to_albums(&mut tx, user_id, &item_id, &takeout_album_ids).await?;
     }
     tx.commit().await?;
     Ok(())

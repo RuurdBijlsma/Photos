@@ -4,4 +4,5 @@ pub mod test_onboarding;
 pub mod test_photos;
 pub mod test_root;
 pub mod test_search;
+pub mod test_takeout;
 pub mod test_timeline;
