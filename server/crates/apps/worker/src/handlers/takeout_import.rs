@@ -58,6 +58,11 @@ struct ExtractedItem {
     filename: String,
     /// Full path relative to `media_root` — the final `media_item.relative_path`.
     relative_path: String,
+    /// The flat destination already held a file, and it was left untouched.
+    /// Its bytes may belong to an earlier import (e.g. the canonical copy of a
+    /// pending-linked filename), so it must never be treated as a disposable
+    /// duplicate.
+    preexisting: bool,
 }
 
 type AlbumMetadataMap = HashMap<String, TakeoutAlbumMetadata>;
@@ -146,6 +151,10 @@ fn extract_zip(
     let file = fs::File::open(zip_path)
         .wrap_err_with(|| format!("Opening takeout zip {}", zip_path.display()))?;
     let mut archive = zip::ZipArchive::new(BufReader::new(file))?;
+    // The flat layout writes directly into the takeout root, so it must exist
+    // up front (per-file parent creation was removed with the album folders).
+    fs::create_dir_all(destination_root)
+        .wrap_err_with(|| format!("Creating takeout folder {}", destination_root.display()))?;
 
     let mut items = Vec::new();
     let mut album_metadata = AlbumMetadataMap::new();
@@ -204,27 +213,36 @@ fn extract_zip(
             continue;
         }
 
-        let destination = destination_root.join(&relative);
-        if let Some(parent) = destination.parent()
-            && let Err(e) = fs::create_dir_all(parent)
-        {
-            warn!("Failed to create takeout folder {:?}: {}", parent, e);
-            continue;
+        // Media files always extract into the flat takeout folder: the
+        // physical copy location is storage-only. Album membership lives in
+        // the database (pending links keyed by filename), and filename dedup
+        // keeps exactly one physical copy per asset, so per-album folders
+        // would imply an on-disk layout that does not exist (an album folder
+        // whose contents were deduped elsewhere).
+        let destination = destination_root.join(file_name);
+        // Never overwrite an existing file: the first-imported bytes win, and
+        // a copy left by an earlier import (possibly the canonical file of a
+        // deduped filename) cannot be clobbered by a later batch. The
+        // trade-off is that a file truncated by a crash mid-copy also stays;
+        // re-uploading the batch after deleting the file repairs that.
+        let preexisting = fs::metadata(&destination).is_ok_and(|m| m.is_file());
+        if !preexisting {
+            let mut out = match fs::File::create(&destination) {
+                Ok(out) => out,
+                Err(e) => {
+                    warn!("Failed to create takeout file {:?}: {}", destination, e);
+                    continue;
+                }
+            };
+            std::io::copy(&mut entry, &mut out)?;
         }
-        let mut out = match fs::File::create(&destination) {
-            Ok(out) => out,
-            Err(e) => {
-                warn!("Failed to create takeout file {:?}: {}", destination, e);
-                continue;
-            }
-        };
-        std::io::copy(&mut entry, &mut out)?;
 
         let relative_path = destination.make_relative(media_root)?;
         items.push(ExtractedItem {
             folder,
             filename: file_path.to_owned(),
             relative_path,
+            preexisting,
         });
     }
 
@@ -289,12 +307,16 @@ async fn register_extracted_items(
         return Ok(Vec::new());
     }
 
-    // Quick index of extract duplicates within this zip.
+    // Quick index of duplicates within this zip. The flat layout gives the
+    // same filename one physical destination, so the folder participates in
+    // the key: two album folders containing the same file are two link
+    // decisions, but an exactly repeated zip entry is not.
     let mut unique_items: Vec<&ExtractedItem> = Vec::with_capacity(items.len());
     {
-        let mut seen_paths: HashSet<&str> = HashSet::with_capacity(items.len());
+        let mut seen_entries: HashSet<(&Option<String>, &str)> =
+            HashSet::with_capacity(items.len());
         for item in items {
-            if seen_paths.insert(&item.relative_path) {
+            if seen_entries.insert((&item.folder, &item.relative_path)) {
                 unique_items.push(item);
             }
         }
@@ -420,6 +442,9 @@ async fn decide_item_fates(
     album_ids: &HashMap<String, String>,
 ) -> color_eyre::Result<(HashMap<String, Vec<String>>, Vec<String>, Vec<PathBuf>)> {
     let mut claimed_in_zip: HashSet<String> = HashSet::new();
+    // Paths whose on-disk file backs a registered or freshly-claimed item and
+    // must therefore never be deleted as a duplicate.
+    let mut kept_paths: HashSet<String> = HashSet::new();
     let mut pending_per_album: HashMap<String, Vec<String>> = HashMap::new();
     let mut new_paths: Vec<String> = Vec::new();
     let mut redundant: Vec<PathBuf> = Vec::new();
@@ -432,7 +457,9 @@ async fn decide_item_fates(
         if let Some(existing) = existing_items.get(&filename) {
             // Already in the library: keep only if this IS that copy on disk.
             let same_path = existing.relative_path == item.relative_path;
-            if !same_path {
+            if same_path {
+                kept_paths.insert(item.relative_path.clone());
+            } else if !item.preexisting {
                 redundant.push(destination);
             }
             if let Some(album_id) = album_id {
@@ -456,7 +483,9 @@ async fn decide_item_fates(
         } else if let Some(linked_item) = linked_items.get(&filename).cloned().flatten() {
             // Claimed by an earlier takeout pass that is still ingesting: link
             // this album to that existing item and drop the duplicate copy.
-            redundant.push(destination);
+            if !item.preexisting {
+                redundant.push(destination);
+            }
             if let Some(album_id) = album_id {
                 TakeoutLinkStore::insert_consumed(
                     &mut **tx,
@@ -477,7 +506,15 @@ async fn decide_item_fates(
             }
         } else if !claimed_in_zip.insert(filename.clone()) {
             // Second (or later) occurrence of the same filename in this zip.
-            redundant.push(destination);
+            // With the flat layout this usually did not even extract a second
+            // file (the first copy already existed on disk), so there is
+            // nothing to delete — only drop it if it was genuinely written by
+            // this pass and no kept item owns the path.
+            if !item.preexisting && !kept_paths.contains(&item.relative_path) {
+                redundant.push(destination);
+            } else {
+                kept_paths.insert(item.relative_path.clone());
+            }
             if let Some(album_id) = album_id {
                 pending_per_album
                     .entry(album_id)
@@ -486,6 +523,7 @@ async fn decide_item_fates(
             }
         } else {
             // Canonical copy: keep the file and start the ingest pipeline.
+            kept_paths.insert(item.relative_path.clone());
             if let Some(album_id) = album_id {
                 pending_per_album
                     .entry(album_id)

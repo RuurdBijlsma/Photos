@@ -345,3 +345,29 @@ Cases:
 3. **Album sort**: takeout albums created with the default `DateAsc` — OK?
 4. **Badge UI now or later?** I'd defer the frontend album badge; the data is
    there once we add `takeout_id` to the album API response.
+
+## 11. Addendum — implemented refinements (smoke-test learnings)
+
+1. **Flat extraction layout.** Media extracts to
+   `{user_media_folder}/takeout/{file}` — no batch directory and **no
+   per-album folders**. Filename dedup keeps exactly one physical copy per
+   asset, so album folders would imply an on-disk layout that does not exist
+   (an album folder whose contents dedup elsewhere); album membership lives
+   solely in `takeout_album_link`, keyed by filename. Legacy folders from
+   imports before this change are not migrated — recreate the DB and
+   re-upload instead.
+2. **First-wins extraction.** A destination file is never overwritten: if a
+   file already exists at `takeout/{file}`, the entry is skipped. This
+   protects canonical bytes of earlier imports from being clobbered by a
+   later batch's copy (frames it would only be safe under the old per-album
+   paths) and makes crash retries safe. Trade-off: a file truncated by a
+   crash mid-copy is not rewritten by a retry; delete it and re-upload.
+3. **Copy-deletion guard.** A "redundant" extracted copy is deleted only if
+   this import wrote it freshly (not skipped as pre-existing) and no
+   registered/claimed item points at its path — with the flat layout the
+   redundant copy and the canonical copy share one destination, so
+   unconditional deletes would destroy the kept copy.
+4. **Win32-unsafe folder names.** Zip components with trailing spaces/dots
+   (e.g. album `"Vakantie Litouwen "`) cannot be addressed via normal Win32
+   paths once they stop being the final component; `photos_relative_path`
+   trims trailing spaces/dots from every component before any path is built.

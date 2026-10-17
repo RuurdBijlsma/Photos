@@ -393,9 +393,10 @@ pub async fn test_takeout_import(context: &TestContext) -> Result<()> {
     assert_eq!(response.status(), StatusCode::OK);
 
     // Media items: canonical copies only; no Google Photos component and no
-    // batch id in the path; sidecars must not have become items.
-    let relative_a = format!("{prefix}takeout/Italië 2016/{TAKE_A}");
-    let relative_b = format!("{prefix}takeout/Photos from 2024/{TAKE_B}");
+    // batch id in the path; sidecars must not have become items. All takeout
+    // media extracts into the flat takeout folder.
+    let relative_a = format!("{prefix}takeout/{TAKE_A}");
+    let relative_b = format!("{prefix}takeout/{TAKE_B}");
     let relative_c = format!("{prefix}takeout/{TAKE_C}");
     wait_item_ingested(context, &relative_a).await?;
     wait_item_ingested(context, &relative_b).await?;
@@ -481,11 +482,11 @@ pub async fn test_takeout_dedup_and_fallback_batch(context: &TestContext) -> Res
     let second = takeout_album(context, "Second Album").await?;
     assert_eq!(second.takeout_id.as_deref(), Some("takeout"));
 
-    wait_item_ingested(context, &format!("{prefix}takeout/Second/{TESTIMG_A}")).await?;
+    wait_item_ingested(context, &format!("{prefix}takeout/{TESTIMG_A}")).await?;
 
-    // The library filename was NOT imported again: no item lives at the Second
-    // folder path, and the consumed link points at an already-existing item.
-    let second_folder_path = format!("{prefix}takeout/Second/{SOURCE_PHOTO_A}");
+    // The library filename was NOT imported again: no item lives at the flat
+    // takeout path, and the consumed link points at an already-existing item.
+    let second_folder_path = format!("{prefix}takeout/{SOURCE_PHOTO_A}");
     let path_count = sqlx::query_scalar!(
         "SELECT COUNT(*) FROM media_item WHERE relative_path = $1",
         second_folder_path
@@ -511,7 +512,7 @@ pub async fn test_takeout_dedup_and_fallback_batch(context: &TestContext) -> Res
     );
 
     // The in-zip duplicate of TESTIMG_A shares one item between Second and Third.
-    wait_item_ingested(context, &format!("{prefix}takeout/Second/{TESTIMG_A}")).await?;
+    wait_item_ingested(context, &format!("{prefix}takeout/{TESTIMG_A}")).await?;
     let testimg_ids = media_item_ids_for_filename(context, TESTIMG_A).await?;
     assert_eq!(testimg_ids.len(), 1, "in-zip duplicate was imported twice");
     let albums_for_testimg = takeout_album_ids_for_item(context, &testimg_ids[0]).await?;
@@ -529,7 +530,6 @@ pub async fn test_takeout_dedup_and_fallback_batch(context: &TestContext) -> Res
             .media_root
             .join(&prefix)
             .join("takeout")
-            .join("Second")
             .join(SOURCE_PHOTO_A)
     )?);
 
@@ -593,20 +593,12 @@ pub async fn test_takeout_chunked_batches(context: &TestContext) -> Result<()> {
     let zip_a = fs::read(chunk_dir.join("takeout-20261016T000000Z-1-001.zip")).await?;
     upload_file(context, "takeout-20261016T000000Z-1-001.zip", &zip_a).await?;
     wait_import_done(context, BATCH_2, 1).await?;
-    wait_item_ingested(
-        context,
-        &format!("{prefix}takeout/Photos from 2025/{TESTIMG_CHUNK_1}"),
-    )
-    .await?;
+    wait_item_ingested(context, &format!("{prefix}takeout/{TESTIMG_CHUNK_1}")).await?;
 
     let zip_b = fs::read(chunk_dir.join("takeout-20261016T000000Z-1-002.zip")).await?;
     upload_file(context, "takeout-20261016T000000Z-1-002.zip", &zip_b).await?;
     wait_import_done(context, BATCH_2, 2).await?;
-    wait_item_ingested(
-        context,
-        &format!("{prefix}takeout/Photos from 2025/{TESTIMG_CHUNK_2}"),
-    )
-    .await?;
+    wait_item_ingested(context, &format!("{prefix}takeout/{TESTIMG_CHUNK_2}")).await?;
 
     // One album created by the two chunks; both chunk files are its members.
     let photos2025 = takeout_album(context, "Photos from 2025").await?;
@@ -680,9 +672,10 @@ pub async fn test_takeout_unsafe_folder_names(context: &TestContext) -> Result<(
     upload_file(context, ZIP_3_NAME, &contents).await?;
     wait_import_done(context, BATCH_3, 1).await?;
 
-    // The files landed under the sanitized folder name instead of being lost.
-    let relative_main = format!("{prefix}takeout/Vakantie Litouwen/{TAKE_SPACE}");
-    let relative_dot = format!("{prefix}takeout/Vakantie Litouwen/long exposure.jpg");
+    // The files landed in the flat takeout folder under sanitized names,
+    // and no per-album folder is created on disk at all.
+    let relative_main = format!("{prefix}takeout/{TAKE_SPACE}");
+    let relative_dot = format!("{prefix}takeout/long exposure.jpg");
     wait_item_ingested(context, &relative_main).await?;
     wait_item_ingested(context, &relative_dot).await?;
 
@@ -691,11 +684,21 @@ pub async fn test_takeout_unsafe_folder_names(context: &TestContext) -> Result<(
         .ingest
         .media_root
         .join("takeout")
-        .join("Vakantie Litouwen")
         .join(TAKE_SPACE);
     assert!(
         std::fs::exists(&space_file)?,
         "file was not extracted to the sanitized path"
+    );
+    assert!(
+        !std::fs::exists(
+            context
+                .settings
+                .ingest
+                .media_root
+                .join("takeout")
+                .join("Vakantie Litouwen")
+        )?,
+        "per-album folder must not be created"
     );
 
     let litouwen = takeout_album(context, "Vakantie Litouwen").await?;
