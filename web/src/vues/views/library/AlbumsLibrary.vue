@@ -10,7 +10,7 @@ import MdiSortCalendarAscending from '~icons/mdi/sort-calendar-ascending'
 import MdiSortCalendarDescending from '~icons/mdi/sort-calendar-descending'
 import MdiSortClockAscendingOutline from '~icons/mdi/sort-clock-ascending-outline'
 import MdiSortClockDescendingOutline from '~icons/mdi/sort-clock-descending-outline'
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, watch } from 'vue'
 import MainLayoutContainer from '@/vues/components/MainLayoutContainer.vue'
 import type { Album, AlbumSortField, SortDirection } from '@/scripts/types/api/album'
 import { useRouter } from 'vue-router'
@@ -64,6 +64,10 @@ const sortedAlbums = computed(() => {
     return isAsc ? comparison : -comparison
   })
 })
+
+watch(sortedAlbums,()=>{
+  console.log("ALBUMS", sortedAlbums.value)
+},{immediate:true})
 
 const flickerLoad = useDelayedBoolean(() => albumStore.userAlbumsLoading, 150)
 const showLoading = computed(() => flickerLoad.value && sortedAlbums.value.length === 0)

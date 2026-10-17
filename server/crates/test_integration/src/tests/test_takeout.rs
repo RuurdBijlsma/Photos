@@ -633,8 +633,9 @@ pub async fn test_takeout_chunked_batches(context: &TestContext) -> Result<()> {
     Ok(())
 }
 
-/// Album folders with names Windows cannot address mid-path (trailing space /
-/// trailing dot) must be renamed while extracting, e.g. export folder
+/// Album folders with names Windows cannot address mid-path
+///
+/// (trailing space trailing dot) must be renamed while extracting, e.g. export folder
 /// `"Vakantie Litouwen "`: `create_dir_all` creates it with the trailing
 /// character silently stripped, but writing a file into the unsanitized path
 /// fails with `ERROR_PATH_NOT_FOUND` and the whole album would silently be
@@ -659,7 +660,7 @@ pub async fn test_takeout_unsafe_folder_names(context: &TestContext) -> Result<(
         &[
             (
                 format!("{TAKEOUT_ROOT}/Vakantie Litouwen /metadata.json"),
-                r#"{"title":"Vakantie Litouwen"}"#.as_bytes().to_vec(),
+                br#"{"title":"Vakantie Litouwen"}"#.to_vec(),
             ),
             (
                 format!("{TAKEOUT_ROOT}/Vakantie Litouwen /{TAKE_SPACE}"),
