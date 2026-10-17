@@ -142,6 +142,10 @@ impl AlbumStore {
     ) -> Result<Album, DbError> {
         if let Some(album) = Self::find_takeout_album(&mut **tx, owner_id, name, takeout_id).await?
         {
+            // Albums created by imports predating the collaborator row below
+            // lack it; upserting on every find lets re-uploaded batches
+            // self-heal them.
+            Self::upsert_collaborator(&mut **tx, &album.id, owner_id, AlbumRole::Owner).await?;
             return Ok(album);
         }
 
@@ -162,6 +166,10 @@ impl AlbumStore {
             },
         )
         .await?;
+        // The plain `create` does not register the owner as a collaborator;
+        // without that row the album detail endpoint (which checks
+        // `can_view_album`) would 404 even though the list endpoint shows it.
+        Self::upsert_collaborator(&mut **tx, &id, owner_id, AlbumRole::Owner).await?;
         // `create` is shared with user-driven album creation and leaves
         // `takeout_id` alone; stamp it here so the album can be found again.
         sqlx::query!(

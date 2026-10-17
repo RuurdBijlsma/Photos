@@ -378,6 +378,20 @@ pub async fn test_takeout_import(context: &TestContext) -> Result<()> {
         ]
     );
 
+    // The owner must be able to open the album detail endpoint directly (it
+    // authorizes via the album_collaborator row, not the owner column).
+    let response = context
+        .http_client
+        .get(format!(
+            "{}/api/album/{}?sort=desc",
+            context.settings.api.public_url, italie.id
+        ))
+        .send()
+        .await?
+        .error_for_status()
+        .wrap_err_with(|| format!("GET /api/album/{} failed", italie.id))?;
+    assert_eq!(response.status(), StatusCode::OK);
+
     // Media items: canonical copies only; no Google Photos component and no
     // batch id in the path; sidecars must not have become items.
     let relative_a = format!("{prefix}takeout/Italië 2016/{TAKE_A}");
