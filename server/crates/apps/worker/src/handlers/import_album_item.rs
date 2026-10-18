@@ -55,6 +55,12 @@ pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
     let full_save_path = full_save_dir.join(filename);
     let relative_path = full_save_path.make_relative(&context.settings.ingest.media_root)?;
     fs::create_dir_all(&full_save_dir).await?;
+    // Staging files abandoned by a killed download (handled by the stream-write
+    // cleanup, but not by a hard process kill) would otherwise accumulate.
+    common_services::utils::remove_stale_part_files(
+        &full_save_dir,
+        std::time::Duration::from_hours(1),
+    );
 
     // Check if file already exists before downloading.
     if let Some(existing_id) =

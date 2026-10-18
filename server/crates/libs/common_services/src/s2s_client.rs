@@ -1,13 +1,13 @@
 use crate::alert;
 use crate::api::album::interfaces::AlbumShareClaims;
 use crate::database::album::album::AlbumSummary;
+use crate::utils::{finalize_part_file, part_file_path};
 use color_eyre::Result;
 use color_eyre::eyre::eyre;
 use futures_util::StreamExt;
 use jsonwebtoken::{DecodingKey, Validation, decode};
 use reqwest::Client;
-use std::path::{Path, PathBuf};
-use tempfile::NamedTempFile;
+use std::path::Path;
 use tokio::fs;
 use tokio::io::AsyncWriteExt;
 use tracing::warn;
@@ -124,18 +124,37 @@ impl S2SClient {
             );
         }
 
-        // --- temp file ---
-        let temp = NamedTempFile::new()?;
-        let temp_path: PathBuf = temp.path().to_path_buf();
-        let mut temp_file = fs::File::create(&temp_path).await?;
-        let mut stream = response.bytes_stream();
-        while let Some(chunk) = stream.next().await {
-            temp_file.write_all(&chunk?).await?;
+        // Stream into a hidden `.part` staging file next to the destination:
+        // incomplete bytes never exist under the final name, the file watcher
+        // and scan.rs skip the staging name, and the completing rename stays
+        // same-volume (a system-temp staging file could live on another drive).
+        let temp = part_file_path(destination, std::process::id());
+        let write_result: Result<()> = async {
+            {
+                let mut temp_file = fs::File::create(&temp).await?;
+                let mut stream = response.bytes_stream();
+                while let Some(chunk) = stream.next().await {
+                    temp_file.write_all(&chunk?).await?;
+                }
+                temp_file.flush().await?;
+            }
+            Ok(())
         }
-        temp_file.flush().await?;
+        .await;
+        if let Err(e) = write_result {
+            // Best-effort removal of the incomplete staging file.
+            let _ = fs::remove_file(&temp).await;
+            return Err(e);
+        }
 
-        // --- move temp → destination ---
-        fs::rename(&temp_path, &destination).await?;
+        // --- move staging file → destination, first writer wins ---
+        let won = finalize_part_file(&temp, destination)?;
+        if !won {
+            warn!(
+                "A file already existed at {:?}; kept its bytes and dropped the staged copy",
+                destination
+            );
+        }
 
         Ok(())
     }

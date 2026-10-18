@@ -15,6 +15,7 @@ use common_services::database::takeout_link_store::{
 };
 use common_services::database::user_store::UserStore;
 use common_services::job_queue::bulk_enqueue_full_ingest_in_tx;
+use common_services::utils::{finalize_part_file, part_file_path, remove_stale_part_files};
 use serde::{Deserialize, Serialize};
 use serde_json::from_value;
 use sqlx::PgPool;
@@ -155,6 +156,9 @@ fn extract_zip(
     // up front (per-file parent creation was removed with the album folders).
     fs::create_dir_all(destination_root)
         .wrap_err_with(|| format!("Creating takeout folder {}", destination_root.display()))?;
+    // Staging files abandoned by a crashed or killed extraction (renames only
+    // leave one when the process died mid-copy) would otherwise accumulate.
+    remove_stale_part_files(destination_root, std::time::Duration::from_hours(1));
 
     let mut items = Vec::new();
     let mut album_metadata = AlbumMetadataMap::new();
@@ -222,19 +226,42 @@ fn extract_zip(
         let destination = destination_root.join(file_name);
         // Never overwrite an existing file: the first-imported bytes win, and
         // a copy left by an earlier import (possibly the canonical file of a
-        // deduped filename) cannot be clobbered by a later batch. The
-        // trade-off is that a file truncated by a crash mid-copy also stays;
-        // re-uploading the batch after deleting the file repairs that.
-        let preexisting = fs::metadata(&destination).is_ok_and(|m| m.is_file());
+        // deduped filename) cannot be clobbered by a later batch. Partial
+        // writes are impossible at the final name: the copy lands on a
+        // `.part` temp first and is renamed into place only when complete,
+        // so a crash mid-copy leaves only the temp behind (overwritten by a
+        // retry) and the final name never refers to incomplete bytes.
+        let mut preexisting = fs::metadata(&destination).is_ok_and(|m| m.is_file());
         if !preexisting {
-            let mut out = match fs::File::create(&destination) {
-                Ok(out) => out,
+            // Copy to a hidden `.part` staging file first and rename into
+            // place only when complete: partially-written bytes never exist
+            // under the final name, so neither the file watcher nor scan.rs
+            // can discover and ingest an incomplete file. A crash mid-copy
+            // leaves only the staging file behind, overwritten on retry.
+            let temp = part_file_path(&destination, format!("{}-{index}", std::process::id()));
+            {
+                let mut out = match fs::File::create(&temp) {
+                    Ok(out) => out,
+                    Err(e) => {
+                        warn!("Failed to create takeout staging file {:?}: {}", temp, e);
+                        continue;
+                    }
+                };
+                std::io::copy(&mut entry, &mut out)?;
+            }
+            match finalize_part_file(&temp, &destination) {
+                Ok(true) => {}
+                Ok(false) => {
+                    // A concurrent import finalized the same filename first:
+                    // its bytes won and ours were discarded — the same
+                    // situation as finding the destination preexisting.
+                    preexisting = true;
+                }
                 Err(e) => {
-                    warn!("Failed to create takeout file {:?}: {}", destination, e);
+                    warn!("Failed to finalize takeout file {:?}: {}", destination, e);
                     continue;
                 }
-            };
-            std::io::copy(&mut entry, &mut out)?;
+            }
         }
 
         let relative_path = destination.make_relative(media_root)?;
