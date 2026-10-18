@@ -15,7 +15,7 @@ use common_services::database::takeout_link_store::{
 };
 use common_services::database::user_store::UserStore;
 use common_services::job_queue::bulk_enqueue_full_ingest_in_tx;
-use common_services::utils::{finalize_part_file, part_file_path, remove_stale_part_files};
+use common_services::part_file::{remove_stale_part_files, stage_part_file};
 use serde::{Deserialize, Serialize};
 use serde_json::from_value;
 use sqlx::PgPool;
@@ -233,32 +233,28 @@ fn extract_zip(
         // retry) and the final name never refers to incomplete bytes.
         let mut preexisting = fs::metadata(&destination).is_ok_and(|m| m.is_file());
         if !preexisting {
-            // Copy to a hidden `.part` staging file first and rename into
-            // place only when complete: partially-written bytes never exist
-            // under the final name, so neither the file watcher nor scan.rs
-            // can discover and ingest an incomplete file. A crash mid-copy
-            // leaves only the staging file behind, overwritten on retry.
-            let temp = part_file_path(&destination, format!("{}-{index}", std::process::id()));
-            {
-                let mut out = match fs::File::create(&temp) {
-                    Ok(out) => out,
-                    Err(e) => {
-                        warn!("Failed to create takeout staging file {:?}: {}", temp, e);
-                        continue;
-                    }
-                };
-                std::io::copy(&mut entry, &mut out)?;
-            }
-            match finalize_part_file(&temp, &destination) {
+            // Shared staging helper: the copy lands on a hidden `.part`
+            // staging name and is renamed into place only when complete, so
+            // neither the file watcher nor scan.rs can discover and ingest
+            // incomplete bytes, and failures never leave a partial file.
+            let staged = stage_part_file(
+                &destination,
+                format!("{}-{index}", std::process::id()),
+                |out| {
+                    std::io::copy(&mut entry, &mut *out)?;
+                    Ok(())
+                },
+            );
+            match staged {
                 Ok(true) => {}
                 Ok(false) => {
-                    // A concurrent import finalized the same filename first:
-                    // its bytes won and ours were discarded — the same
+                    // A concurrent extraction finalized the same filename
+                    // first: its bytes won and ours were discarded — the same
                     // situation as finding the destination preexisting.
                     preexisting = true;
                 }
                 Err(e) => {
-                    warn!("Failed to finalize takeout file {:?}: {}", destination, e);
+                    warn!("Failed to stage takeout file {:?}: {}", destination, e);
                     continue;
                 }
             }

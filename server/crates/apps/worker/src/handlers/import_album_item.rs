@@ -57,7 +57,7 @@ pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
     fs::create_dir_all(&full_save_dir).await?;
     // Staging files abandoned by a killed download (handled by the stream-write
     // cleanup, but not by a hard process kill) would otherwise accumulate.
-    common_services::utils::remove_stale_part_files(
+    common_services::part_file::remove_stale_part_files(
         &full_save_dir,
         std::time::Duration::from_hours(1),
     );
