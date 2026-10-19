@@ -11,7 +11,7 @@ use common_services::database::album_store::AlbumStore;
 use common_services::database::jobs::Job;
 use common_services::database::media_item_store::MediaItemStore;
 use common_services::database::user_store::UserStore;
-use common_services::job_queue::{IngestMetadataPayload, enqueue_full_ingest};
+use common_services::job_queue::{IngestMetadataPayload, bulk_enqueue_full_ingest};
 use common_services::utils::write_media_datetime;
 use sanitize_filename::sanitize;
 use serde::Deserialize;
@@ -341,13 +341,11 @@ async fn index_files(
 
 async fn import_media_item(
     context: &WorkerContext,
-    user_id: i32,
     dest_folder: &Path,
     filename: &str,
     source_path: &Path,
-    album_ids: &[String],
     sidecar_path: Option<&Path>,
-) -> Result<()> {
+) -> Result<String> {
     let is_video = context.settings.ingest.is_video_file(source_path);
 
     let needs_sidecar_date = match context.media_analyzer.analyze_media(source_path).await {
@@ -397,21 +395,7 @@ async fn import_media_item(
         let _ = tokio::fs::remove_file(source_path).await;
     }
 
-    // Enqueue full ingest pipeline
-    let rel_path = dest_file_path.make_relative(&context.settings.ingest.media_root)?;
-    enqueue_full_ingest(
-        &context.pool,
-        &context.settings.ingest,
-        &rel_path,
-        user_id,
-        Some(IngestMetadataPayload {
-            album_ids: album_ids.to_vec(),
-            remote_user_identity: None,
-        }),
-    )
-    .await?;
-
-    Ok(())
+    dest_file_path.make_relative(&context.settings.ingest.media_root)
 }
 
 async fn cleanup(context: &WorkerContext, payload: &TakeoutBatchPayload, extract_dir: &Path) {
@@ -490,6 +474,7 @@ pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
 
     let mut newly_imported_count = 0;
     let mut linked_existing_count = 0;
+    let mut new_media = Vec::new();
 
     for (filename, (source_path, album_ids)) in media_files {
         let album_ids: Vec<String> = album_ids.into_iter().collect();
@@ -512,18 +497,27 @@ pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
                 .and_then(|folder| find_sidecar(&sidecars, folder, &filename))
                 .map(PathBuf::as_path);
 
-            import_media_item(
-                context,
-                user_id,
-                &user_takeout_folder,
-                &filename,
-                &source_path,
-                &album_ids,
-                sidecar_path,
-            )
-            .await?;
+            new_media.push((
+                import_media_item(
+                    context,
+                    &user_takeout_folder,
+                    &filename,
+                    &source_path,
+                    sidecar_path,
+                )
+                .await?,
+                Some(IngestMetadataPayload {
+                    album_ids,
+                    remote_user_identity: None,
+                }),
+            ));
             newly_imported_count += 1;
         }
+    }
+
+    if !new_media.is_empty() {
+        bulk_enqueue_full_ingest(&context.pool, &context.settings.ingest, &new_media, user_id)
+            .await?;
     }
 
     info!(

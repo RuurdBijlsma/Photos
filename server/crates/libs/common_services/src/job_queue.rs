@@ -215,10 +215,10 @@ async fn cancel_ingest_analysis_jobs(
 pub async fn bulk_enqueue_full_ingest(
     pool: &PgPool,
     ingest_settings: &IngestSettings,
-    relative_paths: &[String],
+    items: &[(String, Option<IngestMetadataPayload>)],
     user_id: i32,
 ) -> Result<()> {
-    if relative_paths.is_empty() {
+    if items.is_empty() {
         return Ok(());
     }
 
@@ -227,15 +227,16 @@ pub async fn bulk_enqueue_full_ingest(
         JobType::IngestThumbnails,
         JobType::IngestAnalysis,
     ];
-    let capacity = relative_paths.len() * job_types.len();
+    let capacity = items.len() * job_types.len();
 
     let mut all_paths = Vec::with_capacity(capacity);
     let mut all_types = Vec::with_capacity(capacity);
     let mut all_scopes = Vec::with_capacity(capacity);
     let mut all_phases = Vec::with_capacity(capacity);
     let mut all_priorities = Vec::with_capacity(capacity);
+    let mut all_payloads = Vec::with_capacity(capacity);
 
-    for path in relative_paths {
+    for (path, payload) in items {
         let file_path = ingest_settings.media_root.join(path);
         let is_video = ingest_settings.is_video_file(&file_path);
 
@@ -245,6 +246,11 @@ pub async fn bulk_enqueue_full_ingest(
             all_scopes.push(job_type.scope());
             all_phases.push(job_type.phase());
             all_priorities.push(job_type.get_priority(is_video));
+            all_payloads.push(match (job_type, payload) {
+                (JobType::IngestMetadata, Some(payload)) => serde_json::to_string(payload)?,
+                // Empty string maps to NULL below; serialized payloads are never empty.
+                _ => String::new(),
+            });
         }
     }
 
@@ -253,7 +259,7 @@ pub async fn bulk_enqueue_full_ingest(
 
     sqlx::query!(
         r#"
-        INSERT INTO jobs (relative_path, job_type, priority, scope, phase, user_id, status)
+        INSERT INTO jobs (relative_path, job_type, priority, scope, phase, user_id, status, payload)
         SELECT
             u.path,
             u.jt::job_type,
@@ -261,9 +267,10 @@ pub async fn bulk_enqueue_full_ingest(
             u.sc::job_scope,
             u.ph,
             u.uid,
-            u.stat::job_status
-        FROM UNNEST($1::text[], $2::text[], $3::int[], $4::job_scope[], $5::int[], $6::int[], $7::text[])
-          AS u(path, jt, pri, sc, ph, uid, stat)
+            u.stat::job_status,
+            NULLIF(u.pay, '')::jsonb
+        FROM UNNEST($1::text[], $2::text[], $3::int[], $4::job_scope[], $5::int[], $6::int[], $7::text[], $8::text[])
+          AS u(path, jt, pri, sc, ph, uid, stat, pay)
         ON CONFLICT (job_type, coalesce(user_id, -1), coalesce(md5(payload::text), ''), coalesce(relative_path, ''))
         WHERE (status IN ('queued', 'running'))
         DO NOTHING
@@ -275,6 +282,7 @@ pub async fn bulk_enqueue_full_ingest(
         &all_phases,
         &vec![user_id; capacity],
         &statuses,
+        &all_payloads,
     )
         .execute(pool)
         .await?;

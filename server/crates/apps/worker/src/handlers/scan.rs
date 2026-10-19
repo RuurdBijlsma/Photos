@@ -131,13 +131,15 @@ pub async fn sync_user_files_to_db(
     // Reconnected files that were marked missing -> Set missing_since = NULL
     let to_unmark_missing: Vec<_> = db_missing_paths.intersection(&fs_paths).cloned().collect();
 
-    if !to_ingest.is_empty() {
+    let has_new_files = !to_ingest.is_empty();
+    if has_new_files {
         info!(
             "Enqueuing {} new files for user {}",
             to_ingest.len(),
             user_id
         );
-        bulk_enqueue_full_ingest(pool, settings, &to_ingest, user_id).await?;
+        let items: Vec<_> = to_ingest.into_iter().map(|path| (path, None)).collect();
+        bulk_enqueue_full_ingest(pool, settings, &items, user_id).await?;
     }
 
     if !to_unmark_missing.is_empty() {
@@ -158,7 +160,7 @@ pub async fn sync_user_files_to_db(
         MediaItemStore::mark_relative_paths_as_missing(pool, &to_mark_missing).await?;
     }
 
-    if !to_ingest.is_empty() || !to_unmark_missing.is_empty() {
+    if has_new_files || !to_unmark_missing.is_empty() {
         tokio::try_join!(
             enqueue_job::<()>(pool, settings, JobType::UpdateGlobalCentroid).call(),
             enqueue_job::<()>(pool, settings, JobType::ClusterFaces).call(),
