@@ -155,6 +155,39 @@ impl AlbumStore {
         .await?)
     }
 
+    /// Retrieves an album by its owner and name.
+    pub async fn find_by_name(
+        executor: impl PgExecutor<'_>,
+        owner_id: i32,
+        name: &str,
+    ) -> Result<Option<Album>, DbError> {
+        Ok(sqlx::query_as!(
+            Album,
+            r#"
+            SELECT
+                id,
+                owner_id,
+                name,
+                description,
+                thumbnail_id,
+                is_public,
+                media_count,
+                latest_media_item_timestamp,
+                earliest_media_item_timestamp,
+                updated_at,
+                created_at,
+                sort_mode as "sort_mode: AlbumSort"
+            FROM album
+            WHERE owner_id = $1 AND name = $2
+            LIMIT 1
+            "#,
+            owner_id,
+            name
+        )
+        .fetch_optional(executor)
+        .await?)
+    }
+
     /// Retrieves all albums a user is a collaborator on.
     pub async fn list_by_user_id(
         executor: impl PgExecutor<'_>,

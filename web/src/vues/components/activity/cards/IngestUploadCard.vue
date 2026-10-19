@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, shallowRef } from 'vue'
 import { useUploadStore } from '@/scripts/stores/uploadStore.ts'
+import MdiArchiveArrowUpOutline from '~icons/mdi/archive-arrow-up-outline'
 import MdiFolderOpen from '~icons/mdi/folder-open'
 import MdiTrashCanOutline from '~icons/mdi/trash-can-outline'
 import MdiTrayArrowUp from '~icons/mdi/tray-arrow-up'
@@ -9,6 +10,7 @@ const uploadStore = useUploadStore()
 
 const fileInput = shallowRef<HTMLInputElement | null>(null)
 const folderInput = shallowRef<HTMLInputElement | null>(null)
+const takeoutInput = shallowRef<HTMLInputElement | null>(null)
 const dragover = ref(false)
 
 function triggerFileSelect() {
@@ -17,6 +19,10 @@ function triggerFileSelect() {
 
 function triggerFolderSelect() {
   folderInput.value?.click()
+}
+
+function triggerTakeoutSelect() {
+  takeoutInput.value?.click()
 }
 
 function onDragOver() {
@@ -30,7 +36,13 @@ function onDragLeave() {
 function onDrop(e: DragEvent) {
   dragover.value = false
   if (e.dataTransfer?.files?.length) {
-    uploadStore.addFiles(Array.from(e.dataTransfer.files))
+    const droppedFiles = Array.from(e.dataTransfer.files)
+    const isAllZips = droppedFiles.every((f) => f.name.toLowerCase().endsWith('.zip'))
+    if (isAllZips && droppedFiles.length > 0) {
+      uploadStore.addTakeoutFiles(droppedFiles)
+    } else {
+      uploadStore.addFiles(droppedFiles)
+    }
   }
 }
 
@@ -45,6 +57,13 @@ function onFolderChanged(e: Event) {
   const target = e.target as HTMLInputElement
   if (target.files && target.files.length > 0) {
     uploadStore.addFiles(target.files)
+  }
+}
+
+function onTakeoutChanged(e: Event) {
+  const target = e.target as HTMLInputElement
+  if (target.files && target.files.length > 0) {
+    uploadStore.addTakeoutFiles(target.files)
   }
 }
 </script>
@@ -78,6 +97,14 @@ function onFolderChanged(e: Event) {
         class="hidden-input"
         @change="onFolderChanged"
       />
+      <input
+        ref="takeoutInput"
+        type="file"
+        multiple
+        accept=".zip"
+        class="hidden-input"
+        @change="onTakeoutChanged"
+      />
 
       <div class="dropzone-buttons">
         <v-btn
@@ -88,6 +115,15 @@ function onFolderChanged(e: Event) {
           @click="triggerFolderSelect"
         >
           Upload Folder
+        </v-btn>
+        <v-btn
+          variant="tonal"
+          color="primary"
+          rounded
+          :prepend-icon="MdiArchiveArrowUpOutline"
+          @click="triggerTakeoutSelect"
+        >
+          Import Takeout ZIPs
         </v-btn>
         <v-btn
           v-if="uploadStore.uploads.length > 0"

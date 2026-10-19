@@ -8530,6 +8530,7 @@ dependencies = [
  "tracing-subscriber",
  "url",
  "walkdir",
+ "zip",
 ]
 
 [[package]]
@@ -10166,6 +10167,7 @@ dependencies = [
  "tracing-subscriber",
  "umap-rs",
  "walkdir",
+ "zip",
 ]
 
 [[package]]

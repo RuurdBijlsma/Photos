@@ -54,6 +54,45 @@ impl MediaItemStore {
         .await?)
     }
 
+    pub async fn find_id_by_filename(
+        executor: impl Executor<'_, Database = Postgres>,
+        user_id: i32,
+        filename: &str,
+    ) -> Result<Option<String>, DbError> {
+        Ok(sqlx::query_scalar!(
+            r#"
+            SELECT id
+            FROM media_item
+            WHERE user_id = $1 AND filename = $2 AND deleted = false
+            LIMIT 1
+            "#,
+            user_id,
+            filename
+        )
+        .fetch_optional(executor)
+        .await?)
+    }
+
+    pub async fn find_existing_filenames_map(
+        executor: impl Executor<'_, Database = Postgres>,
+        user_id: i32,
+        filenames: &[String],
+    ) -> Result<std::collections::HashMap<String, String>, DbError> {
+        let rows = sqlx::query!(
+            r#"
+            SELECT DISTINCT ON (filename) filename, id
+            FROM media_item
+            WHERE user_id = $1 AND filename = ANY($2) AND deleted = false
+            "#,
+            user_id,
+            filenames
+        )
+        .fetch_all(executor)
+        .await?;
+
+        Ok(rows.into_iter().map(|r| (r.filename, r.id)).collect())
+    }
+
     pub async fn find_id_and_hash_by_relative_path(
         executor: impl Executor<'_, Database = Postgres>,
         relative_path: &str,

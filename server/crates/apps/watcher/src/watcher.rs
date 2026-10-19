@@ -1,14 +1,12 @@
 use crate::handlers::handle_create;
 use app_state::IngestSettings;
-use app_state::constants::ALBUM_IMPORT_FOLDER;
+use app_state::constants::MANAGED_FOLDERS;
 use color_eyre::eyre::Result;
 use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use sqlx::PgPool;
 use std::path::Component;
 use tokio::sync::{mpsc, watch};
 use tracing::{error, info, warn};
-
-const EXCLUDED_WATCH_FOLDER: [&str; 1] = [ALBUM_IMPORT_FOLDER];
 
 /// Runs the file system watcher.
 ///
@@ -84,9 +82,13 @@ async fn process_event(pool: &PgPool, settings: &IngestSettings, event: Event) -
     }
 
     let rel_path = path.strip_prefix(&settings.media_root)?;
-    if let Some(Component::Normal(name)) = rel_path.components().next()
-        && EXCLUDED_WATCH_FOLDER.contains(&name.to_string_lossy().as_ref())
-    {
+    if rel_path.components().any(|c| {
+        if let Component::Normal(name) = c {
+            MANAGED_FOLDERS.contains(&name.to_string_lossy().as_ref())
+        } else {
+            false
+        }
+    }) {
         return Ok(());
     }
 

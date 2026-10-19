@@ -16,6 +16,7 @@ pub mod handle_web_upload;
 pub mod import_album_item;
 pub mod ingest_analysis;
 pub mod ingest_metadata;
+pub mod ingest_takeout_batch;
 pub mod ingest_thumbnails;
 pub mod remove;
 pub mod scan;
@@ -51,6 +52,7 @@ pub async fn handle_job(context: &WorkerContext, job: &Job) -> Result<JobResult>
         JobType::ImportAlbumItem => import_album_item::handle(context, job).await,
         JobType::GenerateDailyCards => generate_daily_cards::handle(context, job).await,
         JobType::UpdateGlobalCentroid => update_global_centroid::handle(context, job).await,
+        JobType::IngestTakeoutBatch => ingest_takeout_batch::handle(context, job).await,
     };
 
     heartbeat_handle.abort();

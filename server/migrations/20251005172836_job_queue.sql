@@ -1,6 +1,6 @@
 CREATE TYPE job_type AS ENUM ('ingest_metadata', 'ingest_thumbnails', 'ingest_analysis',
     'remove', 'scan', 'clean_db', 'cluster_faces', 'cluster_photos', 'import_album_item', 'update_global_centroid',
-    'sync_thumbnails', 'generate_daily_cards', 'calc_system_stats', 'handle_web_upload');
+    'sync_thumbnails', 'generate_daily_cards', 'calc_system_stats', 'handle_web_upload', 'ingest_takeout_batch');
 CREATE TYPE job_status AS ENUM ('queued', 'running', 'failed', 'done', 'cancelled');
 CREATE TYPE job_scope AS ENUM ('path', 'global');
 

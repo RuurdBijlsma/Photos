@@ -13,6 +13,7 @@ export interface UploadItem {
   status: 'pending' | 'uploading' | 'success' | 'failed' | 'stopped'
   error?: string
   tusUpload?: tus.Upload | null
+  extraMetadata?: Record<string, string>
 }
 
 export const useUploadStore = defineStore('upload', () => {
@@ -64,7 +65,7 @@ export const useUploadStore = defineStore('upload', () => {
     return cachedJwt
   }
 
-  function addFiles(files: FileList | File[]) {
+  function addFiles(files: FileList | File[], extraMetadata?: Record<string, string>) {
     const itemsToAdd: UploadItem[] = []
 
     for (const file of Array.from(files)) {
@@ -87,6 +88,7 @@ export const useUploadStore = defineStore('upload', () => {
         existingItem.status = 'pending'
         existingItem.bytesUploaded = 0
         existingItem.error = undefined
+        existingItem.extraMetadata = extraMetadata
         fileMap.set(existingItem.id, file)
       } else {
         const id = `${file.name}-${file.size}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`
@@ -97,6 +99,7 @@ export const useUploadStore = defineStore('upload', () => {
           bytesUploaded: 0,
           status: 'pending',
           tusUpload: null,
+          extraMetadata,
         })
         fileMap.set(id, file)
       }
@@ -106,6 +109,20 @@ export const useUploadStore = defineStore('upload', () => {
       uploads.value.push(...itemsToAdd)
     }
     processQueue()
+  }
+
+  function addTakeoutFiles(files: FileList | File[]) {
+    const fileList = Array.from(files).filter((f) => f.name.toLowerCase().endsWith('.zip'))
+    if (fileList.length === 0) return
+
+    const batchId = `takeout_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`
+    const extraMetadata: Record<string, string> = {
+      isTakeout: 'true',
+      takeoutBatchId: batchId,
+      takeoutTotalFiles: fileList.length.toString(),
+    }
+
+    addFiles(fileList, extraMetadata)
   }
 
   function processQueue() {
@@ -152,6 +169,7 @@ export const useUploadStore = defineStore('upload', () => {
         filename: file.name,
         filetype: file.type,
         jwt: jwtToken,
+        ...(item.extraMetadata || {}),
       },
       onError: (error) => {
         if (item.status === 'stopped') return
@@ -250,6 +268,7 @@ export const useUploadStore = defineStore('upload', () => {
     totalCount,
     isUploading,
     addFiles,
+    addTakeoutFiles,
     stopUpload,
     removeUpload,
     clearCompleted,

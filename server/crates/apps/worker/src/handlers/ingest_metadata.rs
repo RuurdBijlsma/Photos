@@ -93,8 +93,10 @@ async fn store_media_item(
     pending_payload: Option<IngestMetadataPayload>,
 ) -> Result<()> {
     let mut tx = pool.begin().await?;
-    let remote_user_id = if let Some(info) = &pending_payload {
-        Some(get_or_create_remote_user(&mut tx, user_id, &info.remote_user_identity).await?)
+    let remote_user_id = if let Some(info) = &pending_payload
+        && let Some(remote_identity) = &info.remote_user_identity
+    {
+        Some(get_or_create_remote_user(&mut tx, user_id, remote_identity).await?)
     } else {
         None
     };
@@ -107,25 +109,27 @@ async fn store_media_item(
     )
     .await?;
     if let Some(info) = &pending_payload {
-        AlbumStore::add_media_items(
-            &mut *tx,
-            &info.album_id,
-            std::slice::from_ref(&item_id),
-            user_id,
-        )
-        .await?;
-        if let Some(album) = AlbumStore::find_by_id(&mut *tx, &info.album_id).await?
-            && album.thumbnail_id.is_none()
-        {
-            AlbumStore::update(
+        for album_id in &info.album_ids {
+            AlbumStore::add_media_items(
                 &mut *tx,
-                &info.album_id,
-                None,
-                UpdateField::Ignore,
-                UpdateField::Value(item_id),
-                None,
+                album_id,
+                std::slice::from_ref(&item_id),
+                user_id,
             )
             .await?;
+            if let Some(album) = AlbumStore::find_by_id(&mut *tx, album_id).await?
+                && album.thumbnail_id.is_none()
+            {
+                AlbumStore::update(
+                    &mut *tx,
+                    album_id,
+                    None,
+                    UpdateField::Ignore,
+                    UpdateField::Value(item_id.clone()),
+                    None,
+                )
+                .await?;
+            }
         }
     }
     tx.commit().await?;

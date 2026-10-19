@@ -7,6 +7,7 @@ use chrono::{Duration, Utc};
 use common_services::alert;
 use common_services::api::app_error::AppError;
 use common_services::api::auth::interfaces::AuthClaims;
+use common_services::api::upload::interfaces::TakeoutBatchPayload;
 use common_services::api::upload::service::decode_upload_token;
 use common_services::database::jobs::JobType;
 use common_services::job_queue::enqueue_job;
@@ -76,6 +77,84 @@ pub async fn handle_upload_finished(context: &ApiContext, info: &UploadInfo) {
         );
         return;
     };
+
+    // Check if this upload is part of a Google Takeout multi-zip batch
+    let is_takeout = info
+        .metadata
+        .get("isTakeout")
+        .and_then(|opt| opt.as_ref())
+        .is_some_and(|v| v == "true");
+
+    if is_takeout {
+        let Some(batch_id) = info
+            .metadata
+            .get("takeoutBatchId")
+            .and_then(|opt| opt.as_ref())
+            .cloned()
+        else {
+            warn!("Takeout upload missing takeoutBatchId: {:?}", info);
+            return;
+        };
+
+        let total_parts = info
+            .metadata
+            .get("takeoutTotalFiles")
+            .and_then(|opt| opt.as_ref())
+            .and_then(|s| s.parse::<usize>().ok())
+            .unwrap_or(1);
+
+        let tus_dir = context
+            .settings
+            .ingest
+            .app_data_root
+            .join(constants::TUS_UPLOADS_FOLDER);
+
+        // Scan completed uploads matching this takeoutBatchId in .info sidecars
+        let mut matching_upload_ids = Vec::new();
+        if let Ok(mut entries) = tokio::fs::read_dir(&tus_dir).await {
+            while let Ok(Some(entry)) = entries.next_entry().await {
+                let path = entry.path();
+                if path.extension().and_then(|s| s.to_str()) == Some("info")
+                    && let Ok(content) = tokio::fs::read_to_string(&path).await
+                        && let Ok(other_info) = serde_json::from_str::<UploadInfo>(&content)
+                            && other_info.size == Some(other_info.offset)
+                                && other_info
+                                    .metadata
+                                    .get("takeoutBatchId")
+                                    .and_then(|opt| opt.as_ref())
+                                    == Some(&batch_id)
+                            {
+                                matching_upload_ids.push(other_info.id.to_string());
+                            }
+            }
+        }
+
+        // If all parts have completed uploading, enqueue IngestTakeoutBatch
+        if matching_upload_ids.len() >= total_parts {
+            matching_upload_ids.sort();
+            matching_upload_ids.dedup();
+
+            let payload = TakeoutBatchPayload {
+                batch_id: batch_id.clone(),
+                tus_upload_ids: matching_upload_ids,
+            };
+
+            let enqueue_res = enqueue_job(
+                &context.pool,
+                &context.settings.ingest,
+                JobType::IngestTakeoutBatch,
+            )
+            .user_id(user_id)
+            .payload(&payload)
+            .call()
+            .await;
+
+            if let Err(e) = enqueue_res {
+                error!("Failed to enqueue IngestTakeoutBatch job: {}", e);
+            }
+        }
+        return;
+    }
 
     let enqueue_res = enqueue_job(
         &context.pool,

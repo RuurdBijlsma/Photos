@@ -10,8 +10,8 @@ use tracing::{debug, info};
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct IngestMetadataPayload {
-    pub album_id: String,
-    pub remote_user_identity: String,
+    pub album_ids: Vec<String>,
+    pub remote_user_identity: Option<String>,
 }
 
 /// Enqueues a job for a specific file, such as ingestion or removal.

@@ -44,6 +44,7 @@ pub enum JobType {
     HandleWebUpload,
     GenerateDailyCards,
     UpdateGlobalCentroid,
+    IngestTakeoutBatch,
 }
 
 impl JobType {
@@ -59,7 +60,7 @@ impl JobType {
     pub const fn phase(&self) -> i32 {
         match self {
             Self::Remove => 5,
-            Self::HandleWebUpload => 10,
+            Self::HandleWebUpload | Self::IngestTakeoutBatch => 10,
             Self::IngestMetadata => 20,
             Self::IngestThumbnails => 30,
             Self::IngestAnalysis => 40,
@@ -83,6 +84,7 @@ impl JobType {
 
             Self::Scan
             | Self::HandleWebUpload
+            | Self::IngestTakeoutBatch
             | Self::ImportAlbumItem
             | Self::CleanDb
             | Self::UpdateGlobalCentroid
@@ -128,7 +130,7 @@ impl JobType {
             Self::ClusterPhotos => 130,
             Self::SyncThumbnails => 140,
             Self::GenerateDailyCards => 160,
-            Self::HandleWebUpload => 10,
+            Self::HandleWebUpload | Self::IngestTakeoutBatch => 10,
         }
     }
 }

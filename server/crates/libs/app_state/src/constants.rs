@@ -8,6 +8,8 @@ pub const VOCAB_CACHE_FOLDER: &str = "assets/static-cache/tag-vocab";
 // media_folder subfolders
 pub const ALBUM_IMPORT_FOLDER: &str = "import";
 pub const USER_UPLOAD_FOLDER: &str = "uploads";
+pub const TAKEOUT_IMPORT_FOLDER: &str = "takeout";
+pub const MANAGED_FOLDERS: &[&str] = &[ALBUM_IMPORT_FOLDER, TAKEOUT_IMPORT_FOLDER];
 
 // app_data folders
 pub const CACHE_FOLDER: &str = "cache";
