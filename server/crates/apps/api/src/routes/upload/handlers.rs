@@ -116,16 +116,16 @@ pub async fn handle_upload_finished(context: &ApiContext, info: &UploadInfo) {
                 let path = entry.path();
                 if path.extension().and_then(|s| s.to_str()) == Some("info")
                     && let Ok(content) = tokio::fs::read_to_string(&path).await
-                        && let Ok(other_info) = serde_json::from_str::<UploadInfo>(&content)
-                            && other_info.size == Some(other_info.offset)
-                                && other_info
-                                    .metadata
-                                    .get("takeoutBatchId")
-                                    .and_then(|opt| opt.as_ref())
-                                    == Some(&batch_id)
-                            {
-                                matching_upload_ids.push(other_info.id.to_string());
-                            }
+                    && let Ok(other_info) = serde_json::from_str::<UploadInfo>(&content)
+                    && other_info.size == Some(other_info.offset)
+                    && other_info
+                        .metadata
+                        .get("takeoutBatchId")
+                        .and_then(|opt| opt.as_ref())
+                        == Some(&batch_id)
+                {
+                    matching_upload_ids.push(other_info.id.to_string());
+                }
             }
         }
 

@@ -4,6 +4,7 @@ import * as tus from 'tus-js-client'
 import uploadService from '@/scripts/services/uploadService.ts'
 import { SERVER_BASE_URL } from '@/scripts/services/api.ts'
 import { useSettingStore } from '@/scripts/stores/settingsStore.ts'
+import { useSnackbarsStore } from '@/scripts/stores/snackbarStore.ts'
 
 export interface UploadItem {
   id: string
@@ -19,6 +20,7 @@ export interface UploadItem {
 export const useUploadStore = defineStore('upload', () => {
   const uploads = ref<UploadItem[]>([])
   const settings = useSettingStore()
+  const snackbarStore = useSnackbarsStore()
 
   const fileMap = new Map<string, File>()
 
@@ -65,10 +67,37 @@ export const useUploadStore = defineStore('upload', () => {
     return cachedJwt
   }
 
-  function addFiles(files: FileList | File[], extraMetadata?: Record<string, string>) {
+  function addFiles(files: FileList | File[]) {
+    const fileList = Array.from(files)
+    const isZip = (file: File) => file.name.toLowerCase().endsWith('.zip')
+
+    if (fileList.some(isZip)) {
+      snackbarStore.warning(
+        'ZIP files are not uploaded here. Use "Import Google Photos Takeout" instead.',
+      )
+    }
+
+    addFilesInternal(fileList.filter((file) => !isZip(file)))
+  }
+
+  function addTakeoutFiles(files: FileList | File[]) {
+    const fileList = Array.from(files).filter((f) => f.name.toLowerCase().endsWith('.zip'))
+    if (fileList.length === 0) return
+
+    const batchId = `takeout_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`
+    const extraMetadata: Record<string, string> = {
+      isTakeout: 'true',
+      takeoutBatchId: batchId,
+      takeoutTotalFiles: fileList.length.toString(),
+    }
+
+    addFilesInternal(fileList, extraMetadata)
+  }
+
+  function addFilesInternal(files: File[], extraMetadata?: Record<string, string>) {
     const itemsToAdd: UploadItem[] = []
 
-    for (const file of Array.from(files)) {
+    for (const file of files) {
       // Filter out 0-byte entries, which are highly likely to be directories or invalid uploads
       if (file.size === 0) {
         console.warn(`File "${file.name}" was skipped because it is empty (0 bytes).`)
@@ -109,20 +138,6 @@ export const useUploadStore = defineStore('upload', () => {
       uploads.value.push(...itemsToAdd)
     }
     processQueue()
-  }
-
-  function addTakeoutFiles(files: FileList | File[]) {
-    const fileList = Array.from(files).filter((f) => f.name.toLowerCase().endsWith('.zip'))
-    if (fileList.length === 0) return
-
-    const batchId = `takeout_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`
-    const extraMetadata: Record<string, string> = {
-      isTakeout: 'true',
-      takeoutBatchId: batchId,
-      takeoutTotalFiles: fileList.length.toString(),
-    }
-
-    addFiles(fileList, extraMetadata)
   }
 
   function processQueue() {
@@ -169,7 +184,7 @@ export const useUploadStore = defineStore('upload', () => {
         filename: file.name,
         filetype: file.type,
         jwt: jwtToken,
-        ...(item.extraMetadata || {}),
+        ...item.extraMetadata,
       },
       onError: (error) => {
         if (item.status === 'stopped') return

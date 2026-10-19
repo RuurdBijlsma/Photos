@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, shallowRef } from 'vue'
 import { useUploadStore } from '@/scripts/stores/uploadStore.ts'
+import TakeoutImportDialog from '@/vues/components/activity/cards/TakeoutImportDialog.vue'
 import MdiArchiveArrowUpOutline from '~icons/mdi/archive-arrow-up-outline'
 import MdiFolderOpen from '~icons/mdi/folder-open'
 import MdiTrashCanOutline from '~icons/mdi/trash-can-outline'
@@ -10,7 +11,7 @@ const uploadStore = useUploadStore()
 
 const fileInput = shallowRef<HTMLInputElement | null>(null)
 const folderInput = shallowRef<HTMLInputElement | null>(null)
-const takeoutInput = shallowRef<HTMLInputElement | null>(null)
+const takeoutDialog = ref(false)
 const dragover = ref(false)
 
 function triggerFileSelect() {
@@ -19,10 +20,6 @@ function triggerFileSelect() {
 
 function triggerFolderSelect() {
   folderInput.value?.click()
-}
-
-function triggerTakeoutSelect() {
-  takeoutInput.value?.click()
 }
 
 function onDragOver() {
@@ -36,13 +33,7 @@ function onDragLeave() {
 function onDrop(e: DragEvent) {
   dragover.value = false
   if (e.dataTransfer?.files?.length) {
-    const droppedFiles = Array.from(e.dataTransfer.files)
-    const isAllZips = droppedFiles.every((f) => f.name.toLowerCase().endsWith('.zip'))
-    if (isAllZips && droppedFiles.length > 0) {
-      uploadStore.addTakeoutFiles(droppedFiles)
-    } else {
-      uploadStore.addFiles(droppedFiles)
-    }
+    uploadStore.addFiles(e.dataTransfer.files)
   }
 }
 
@@ -57,13 +48,6 @@ function onFolderChanged(e: Event) {
   const target = e.target as HTMLInputElement
   if (target.files && target.files.length > 0) {
     uploadStore.addFiles(target.files)
-  }
-}
-
-function onTakeoutChanged(e: Event) {
-  const target = e.target as HTMLInputElement
-  if (target.files && target.files.length > 0) {
-    uploadStore.addTakeoutFiles(target.files)
   }
 }
 </script>
@@ -97,14 +81,6 @@ function onTakeoutChanged(e: Event) {
         class="hidden-input"
         @change="onFolderChanged"
       />
-      <input
-        ref="takeoutInput"
-        type="file"
-        multiple
-        accept=".zip"
-        class="hidden-input"
-        @change="onTakeoutChanged"
-      />
 
       <div class="dropzone-buttons">
         <v-btn
@@ -117,13 +93,12 @@ function onTakeoutChanged(e: Event) {
           Upload Folder
         </v-btn>
         <v-btn
-          variant="tonal"
-          color="primary"
-          rounded
+          variant="text"
+          size="small"
           :prepend-icon="MdiArchiveArrowUpOutline"
-          @click="triggerTakeoutSelect"
+          @click="takeoutDialog = true"
         >
-          Import Takeout ZIPs
+          Import Google Photos Takeout
         </v-btn>
         <v-btn
           v-if="uploadStore.uploads.length > 0"
@@ -137,6 +112,8 @@ function onTakeoutChanged(e: Event) {
           Clear Completed
         </v-btn>
       </div>
+
+      <TakeoutImportDialog v-model="takeoutDialog" />
     </div>
   </v-card>
 </template>

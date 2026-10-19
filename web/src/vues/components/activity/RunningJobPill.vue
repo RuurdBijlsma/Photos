@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { caps } from '@/scripts/utils.ts'
+import { formatJobType } from '@/scripts/utils.ts'
 
 defineProps<{
   jobType: string
@@ -18,7 +18,7 @@ defineProps<{
   >
     <div class="job-info-left">
       <span class="job-type-badge" :class="{ 'text-caption mb-1': !compact }">
-        {{ caps(jobType.replace('ingest_', '')) }}
+        {{ formatJobType(jobType) }}
       </span>
       <span
         class="job-path"

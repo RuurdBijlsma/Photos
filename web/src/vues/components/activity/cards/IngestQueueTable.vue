@@ -4,7 +4,7 @@ import { useIngestJobsStore } from '@/scripts/stores/ingestJobsStore.ts'
 import { useSnackbarsStore } from '@/scripts/stores/snackbarStore.ts'
 import { useResponsive } from '@/scripts/composables/useResponsive.ts'
 import mediaItemService from '@/scripts/services/mediaItemService.ts'
-import { downloadBlob, filenameFromHeaders } from '@/scripts/utils.ts'
+import { downloadBlob, filenameFromHeaders, formatJobType } from '@/scripts/utils.ts'
 import type { JobInfo } from '@/scripts/types/api/admin.ts'
 import IngestJobDetailsDialog from './IngestJobDetailsDialog.vue'
 import MdiCached from '~icons/mdi/cached'
@@ -93,19 +93,6 @@ async function handleDialogRetry(jobId: number) {
 function openDetails(job: JobInfo) {
   detailedJob.value = job
   detailsDialog.value = true
-}
-
-function formatJobType(jobType: string) {
-  switch (jobType) {
-    case 'ingest_metadata':
-      return 'Metadata'
-    case 'ingest_thumbnails':
-      return 'Thumbnails'
-    case 'ingest_analysis':
-      return 'Analysis'
-    default:
-      return jobType
-  }
 }
 
 watch(

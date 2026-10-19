@@ -216,6 +216,18 @@ export function caps(str: string) {
   return str[0].toUpperCase() + str.slice(1)
 }
 
+const JOB_TYPE_LABELS: Record<string, string> = {
+  ingest_metadata: 'Metadata',
+  ingest_thumbnails: 'Thumbnails',
+  ingest_analysis: 'Analysis',
+  ingest_takeout_batch: 'Takeout Import',
+  handle_web_upload: 'Upload',
+}
+
+export function formatJobType(jobType: string) {
+  return JOB_TYPE_LABELS[jobType] ?? caps(jobType.replace('ingest_', ''))
+}
+
 export function arrayToMap<T extends { id: string }>(items: readonly T[]): Map<string, T> {
   const map = new Map<string, T>()
 

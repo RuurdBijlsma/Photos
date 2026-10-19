@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { JobInfo } from '@/scripts/types/api/admin.ts'
+import { formatJobType } from '@/scripts/utils.ts'
 import MdiAlertCircle from '~icons/mdi/alert-circle'
 import MdiCached from '~icons/mdi/cached'
 import MdiClose from '~icons/mdi/close'
@@ -18,19 +19,6 @@ const emit = defineEmits<{
   (e: 'retry', jobId: number): void
   (e: 'download', path: string, jobId: number): void
 }>()
-
-function formatJobType(jobType: string) {
-  switch (jobType) {
-    case 'ingest_metadata':
-      return 'Metadata'
-    case 'ingest_thumbnails':
-      return 'Thumbnails'
-    case 'ingest_analysis':
-      return 'Analysis'
-    default:
-      return jobType
-  }
-}
 
 function formatDate(dateStr: string | null) {
   if (!dateStr) return '-'

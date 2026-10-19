@@ -287,6 +287,8 @@ watch(
                   'ingest_metadata',
                   'ingest_thumbnails',
                   'ingest_analysis',
+                  'ingest_takeout_batch',
+                  'handle_web_upload',
                   'remove',
                   'scan',
                   'clean_db',
