@@ -284,7 +284,7 @@ async fn create_albums(
                     name: album_title.clone(),
                     description: album_desc,
                     thumbnail_id: None,
-                    sort_mode: common_services::api::album::interfaces::AlbumSort::None,
+                    sort_mode: common_services::api::album::interfaces::AlbumSort::DateAsc,
                     is_public: false,
                 };
                 AlbumStore::create(&context.pool, &new_id, payload)
@@ -477,18 +477,21 @@ pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
     let mut new_media = Vec::new();
 
     for (filename, (source_path, album_ids)) in media_files {
-        let album_ids: Vec<String> = album_ids.into_iter().collect();
+        let mut album_ids: Vec<String> = album_ids.into_iter().collect();
+        album_ids.sort_unstable();
 
         if let Some(existing_media_id) = existing_items_map.get(&filename) {
             // Already imported: only attach to the albums, ignore its sidecar.
             for album_id in &album_ids {
+                let mut tx = context.pool.begin().await?;
                 AlbumStore::add_media_items(
-                    &context.pool,
+                    &mut tx,
                     album_id,
                     std::slice::from_ref(existing_media_id),
                     user_id,
                 )
                 .await?;
+                tx.commit().await?;
             }
             linked_existing_count += 1;
         } else {

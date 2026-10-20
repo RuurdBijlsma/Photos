@@ -62,7 +62,7 @@ pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
     {
         let mut tx = context.pool.begin().await?;
         AlbumStore::add_media_items(
-            &mut *tx,
+            &mut tx,
             &payload.local_album_id,
             slice::from_ref(&existing_id),
             user_id,

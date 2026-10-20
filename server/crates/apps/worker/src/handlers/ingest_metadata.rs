@@ -109,14 +109,12 @@ async fn store_media_item(
     )
     .await?;
     if let Some(info) = &pending_payload {
-        for album_id in &info.album_ids {
-            AlbumStore::add_media_items(
-                &mut *tx,
-                album_id,
-                std::slice::from_ref(&item_id),
-                user_id,
-            )
-            .await?;
+        // Stable lock order keeps concurrent multi-album ingests from deadlocking.
+        let mut album_ids = info.album_ids.clone();
+        album_ids.sort_unstable();
+        for album_id in &album_ids {
+            AlbumStore::add_media_items(&mut tx, album_id, std::slice::from_ref(&item_id), user_id)
+                .await?;
             if let Some(album) = AlbumStore::find_by_id(&mut *tx, album_id).await?
                 && album.thumbnail_id.is_none()
             {

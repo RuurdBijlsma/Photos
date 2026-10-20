@@ -236,6 +236,16 @@ async fn assert_album_linking(
         2,
         "both Takeout folders should have become albums, using metadata.json's title"
     );
+    let sorts: Vec<String> = sqlx::query_scalar!(
+        r#"SELECT sort_mode::text AS "sort_mode!" FROM album WHERE id = ANY($1::TEXT[])"#,
+        &album_ids
+    )
+    .fetch_all(&context.pool)
+    .await?;
+    assert!(
+        sorts.iter().all(|sort| sort == "date_asc"),
+        "Takeout albums must not be manually sorted"
+    );
 
     for album_id in &album_ids {
         let in_album = sqlx::query_scalar!(

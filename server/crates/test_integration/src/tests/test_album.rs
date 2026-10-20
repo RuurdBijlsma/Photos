@@ -6,6 +6,7 @@ use common_services::api::album::interfaces::{
     AcceptInviteRequest, AddMediaToAlbumRequest, AlbumSort, CheckInviteRequest, CreateAlbumRequest,
     UpdateAlbumRequest,
 };
+use common_services::database::CreateAlbumPayload;
 use common_services::database::UpdateField;
 use common_services::database::album::album::{Album, AlbumSummary};
 use common_services::database::album_store::AlbumStore;
@@ -478,6 +479,110 @@ pub async fn test_album_rank_override(context: &TestContext) -> Result<()> {
     assert_date_sortedness(&context.pool, &final_view).await;
 
     info!("Album rank override assertions passed.");
+    Ok(())
+}
+
+/// Concurrent appends to a manually sorted album must serialize rank
+/// assignment instead of racing `MAX(rank)` and deadlocking on the deferred
+/// unique constraint.
+pub async fn test_manual_album_concurrent_add(context: &TestContext) -> Result<()> {
+    let user_id: i32 = sqlx::query_scalar!("SELECT id FROM app_user LIMIT 1")
+        .fetch_one(&context.pool)
+        .await?;
+
+    let album = AlbumStore::create(
+        &context.pool,
+        "testconcal",
+        CreateAlbumPayload {
+            owner_id: user_id,
+            name: "Concurrent Album".to_string(),
+            description: None,
+            thumbnail_id: None,
+            sort_mode: AlbumSort::None,
+            is_public: false,
+        },
+    )
+    .await?;
+
+    let media_ids = ["testmed001".to_string(), "testmed002".to_string()];
+    for media_id in &media_ids {
+        let hash = format!("hash-{media_id}");
+        let relative_path = format!("concurrent/{media_id}.jpg");
+        let filename = format!("{media_id}.jpg");
+        sqlx::query!(
+            r#"
+            INSERT INTO media_item (
+                id, user_id, hash, relative_path, filename, width, height, is_video,
+                taken_at_local, og_taken_at_local, sort_timestamp, use_panorama_viewer
+            )
+            VALUES ($1, $2, $3, $4, $5, 1, 1, false, now()::timestamp, now()::timestamp, now(), false)
+            "#,
+            media_id,
+            user_id,
+            hash,
+            relative_path,
+            filename,
+        )
+        .execute(&context.pool)
+        .await?;
+    }
+
+    // Hold the first insert uncommitted while the second one starts.
+    let mut first_tx = context.pool.begin().await?;
+    AlbumStore::add_media_items(
+        &mut first_tx,
+        &album.id,
+        std::slice::from_ref(&media_ids[0]),
+        user_id,
+    )
+    .await?;
+
+    let (started_tx, started_rx) = tokio::sync::oneshot::channel();
+    let pool = context.pool.clone();
+    let album_id = album.id.clone();
+    let second_id = media_ids[1].clone();
+    let second = tokio::spawn(async move {
+        let _ = started_tx.send(());
+        let mut tx = pool.begin().await?;
+        AlbumStore::add_media_items(
+            &mut tx,
+            &album_id,
+            std::slice::from_ref(&second_id),
+            user_id,
+        )
+        .await?;
+        tx.commit().await?;
+        Ok::<(), color_eyre::Report>(())
+    });
+
+    started_rx.await?;
+    sleep(Duration::from_millis(500)).await;
+    first_tx.commit().await?;
+    second.await??;
+
+    let ranks: Vec<Option<f64>> = sqlx::query_scalar!(
+        "SELECT rank FROM album_media_item WHERE album_id = $1 ORDER BY rank",
+        &album.id
+    )
+    .fetch_all(&context.pool)
+    .await?;
+    assert_eq!(ranks.len(), 2);
+    assert_eq!(ranks[0].expect("manual album must rank first item"), 1000.0);
+    assert_eq!(
+        ranks[1].expect("manual album must rank second item"),
+        2000.0
+    );
+
+    sqlx::query!("DELETE FROM album WHERE id = $1", &album.id)
+        .execute(&context.pool)
+        .await?;
+    sqlx::query!(
+        "DELETE FROM media_item WHERE id = ANY($1::TEXT[])",
+        media_ids.as_slice()
+    )
+    .execute(&context.pool)
+    .await?;
+
     Ok(())
 }
 

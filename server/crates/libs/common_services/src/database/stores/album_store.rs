@@ -297,12 +297,21 @@ impl AlbumStore {
     /// New items get a manual position (rank) only when the album is
     /// manually sorted (`sort_mode = 'none'`); otherwise rank stays NULL and
     /// display order derives from data columns at read time.
+    ///
+    /// The album row is locked before `MAX(rank)` is read so concurrent
+    /// appends cannot compute the same rank.
     pub async fn add_media_items(
-        executor: impl PgExecutor<'_>,
+        executor: &mut PgConnection,
         album_id: &str,
         media_item_ids: &[String],
         added_by_user_id: i32,
     ) -> Result<PgQueryResult, DbError> {
+        // Separate statement: the insert must start with a snapshot taken after
+        // the previous writer committed, or MAX(rank) misses its new row.
+        let _ = sqlx::query!("SELECT id FROM album WHERE id = $1 FOR UPDATE", album_id)
+            .fetch_optional(&mut *executor)
+            .await?;
+
         Ok(sqlx::query!(
             r#"
             INSERT INTO album_media_item (album_id, media_item_id, rank, added_by_user)
@@ -324,7 +333,7 @@ impl AlbumStore {
             added_by_user_id,
             media_item_ids
         )
-        .execute(executor)
+        .execute(&mut *executor)
         .await?)
     }
 
