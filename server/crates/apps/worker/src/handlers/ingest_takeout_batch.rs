@@ -19,6 +19,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fs::File;
 use std::io::BufReader;
 use std::path::{Path, PathBuf};
+use std::time::{Duration, Instant};
 use tokio::fs;
 use tracing::info;
 
@@ -383,6 +384,10 @@ pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
         extract_dir
     );
     extract_archives(context, &payload, &extract_dir).await?;
+    info!(
+        "✅ Extracted {} Takeout ZIP archive(s)",
+        payload.tus_upload_ids.len()
+    );
 
     let photos_root = locate_photos_root(&extract_dir);
     info!("🔍 Scanning extracted Takeout folders at {:?}", photos_root);
@@ -412,8 +417,13 @@ pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
     let mut linked_existing_count = 0;
     let mut new_media = Vec::new();
     let mut existing_album_links: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    let total_media_count = media_files.len();
+    let progress_interval = Duration::from_secs(10);
+    let mut last_progress = Instant::now();
 
-    for (filename, (source_path, album_ids)) in media_files {
+    info!("📥 Importing {total_media_count} Takeout media item(s)...");
+
+    for (index, (filename, (source_path, album_ids))) in media_files.into_iter().enumerate() {
         let mut album_ids: Vec<String> = album_ids.into_iter().collect();
         album_ids.sort_unstable();
 
@@ -451,8 +461,25 @@ pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
             ));
             newly_imported_count += 1;
         }
+
+        let processed = index + 1;
+        // Time-based keeps slow imports informative; count-based covers fast ones.
+        if processed < total_media_count
+            && (processed % 1000 == 0 || last_progress.elapsed() >= progress_interval)
+        {
+            info!(
+                "📥 Takeout progress: {processed}/{total_media_count} media item(s) processed ({newly_imported_count} new, {linked_existing_count} existing)"
+            );
+            last_progress = Instant::now();
+        }
     }
 
+    if !existing_album_links.is_empty() {
+        info!(
+            "🔗 Linking {linked_existing_count} existing media item(s) to {} album(s)...",
+            existing_album_links.len()
+        );
+    }
     for (album_id, media_item_ids) in existing_album_links {
         let mut tx = context.pool.begin().await?;
         AlbumStore::add_media_items(&mut tx, &album_id, &media_item_ids, user_id).await?;
