@@ -26,11 +26,12 @@ pub fn apply_to_media_item(media_item: &mut CreateFullMediaItem, taken_at: DateT
 pub async fn resolve_override(
     media_info: &mut MediaMetadata,
     file_path: &Path,
-    maybe_override: Option<DateTime<Utc>>,
+    fallback_taken_at: Option<DateTime<Utc>>,
 ) -> Result<Option<DateTime<Utc>>> {
-    let Some(taken_at) =
-        low_confidence_override(&media_info.time.source_details.confidence, maybe_override)
-    else {
+    let Some(taken_at) = low_confidence_override(
+        &media_info.time.source_details.confidence,
+        fallback_taken_at,
+    ) else {
         return Ok(None);
     };
 
@@ -55,10 +56,10 @@ pub async fn resolve_override(
 
 const fn low_confidence_override(
     confidence: &str,
-    maybe_override: Option<DateTime<Utc>>,
+    fallback_taken_at: Option<DateTime<Utc>>,
 ) -> Option<DateTime<Utc>> {
     if confidence.eq_ignore_ascii_case("low") {
-        maybe_override
+        fallback_taken_at
     } else {
         None
     }

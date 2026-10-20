@@ -55,9 +55,7 @@ pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
     if let Some(result) = result_if_source_missing(&context.pool, media_root, &file_path).await? {
         return Ok(result);
     }
-    let fallback_taken_at = payload
-        .as_ref()
-        .and_then(|info| info.fallback_taken_at);
+    let fallback_taken_at = payload.as_ref().and_then(|info| info.fallback_taken_at);
     let override_taken_at =
         takeout::resolve_override(&mut media_info, &file_path, fallback_taken_at).await?;
     store_media_item(

@@ -15,7 +15,7 @@ use common_services::job_queue::{IngestMetadataPayload, bulk_enqueue_full_ingest
 use sanitize_filename::sanitize;
 use serde::Deserialize;
 use serde_json::from_value;
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fs::File;
 use std::io::BufReader;
 use std::path::{Path, PathBuf};
@@ -441,6 +441,7 @@ pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
     let mut newly_imported_count = 0;
     let mut linked_existing_count = 0;
     let mut new_media = Vec::new();
+    let mut existing_album_links: BTreeMap<String, Vec<String>> = BTreeMap::new();
 
     for (filename, (source_path, album_ids)) in media_files {
         let mut album_ids: Vec<String> = album_ids.into_iter().collect();
@@ -448,16 +449,11 @@ pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
 
         if let Some(existing_media_id) = existing_items_map.get(&filename) {
             // Already imported: only attach to the albums, ignore its sidecar.
-            for album_id in &album_ids {
-                let mut tx = context.pool.begin().await?;
-                AlbumStore::add_media_items(
-                    &mut tx,
-                    album_id,
-                    std::slice::from_ref(existing_media_id),
-                    user_id,
-                )
-                .await?;
-                tx.commit().await?;
+            for album_id in album_ids {
+                existing_album_links
+                    .entry(album_id)
+                    .or_default()
+                    .push(existing_media_id.clone());
             }
             linked_existing_count += 1;
         } else {
@@ -466,7 +462,7 @@ pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
                 .and_then(|folder| find_sidecar(&sidecars, folder, &filename))
                 .map(PathBuf::as_path);
 
-            let (relative_path, maybe_override_taken_at) = import_media_item(
+            let (relative_path, fallback_taken_at) = import_media_item(
                 context,
                 &user_takeout_folder,
                 &filename,
@@ -480,11 +476,17 @@ pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
                 Some(IngestMetadataPayload {
                     album_ids,
                     remote_user_identity: None,
-                    fallback_taken_at: maybe_override_taken_at,
+                    fallback_taken_at,
                 }),
             ));
             newly_imported_count += 1;
         }
+    }
+
+    for (album_id, media_item_ids) in existing_album_links {
+        let mut tx = context.pool.begin().await?;
+        AlbumStore::add_media_items(&mut tx, &album_id, &media_item_ids, user_id).await?;
+        tx.commit().await?;
     }
 
     if !new_media.is_empty() {
