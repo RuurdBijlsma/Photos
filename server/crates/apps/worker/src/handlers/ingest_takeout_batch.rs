@@ -1,6 +1,6 @@
 use crate::context::WorkerContext;
 use crate::handlers::JobResult;
-use crate::handlers::common::utils::require_media_mounted;
+use crate::handlers::common::utils::{get_unique_filename, require_media_mounted};
 use app_state::MakeRelativePath;
 use app_state::constants::{TAKEOUT_IMPORT_FOLDER, TUS_UPLOADS_FOLDER};
 use chrono::{DateTime, Utc};
@@ -45,36 +45,6 @@ struct SidecarJson {
 type SidecarIndex = HashMap<PathBuf, HashMap<String, PathBuf>>;
 /// Media file name -> (first seen path, album ids that contain it).
 type MediaIndex = HashMap<String, (PathBuf, HashSet<String>)>;
-
-async fn get_unique_filename(dest_folder: &Path, destination_path: &Path) -> PathBuf {
-    let mut unique_destination_path = destination_path.to_path_buf();
-    let mut counter = 1;
-
-    while fs::try_exists(&unique_destination_path)
-        .await
-        .unwrap_or(false)
-    {
-        let stem = destination_path
-            .file_stem()
-            .unwrap_or_default()
-            .to_string_lossy();
-        let extension = destination_path
-            .extension()
-            .unwrap_or_default()
-            .to_string_lossy();
-
-        let new_filename = if extension.is_empty() {
-            format!("{stem}_{counter}")
-        } else {
-            format!("{stem}_{counter}.{extension}")
-        };
-
-        unique_destination_path = dest_folder.join(new_filename);
-        counter += 1;
-    }
-
-    unique_destination_path
-}
 
 fn extract_zip_archive(zip_path: &Path, extract_to: &Path) -> Result<()> {
     let file = File::open(zip_path)?;
