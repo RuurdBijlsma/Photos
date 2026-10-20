@@ -7,6 +7,7 @@ use chrono::{DateTime, Utc};
 use color_eyre::Result;
 use color_eyre::eyre::{bail, eyre};
 use common_services::api::upload::interfaces::TakeoutBatchPayload;
+use common_services::database::album::album::AlbumRole;
 use common_services::database::album_store::AlbumStore;
 use common_services::database::jobs::Job;
 use common_services::database::media_item_store::MediaItemStore;
@@ -246,6 +247,13 @@ async fn create_albums(
             let existing_album =
                 AlbumStore::find_by_name(&context.pool, user_id, &album_title).await?;
             let id = if let Some(album) = existing_album {
+                AlbumStore::upsert_collaborator(
+                    &context.pool,
+                    &album.id,
+                    user_id,
+                    AlbumRole::Owner,
+                )
+                .await?;
                 album.id
             } else {
                 let new_id = common_services::utils::nice_id(10);
@@ -257,9 +265,12 @@ async fn create_albums(
                     sort_mode: common_services::api::album::interfaces::AlbumSort::DateAsc,
                     is_public: false,
                 };
-                AlbumStore::create(&context.pool, &new_id, payload)
-                    .await?
-                    .id
+                let mut tx = context.pool.begin().await?;
+                let album = AlbumStore::create(&mut *tx, &new_id, payload).await?;
+                AlbumStore::upsert_collaborator(&mut *tx, &album.id, user_id, AlbumRole::Owner)
+                    .await?;
+                tx.commit().await?;
+                album.id
             };
             album_name_to_id.insert(album_title, id.clone());
             id

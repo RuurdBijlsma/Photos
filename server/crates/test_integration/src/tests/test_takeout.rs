@@ -283,6 +283,19 @@ async fn assert_album_linking(
             in_album,
             "the new photo should be in every Takeout album that contains it"
         );
+
+        let owner_role: Option<String> = sqlx::query_scalar!(
+            r#"SELECT role::text AS "role!" FROM album_collaborator WHERE album_id = $1 AND user_id = $2"#,
+            album_id,
+            user_id
+        )
+        .fetch_optional(&context.pool)
+        .await?;
+        assert_eq!(
+            owner_role.as_deref(),
+            Some("owner"),
+            "the Takeout album owner must have the owner collaborator row"
+        );
     }
 
     let album_description: Option<String> = sqlx::query_scalar!(
