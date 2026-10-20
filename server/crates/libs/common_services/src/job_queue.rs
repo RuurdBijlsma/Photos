@@ -12,8 +12,9 @@ use tracing::{debug, info};
 pub struct IngestMetadataPayload {
     pub album_ids: Vec<String>,
     pub remote_user_identity: Option<String>,
+    /// Takeout sidecar timestamp; applied only when ingest analysis is low-confidence.
     #[serde(default)]
-    pub override_taken_at: Option<DateTime<Utc>>,
+    pub fallback_taken_at: Option<DateTime<Utc>>,
 }
 
 /// Enqueues a job for a specific file, such as ingestion or removal.
@@ -304,6 +305,6 @@ mod tests {
 
         assert_eq!(payload.album_ids, vec!["album-1"]);
         assert_eq!(payload.remote_user_identity, None);
-        assert!(payload.override_taken_at.is_none());
+        assert!(payload.fallback_taken_at.is_none());
     }
 }

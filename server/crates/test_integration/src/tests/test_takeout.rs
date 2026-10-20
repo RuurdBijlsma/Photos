@@ -296,6 +296,25 @@ async fn assert_album_linking(
     Ok(())
 }
 
+async fn assert_hash_matches_file(
+    context: &TestContext,
+    media_id: &str,
+    relative_path: &str,
+) -> Result<()> {
+    let stored_hash: String =
+        sqlx::query_scalar!("SELECT hash FROM media_item WHERE id = $1", media_id)
+            .fetch_one(&context.pool)
+            .await?;
+    let disk_hash = common_services::caching::hash_file(
+        &context.settings.ingest.media_root.join(relative_path),
+    )?;
+    assert_eq!(
+        stored_hash, disk_hash,
+        "the stored hash should match the file after the EXIF datetime write"
+    );
+    Ok(())
+}
+
 async fn assert_existing_media_linking(context: &TestContext, user_id: i32) -> Result<()> {
     let existing_items: Vec<String> = sqlx::query_scalar!(
         "SELECT id FROM media_item WHERE user_id = $1 AND filename = $2",
@@ -435,6 +454,8 @@ pub async fn test_takeout_import_flow(context: &TestContext) -> Result<()> {
             .unwrap(),
         "the sidecar date should have been written to the file and read back during ingest"
     );
+
+    assert_hash_matches_file(context, &new_media_id, &relative_path).await?;
 
     let (broken_media_id, broken_relative_path, broken_taken_at_local) =
         wait_for_media_item(context, user_id, BROKEN_PHOTO).await?;

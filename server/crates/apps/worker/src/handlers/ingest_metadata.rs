@@ -2,8 +2,10 @@ use crate::context::WorkerContext;
 use crate::handlers::JobResult;
 use crate::handlers::common::cache::ingest_cache::{get_ingest_cache, write_ingest_cache};
 use crate::handlers::common::remote_user::get_or_create_remote_user;
+use crate::handlers::common::takeout;
 use crate::handlers::common::utils::result_if_source_missing;
 use crate::jobs::management::is_job_cancelled;
+use chrono::{DateTime, Utc};
 use color_eyre::eyre::Context;
 use color_eyre::{Result, eyre::eyre};
 use common_services::caching::hash_file;
@@ -40,7 +42,7 @@ pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
         return Ok(JobResult::Cancelled);
     }
     let file_hash = hash_file(&file_path)?;
-    let media_info = get_media_info(context, &file_path, &file_hash).await?;
+    let mut media_info = get_media_info(context, &file_path, &file_hash).await?;
     let payload = if let Some(payload_json) = &job.payload {
         let payload: IngestMetadataPayload = from_value(payload_json.clone())?;
         Some(payload)
@@ -53,7 +55,20 @@ pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
     if let Some(result) = result_if_source_missing(&context.pool, media_root, &file_path).await? {
         return Ok(result);
     }
-    store_media_item(&context.pool, user_id, relative_path, media_info, payload).await?;
+    let fallback_taken_at = payload
+        .as_ref()
+        .and_then(|info| info.fallback_taken_at);
+    let override_taken_at =
+        takeout::resolve_override(&mut media_info, &file_path, fallback_taken_at).await?;
+    store_media_item(
+        &context.pool,
+        user_id,
+        relative_path,
+        media_info,
+        override_taken_at,
+        payload,
+    )
+    .await?;
     Ok(JobResult::Done)
 }
 
@@ -91,6 +106,7 @@ async fn store_media_item(
     user_id: i32,
     relative_path: &str,
     analyze_result: MediaMetadata,
+    override_taken_at: Option<DateTime<Utc>>,
     pending_payload: Option<IngestMetadataPayload>,
 ) -> Result<()> {
     let mut tx = pool.begin().await?;
@@ -102,21 +118,8 @@ async fn store_media_item(
         None
     };
     let mut media_item: CreateFullMediaItem = analyze_result.into();
-    if let Some(override_taken_at) = pending_payload
-        .as_ref()
-        .and_then(|info| info.override_taken_at)
-    {
-        media_item.taken_at_local = override_taken_at.naive_utc();
-        media_item.taken_at_utc = Some(override_taken_at);
-        media_item.og_taken_at_local = media_item.taken_at_local;
-
-        // TODO: sidecar timestamps are UTC; derive the real photo timezone and local time.
-        media_item.timezone_name = Some("UTC".to_string());
-        media_item.timezone_offset_seconds = Some(0);
-        media_item.og_timezone_offset_seconds = Some(0);
-        media_item.time.timezone_source = Some("Google Takeout sidecar (UTC)".to_string());
-        media_item.time.source_details = "Google Takeout sidecar".to_string();
-        media_item.time.source_confidence = "Medium".to_string();
+    if let Some(override_taken_at) = override_taken_at {
+        takeout::apply_to_media_item(&mut media_item, override_taken_at);
     }
 
     let item_id =

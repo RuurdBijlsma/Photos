@@ -91,7 +91,7 @@ pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
         Some(IngestMetadataPayload {
             album_ids: vec![payload.local_album_id],
             remote_user_identity: Some(remote_identity),
-            override_taken_at: None,
+            fallback_taken_at: None,
         }),
     )
     .await?;
