@@ -3,7 +3,7 @@ use crate::test_helpers::login;
 use app_state::constants::TUS_UPLOADS_FOLDER;
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
-use chrono::{NaiveDate, NaiveDateTime};
+use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
 use color_eyre::Result;
 use color_eyre::eyre::{bail, eyre};
 use reqwest::StatusCode;
@@ -28,6 +28,8 @@ const NO_METADATA_PNG: &[u8] = &[
 const EXISTING_VIDEO: &str = "VID_20190223_155900.mp4";
 const NEW_PHOTO: &str = "takeout_new(1).png";
 const SIDECAR_TIMESTAMP: i64 = 1_690_000_000; // 2023-07-22 04:26:40 UTC
+const BROKEN_PHOTO: &str = "takeout_broken(1).jpg";
+const BROKEN_SIDECAR_TIMESTAMP: i64 = 1_690_000_060; // 2023-07-22 04:27:40 UTC
 
 fn build_zip(path: &Path, entries: &[(&str, &[u8])]) -> Result<()> {
     let file = std::fs::File::create(path)?;
@@ -47,6 +49,10 @@ fn create_takeout_zips(context: &TestContext, folder: &Path) -> Result<(PathBuf,
         r#"{{"title": "{NEW_PHOTO}", "photoTakenTime": {{"timestamp": "{SIDECAR_TIMESTAMP}"}}}}"#
     );
     let sidecar = sidecar.as_bytes();
+    let broken_sidecar = format!(
+        r#"{{"title": "{BROKEN_PHOTO}", "photoTakenTime": {{"timestamp": "{BROKEN_SIDECAR_TIMESTAMP}"}}}}"#
+    );
+    let broken_sidecar = broken_sidecar.as_bytes();
     let album_metadata = br#"{"title": "Summer Vacation", "description": "Summer holiday"}"#;
 
     let zip1 = folder.join("takeout-001.zip");
@@ -60,6 +66,14 @@ fn create_takeout_zips(context: &TestContext, folder: &Path) -> Result<(PathBuf,
             (
                 "Takeout/Google Photos/Vacation 2023 /takeout_new(1).png",
                 NO_METADATA_PNG,
+            ),
+            (
+                "Takeout/Google Photos/Vacation 2023 /takeout_broken(1).jpg",
+                NO_METADATA_PNG,
+            ),
+            (
+                "Takeout/Google Photos/Vacation 2023 /takeout_broken.jpg.supplemental-metadata(1).json",
+                broken_sidecar,
             ),
             (
                 "Takeout/Google Photos/Vacation 2023 /VID_20190223_155900.mp4",
@@ -83,6 +97,14 @@ fn create_takeout_zips(context: &TestContext, folder: &Path) -> Result<(PathBuf,
             (
                 "Takeout/Google Photos/Photos from 2023 /takeout_new.png.supplemental-metadata(1).json",
                 sidecar,
+            ),
+            (
+                "Takeout/Google Photos/Photos from 2023 /takeout_broken(1).jpg",
+                NO_METADATA_PNG,
+            ),
+            (
+                "Takeout/Google Photos/Photos from 2023 /takeout_broken.jpg.supplemental-metadata(1).json",
+                broken_sidecar,
             ),
             (
                 "Takeout/Google Photos/Photos from 2023 /VID_20190223_155900.mp4",
@@ -414,7 +436,46 @@ pub async fn test_takeout_import_flow(context: &TestContext) -> Result<()> {
         "the sidecar date should have been written to the file and read back during ingest"
     );
 
+    let (broken_media_id, broken_relative_path, broken_taken_at_local) =
+        wait_for_media_item(context, user_id, BROKEN_PHOTO).await?;
+
+    assert_eq!(broken_relative_path, format!("takeout/{BROKEN_PHOTO}"));
+    assert_eq!(
+        broken_taken_at_local,
+        NaiveDate::from_ymd_opt(2023, 7, 22)
+            .unwrap()
+            .and_hms_opt(4, 27, 40)
+            .unwrap(),
+        "the sidecar date must reach the DB even when ExifTool cannot write the file"
+    );
+
+    let broken_time = sqlx::query!(
+        r#"
+        SELECT mi.taken_at_utc, mi.og_taken_at_local,
+               mi.timezone_name, mi.timezone_offset_seconds, mi.og_timezone_offset_seconds,
+               t.source_details, t.source_confidence
+        FROM media_item mi
+        JOIN "time" t ON t.media_item_id = mi.id
+        WHERE mi.id = $1
+        "#,
+        broken_media_id
+    )
+    .fetch_one(&context.pool)
+    .await?;
+
+    assert_eq!(
+        broken_time.taken_at_utc,
+        Some(DateTime::<Utc>::from_timestamp(BROKEN_SIDECAR_TIMESTAMP, 0).unwrap())
+    );
+    assert_eq!(broken_time.og_taken_at_local, broken_taken_at_local);
+    assert_eq!(broken_time.timezone_name.as_deref(), Some("UTC"));
+    assert_eq!(broken_time.timezone_offset_seconds, Some(0));
+    assert_eq!(broken_time.og_timezone_offset_seconds, Some(0));
+    assert_eq!(broken_time.source_details, "Google Takeout sidecar");
+    assert_eq!(broken_time.source_confidence, "Medium");
+
     assert_album_linking(context, user_id, &new_media_id).await?;
+    assert_album_linking(context, user_id, &broken_media_id).await?;
     assert_existing_media_linking(context, user_id).await?;
     assert_cleanup(context, batch_id, &[zip1_id, zip2_id]);
 

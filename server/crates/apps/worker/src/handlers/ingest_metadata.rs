@@ -10,6 +10,7 @@ use common_services::caching::hash_file;
 use common_services::database::UpdateField;
 use common_services::database::album_store::AlbumStore;
 use common_services::database::jobs::Job;
+use common_services::database::media_item::media_item::CreateFullMediaItem;
 use common_services::database::media_item_store::MediaItemStore;
 use common_services::job_queue::IngestMetadataPayload;
 use media_analyzer::MediaMetadata;
@@ -100,14 +101,27 @@ async fn store_media_item(
     } else {
         None
     };
-    let item_id = MediaItemStore::upsert(
-        &mut tx,
-        relative_path,
-        user_id,
-        remote_user_id,
-        &analyze_result.into(),
-    )
-    .await?;
+    let mut media_item: CreateFullMediaItem = analyze_result.into();
+    if let Some(override_taken_at) = pending_payload
+        .as_ref()
+        .and_then(|info| info.override_taken_at)
+    {
+        media_item.taken_at_local = override_taken_at.naive_utc();
+        media_item.taken_at_utc = Some(override_taken_at);
+        media_item.og_taken_at_local = media_item.taken_at_local;
+
+        // TODO: sidecar timestamps are UTC; derive the real photo timezone and local time.
+        media_item.timezone_name = Some("UTC".to_string());
+        media_item.timezone_offset_seconds = Some(0);
+        media_item.og_timezone_offset_seconds = Some(0);
+        media_item.time.timezone_source = Some("Google Takeout sidecar (UTC)".to_string());
+        media_item.time.source_details = "Google Takeout sidecar".to_string();
+        media_item.time.source_confidence = "Medium".to_string();
+    }
+
+    let item_id =
+        MediaItemStore::upsert(&mut tx, relative_path, user_id, remote_user_id, &media_item)
+            .await?;
     if let Some(info) = &pending_payload {
         // Stable lock order keeps concurrent multi-album ingests from deadlocking.
         let mut album_ids = info.album_ids.clone();
