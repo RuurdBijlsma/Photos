@@ -12,6 +12,8 @@ use tracing::{debug, info};
 pub struct IngestMetadataPayload {
     pub album_ids: Vec<String>,
     pub remote_user_identity: Option<String>,
+    #[serde(default)]
+    pub override_taken_at: Option<DateTime<Utc>>,
 }
 
 /// Enqueues a job for a specific file, such as ingestion or removal.
@@ -288,4 +290,20 @@ pub async fn bulk_enqueue_full_ingest(
         .await?;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::IngestMetadataPayload;
+
+    #[test]
+    fn ingest_metadata_payload_accepts_legacy_json() {
+        let payload: IngestMetadataPayload =
+            serde_json::from_str(r#"{"album_ids":["album-1"],"remote_user_identity":null}"#)
+                .expect("legacy payload should deserialize");
+
+        assert_eq!(payload.album_ids, vec!["album-1"]);
+        assert_eq!(payload.remote_user_identity, None);
+        assert!(payload.override_taken_at.is_none());
+    }
 }

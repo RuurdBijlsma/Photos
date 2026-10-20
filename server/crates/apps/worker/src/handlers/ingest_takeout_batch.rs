@@ -21,7 +21,7 @@ use std::fs::File;
 use std::io::BufReader;
 use std::path::{Path, PathBuf};
 use tokio::fs;
-use tracing::{debug, info};
+use tracing::{info, warn};
 
 #[derive(Debug, Deserialize)]
 struct AlbumMetadataJson {
@@ -125,6 +125,17 @@ fn parse_sidecar_timestamp(sidecar_path: &Path) -> Option<DateTime<Utc>> {
 
     let epoch_secs = ts_str.parse::<i64>().ok()?;
     DateTime::from_timestamp(epoch_secs, 0)
+}
+
+const fn takeout_override_taken_at(
+    is_low_confidence: bool,
+    sidecar_taken_at: Option<DateTime<Utc>>,
+) -> Option<DateTime<Utc>> {
+    if is_low_confidence {
+        sidecar_taken_at
+    } else {
+        None
+    }
 }
 
 /// Splits a trailing Takeout duplicate counter, e.g. `IMG_0001(2)` -> (`IMG_0001`, `2`).
@@ -345,29 +356,31 @@ async fn import_media_item(
     filename: &str,
     source_path: &Path,
     sidecar_path: Option<&Path>,
-) -> Result<String> {
+) -> Result<(String, Option<DateTime<Utc>>)> {
     let is_video = context.settings.ingest.is_video_file(source_path);
+    let sidecar_taken_at = sidecar_path.and_then(parse_sidecar_timestamp);
 
-    let needs_sidecar_date = match context.media_analyzer.analyze_media(source_path).await {
-        Ok(info) => {
-            let is_low_confidence = info
-                .time
-                .source_details
-                .confidence
-                .eq_ignore_ascii_case("low");
-            let is_future = info.time.datetime_utc.is_some_and(|dt| dt > Utc::now());
-            let is_epoch_zero = info.time.datetime_utc.is_some_and(|dt| dt.timestamp() == 0)
-                || (info.time.datetime_local.and_utc().timestamp() == 0);
+    let (needs_sidecar_date, override_taken_at) =
+        match context.media_analyzer.analyze_media(source_path).await {
+            Ok(info) => {
+                let is_low_confidence = info
+                    .time
+                    .source_details
+                    .confidence
+                    .eq_ignore_ascii_case("low");
+                let is_future = info.time.datetime_utc.is_some_and(|dt| dt > Utc::now());
+                let is_epoch_zero = info.time.datetime_utc.is_some_and(|dt| dt.timestamp() == 0)
+                    || (info.time.datetime_local.and_utc().timestamp() == 0);
 
-            is_low_confidence || is_future || is_epoch_zero
-        }
-        Err(_) => true,
-    };
+                (
+                    is_low_confidence || is_future || is_epoch_zero,
+                    takeout_override_taken_at(is_low_confidence, sidecar_taken_at),
+                )
+            }
+            Err(_) => (true, None),
+        };
 
-    if needs_sidecar_date
-        && let Some(sidecar_path) = sidecar_path
-        && let Some(sidecar_dt) = parse_sidecar_timestamp(sidecar_path)
-    {
+    if needs_sidecar_date && let Some(sidecar_dt) = sidecar_taken_at.as_ref() {
         let formatted = sidecar_dt.format("%Y:%m:%d %H:%M:%S").to_string();
         let target_path = source_path.to_path_buf();
         let res = tokio::task::spawn_blocking(move || {
@@ -376,8 +389,8 @@ async fn import_media_item(
         .await?;
 
         if let Err(e) = res {
-            debug!(
-                "Failed to write sidecar datetime to {:?}: {}",
+            warn!(
+                "Failed to write sidecar datetime to {:?}: {}; the sidecar timestamp will still be used for ingest.",
                 source_path, e
             );
         }
@@ -395,7 +408,8 @@ async fn import_media_item(
         let _ = tokio::fs::remove_file(source_path).await;
     }
 
-    dest_file_path.make_relative(&context.settings.ingest.media_root)
+    let relative_path = dest_file_path.make_relative(&context.settings.ingest.media_root)?;
+    Ok((relative_path, override_taken_at))
 }
 
 async fn cleanup(context: &WorkerContext, payload: &TakeoutBatchPayload, extract_dir: &Path) {
@@ -412,6 +426,7 @@ async fn cleanup(context: &WorkerContext, payload: &TakeoutBatchPayload, extract
     }
 }
 
+#[allow(clippy::too_many_lines)]
 pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
     if let Some(result) =
         require_media_mounted(&context.pool, &context.settings.ingest.media_root).await?
@@ -500,18 +515,21 @@ pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
                 .and_then(|folder| find_sidecar(&sidecars, folder, &filename))
                 .map(PathBuf::as_path);
 
+            let (relative_path, override_taken_at) = import_media_item(
+                context,
+                &user_takeout_folder,
+                &filename,
+                &source_path,
+                sidecar_path,
+            )
+            .await?;
+
             new_media.push((
-                import_media_item(
-                    context,
-                    &user_takeout_folder,
-                    &filename,
-                    &source_path,
-                    sidecar_path,
-                )
-                .await?,
+                relative_path,
                 Some(IngestMetadataPayload {
                     album_ids,
                     remote_user_identity: None,
+                    override_taken_at,
                 }),
             ));
             newly_imported_count += 1;
@@ -535,8 +553,19 @@ pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
 
 #[cfg(test)]
 mod tests {
-    use super::{SidecarIndex, find_sidecar, sidecar_candidates};
+    use super::{SidecarIndex, find_sidecar, sidecar_candidates, takeout_override_taken_at};
+    use chrono::DateTime;
     use std::path::PathBuf;
+
+    #[test]
+    fn takeout_override_only_applies_to_low_confidence() {
+        let dt = DateTime::from_timestamp(1_690_000_000, 0).expect("valid timestamp");
+
+        assert_eq!(takeout_override_taken_at(true, Some(dt)), Some(dt));
+        assert_eq!(takeout_override_taken_at(false, Some(dt)), None);
+        assert_eq!(takeout_override_taken_at(true, None), None);
+        assert_eq!(takeout_override_taken_at(false, Some(dt)), None);
+    }
 
     #[test]
     fn sidecar_candidates_cover_takeout_naming_quirks() {
