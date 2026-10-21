@@ -8,7 +8,7 @@ use crate::database::structs::CreateAlbumPayload;
 use crate::database::{DbError, UpdateField};
 use common_types::pb::api::{CollaboratorSummary, SimpleTimelineItem, TimelineItem};
 use sqlx::postgres::PgQueryResult;
-use sqlx::{PgConnection, PgExecutor};
+use sqlx::{PgConnection, PgExecutor, PgTransaction};
 
 pub struct AlbumStore;
 
@@ -299,9 +299,10 @@ impl AlbumStore {
     /// display order derives from data columns at read time.
     ///
     /// The album row is locked before `MAX(rank)` is read so concurrent
-    /// appends cannot compute the same rank.
+    /// appends cannot compute the same rank. The lock lives until the
+    /// transaction ends, so this must run inside one.
     pub async fn add_media_items(
-        executor: &mut PgConnection,
+        executor: &mut PgTransaction<'_>,
         album_id: &str,
         media_item_ids: &[String],
         added_by_user_id: i32,
@@ -309,7 +310,7 @@ impl AlbumStore {
         // Separate statement: the insert must start with a snapshot taken after
         // the previous writer committed, or MAX(rank) misses its new row.
         let _ = sqlx::query!("SELECT id FROM album WHERE id = $1 FOR UPDATE", album_id)
-            .fetch_optional(&mut *executor)
+            .fetch_optional(&mut **executor)
             .await?;
 
         Ok(sqlx::query!(
@@ -333,7 +334,7 @@ impl AlbumStore {
             added_by_user_id,
             media_item_ids
         )
-        .execute(&mut *executor)
+        .execute(&mut **executor)
         .await?)
     }
 
