@@ -7,6 +7,7 @@ import mediaItemService from '@/scripts/services/mediaItemService.ts'
 import { downloadBlob, filenameFromHeaders, formatJobType } from '@/scripts/utils.ts'
 import type { JobInfo } from '@/scripts/types/api/admin.ts'
 import IngestJobDetailsDialog from './IngestJobDetailsDialog.vue'
+import MdiCancel from '~icons/mdi/cancel'
 import MdiCached from '~icons/mdi/cached'
 import MdiDownloadOutline from '~icons/mdi/download-outline'
 import MdiInformationOutline from '~icons/mdi/information-outline'
@@ -22,6 +23,9 @@ const downloadingJobIds = ref<Set<number>>(new Set())
 const detailsDialog = ref(false)
 const detailedJob = ref<JobInfo | null>(null)
 const isActionLoading = ref(false)
+const cancelAllDialog = ref(false)
+const isCancelling = ref(false)
+const canCancelAll = computed(() => ingestStore.pendingIngestCount > 0)
 
 const headers = computed(() => [
   { title: 'Job Type', key: 'jobType' },
@@ -90,6 +94,18 @@ async function handleDialogRetry(jobId: number) {
   }
 }
 
+async function handleCancelAll() {
+  isCancelling.value = true
+  try {
+    await ingestStore.cancelAllJobs()
+    cancelAllDialog.value = false
+  } catch {
+    // Handled in store
+  } finally {
+    isCancelling.value = false
+  }
+}
+
 function openDetails(job: JobInfo) {
   detailedJob.value = job
   detailsDialog.value = true
@@ -114,7 +130,19 @@ watch(
 <template>
   <v-card class="action-card" flat>
     <div class="card-body">
-      <h2 class="card-title">Ingestion Queue Details</h2>
+      <div class="card-header-row">
+        <h2 class="card-title">Ingestion Queue Details</h2>
+        <v-btn
+          color="error"
+          variant="tonal"
+          rounded="xl"
+          :prepend-icon="MdiCancel"
+          :disabled="!canCancelAll"
+          @click="cancelAllDialog = true"
+        >
+          Cancel all
+        </v-btn>
+      </div>
 
       <div class="table-filters">
         <v-text-field
@@ -239,6 +267,26 @@ watch(
       @retry="handleDialogRetry"
       @download="handleDownload"
     />
+
+    <v-dialog v-model="cancelAllDialog" max-width="480">
+      <v-card rounded="xl" color="surface-container-highest">
+        <v-card-title>Cancel all ingest jobs?</v-card-title>
+        <v-card-text>
+          This cancels {{ ingestStore.pendingIngestCount }} queued and running ingest jobs. Running
+          jobs finish their current file, then stop. Photos and videos are not deleted, and new
+          files added afterwards will still be ingested.
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn variant="text" :disabled="isCancelling" @click="cancelAllDialog = false">
+            Keep jobs
+          </v-btn>
+          <v-btn color="error" variant="tonal" :loading="isCancelling" @click="handleCancelAll">
+            Cancel jobs
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </v-card>
 </template>
 
@@ -267,6 +315,19 @@ watch(
 
 .is-mobile .card-body {
   padding: 16px 14px;
+}
+
+.card-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.card-header-row .card-title {
+  margin-bottom: 0;
 }
 
 .card-title {

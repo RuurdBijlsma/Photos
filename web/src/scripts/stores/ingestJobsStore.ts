@@ -1,4 +1,4 @@
-import { ref, type Ref } from 'vue'
+import { computed, ref, type Ref } from 'vue'
 import { defineStore } from 'pinia'
 import type { IngestOverviewResponse } from '@/scripts/types/api/ingestJobs.ts'
 import type { JobInfo } from '@/scripts/types/api/admin.ts'
@@ -23,6 +23,19 @@ export const useIngestJobsStore = defineStore('ingestJobs', () => {
   const isOverviewLoading: Ref<boolean> = ref(false)
   const isRunningLoading: Ref<boolean> = ref(false)
   const isJobsLoading = ref(false)
+
+  const pendingIngestCount = computed(() => {
+    const counts = overview.value
+    if (!counts) return 0
+    return (
+      counts.metadata.queued +
+      counts.metadata.running +
+      counts.thumbnails.queued +
+      counts.thumbnails.running +
+      counts.analysis.queued +
+      counts.analysis.running
+    )
+  })
 
   // Paginated Jobs Table State
   const totalJobsCount = ref(0)
@@ -218,6 +231,21 @@ export const useIngestJobsStore = defineStore('ingestJobs', () => {
     }
   }
 
+  async function cancelAllJobs() {
+    try {
+      const response = await ingestJobsService.cancelAll()
+      const cancelled = response.data.cancelled
+      snackbarStore.success(
+        cancelled === 0 ? 'No pending ingest jobs to cancel' : `Cancelled ${cancelled} ingest jobs`,
+      )
+      await Promise.all([fetchOverview(), fetchRunning(), fetchUserJobs(true)])
+      return cancelled
+    } catch (error) {
+      snackbarStore.error('Failed to cancel ingest jobs', error)
+      throw error
+    }
+  }
+
   async function retryJob(jobId: number) {
     try {
       await ingestJobsService.retry(jobId)
@@ -285,6 +313,7 @@ export const useIngestJobsStore = defineStore('ingestJobs', () => {
     runningJobs,
     isOverviewLoading,
     isRunningLoading,
+    pendingIngestCount,
     userJobs,
     totalJobsCount,
     isJobsLoading,
@@ -294,6 +323,7 @@ export const useIngestJobsStore = defineStore('ingestJobs', () => {
     selectedTab,
     fetchUserJobs,
     triggerScan,
+    cancelAllJobs,
     retryJob,
     pollTick,
     startPolling,

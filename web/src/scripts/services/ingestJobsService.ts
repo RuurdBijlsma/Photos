@@ -1,6 +1,6 @@
 import type { AxiosResponse } from 'axios'
 import apiClient from './api.ts'
-import type { IngestOverviewResponse } from '@/scripts/types/api/ingestJobs.ts'
+import type { BulkCancelResponse, IngestOverviewResponse } from '@/scripts/types/api/ingestJobs.ts'
 import type { JobInfo, PaginatedJobsResponse } from '@/scripts/types/api/admin.ts'
 
 const ingestJobsService = {
@@ -42,6 +42,13 @@ const ingestJobsService = {
    */
   retry(jobId: number): Promise<AxiosResponse<void>> {
     return apiClient.post<void>('/jobs/ingest/retry', { id: jobId })
+  },
+
+  /**
+   * Cancel all queued and running ingest jobs for the current user.
+   */
+  cancelAll(): Promise<AxiosResponse<BulkCancelResponse>> {
+    return apiClient.post<BulkCancelResponse>('/jobs/ingest/cancel-all')
   },
 }
 

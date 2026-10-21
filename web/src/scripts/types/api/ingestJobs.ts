@@ -20,3 +20,7 @@ export interface IngestOverviewResponse {
 export interface RetryJobPayload {
   id: number
 }
+
+export interface BulkCancelResponse {
+  cancelled: number
+}
