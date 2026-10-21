@@ -15,8 +15,7 @@ use common_services::api::jobs::user_level::{
     cancel_user_ingest_jobs, get_failed_ingest_jobs, get_running_ingest_jobs, get_user_ingest_jobs,
     get_user_ingest_overview, retry_user_job,
 };
-use common_services::database::jobs::JobType;
-use common_services::job_queue::enqueue_job;
+use common_services::job_queue::enqueue_full_scan;
 use sqlx::PgPool;
 use tracing::instrument;
 
@@ -91,10 +90,7 @@ pub async fn scan_user_media_handler(
     State(context): State<ApiContext>,
     Extension(user): Extension<ApiUser>,
 ) -> Result<Json<()>, AppError> {
-    enqueue_job::<()>(&context.pool, &context.settings.ingest, JobType::Scan)
-        .user_id(user.id)
-        .call()
-        .await?;
+    enqueue_full_scan(&context.pool, &context.settings.ingest, user.id).await?;
     Ok(Json(()))
 }
 

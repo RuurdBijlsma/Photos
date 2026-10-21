@@ -180,3 +180,53 @@ pub async fn test_cancelled_job_is_not_resurrected(context: &TestContext) -> Res
 
     Ok(())
 }
+
+pub async fn test_scan_enqueues_thumbnail_sync(context: &TestContext) -> Result<()> {
+    login(context).await?;
+    let url = format!("{}/api/jobs/ingest/scan", context.settings.api.public_url);
+
+    // Clear active scan/sync rows so dedupe cannot hide the new jobs.
+    sqlx::query!(
+        "DELETE FROM jobs WHERE job_type IN ('scan', 'sync_thumbnails') \
+         AND status IN ('queued', 'running')"
+    )
+    .execute(&context.pool)
+    .await?;
+
+    let max_id: i64 = sqlx::query_scalar!(r#"SELECT COALESCE(MAX(id), 0) AS "max_id!" FROM jobs"#)
+        .fetch_one(&context.pool)
+        .await?;
+
+    let response = context.http_client.post(&url).send().await?;
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let rows = sqlx::query!(
+        r#"
+        SELECT job_type::text AS "job_type!", COUNT(*)::bigint AS "count!"
+        FROM jobs
+        WHERE id > $1 AND job_type IN ('scan', 'sync_thumbnails')
+        GROUP BY job_type
+        "#,
+        max_id
+    )
+    .fetch_all(&context.pool)
+    .await?;
+
+    assert!(
+        rows.iter()
+            .any(|row| row.job_type == "scan" && row.count == 1)
+    );
+    assert!(
+        rows.iter()
+            .any(|row| row.job_type == "sync_thumbnails" && row.count == 1)
+    );
+
+    sqlx::query!(
+        "DELETE FROM jobs WHERE id > $1 AND job_type IN ('scan', 'sync_thumbnails')",
+        max_id
+    )
+    .execute(&context.pool)
+    .await?;
+
+    Ok(())
+}

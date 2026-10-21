@@ -26,6 +26,7 @@ mod test_runner {
     };
     use crate::tests::test_jobs::{
         test_cancel_all_ingest_jobs, test_cancelled_job_is_not_resurrected,
+        test_scan_enqueues_thumbnail_sync,
     };
     use crate::tests::test_onboarding::{test_onboarding, test_start_processing};
     use crate::tests::test_photos::{
@@ -86,6 +87,7 @@ mod test_runner {
                 // -- Jobs --
                 test_cancel_all_ingest_jobs,
                 test_cancelled_job_is_not_resurrected,
+                test_scan_enqueues_thumbnail_sync,
             ]
         );
 
