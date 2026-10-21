@@ -20,7 +20,7 @@ pub mod ingest_takeout_batch;
 pub mod ingest_thumbnails;
 pub mod remove;
 pub mod scan;
-pub mod sync_thumbnails;
+pub mod sync_ingest;
 pub mod update_global_centroid;
 
 /// The outcome of a job handler's execution.
@@ -46,7 +46,7 @@ pub async fn handle_job(context: &WorkerContext, job: &Job) -> Result<JobResult>
         JobType::CleanDb => clean_db::handle(context, job).await,
         JobType::ClusterFaces => cluster_faces::handle(context, job).await,
         JobType::ClusterPhotos => cluster_photos::handle(context, job).await,
-        JobType::SyncThumbnails => sync_thumbnails::handle(context, job).await,
+        JobType::SyncIngest => sync_ingest::handle(context, job).await,
         JobType::HandleWebUpload => handle_web_upload::handle(context, job).await,
         JobType::CalcSystemStats => calc_system_stats::handle(context, job).await,
         JobType::ImportAlbumItem => import_album_item::handle(context, job).await,

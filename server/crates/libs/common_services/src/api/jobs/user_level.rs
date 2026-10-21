@@ -280,8 +280,8 @@ pub async fn get_user_ingest_jobs(
 
 /// Cancels all queued and running per-file ingest jobs owned by one user.
 ///
-/// Also cancels all scan and thumbnail-sync jobs: scans are global, so leaving one queued would
-/// immediately re-enqueue the jobs the user just cancelled.
+/// Also cancels all scan jobs: scans are global, so leaving one queued would immediately re-enqueue
+/// the jobs the user just cancelled. Repair jobs are left alone; the caller starts a fresh repair.
 pub async fn cancel_user_ingest_jobs(pool: &PgPool, user_id: i32) -> Result<i64, AppError> {
     let result = sqlx::query!(
         r#"
@@ -291,7 +291,7 @@ pub async fn cancel_user_ingest_jobs(pool: &PgPool, user_id: i32) -> Result<i64,
         WHERE status IN ('queued'::job_status, 'running'::job_status)
           AND (
               (user_id = $1 AND job_type IN ('ingest_metadata'::job_type, 'ingest_thumbnails'::job_type, 'ingest_analysis'::job_type))
-              OR job_type IN ('scan'::job_type, 'sync_thumbnails'::job_type)
+              OR job_type = 'scan'::job_type
           )
         "#,
         user_id

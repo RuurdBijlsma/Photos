@@ -96,7 +96,7 @@ pub async fn enqueue_full_scan(
         .user_id(target_user_id)
         .call()
         .await?;
-    enqueue_job::<()>(pool, settings, JobType::SyncThumbnails)
+    enqueue_job::<()>(pool, settings, JobType::SyncIngest)
         .user_id(target_user_id)
         .call()
         .await?;

@@ -18,6 +18,13 @@ accidental cancel.
 
 **Spec:** Design agreed in conversation on 2026-10-21; this plan is the source of truth.
 
+## Follow-up: SyncIngest repair
+
+The original `sync_thumbnails` job was renamed to `sync_ingest` and now repairs incomplete items
+instead of re-running full ingest. It enqueues only the missing thumbnail/analysis stages, skips
+deleted, missing, and zero-byte files, and never re-runs metadata. It runs every 48 hours and is
+also enqueued by cancel-all. Cancel-all leaves repair jobs running and does not cancel them.
+
 ## Global Constraints
 
 - No database migration: `job_status` already contains `cancelled`.

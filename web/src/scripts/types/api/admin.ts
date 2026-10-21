@@ -69,7 +69,7 @@ export type JobType =
   | 'cluster_photos'
   | 'import_album_item'
   | 'update_global_centroid'
-  | 'sync_thumbnails'
+  | 'sync_ingest'
   | 'delayed_scan'
   | 'generate_daily_cards'
   | 'calc_system_stats'

@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE jobs\n        SET status = 'cancelled'::job_status,\n            finished_at = NOW()\n        WHERE status IN ('queued'::job_status, 'running'::job_status)\n          AND (\n              (user_id = $1 AND job_type IN ('ingest_metadata'::job_type, 'ingest_thumbnails'::job_type, 'ingest_analysis'::job_type))\n              OR job_type = 'scan'::job_type\n          )\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "27ecffe063345e85242e3ba5e4bdea6cf20493b46295549d77234d4e894e38eb"
+}

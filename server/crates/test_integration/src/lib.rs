@@ -26,7 +26,8 @@ mod test_runner {
     };
     use crate::tests::test_jobs::{
         test_bulk_enqueue_full_ingest_concurrent_overlap, test_cancel_all_ingest_jobs,
-        test_cancelled_job_is_not_resurrected, test_scan_enqueues_thumbnail_sync,
+        test_cancelled_job_is_not_resurrected, test_scan_enqueues_sync_ingest,
+        test_sync_ingest_repairs_incomplete_items,
     };
     use crate::tests::test_onboarding::{test_onboarding, test_start_processing};
     use crate::tests::test_photos::{
@@ -88,7 +89,8 @@ mod test_runner {
                 test_cancel_all_ingest_jobs,
                 test_cancelled_job_is_not_resurrected,
                 test_bulk_enqueue_full_ingest_concurrent_overlap,
-                test_scan_enqueues_thumbnail_sync,
+                test_scan_enqueues_sync_ingest,
+                test_sync_ingest_repairs_incomplete_items,
             ]
         );
 

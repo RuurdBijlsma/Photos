@@ -8,8 +8,10 @@ use reqwest::StatusCode;
 use serde::Deserialize;
 use sqlx::PgPool;
 use std::sync::Arc;
+use tokio::fs;
 use tokio::sync::Barrier;
 use worker::handlers::JobResult;
+use worker::handlers::sync_ingest::repair_incomplete_ingest;
 use worker::jobs::management::{update_job_on_completion, update_job_on_failure};
 
 #[derive(Deserialize)]
@@ -54,6 +56,38 @@ async fn insert_global_scan(pool: &PgPool) -> Result<i64> {
     Ok(id)
 }
 
+async fn insert_incomplete_media_item(
+    pool: &PgPool,
+    template_id: &str,
+    id: &str,
+    relative_path: &str,
+    has_thumbnails: bool,
+) -> Result<()> {
+    sqlx::query!(
+        r#"
+        INSERT INTO media_item (
+            id, user_id, hash, relative_path, filename, width, height, is_video,
+            duration_ms, orientation, taken_at_local, og_taken_at_local, taken_at_utc,
+            sort_timestamp, timezone_name, timezone_offset_seconds, og_timezone_offset_seconds,
+            use_panorama_viewer, has_thumbnails, user_caption, deleted, missing_since
+        )
+        SELECT $1, user_id, hash, $2, $3, width, height, is_video,
+               duration_ms, orientation, taken_at_local, og_taken_at_local, taken_at_utc,
+               sort_timestamp, timezone_name, timezone_offset_seconds, og_timezone_offset_seconds,
+               use_panorama_viewer, $4, user_caption, false, NULL
+        FROM media_item WHERE id = $5
+        "#,
+        id,
+        relative_path,
+        relative_path,
+        has_thumbnails,
+        template_id
+    )
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
 async fn status_of(pool: &PgPool, job_id: i64) -> Result<String> {
     let status = sqlx::query_scalar!(
         r#"SELECT status::text AS "status!" FROM jobs WHERE id = $1"#,
@@ -80,7 +114,7 @@ pub async fn test_cancel_all_ingest_jobs(context: &TestContext) -> Result<()> {
          WHERE status IN ('queued', 'running') \
            AND ( \
                (user_id = $1 AND job_type IN ('ingest_metadata', 'ingest_thumbnails', 'ingest_analysis')) \
-               OR job_type IN ('scan', 'sync_thumbnails') \
+               OR job_type IN ('scan', 'sync_ingest') \
            )",
         user_id
     )
@@ -98,33 +132,40 @@ pub async fn test_cancel_all_ingest_jobs(context: &TestContext) -> Result<()> {
     let thumbnails_id = insert_job(&context.pool, user_id, JobType::IngestThumbnails, true).await?;
     let analysis_id = insert_job(&context.pool, user_id, JobType::IngestAnalysis, false).await?;
     let scan_id = insert_job(&context.pool, user_id, JobType::Scan, false).await?;
-    let sync_id = insert_job(&context.pool, user_id, JobType::SyncThumbnails, true).await?;
+    let sync_id = insert_job(&context.pool, user_id, JobType::SyncIngest, true).await?;
     let global_scan_id = insert_global_scan(&context.pool).await?;
     let remove_id = insert_job(&context.pool, user_id, JobType::Remove, false).await?;
     let takeout_id = insert_job(&context.pool, user_id, JobType::IngestTakeoutBatch, false).await?;
     let other_user_job_id =
         insert_job(&context.pool, other_user_id, JobType::IngestMetadata, false).await?;
 
+    let max_id: i64 = sqlx::query_scalar!(r#"SELECT COALESCE(MAX(id), 0) AS "max_id!" FROM jobs"#)
+        .fetch_one(&context.pool)
+        .await?;
     let response = context.http_client.post(&url).send().await?;
     assert_eq!(response.status(), StatusCode::OK);
     let body: CancelResponse = response.json().await?;
-    assert_eq!(body.cancelled, 6);
+    assert_eq!(body.cancelled, 5);
 
     assert_eq!(status_of(&context.pool, metadata_id).await?, "cancelled");
     assert_eq!(status_of(&context.pool, thumbnails_id).await?, "cancelled");
     assert_eq!(status_of(&context.pool, analysis_id).await?, "cancelled");
     assert_eq!(status_of(&context.pool, scan_id).await?, "cancelled");
-    assert_eq!(status_of(&context.pool, sync_id).await?, "cancelled");
+    assert_eq!(status_of(&context.pool, sync_id).await?, "running");
     assert_eq!(status_of(&context.pool, global_scan_id).await?, "cancelled");
     assert_eq!(status_of(&context.pool, remove_id).await?, "queued");
     assert_eq!(status_of(&context.pool, takeout_id).await?, "queued");
     assert_eq!(status_of(&context.pool, other_user_job_id).await?, "queued");
 
-    // Idempotent: a second click cancels nothing.
-    let response = context.http_client.post(&url).send().await?;
-    assert_eq!(response.status(), StatusCode::OK);
-    let body: CancelResponse = response.json().await?;
-    assert_eq!(body.cancelled, 0);
+    // The active repair is left alone, and a fresh global repair is started.
+    let repair_count: i64 = sqlx::query_scalar!(
+        r#"SELECT COUNT(*)::bigint AS "repair_count!" FROM jobs
+           WHERE id > $1 AND job_type = 'sync_ingest' AND relative_path IS NULL"#,
+        max_id
+    )
+    .fetch_one(&context.pool)
+    .await?;
+    assert_eq!(repair_count, 1);
 
     let ids = [
         metadata_id,
@@ -139,6 +180,12 @@ pub async fn test_cancel_all_ingest_jobs(context: &TestContext) -> Result<()> {
     sqlx::query!("DELETE FROM jobs WHERE id = ANY($1)", &ids[..])
         .execute(&context.pool)
         .await?;
+    sqlx::query!(
+        "DELETE FROM jobs WHERE id > $1 AND job_type = 'sync_ingest'",
+        max_id
+    )
+    .execute(&context.pool)
+    .await?;
     sqlx::query!("DELETE FROM app_user WHERE id = $1", other_user_id)
         .execute(&context.pool)
         .await?;
@@ -246,13 +293,13 @@ pub async fn test_bulk_enqueue_full_ingest_concurrent_overlap(context: &TestCont
     Ok(())
 }
 
-pub async fn test_scan_enqueues_thumbnail_sync(context: &TestContext) -> Result<()> {
+pub async fn test_scan_enqueues_sync_ingest(context: &TestContext) -> Result<()> {
     login(context).await?;
     let url = format!("{}/api/jobs/ingest/scan", context.settings.api.public_url);
 
     // Clear active scan/sync rows so dedupe cannot hide the new jobs.
     sqlx::query!(
-        "DELETE FROM jobs WHERE job_type IN ('scan', 'sync_thumbnails') \
+        "DELETE FROM jobs WHERE job_type IN ('scan', 'sync_ingest') \
          AND status IN ('queued', 'running')"
     )
     .execute(&context.pool)
@@ -269,7 +316,7 @@ pub async fn test_scan_enqueues_thumbnail_sync(context: &TestContext) -> Result<
         r#"
         SELECT job_type::text AS "job_type!", COUNT(*)::bigint AS "count!"
         FROM jobs
-        WHERE id > $1 AND job_type IN ('scan', 'sync_thumbnails')
+        WHERE id > $1 AND job_type IN ('scan', 'sync_ingest')
         GROUP BY job_type
         "#,
         max_id
@@ -283,15 +330,122 @@ pub async fn test_scan_enqueues_thumbnail_sync(context: &TestContext) -> Result<
     );
     assert!(
         rows.iter()
-            .any(|row| row.job_type == "sync_thumbnails" && row.count == 1)
+            .any(|row| row.job_type == "sync_ingest" && row.count == 1)
     );
 
     sqlx::query!(
-        "DELETE FROM jobs WHERE id > $1 AND job_type IN ('scan', 'sync_thumbnails')",
+        "DELETE FROM jobs WHERE id > $1 AND job_type IN ('scan', 'sync_ingest')",
         max_id
     )
     .execute(&context.pool)
     .await?;
+
+    Ok(())
+}
+
+pub async fn test_sync_ingest_repairs_incomplete_items(context: &TestContext) -> Result<()> {
+    let user_id: i32 = sqlx::query_scalar!("SELECT id FROM app_user WHERE email = $1", EMAIL)
+        .fetch_one(&context.pool)
+        .await?;
+    let template = sqlx::query!(
+        "SELECT id, relative_path FROM media_item WHERE user_id = $1 AND is_video = false LIMIT 1",
+        user_id
+    )
+    .fetch_one(&context.pool)
+    .await?;
+
+    let thumbs_path = "sync-ingest-test-thumbs.jpg";
+    let analysis_path = "sync-ingest-test-analysis.jpg";
+    let missing_path = "sync-ingest-test-missing.jpg";
+    let source = context
+        .settings
+        .ingest
+        .media_root
+        .join(&template.relative_path);
+
+    insert_incomplete_media_item(
+        &context.pool,
+        &template.id,
+        "synctest01",
+        thumbs_path,
+        false,
+    )
+    .await?;
+    insert_incomplete_media_item(
+        &context.pool,
+        &template.id,
+        "synctest02",
+        analysis_path,
+        true,
+    )
+    .await?;
+    insert_incomplete_media_item(
+        &context.pool,
+        &template.id,
+        "synctest03",
+        missing_path,
+        false,
+    )
+    .await?;
+
+    // Insert the rows first so the file watcher sees them and does not enqueue ingest jobs.
+    fs::copy(
+        &source,
+        context.settings.ingest.media_root.join(thumbs_path),
+    )
+    .await?;
+    fs::copy(
+        &source,
+        context.settings.ingest.media_root.join(analysis_path),
+    )
+    .await?;
+    fs::create_dir_all(context.settings.ingest.thumbnails_root.join("synctest02")).await?;
+
+    repair_incomplete_ingest(&context.pool, &context.settings.ingest).await?;
+
+    let rows = sqlx::query!(
+        r#"
+        SELECT relative_path, job_type::text AS "job_type!"
+        FROM jobs
+        WHERE relative_path IN ($1, $2, $3)
+        "#,
+        thumbs_path,
+        analysis_path,
+        missing_path
+    )
+    .fetch_all(&context.pool)
+    .await?;
+    let has = |path: &str, job_type: &str| {
+        rows.iter()
+            .any(|row| row.relative_path.as_deref() == Some(path) && row.job_type == job_type)
+    };
+
+    assert!(has(thumbs_path, "ingest_thumbnails"));
+    assert!(has(thumbs_path, "ingest_analysis"));
+    assert!(!has(thumbs_path, "ingest_metadata"));
+    assert!(has(analysis_path, "ingest_analysis"));
+    assert!(!has(analysis_path, "ingest_thumbnails"));
+    assert!(
+        !rows
+            .iter()
+            .any(|row| row.relative_path.as_deref() == Some(missing_path))
+    );
+
+    sqlx::query!(
+        "DELETE FROM jobs WHERE relative_path IN ($1, $2, $3)",
+        thumbs_path,
+        analysis_path,
+        missing_path
+    )
+    .execute(&context.pool)
+    .await?;
+    sqlx::query!("DELETE FROM media_item WHERE id IN ('synctest01', 'synctest02', 'synctest03')")
+        .execute(&context.pool)
+        .await?;
+    let _ = fs::remove_file(context.settings.ingest.media_root.join(thumbs_path)).await;
+    let _ = fs::remove_file(context.settings.ingest.media_root.join(analysis_path)).await;
+    let _ = fs::remove_dir_all(context.settings.ingest.thumbnails_root.join("synctest01")).await;
+    let _ = fs::remove_dir_all(context.settings.ingest.thumbnails_root.join("synctest02")).await;
 
     Ok(())
 }

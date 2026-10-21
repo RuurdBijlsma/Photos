@@ -15,9 +15,10 @@ use common_services::api::jobs::user_level::{
     cancel_user_ingest_jobs, get_failed_ingest_jobs, get_running_ingest_jobs, get_user_ingest_jobs,
     get_user_ingest_overview, retry_user_job,
 };
-use common_services::job_queue::enqueue_full_scan;
+use common_services::database::jobs::JobType;
+use common_services::job_queue::{enqueue_full_scan, enqueue_job};
 use sqlx::PgPool;
-use tracing::instrument;
+use tracing::{error, instrument};
 
 #[instrument(skip(pool), err(Debug))]
 pub async fn job_summary_handler(
@@ -104,12 +105,19 @@ pub async fn retry_ingest_job_handler(
     Ok(Json(()))
 }
 
-#[instrument(skip(pool, user), err(Debug))]
+#[instrument(skip(context, user), err(Debug))]
 pub async fn cancel_all_ingest_jobs_handler(
-    State(pool): State<PgPool>,
+    State(context): State<ApiContext>,
     Extension(user): Extension<ApiUser>,
 ) -> Result<Json<BulkCancelResponse>, AppError> {
-    let cancelled = cancel_user_ingest_jobs(&pool, user.id).await?;
+    let cancelled = cancel_user_ingest_jobs(&context.pool, user.id).await?;
+    if let Err(e) = enqueue_job::<()>(&context.pool, &context.settings.ingest, JobType::SyncIngest)
+        .user_id(user.id)
+        .call()
+        .await
+    {
+        error!("Failed to enqueue ingest repair after cancel-all: {e}");
+    }
     Ok(Json(BulkCancelResponse { cancelled }))
 }
 

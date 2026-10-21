@@ -98,7 +98,7 @@ async function handleDialogRetry(jobId: number) {
 async function handleCancelAll() {
   const confirmed = await dialogs.confirm({
     title: 'Cancel all ingest jobs?',
-    description: `This cancels <strong>${ingestStore.pendingIngestCount}</strong> queued and running ingest jobs, plus any queued library scans. Running jobs finish their current file, then stop. Photos and videos are not deleted, and new files added afterwards will still be ingested.`,
+    description: `This cancels <strong>${ingestStore.pendingIngestCount}</strong> queued and running ingest jobs, plus any queued library scans. Running jobs finish their current file, then stop. Files left partially ingested are repaired automatically. Photos and videos are not deleted, and new files added afterwards will still be ingested.`,
     icon: MdiCancel,
     color: 'error',
     confirmText: 'Cancel jobs',
