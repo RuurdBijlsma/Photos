@@ -112,7 +112,6 @@ pub async fn cancel_all_ingest_jobs_handler(
 ) -> Result<Json<BulkCancelResponse>, AppError> {
     let cancelled = cancel_user_ingest_jobs(&context.pool, user.id).await?;
     if let Err(e) = enqueue_job::<()>(&context.pool, &context.settings.ingest, JobType::SyncIngest)
-        .user_id(user.id)
         .call()
         .await
     {

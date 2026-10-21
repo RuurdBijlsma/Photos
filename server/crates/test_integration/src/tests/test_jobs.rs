@@ -2,7 +2,7 @@ use crate::runner::context::test_context::TestContext;
 use crate::test_helpers::login;
 use color_eyre::Result;
 use common_services::database::jobs::{Job, JobScope, JobType};
-use common_services::job_queue::bulk_enqueue_full_ingest;
+use common_services::job_queue::{bulk_enqueue_full_ingest, enqueue_job};
 use common_types::dev_constants::EMAIL;
 use reqwest::StatusCode;
 use serde::Deserialize;
@@ -290,6 +290,60 @@ pub async fn test_bulk_enqueue_full_ingest_concurrent_overlap(context: &TestCont
 
     forwards_result?;
     backwards_result?;
+    Ok(())
+}
+
+pub async fn test_sync_ingest_is_global_singleton(context: &TestContext) -> Result<()> {
+    sqlx::query!(
+        "DELETE FROM jobs WHERE job_type = 'sync_ingest' \
+         AND status IN ('queued', 'running')"
+    )
+    .execute(&context.pool)
+    .await?;
+
+    let other_user_id: i32 = sqlx::query_scalar!(
+        "INSERT INTO app_user (email, password, name) \
+         VALUES ('sync-singleton-other@test.local', 'x', 'Other') RETURNING id"
+    )
+    .fetch_one(&context.pool)
+    .await?;
+    let second_user_id: i32 = sqlx::query_scalar!(
+        "INSERT INTO app_user (email, password, name) \
+         VALUES ('sync-singleton-second@test.local', 'x', 'Second') RETURNING id"
+    )
+    .fetch_one(&context.pool)
+    .await?;
+
+    let first = enqueue_job::<()>(&context.pool, &context.settings.ingest, JobType::SyncIngest)
+        .user_id(other_user_id)
+        .call()
+        .await?;
+    let second = enqueue_job::<()>(&context.pool, &context.settings.ingest, JobType::SyncIngest)
+        .user_id(second_user_id)
+        .call()
+        .await?;
+    assert!(first);
+    assert!(!second);
+
+    let rows = sqlx::query!(
+        "SELECT id, user_id FROM jobs \
+         WHERE job_type = 'sync_ingest' AND status IN ('queued', 'running')"
+    )
+    .fetch_all(&context.pool)
+    .await?;
+    assert_eq!(rows.len(), 1);
+    assert!(rows[0].user_id.is_none());
+
+    sqlx::query!("DELETE FROM jobs WHERE id = $1", rows[0].id)
+        .execute(&context.pool)
+        .await?;
+    sqlx::query!("DELETE FROM app_user WHERE id = $1", other_user_id)
+        .execute(&context.pool)
+        .await?;
+    sqlx::query!("DELETE FROM app_user WHERE id = $1", second_user_id)
+        .execute(&context.pool)
+        .await?;
+
     Ok(())
 }
 

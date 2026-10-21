@@ -33,6 +33,12 @@ pub async fn enqueue_job<T: Serialize + Send + Sync>(
     payload: Option<&T>,
 ) -> Result<bool> {
     let json_payload = payload.and_then(|p| to_value(p).ok());
+    // SyncIngest scans the whole library; a per-user id would bypass active-job dedupe.
+    let user_id = if job_type == JobType::SyncIngest {
+        None
+    } else {
+        user_id
+    };
 
     let mut tx = pool.begin().await?;
 
@@ -97,7 +103,6 @@ pub async fn enqueue_full_scan(
         .call()
         .await?;
     enqueue_job::<()>(pool, settings, JobType::SyncIngest)
-        .user_id(target_user_id)
         .call()
         .await?;
     Ok(())

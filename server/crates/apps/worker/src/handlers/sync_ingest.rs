@@ -42,7 +42,10 @@ async fn sync_ingest(pool: &PgPool, settings: &IngestSettings) -> Result<()> {
     let to_delete: Vec<_> = thumb_ids.difference(&db_ids).cloned().collect();
     for id in to_delete {
         let path_to_remove = thumbnails_root.join(id);
-        if let Err(e) = fs::remove_dir_all(&path_to_remove).await {
+        // Another cleanup path may have already removed the orphan.
+        if let Err(e) = fs::remove_dir_all(&path_to_remove).await
+            && e.kind() != std::io::ErrorKind::NotFound
+        {
             warn!(
                 "Couldn't remove dir {:?} in `sync_ingest` job: {:?}",
                 &path_to_remove, e
