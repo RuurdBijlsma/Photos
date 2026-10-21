@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useIngestJobsStore } from '@/scripts/stores/ingestJobsStore.ts'
+import { useDialogStore } from '@/scripts/stores/dialogStore.ts'
 import { useSnackbarsStore } from '@/scripts/stores/snackbarStore.ts'
 import { useResponsive } from '@/scripts/composables/useResponsive.ts'
 import mediaItemService from '@/scripts/services/mediaItemService.ts'
@@ -14,6 +15,7 @@ import MdiInformationOutline from '~icons/mdi/information-outline'
 import MdiMagnify from '~icons/mdi/magnify'
 
 const ingestStore = useIngestJobsStore()
+const dialogs = useDialogStore()
 const snackbarStore = useSnackbarsStore()
 const { isMobile } = useResponsive()
 
@@ -23,7 +25,6 @@ const downloadingJobIds = ref<Set<number>>(new Set())
 const detailsDialog = ref(false)
 const detailedJob = ref<JobInfo | null>(null)
 const isActionLoading = ref(false)
-const cancelAllDialog = ref(false)
 const isCancelling = ref(false)
 const canCancelAll = computed(() => ingestStore.pendingIngestCount > 0)
 
@@ -95,10 +96,19 @@ async function handleDialogRetry(jobId: number) {
 }
 
 async function handleCancelAll() {
+  const confirmed = await dialogs.confirm({
+    title: 'Cancel all ingest jobs?',
+    description: `This cancels <strong>${ingestStore.pendingIngestCount}</strong> queued and running ingest jobs. Running jobs finish their current file, then stop. Photos and videos are not deleted, and new files added afterwards will still be ingested.`,
+    icon: MdiCancel,
+    color: 'error',
+    confirmText: 'Cancel jobs',
+    cancelText: 'Keep jobs',
+  })
+  if (!confirmed) return
+
   isCancelling.value = true
   try {
     await ingestStore.cancelAllJobs()
-    cancelAllDialog.value = false
   } catch {
     // Handled in store
   } finally {
@@ -138,7 +148,8 @@ watch(
           rounded="xl"
           :prepend-icon="MdiCancel"
           :disabled="!canCancelAll"
-          @click="cancelAllDialog = true"
+          :loading="isCancelling"
+          @click="handleCancelAll"
         >
           Cancel all
         </v-btn>
@@ -267,26 +278,6 @@ watch(
       @retry="handleDialogRetry"
       @download="handleDownload"
     />
-
-    <v-dialog v-model="cancelAllDialog" max-width="480">
-      <v-card rounded="xl" color="surface-container-highest">
-        <v-card-title>Cancel all ingest jobs?</v-card-title>
-        <v-card-text>
-          This cancels {{ ingestStore.pendingIngestCount }} queued and running ingest jobs. Running
-          jobs finish their current file, then stop. Photos and videos are not deleted, and new
-          files added afterwards will still be ingested.
-        </v-card-text>
-        <v-card-actions>
-          <v-spacer />
-          <v-btn variant="text" :disabled="isCancelling" @click="cancelAllDialog = false">
-            Keep jobs
-          </v-btn>
-          <v-btn color="error" variant="tonal" :loading="isCancelling" @click="handleCancelAll">
-            Cancel jobs
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
   </v-card>
 </template>
 
