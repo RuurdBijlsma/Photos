@@ -44,7 +44,7 @@ function onTakeoutChanged(e: Event) {
         </p>
         <p>
           <strong>Upload all ZIP files from the same export at once.</strong> The import starts when
-          the last ZIP has finished uploading.
+          the last ZIP has finished uploading. If an upload is interrupted, select all ZIPs again.
         </p>
         <p>
           Photos that are already in your library are not imported again; they are only added to the

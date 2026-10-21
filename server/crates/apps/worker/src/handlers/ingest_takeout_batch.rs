@@ -7,6 +7,7 @@ use chrono::{DateTime, Utc};
 use color_eyre::Result;
 use color_eyre::eyre::{bail, eyre};
 use common_services::api::upload::interfaces::TakeoutBatchPayload;
+use common_services::api::upload::service::repair_tus_upload;
 use common_services::database::album::album::AlbumRole;
 use common_services::database::album_store::AlbumStore;
 use common_services::database::jobs::Job;
@@ -189,6 +190,7 @@ async fn extract_archives(
         .join(TUS_UPLOADS_FOLDER);
 
     for upload_id in &payload.tus_upload_ids {
+        repair_tus_upload(&tus_dir, upload_id).await?;
         let zip_path = tus_dir.join(upload_id);
         if fs::try_exists(&zip_path).await.unwrap_or(false) {
             let extract_to = extract_dir.to_path_buf();
@@ -385,7 +387,7 @@ pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
         .ingest
         .cache_root
         .join("takeout_tmp")
-        .join(&payload.batch_id);
+        .join(job.id.to_string());
     fs::create_dir_all(&extract_dir).await?;
 
     info!(

@@ -26,6 +26,7 @@ export const useUploadStore = defineStore('upload', () => {
 
   let cachedJwt = ''
   let jwtFetchedAt = 0
+  let takeoutImportRequested = false
 
   // Cached status counts: these only recompute when upload items are added, removed, or change status
   // They DO NOT recalculate on progress ticks!
@@ -84,14 +85,8 @@ export const useUploadStore = defineStore('upload', () => {
     const fileList = Array.from(files).filter((f) => f.name.toLowerCase().endsWith('.zip'))
     if (fileList.length === 0) return
 
-    const batchId = `takeout_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`
-    const extraMetadata: Record<string, string> = {
-      isTakeout: 'true',
-      takeoutBatchId: batchId,
-      takeoutTotalFiles: fileList.length.toString(),
-    }
-
-    addFilesInternal(fileList, extraMetadata)
+    takeoutImportRequested = false
+    addFilesInternal(fileList, { isTakeout: 'true' })
   }
 
   function addFilesInternal(files: File[], extraMetadata?: Record<string, string>) {
@@ -141,13 +136,45 @@ export const useUploadStore = defineStore('upload', () => {
   }
 
   function processQueue() {
-    if (activeCount.value >= settings.uploadConcurrencyLimit) return
+    if (activeCount.value < settings.uploadConcurrencyLimit) {
+      const nextPending = uploads.value.find((u) => u.status === 'pending')
+      if (nextPending) {
+        startUpload(nextPending)
+        processQueue()
+        return
+      }
+    }
+    maybeStartTakeoutImport()
+  }
 
-    const nextPending = uploads.value.find((u) => u.status === 'pending')
-    if (!nextPending) return
+  // Takeout ZIPs are imported once the browser's queue is done, so a refresh can
+  // simply reselect the ZIPs and reuse whatever already finished uploading.
+  function maybeStartTakeoutImport() {
+    if (takeoutImportRequested) return
 
-    startUpload(nextPending)
-    processQueue()
+    const takeoutUploads = uploads.value.filter((u) => u.extraMetadata?.isTakeout === 'true')
+    if (takeoutUploads.length === 0 || !takeoutUploads.every((u) => u.status === 'success')) return
+
+    takeoutImportRequested = true
+    uploadService
+      .startTakeoutImport()
+      .then(({ data }) => {
+        if (data.started) {
+          snackbarStore.success(`Takeout import started for ${data.zipCount} ZIP(s).`)
+        } else {
+          takeoutImportRequested = false
+          snackbarStore.warning(
+            'No finished Takeout ZIPs were found to import. Select the ZIPs again.',
+          )
+        }
+      })
+      .catch((err) => {
+        takeoutImportRequested = false
+        console.error('[UploadStore] Failed to start Takeout import:', err)
+        snackbarStore.error(
+          'Uploads finished, but the Takeout import could not be started. Select the ZIPs again to retry.',
+        )
+      })
   }
 
   async function startUpload(item: UploadItem) {
@@ -254,6 +281,7 @@ export const useUploadStore = defineStore('upload', () => {
     if (idx !== -1) {
       uploads.value.splice(idx, 1)
     }
+    maybeStartTakeoutImport()
   }
 
   function clearCompleted() {
@@ -264,6 +292,7 @@ export const useUploadStore = defineStore('upload', () => {
       }
       return true
     })
+    maybeStartTakeoutImport()
   }
 
   function abortAll() {

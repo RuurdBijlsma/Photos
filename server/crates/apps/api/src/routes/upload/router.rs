@@ -1,8 +1,10 @@
 use crate::api_state::ApiContext;
-use crate::upload::handlers::{get_upload_jwt, handle_upload_finished, pre_create_handler};
+use crate::upload::handlers::{
+    get_upload_jwt, handle_upload_finished, pre_create_handler, start_takeout_import,
+};
 use app_state::constants::{TUS_LOCKS_FOLDER, TUS_UPLOADS_FOLDER};
 use axum::Router;
-use axum::routing::get;
+use axum::routing::{get, post};
 use fileloft_axum::tus_router;
 use fileloft_core::hooks::HookConfig;
 use fileloft_core::{Config, Extensions, HookEvent, TusHandler};
@@ -68,8 +70,9 @@ fn get_tus_handler(context: &ApiContext) -> TusHandler<FileStore, FileLocker> {
 }
 
 pub fn upload_protected_router() -> Router<ApiContext> {
-    // todo, can i do multi file upload or something? So i can batch enqueue the jobs for it as well?
-    Router::new().route("/upload/jwt", get(get_upload_jwt))
+    Router::new()
+        .route("/upload/jwt", get(get_upload_jwt))
+        .route("/upload/takeout/start", post(start_takeout_import))
 }
 
 // Public because the auth is in the jwt token which is validated in `pre_create_handler`

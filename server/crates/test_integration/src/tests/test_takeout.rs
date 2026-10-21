@@ -116,15 +116,14 @@ fn create_takeout_zips(context: &TestContext, folder: &Path) -> Result<(PathBuf,
     Ok((zip1, zip2))
 }
 
-/// Minimal tus creation + upload, so the test exercises the real upload-finished batch detection.
-async fn tus_upload(
+async fn tus_create(
     client: &reqwest::Client,
     api_url: &str,
     upload_jwt: &str,
     filename: &str,
     metadata: &[(&str, &str)],
-    bytes: &[u8],
-) -> Result<String> {
+    size: usize,
+) -> Result<(String, String)> {
     let mut pairs = vec![
         format!("filename {}", STANDARD.encode(filename)),
         format!("jwt {}", STANDARD.encode(upload_jwt)),
@@ -138,7 +137,7 @@ async fn tus_upload(
     let create = client
         .post(format!("{api_url}/api/files"))
         .header("Tus-Resumable", "1.0.0")
-        .header("Upload-Length", bytes.len().to_string())
+        .header("Upload-Length", size.to_string())
         .header("Upload-Metadata", pairs.join(","))
         .send()
         .await?;
@@ -159,10 +158,19 @@ async fn tus_upload(
         .to_owned();
     let upload_id = location.rsplit('/').next().unwrap_or_default().to_owned();
 
+    Ok((location, upload_id))
+}
+
+async fn tus_patch(
+    client: &reqwest::Client,
+    location: &str,
+    offset: u64,
+    bytes: &[u8],
+) -> Result<()> {
     let patch = client
-        .patch(&location)
+        .patch(location)
         .header("Tus-Resumable", "1.0.0")
-        .header("Upload-Offset", "0")
+        .header("Upload-Offset", offset.to_string())
         .header("Content-Type", "application/offset+octet-stream")
         .body(bytes.to_vec())
         .send()
@@ -176,7 +184,63 @@ async fn tus_upload(
         );
     }
 
+    Ok(())
+}
+
+/// Minimal tus creation + upload, so the test exercises the real upload-finished batch detection.
+async fn tus_upload(
+    client: &reqwest::Client,
+    api_url: &str,
+    upload_jwt: &str,
+    filename: &str,
+    metadata: &[(&str, &str)],
+    bytes: &[u8],
+) -> Result<String> {
+    let (location, upload_id) =
+        tus_create(client, api_url, upload_jwt, filename, metadata, bytes.len()).await?;
+    tus_patch(client, &location, 0, bytes).await?;
     Ok(upload_id)
+}
+
+/// Leaves an upload in the state produced by a browser refresh during finalization:
+/// `.info` says complete, the final file is a prefix, and the parts hold the full ZIP.
+fn simulate_interrupted_finalize(tus_dir: &Path, upload_id: &str, bytes: &[u8]) -> Result<()> {
+    let split = bytes.len() / 2;
+    std::fs::write(tus_dir.join(format!("{upload_id}_part_0")), &bytes[..split])?;
+    std::fs::write(tus_dir.join(format!("{upload_id}_part_1")), &bytes[split..])?;
+    std::fs::OpenOptions::new()
+        .write(true)
+        .open(tus_dir.join(upload_id))?
+        .set_len(u64::try_from(split / 2)?)?;
+    Ok(())
+}
+
+async fn start_takeout_import(client: &reqwest::Client, api_url: &str) -> Result<(bool, usize)> {
+    let response = client
+        .post(format!("{api_url}/api/upload/takeout/start"))
+        .send()
+        .await?;
+
+    if !response.status().is_success() {
+        bail!(
+            "Starting the takeout import failed: {} {}",
+            response.status(),
+            response.text().await?
+        );
+    }
+
+    let body: serde_json::Value = response.json().await?;
+    Ok((
+        body.get("started")
+            .and_then(serde_json::Value::as_bool)
+            .unwrap_or(false),
+        usize::try_from(
+            body.get("zipCount")
+                .and_then(serde_json::Value::as_u64)
+                .unwrap_or_default(),
+        )
+        .unwrap_or_default(),
+    ))
 }
 
 async fn wait_for_takeout_job(context: &TestContext) -> Result<()> {
@@ -375,7 +439,7 @@ async fn assert_existing_media_linking(context: &TestContext, user_id: i32) -> R
     Ok(())
 }
 
-fn assert_cleanup(context: &TestContext, batch_id: &str, upload_ids: &[String]) {
+fn assert_cleanup(context: &TestContext, job_id: i64, upload_ids: &[String]) {
     let tus_dir = context
         .settings
         .ingest
@@ -394,12 +458,13 @@ fn assert_cleanup(context: &TestContext, batch_id: &str, upload_ids: &[String]) 
             .ingest
             .cache_root
             .join("takeout_tmp")
-            .join(batch_id)
+            .join(job_id.to_string())
             .exists(),
         "extraction folder should be deleted"
     );
 }
 
+#[allow(clippy::too_many_lines)]
 pub async fn test_takeout_import_flow(context: &TestContext) -> Result<()> {
     login(context).await?;
     let api_url = &context.settings.api.public_url;
@@ -415,37 +480,66 @@ pub async fn test_takeout_import_flow(context: &TestContext) -> Result<()> {
         .json()
         .await?;
 
-    let batch_id = "test_takeout_batch";
     let temp_dir = tempfile::TempDir::new()?;
     let (zip1_path, zip2_path) = create_takeout_zips(context, temp_dir.path())?;
+    let metadata = [("isTakeout", "true")];
 
-    let total_files = "2".to_owned();
-    let metadata = [
-        ("isTakeout", "true"),
-        ("takeoutBatchId", batch_id),
-        ("takeoutTotalFiles", total_files.as_str()),
-    ];
+    let zip1_bytes = std::fs::read(&zip1_path)?;
+    let zip2_bytes = std::fs::read(&zip2_path)?;
 
+    // Simulate an interrupted upload: zip2 is created and half uploaded, then the
+    // browser is refreshed. The client only calls start once its queue is done.
+    let (zip2_location, zip2_id) = tus_create(
+        client,
+        api_url,
+        &upload_jwt,
+        "takeout-002.zip",
+        &metadata,
+        zip2_bytes.len(),
+    )
+    .await?;
+    let split = zip2_bytes.len() / 2;
+    tus_patch(client, &zip2_location, 0, &zip2_bytes[..split]).await?;
+
+    let (started, zip_count) = start_takeout_import(client, api_url).await?;
+    assert!(!started, "partial ZIPs must not start an import");
+    assert_eq!(zip_count, 0);
+
+    // The already-finished ZIP resumes without another upload event; the partial one
+    // is finished after the refresh.
     let zip1_id = tus_upload(
         client,
         api_url,
         &upload_jwt,
         "takeout-001.zip",
         &metadata,
-        &std::fs::read(&zip1_path)?,
+        &zip1_bytes,
     )
     .await?;
-    let zip2_id = tus_upload(
-        client,
-        api_url,
-        &upload_jwt,
-        "takeout-002.zip",
-        &metadata,
-        &std::fs::read(&zip2_path)?,
-    )
-    .await?;
+    tus_patch(client, &zip2_location, split as u64, &zip2_bytes[split..]).await?;
 
-    // The last finished ZIP starts the batch job.
+    // A refresh during the final PATCH leaves .info complete but the final file truncated.
+    let tus_dir = context
+        .settings
+        .ingest
+        .app_data_root
+        .join(TUS_UPLOADS_FOLDER);
+    simulate_interrupted_finalize(&tus_dir, &zip1_id, &zip1_bytes)?;
+    assert!(
+        std::fs::metadata(tus_dir.join(&zip1_id))?.len() < u64::try_from(zip1_bytes.len())?,
+        "the upload should start out truncated"
+    );
+
+    let (started, zip_count) = start_takeout_import(client, api_url).await?;
+    assert!(started);
+    assert_eq!(zip_count, 2);
+    assert_eq!(
+        std::fs::read(tus_dir.join(&zip1_id))?,
+        zip1_bytes,
+        "the interrupted finalization should be repaired before enqueueing"
+    );
+    assert!(!tus_dir.join(format!("{zip1_id}_part_0")).exists());
+    assert!(!tus_dir.join(format!("{zip1_id}_part_1")).exists());
     wait_for_takeout_job(context).await?;
 
     let job_count: i64 =
@@ -454,6 +548,18 @@ pub async fn test_takeout_import_flow(context: &TestContext) -> Result<()> {
             .await?
             .expect("count");
     assert_eq!(job_count, 1, "the batch should only be enqueued once");
+
+    let (job_id, payload): (i64, Option<serde_json::Value>) = sqlx::query_as(
+        "SELECT id, payload FROM jobs WHERE job_type = 'ingest_takeout_batch' ORDER BY id DESC LIMIT 1",
+    )
+    .fetch_one(&context.pool)
+    .await?;
+    let mut expected_ids = vec![zip1_id.clone(), zip2_id.clone()];
+    expected_ids.sort_unstable();
+    let payload_ids: Vec<String> = payload
+        .and_then(|payload| serde_json::from_value(payload.get("tus_upload_ids")?.clone()).ok())
+        .expect("takeout payload should contain the upload ids");
+    assert_eq!(payload_ids, expected_ids);
 
     // The new photo is imported from the takeout folder, with the sidecar date burned into it.
     let (new_media_id, relative_path, taken_at_local) =
@@ -511,7 +617,11 @@ pub async fn test_takeout_import_flow(context: &TestContext) -> Result<()> {
     assert_album_linking(context, user_id, &new_media_id).await?;
     assert_album_linking(context, user_id, &broken_media_id).await?;
     assert_existing_media_linking(context, user_id).await?;
-    assert_cleanup(context, batch_id, &[zip1_id, zip2_id]);
+    assert_cleanup(context, job_id, &[zip1_id, zip2_id]);
+
+    let (started, zip_count) = start_takeout_import(client, api_url).await?;
+    assert!(!started, "nothing should be left to import after cleanup");
+    assert_eq!(zip_count, 0);
 
     Ok(())
 }
