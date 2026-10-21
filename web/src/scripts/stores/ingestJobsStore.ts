@@ -236,7 +236,7 @@ export const useIngestJobsStore = defineStore('ingestJobs', () => {
       const response = await ingestJobsService.cancelAll()
       const cancelled = response.data.cancelled
       snackbarStore.success(
-        cancelled === 0 ? 'No pending ingest jobs to cancel' : `Cancelled ${cancelled} ingest jobs`,
+        cancelled === 0 ? 'No pending jobs to cancel' : `Cancelled ${cancelled} pending jobs`,
       )
       await Promise.all([fetchOverview(), fetchRunning(), fetchUserJobs(true)])
       return cancelled

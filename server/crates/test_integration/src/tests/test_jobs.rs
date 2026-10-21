@@ -2,10 +2,13 @@ use crate::runner::context::test_context::TestContext;
 use crate::test_helpers::login;
 use color_eyre::Result;
 use common_services::database::jobs::{Job, JobScope, JobType};
+use common_services::job_queue::bulk_enqueue_full_ingest;
 use common_types::dev_constants::EMAIL;
 use reqwest::StatusCode;
 use serde::Deserialize;
 use sqlx::PgPool;
+use std::sync::Arc;
+use tokio::sync::Barrier;
 use worker::handlers::JobResult;
 use worker::jobs::management::{update_job_on_completion, update_job_on_failure};
 
@@ -37,6 +40,20 @@ async fn insert_job(pool: &PgPool, user_id: i32, job_type: JobType, running: boo
     Ok(id)
 }
 
+async fn insert_global_scan(pool: &PgPool) -> Result<i64> {
+    let id: i64 = sqlx::query_scalar!(
+        r#"
+        INSERT INTO jobs (job_type, scope, phase, priority, status, scheduled_at)
+        VALUES ('scan'::job_type, 'global'::job_scope, 20, 50, 'queued'::job_status,
+                now() + interval '1 hour')
+        RETURNING id
+        "#
+    )
+    .fetch_one(pool)
+    .await?;
+    Ok(id)
+}
+
 async fn status_of(pool: &PgPool, job_id: i64) -> Result<String> {
     let status = sqlx::query_scalar!(
         r#"SELECT status::text AS "status!" FROM jobs WHERE id = $1"#,
@@ -59,9 +76,12 @@ pub async fn test_cancel_all_ingest_jobs(context: &TestContext) -> Result<()> {
 
     // Clear leftovers from earlier tests so the counts below are deterministic.
     sqlx::query!(
-        "DELETE FROM jobs WHERE user_id = $1 \
-         AND job_type IN ('ingest_metadata', 'ingest_thumbnails', 'ingest_analysis') \
-         AND status IN ('queued', 'running')",
+        "DELETE FROM jobs \
+         WHERE status IN ('queued', 'running') \
+           AND ( \
+               (user_id = $1 AND job_type IN ('ingest_metadata', 'ingest_thumbnails', 'ingest_analysis')) \
+               OR job_type IN ('scan', 'sync_thumbnails') \
+           )",
         user_id
     )
     .execute(&context.pool)
@@ -77,6 +97,9 @@ pub async fn test_cancel_all_ingest_jobs(context: &TestContext) -> Result<()> {
     let metadata_id = insert_job(&context.pool, user_id, JobType::IngestMetadata, false).await?;
     let thumbnails_id = insert_job(&context.pool, user_id, JobType::IngestThumbnails, true).await?;
     let analysis_id = insert_job(&context.pool, user_id, JobType::IngestAnalysis, false).await?;
+    let scan_id = insert_job(&context.pool, user_id, JobType::Scan, false).await?;
+    let sync_id = insert_job(&context.pool, user_id, JobType::SyncThumbnails, true).await?;
+    let global_scan_id = insert_global_scan(&context.pool).await?;
     let remove_id = insert_job(&context.pool, user_id, JobType::Remove, false).await?;
     let takeout_id = insert_job(&context.pool, user_id, JobType::IngestTakeoutBatch, false).await?;
     let other_user_job_id =
@@ -85,11 +108,14 @@ pub async fn test_cancel_all_ingest_jobs(context: &TestContext) -> Result<()> {
     let response = context.http_client.post(&url).send().await?;
     assert_eq!(response.status(), StatusCode::OK);
     let body: CancelResponse = response.json().await?;
-    assert_eq!(body.cancelled, 3);
+    assert_eq!(body.cancelled, 6);
 
     assert_eq!(status_of(&context.pool, metadata_id).await?, "cancelled");
     assert_eq!(status_of(&context.pool, thumbnails_id).await?, "cancelled");
     assert_eq!(status_of(&context.pool, analysis_id).await?, "cancelled");
+    assert_eq!(status_of(&context.pool, scan_id).await?, "cancelled");
+    assert_eq!(status_of(&context.pool, sync_id).await?, "cancelled");
+    assert_eq!(status_of(&context.pool, global_scan_id).await?, "cancelled");
     assert_eq!(status_of(&context.pool, remove_id).await?, "queued");
     assert_eq!(status_of(&context.pool, takeout_id).await?, "queued");
     assert_eq!(status_of(&context.pool, other_user_job_id).await?, "queued");
@@ -104,6 +130,9 @@ pub async fn test_cancel_all_ingest_jobs(context: &TestContext) -> Result<()> {
         metadata_id,
         thumbnails_id,
         analysis_id,
+        scan_id,
+        sync_id,
+        global_scan_id,
         remove_id,
         takeout_id,
     ];
@@ -178,6 +207,42 @@ pub async fn test_cancelled_job_is_not_resurrected(context: &TestContext) -> Res
         .execute(&context.pool)
         .await?;
 
+    Ok(())
+}
+
+pub async fn test_bulk_enqueue_full_ingest_concurrent_overlap(context: &TestContext) -> Result<()> {
+    let user_id: i32 = sqlx::query_scalar!("SELECT id FROM app_user WHERE email = $1", EMAIL)
+        .fetch_one(&context.pool)
+        .await?;
+    let prefix = "deadlock-test/";
+    let paths: Vec<String> = (0..1000).map(|i| format!("{prefix}{i}.jpg")).collect();
+    let forwards: Vec<_> = paths.iter().map(|path| (path.clone(), None)).collect();
+    let backwards: Vec<_> = forwards.iter().rev().cloned().collect();
+    let barrier = Arc::new(Barrier::new(2));
+
+    let forwards_barrier = Arc::clone(&barrier);
+    let forwards_task = async {
+        forwards_barrier.wait().await;
+        bulk_enqueue_full_ingest(&context.pool, &context.settings.ingest, &forwards, user_id).await
+    };
+    let backwards_barrier = Arc::clone(&barrier);
+    let backwards_task = async {
+        backwards_barrier.wait().await;
+        bulk_enqueue_full_ingest(&context.pool, &context.settings.ingest, &backwards, user_id).await
+    };
+
+    let (forwards_result, backwards_result) = tokio::join!(forwards_task, backwards_task);
+
+    sqlx::query!(
+        "DELETE FROM jobs WHERE user_id = $1 AND relative_path LIKE $2",
+        user_id,
+        format!("{prefix}%")
+    )
+    .execute(&context.pool)
+    .await?;
+
+    forwards_result?;
+    backwards_result?;
     Ok(())
 }
 

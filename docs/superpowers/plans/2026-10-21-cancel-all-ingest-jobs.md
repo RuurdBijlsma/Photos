@@ -3,14 +3,16 @@
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:
 > executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Give a user one button that cancels all of their queued and running per-file ingest jobs, and make that
-cancellation stick when a worker finishes an in-flight job.
+**Goal:** Give a user one button that cancels all of their queued and running per-file ingest jobs and any active
+library scan/thumbnail sync, and make that cancellation stick when a worker finishes an in-flight job.
 
-**Architecture:** A protected `POST /api/jobs/ingest/cancel-all` performs one user-scoped `UPDATE jobs` for
-`ingest_metadata`, `ingest_thumbnails`, and `ingest_analysis`, returning the affected count. Worker completion/requeue
-writes get a `status <> 'cancelled'` guard so a job already running at cancel time cannot overwrite the cancellation.
-The Activity dashboard gets a confirmed "Cancel all" action. "Scan Folder" also enqueues `SyncThumbnails` so the
-existing scan button re-ingests items with missing thumbnails after an accidental cancel.
+**Architecture:** A protected `POST /api/jobs/ingest/cancel-all` performs one `UPDATE jobs` for the user's
+`ingest_metadata`, `ingest_thumbnails`, and `ingest_analysis` jobs plus all active `scan` and `sync_thumbnails` jobs,
+returning the affected count. Scan and sync jobs are global, so leaving one queued would immediately re-enqueue the
+cancelled files. Worker completion/requeue writes get a `status <> 'cancelled'` guard so a job already running at
+cancel time cannot overwrite the cancellation. The Activity dashboard gets a confirmed "Cancel all" action. "Scan
+Folder" also enqueues `SyncThumbnails` so the existing scan button re-ingests items with missing thumbnails after an
+accidental cancel.
 
 **Tech Stack:** Rust, Axum, SQLx, Postgres, Vue 3, Pinia, Vuetify.
 
@@ -19,11 +21,12 @@ existing scan button re-ingests items with missing thumbnails after an accidenta
 ## Global Constraints
 
 - No database migration: `job_status` already contains `cancelled`.
-- Scope is exactly the three per-file ingest types. Do **not** cancel `remove`, `scan`, `sync_thumbnails`,
+- Scope is the three per-file ingest types plus `scan` and `sync_thumbnails`. Do **not** cancel `remove`,
   `ingest_takeout_batch`, `handle_web_upload`, cluster jobs, or stats jobs.
-- Every cancel query must filter `user_id = $1`. Never reuse the admin-only `cancel_job`.
-- Cancel is point-in-time. Jobs created after the call (by a running scan, an upload finalization, or a takeout batch)
-  are allowed and may need a second click.
+- Ingest jobs must filter `user_id = $1`. Scan and sync jobs are global and are cancelled for all users because any
+  one of them would scan every user's files. Never reuse the admin-only `cancel_job`.
+- Cancel is point-in-time. Jobs created after the call (by a running scan/sync, an upload finalization, or a takeout
+  batch) are allowed and may need a second click. A scan/sync already running may finish its current pass.
 - Cancelled jobs are not deleted and do not delete files or `media_item` rows. A later scan marks deleted files missing.
 - Use SQLx compile-time-checked queries like the surrounding code, then regenerate `server/.sqlx` with
   `cargo sqlx prepare --workspace`.
@@ -40,7 +43,8 @@ existing scan button re-ingests items with missing thumbnails after an accidenta
 
 ## Review Focus
 
-- Cancel-all from one user must not touch another user's jobs. Covered in Task 1.
+- Cancel-all from one user must not touch another user's ingest jobs. Scan/sync jobs are global and intentionally
+  cancelled for everyone. Covered in Task 1.
 - A running job that returns `Done` after the cancel must not overwrite `cancelled`. Covered in Task 2.
 - A running job whose file vanished must not requeue itself after the cancel (`FileNotFound`, `DependencyReschedule`,
   storage unavailable, retry). Covered in Task 2.
@@ -792,3 +796,13 @@ git commit -m "chore: format cancel-all ingest changes"
 ```
 
 Only commit if `cargo fmt` or prettier changed something.
+
+## Follow-Up (2026-10-21)
+
+- Cancel-all also cancels active `scan` and `sync_thumbnails` jobs. They are global, so any pending one would
+  immediately re-enqueue the files the user just cancelled. A scan/sync already running may finish its current pass.
+- `bulk_enqueue_full_ingest` sorts items by path before building its insert arrays. Two scans that enqueue the same
+  files now lock the unique index in the same order instead of deadlocking. Regression test:
+  `test_bulk_enqueue_full_ingest_concurrent_overlap`.
+- Follow-up verification: `cargo fmt --check`, `cargo sqlx prepare --check --workspace`, `just clippy`, `just test`
+  (28/28), `npm run build`, `prettier:check` all pass.

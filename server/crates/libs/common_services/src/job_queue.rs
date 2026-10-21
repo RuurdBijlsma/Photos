@@ -239,7 +239,11 @@ pub async fn bulk_enqueue_full_ingest(
     let mut all_priorities = Vec::with_capacity(capacity);
     let mut all_payloads = Vec::with_capacity(capacity);
 
-    for (path, payload) in items {
+    // Concurrent scans enqueue the same files; a shared order avoids lock inversion on the unique index.
+    let mut sorted_items: Vec<_> = items.iter().collect();
+    sorted_items.sort_unstable_by(|a, b| a.0.cmp(&b.0));
+
+    for (path, payload) in sorted_items {
         let file_path = ingest_settings.media_root.join(path);
         let is_video = ingest_settings.is_video_file(&file_path);
 
