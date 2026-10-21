@@ -24,6 +24,8 @@ The original `sync_thumbnails` job was renamed to `sync_ingest` and now repairs 
 instead of re-running full ingest. It enqueues only the missing thumbnail/analysis stages, skips
 deleted, missing, and zero-byte files, and never re-runs metadata. It runs every 48 hours and is
 also enqueued by cancel-all. Cancel-all leaves repair jobs running and does not cancel them.
+Permanently failed thumbnail/analysis jobs set per-stage `repair_blocked` flags so automatic repair
+does not retry corrupt files; a successful manual retry or Reprocess clears the flag.
 
 ## Global Constraints
 

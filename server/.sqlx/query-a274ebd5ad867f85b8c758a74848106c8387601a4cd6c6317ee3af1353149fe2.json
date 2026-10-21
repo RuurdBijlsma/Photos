@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE media_item SET analysis_repair_blocked = false WHERE relative_path = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "a274ebd5ad867f85b8c758a74848106c8387601a4cd6c6317ee3af1353149fe2"
+}

@@ -99,8 +99,17 @@ pub async fn claim_next_job(context: &WorkerContext) -> Result<Option<Job>> {
 /// Updates a job's status based on a successful completion result.
 pub async fn update_job_on_completion(pool: &PgPool, job: &Job, result: JobResult) -> Result<()> {
     match result {
-        JobResult::Done => mark_job_done(pool, job.id).await,
-        JobResult::Cancelled => mark_job_cancelled(pool, job.id).await,
+        JobResult::Done => {
+            if mark_job_done(pool, job.id).await? {
+                clear_repair_blocked(pool, job).await
+            } else {
+                Ok(())
+            }
+        }
+        JobResult::Cancelled => {
+            mark_job_cancelled(pool, job.id).await?;
+            Ok(())
+        }
         JobResult::DependencyReschedule => {
             const MAX_DEPENDENCY_ATTEMPTS: i32 = 20;
             if job.dependency_attempts >= MAX_DEPENDENCY_ATTEMPTS {
@@ -108,7 +117,11 @@ pub async fn update_job_on_completion(pool: &PgPool, job: &Job, result: JobResul
                     "Dependency not met after {} attempts for job {} ({:?}). Cancelling job.",
                     job.dependency_attempts, job.id, job.relative_path
                 );
-                mark_job_cancelled(pool, job.id).await
+                if mark_job_cancelled(pool, job.id).await? {
+                    set_repair_blocked(pool, job).await
+                } else {
+                    Ok(())
+                }
             } else {
                 if job.dependency_attempts > 10 {
                     alert!(
@@ -127,7 +140,8 @@ pub async fn update_job_on_completion(pool: &PgPool, job: &Job, result: JobResul
                     "File not found after {} attempts for job {} ({:?}). Cancelling job.",
                     job.dependency_attempts, job.id, job.relative_path
                 );
-                mark_job_cancelled(pool, job.id).await
+                mark_job_cancelled(pool, job.id).await?;
+                Ok(())
             } else {
                 let delay = backoff_seconds(job.dependency_attempts);
                 info!(
@@ -151,43 +165,102 @@ pub async fn update_job_on_completion(pool: &PgPool, job: &Job, result: JobResul
 pub async fn update_job_on_failure(pool: &PgPool, job: &Job, error: &Report) -> Result<()> {
     let error_string = &format!("{error:?}");
     if job.attempts + 1 >= job.max_attempts {
-        mark_job_failed(pool, job.id, error_string).await
+        if mark_job_failed(pool, job.id, error_string).await? {
+            set_repair_blocked(pool, job).await
+        } else {
+            Ok(())
+        }
     } else {
         let delay = backoff_seconds(job.attempts);
         reschedule_for_retry(pool, job.id, delay, error_string).await
     }
 }
 
+async fn set_repair_blocked(pool: &PgPool, job: &Job) -> Result<()> {
+    let Some(relative_path) = job.relative_path.as_deref() else {
+        return Ok(());
+    };
+    match job.job_type {
+        JobType::IngestThumbnails => {
+            sqlx::query!(
+                "UPDATE media_item SET thumbnail_repair_blocked = true WHERE relative_path = $1",
+                relative_path
+            )
+            .execute(pool)
+            .await?;
+        }
+        JobType::IngestAnalysis => {
+            sqlx::query!(
+                "UPDATE media_item SET analysis_repair_blocked = true WHERE relative_path = $1",
+                relative_path
+            )
+            .execute(pool)
+            .await?;
+        }
+        _ => {}
+    }
+    Ok(())
+}
+
+async fn clear_repair_blocked(pool: &PgPool, job: &Job) -> Result<()> {
+    let Some(relative_path) = job.relative_path.as_deref() else {
+        return Ok(());
+    };
+    match job.job_type {
+        JobType::IngestThumbnails => {
+            sqlx::query!(
+                "UPDATE media_item SET thumbnail_repair_blocked = false WHERE relative_path = $1",
+                relative_path
+            )
+            .execute(pool)
+            .await?;
+        }
+        JobType::IngestAnalysis => {
+            sqlx::query!(
+                "UPDATE media_item SET analysis_repair_blocked = false WHERE relative_path = $1",
+                relative_path
+            )
+            .execute(pool)
+            .await?;
+        }
+        _ => {}
+    }
+    Ok(())
+}
+
 /// Marks a job as done in the database.
-async fn mark_job_done(pool: &PgPool, job_id: i64) -> Result<()> {
-    sqlx::query!(
+async fn mark_job_done(pool: &PgPool, job_id: i64) -> Result<bool> {
+    let result = sqlx::query!(
         "UPDATE jobs SET status = 'done', finished_at = now() WHERE id = $1 AND status <> 'cancelled'",
         job_id
     )
     .execute(pool)
     .await?;
-    Ok(())
+    Ok(result.rows_affected() == 1)
 }
 
 /// Marks a job as cancelled in the database.
-async fn mark_job_cancelled(pool: &PgPool, job_id: i64) -> Result<()> {
-    sqlx::query!("UPDATE jobs SET status = 'cancelled' WHERE id = $1", job_id)
-        .execute(pool)
-        .await?;
-    Ok(())
+async fn mark_job_cancelled(pool: &PgPool, job_id: i64) -> Result<bool> {
+    let result = sqlx::query!(
+        "UPDATE jobs SET status = 'cancelled' WHERE id = $1 AND status <> 'cancelled'",
+        job_id
+    )
+    .execute(pool)
+    .await?;
+    Ok(result.rows_affected() == 1)
 }
 
 /// Marks a job as failed in the database.
-async fn mark_job_failed(pool: &PgPool, job_id: i64, last_error: &str) -> Result<()> {
+async fn mark_job_failed(pool: &PgPool, job_id: i64, last_error: &str) -> Result<bool> {
     alert!("🚨 Marking job {} as failed: {}", job_id, last_error);
-    sqlx::query!(
+    let result = sqlx::query!(
         "UPDATE jobs SET status = 'failed', finished_at = now(), last_error = $2, attempts = attempts + 1 WHERE id = $1 AND status <> 'cancelled'",
         job_id,
         last_error
     )
         .execute(pool)
         .await?;
-    Ok(())
+    Ok(result.rows_affected() == 1)
 }
 
 /// Reschedules a job to be tried again after a backoff period.

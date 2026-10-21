@@ -343,6 +343,7 @@ pub async fn test_scan_enqueues_sync_ingest(context: &TestContext) -> Result<()>
     Ok(())
 }
 
+#[allow(clippy::too_many_lines)]
 pub async fn test_sync_ingest_repairs_incomplete_items(context: &TestContext) -> Result<()> {
     let user_id: i32 = sqlx::query_scalar!("SELECT id FROM app_user WHERE email = $1", EMAIL)
         .fetch_one(&context.pool)
@@ -357,6 +358,8 @@ pub async fn test_sync_ingest_repairs_incomplete_items(context: &TestContext) ->
     let thumbs_path = "sync-ingest-test-thumbs.jpg";
     let analysis_path = "sync-ingest-test-analysis.jpg";
     let missing_path = "sync-ingest-test-missing.jpg";
+    let blocked_thumbs_path = "sync-ingest-test-blocked-thumbs.jpg";
+    let blocked_analysis_path = "sync-ingest-test-blocked-analysis.jpg";
     let source = context
         .settings
         .ingest
@@ -387,6 +390,28 @@ pub async fn test_sync_ingest_repairs_incomplete_items(context: &TestContext) ->
         false,
     )
     .await?;
+    insert_incomplete_media_item(
+        &context.pool,
+        &template.id,
+        "synctest04",
+        blocked_thumbs_path,
+        false,
+    )
+    .await?;
+    insert_incomplete_media_item(
+        &context.pool,
+        &template.id,
+        "synctest05",
+        blocked_analysis_path,
+        true,
+    )
+    .await?;
+    sqlx::query!("UPDATE media_item SET thumbnail_repair_blocked = true WHERE id = 'synctest04'")
+        .execute(&context.pool)
+        .await?;
+    sqlx::query!("UPDATE media_item SET analysis_repair_blocked = true WHERE id = 'synctest05'")
+        .execute(&context.pool)
+        .await?;
 
     // Insert the rows first so the file watcher sees them and does not enqueue ingest jobs.
     fs::copy(
@@ -399,7 +424,22 @@ pub async fn test_sync_ingest_repairs_incomplete_items(context: &TestContext) ->
         context.settings.ingest.media_root.join(analysis_path),
     )
     .await?;
+    fs::copy(
+        &source,
+        context.settings.ingest.media_root.join(blocked_thumbs_path),
+    )
+    .await?;
+    fs::copy(
+        &source,
+        context
+            .settings
+            .ingest
+            .media_root
+            .join(blocked_analysis_path),
+    )
+    .await?;
     fs::create_dir_all(context.settings.ingest.thumbnails_root.join("synctest02")).await?;
+    fs::create_dir_all(context.settings.ingest.thumbnails_root.join("synctest05")).await?;
 
     repair_incomplete_ingest(&context.pool, &context.settings.ingest).await?;
 
@@ -407,11 +447,13 @@ pub async fn test_sync_ingest_repairs_incomplete_items(context: &TestContext) ->
         r#"
         SELECT relative_path, job_type::text AS "job_type!"
         FROM jobs
-        WHERE relative_path IN ($1, $2, $3)
+        WHERE relative_path IN ($1, $2, $3, $4, $5)
         "#,
         thumbs_path,
         analysis_path,
-        missing_path
+        missing_path,
+        blocked_thumbs_path,
+        blocked_analysis_path
     )
     .fetch_all(&context.pool)
     .await?;
@@ -430,22 +472,194 @@ pub async fn test_sync_ingest_repairs_incomplete_items(context: &TestContext) ->
             .iter()
             .any(|row| row.relative_path.as_deref() == Some(missing_path))
     );
+    assert!(!has(blocked_thumbs_path, "ingest_thumbnails"));
+    assert!(!has(blocked_thumbs_path, "ingest_analysis"));
+    assert!(!has(blocked_analysis_path, "ingest_analysis"));
 
     sqlx::query!(
-        "DELETE FROM jobs WHERE relative_path IN ($1, $2, $3)",
+        "DELETE FROM jobs WHERE relative_path IN ($1, $2, $3, $4, $5)",
         thumbs_path,
         analysis_path,
-        missing_path
+        missing_path,
+        blocked_thumbs_path,
+        blocked_analysis_path
     )
     .execute(&context.pool)
     .await?;
-    sqlx::query!("DELETE FROM media_item WHERE id IN ('synctest01', 'synctest02', 'synctest03')")
-        .execute(&context.pool)
-        .await?;
+    sqlx::query!(
+        "DELETE FROM media_item WHERE id IN \
+         ('synctest01', 'synctest02', 'synctest03', 'synctest04', 'synctest05')"
+    )
+    .execute(&context.pool)
+    .await?;
     let _ = fs::remove_file(context.settings.ingest.media_root.join(thumbs_path)).await;
     let _ = fs::remove_file(context.settings.ingest.media_root.join(analysis_path)).await;
+    let _ = fs::remove_file(context.settings.ingest.media_root.join(blocked_thumbs_path)).await;
+    let _ = fs::remove_file(
+        context
+            .settings
+            .ingest
+            .media_root
+            .join(blocked_analysis_path),
+    )
+    .await;
     let _ = fs::remove_dir_all(context.settings.ingest.thumbnails_root.join("synctest01")).await;
     let _ = fs::remove_dir_all(context.settings.ingest.thumbnails_root.join("synctest02")).await;
+    let _ = fs::remove_dir_all(context.settings.ingest.thumbnails_root.join("synctest04")).await;
+    let _ = fs::remove_dir_all(context.settings.ingest.thumbnails_root.join("synctest05")).await;
+
+    Ok(())
+}
+
+#[allow(clippy::too_many_lines)]
+pub async fn test_permanently_failed_ingest_blocks_repair(context: &TestContext) -> Result<()> {
+    let user_id: i32 = sqlx::query_scalar!("SELECT id FROM app_user WHERE email = $1", EMAIL)
+        .fetch_one(&context.pool)
+        .await?;
+    let template = sqlx::query!(
+        "SELECT id, relative_path FROM media_item WHERE user_id = $1 AND is_video = false LIMIT 1",
+        user_id
+    )
+    .fetch_one(&context.pool)
+    .await?;
+    let relative_path = "sync-ingest-test-failed.jpg";
+    let source = context
+        .settings
+        .ingest
+        .media_root
+        .join(&template.relative_path);
+
+    insert_incomplete_media_item(
+        &context.pool,
+        &template.id,
+        "synctest06",
+        relative_path,
+        false,
+    )
+    .await?;
+    fs::copy(
+        &source,
+        context.settings.ingest.media_root.join(relative_path),
+    )
+    .await?;
+
+    let job_id: i64 = sqlx::query_scalar!(
+        r#"
+        INSERT INTO jobs (relative_path, user_id, job_type, scope, phase, priority, status,
+                          owner, started_at, last_heartbeat, scheduled_at, attempts, max_attempts)
+        VALUES ($1, $2, 'ingest_thumbnails'::job_type, 'path'::job_scope, 30, 60,
+                'running'::job_status, 'repair-test', now(), now() + interval '1 hour',
+                now() + interval '1 hour', 1, 2)
+        RETURNING id
+        "#,
+        relative_path,
+        user_id
+    )
+    .fetch_one(&context.pool)
+    .await?;
+    let job = Job {
+        id: job_id,
+        payload: None,
+        relative_path: Some(relative_path.to_owned()),
+        user_id: Some(user_id),
+        job_type: JobType::IngestThumbnails,
+        scope: JobScope::Path,
+        phase: 30,
+        priority: 60,
+        attempts: 1,
+        max_attempts: 2,
+        dependency_attempts: 0,
+    };
+
+    update_job_on_failure(
+        &context.pool,
+        &job,
+        &color_eyre::eyre::eyre!("simulated corrupt file"),
+    )
+    .await?;
+    let blocked: bool = sqlx::query_scalar!(
+        "SELECT thumbnail_repair_blocked FROM media_item WHERE id = 'synctest06'"
+    )
+    .fetch_one(&context.pool)
+    .await?;
+    assert!(blocked);
+
+    let max_id: i64 = sqlx::query_scalar!(r#"SELECT COALESCE(MAX(id), 0) AS "max_id!" FROM jobs"#)
+        .fetch_one(&context.pool)
+        .await?;
+    repair_incomplete_ingest(&context.pool, &context.settings.ingest).await?;
+    let new_jobs: i64 = sqlx::query_scalar!(
+        r#"SELECT COUNT(*)::bigint AS "count!" FROM jobs
+           WHERE id > $1 AND relative_path = $2"#,
+        max_id,
+        relative_path
+    )
+    .fetch_one(&context.pool)
+    .await?;
+    assert_eq!(new_jobs, 0);
+
+    update_job_on_completion(&context.pool, &job, JobResult::Done).await?;
+    let blocked: bool = sqlx::query_scalar!(
+        "SELECT thumbnail_repair_blocked FROM media_item WHERE id = 'synctest06'"
+    )
+    .fetch_one(&context.pool)
+    .await?;
+    assert!(!blocked);
+
+    let max_id: i64 = sqlx::query_scalar!(r#"SELECT COALESCE(MAX(id), 0) AS "max_id!" FROM jobs"#)
+        .fetch_one(&context.pool)
+        .await?;
+    repair_incomplete_ingest(&context.pool, &context.settings.ingest).await?;
+    let repaired: i64 = sqlx::query_scalar!(
+        r#"SELECT COUNT(*)::bigint AS "count!" FROM jobs
+           WHERE id > $1 AND relative_path = $2 AND job_type = 'ingest_thumbnails'"#,
+        max_id,
+        relative_path
+    )
+    .fetch_one(&context.pool)
+    .await?;
+    assert_eq!(repaired, 1);
+
+    // A job cancelled while running must not create a repair block when it later errors.
+    sqlx::query!(
+        "UPDATE jobs SET status = 'cancelled'::job_status, attempts = 1 WHERE id = $1",
+        job_id
+    )
+    .execute(&context.pool)
+    .await?;
+    update_job_on_failure(
+        &context.pool,
+        &job,
+        &color_eyre::eyre::eyre!("cancelled job then failed"),
+    )
+    .await?;
+    let blocked: bool = sqlx::query_scalar!(
+        "SELECT thumbnail_repair_blocked FROM media_item WHERE id = 'synctest06'"
+    )
+    .fetch_one(&context.pool)
+    .await?;
+    assert!(!blocked);
+
+    // A cancelled job finishing must not clear an existing repair block.
+    sqlx::query!("UPDATE media_item SET thumbnail_repair_blocked = true WHERE id = 'synctest06'")
+        .execute(&context.pool)
+        .await?;
+    update_job_on_completion(&context.pool, &job, JobResult::Done).await?;
+    let blocked: bool = sqlx::query_scalar!(
+        "SELECT thumbnail_repair_blocked FROM media_item WHERE id = 'synctest06'"
+    )
+    .fetch_one(&context.pool)
+    .await?;
+    assert!(blocked);
+
+    sqlx::query!("DELETE FROM jobs WHERE relative_path = $1", relative_path)
+        .execute(&context.pool)
+        .await?;
+    sqlx::query!("DELETE FROM media_item WHERE id = 'synctest06'")
+        .execute(&context.pool)
+        .await?;
+    let _ = fs::remove_file(context.settings.ingest.media_root.join(relative_path)).await;
+    let _ = fs::remove_dir_all(context.settings.ingest.thumbnails_root.join("synctest06")).await;
 
     Ok(())
 }

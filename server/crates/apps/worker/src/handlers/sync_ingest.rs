@@ -63,6 +63,7 @@ async fn repair_incomplete_ingest_with_thumb_ids(
     let rows = sqlx::query!(
         r#"
         SELECT mi.id, mi.relative_path, mi.user_id, mi.has_thumbnails,
+               mi.thumbnail_repair_blocked, mi.analysis_repair_blocked,
                NOT EXISTS (
                    SELECT 1 FROM visual_analysis va WHERE va.media_item_id = mi.id
                ) AS "needs_analysis!"
@@ -76,7 +77,12 @@ async fn repair_incomplete_ingest_with_thumb_ids(
     let mut skipped = 0_usize;
     for row in rows {
         let needs_thumbnails = !row.has_thumbnails || !thumb_ids.contains(&row.id);
-        if !needs_thumbnails && !row.needs_analysis {
+        let repair_thumbnails = needs_thumbnails && !row.thumbnail_repair_blocked;
+        // Analysis reads generated thumbnails, so a blocked thumbnail stage blocks it too.
+        let repair_analysis = row.needs_analysis
+            && !row.analysis_repair_blocked
+            && (!needs_thumbnails || !row.thumbnail_repair_blocked);
+        if !repair_thumbnails && !repair_analysis {
             continue;
         }
 
@@ -93,14 +99,14 @@ async fn repair_incomplete_ingest_with_thumb_ids(
             continue;
         }
 
-        if needs_thumbnails {
+        if repair_thumbnails {
             enqueue_job::<()>(pool, settings, JobType::IngestThumbnails)
                 .relative_path(row.relative_path.clone())
                 .user_id(row.user_id)
                 .call()
                 .await?;
         }
-        if row.needs_analysis {
+        if repair_analysis {
             enqueue_job::<()>(pool, settings, JobType::IngestAnalysis)
                 .relative_path(row.relative_path.clone())
                 .user_id(row.user_id)

@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT mi.id, mi.relative_path, mi.user_id, mi.has_thumbnails,\n               NOT EXISTS (\n                   SELECT 1 FROM visual_analysis va WHERE va.media_item_id = mi.id\n               ) AS \"needs_analysis!\"\n        FROM media_item mi\n        WHERE mi.deleted = false AND mi.missing_since IS NULL\n        ",
+  "query": "\n        SELECT mi.id, mi.relative_path, mi.user_id, mi.has_thumbnails,\n               mi.thumbnail_repair_blocked, mi.analysis_repair_blocked,\n               NOT EXISTS (\n                   SELECT 1 FROM visual_analysis va WHERE va.media_item_id = mi.id\n               ) AS \"needs_analysis!\"\n        FROM media_item mi\n        WHERE mi.deleted = false AND mi.missing_since IS NULL\n        ",
   "describe": {
     "columns": [
       {
@@ -49,6 +49,28 @@
       },
       {
         "ordinal": 4,
+        "name": "thumbnail_repair_blocked",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "media_item",
+            "name": "thumbnail_repair_blocked"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "analysis_repair_blocked",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "media_item",
+            "name": "analysis_repair_blocked"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
         "name": "needs_analysis!",
         "type_info": "Bool",
         "origin": "Expression"
@@ -62,8 +84,10 @@
       false,
       false,
       false,
+      false,
+      false,
       null
     ]
   },
-  "hash": "640043344238a7380e7a4337b1590a58b013bf72f02627bd320da1874aad65aa"
+  "hash": "5a0342a7d183176addab4d9c261841b5582c6821b7f7251a836594dd16f27b4c"
 }
