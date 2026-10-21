@@ -168,11 +168,9 @@ scaler:
       excluded_jobs:
         - "ingest_analysis"
         - "cluster_photos"
-        - "clean_thumbnails"
     ml:
       priority: 3
       estimated_ram_mb: 1000
       max_workers: 1
       excluded_jobs:
         - "ingest_thumbnails"
-        - "clean_thumbnails"
