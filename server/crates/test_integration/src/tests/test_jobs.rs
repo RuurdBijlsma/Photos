@@ -651,6 +651,19 @@ pub async fn test_sync_ingest_repairs_incomplete_items(context: &TestContext) ->
     fs::create_dir_all(context.settings.ingest.thumbnails_root.join("synctest02")).await?;
     fs::create_dir_all(context.settings.ingest.thumbnails_root.join("synctest05")).await?;
 
+    let remove_job_id: i64 = sqlx::query_scalar!(
+        r#"
+        INSERT INTO jobs (relative_path, user_id, job_type, scope, phase, priority, status, scheduled_at)
+        VALUES ($1, $2, 'remove'::job_type, 'path'::job_scope, 5, 0, 'queued'::job_status,
+                now() + interval '1 hour')
+        RETURNING id
+        "#,
+        thumbs_path,
+        user_id
+    )
+    .fetch_one(&context.pool)
+    .await?;
+
     repair_incomplete_ingest(&context.pool, &context.settings.ingest, Some(user_id)).await?;
 
     let rows = sqlx::query!(
@@ -685,6 +698,13 @@ pub async fn test_sync_ingest_repairs_incomplete_items(context: &TestContext) ->
     assert!(!has(blocked_thumbs_path, "ingest_thumbnails"));
     assert!(!has(blocked_thumbs_path, "ingest_analysis"));
     assert!(!has(blocked_analysis_path, "ingest_analysis"));
+    let remove_status: String = sqlx::query_scalar!(
+        r#"SELECT status::text AS "status!" FROM jobs WHERE id = $1"#,
+        remove_job_id
+    )
+    .fetch_one(&context.pool)
+    .await?;
+    assert_eq!(remove_status, "cancelled");
 
     sqlx::query!(
         "DELETE FROM jobs WHERE relative_path IN ($1, $2, $3, $4, $5)",

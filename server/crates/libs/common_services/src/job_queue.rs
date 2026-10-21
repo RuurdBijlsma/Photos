@@ -297,6 +297,87 @@ pub async fn bulk_enqueue_full_ingest(
     Ok(())
 }
 
+/// Enqueues path-scoped ingest jobs in one transaction and one bulk insert.
+///
+/// Repair can enqueue thousands of thumbnail/analysis jobs; one transaction per job is slow.
+///
+/// # Errors
+///
+/// Returns an error if the database transaction fails.
+pub async fn bulk_enqueue_ingest_jobs(
+    pool: &PgPool,
+    settings: &IngestSettings,
+    jobs: &[(String, i32, JobType)],
+) -> Result<()> {
+    if jobs.is_empty() {
+        return Ok(());
+    }
+
+    // Concurrent scans enqueue the same files; a shared order avoids lock inversion on the unique index.
+    let mut sorted_jobs: Vec<_> = jobs.iter().collect();
+    sorted_jobs.sort_unstable_by(|a, b| a.0.cmp(&b.0).then_with(|| a.2.phase().cmp(&b.2.phase())));
+
+    let capacity = jobs.len();
+    let mut paths = Vec::with_capacity(capacity);
+    let mut job_types = Vec::with_capacity(capacity);
+    let mut scopes = Vec::with_capacity(capacity);
+    let mut phases = Vec::with_capacity(capacity);
+    let mut priorities = Vec::with_capacity(capacity);
+    let mut user_ids = Vec::with_capacity(capacity);
+
+    for (path, user_id, job_type) in sorted_jobs {
+        let is_video = settings.is_video_file(&settings.media_root.join(path));
+        paths.push(path.clone());
+        job_types.push(*job_type);
+        scopes.push(job_type.scope());
+        phases.push(job_type.phase());
+        priorities.push(job_type.get_priority(is_video));
+        user_ids.push(*user_id);
+    }
+
+    let mut tx = pool.begin().await?;
+
+    // Enqueueing an ingest stage cancels a queued/running remove for the same path.
+    sqlx::query!(
+        r#"
+        UPDATE jobs
+        SET status = 'cancelled'
+        WHERE relative_path = ANY($1)
+          AND status IN ('queued', 'running')
+          AND job_type = 'remove'
+        "#,
+        &paths
+    )
+    .execute(&mut *tx)
+    .await?;
+
+    sqlx::query!(
+        r#"
+        INSERT INTO jobs (relative_path, job_type, priority, scope, phase, user_id)
+        SELECT u.path, u.jt::job_type, u.pri, u.sc::job_scope, u.ph, u.uid
+        FROM UNNEST($1::text[], $2::text[], $3::int[], $4::job_scope[], $5::int[], $6::int[])
+          AS u(path, jt, pri, sc, ph, uid)
+        ON CONFLICT (job_type, coalesce(user_id, -1), coalesce(md5(payload::text), ''), coalesce(relative_path, ''))
+        WHERE (status IN ('queued', 'running'))
+        DO NOTHING
+        "#,
+        &paths,
+        &job_types as &[_],
+        &priorities,
+        &scopes as &[_],
+        &phases,
+        &user_ids,
+    )
+    .execute(&mut *tx)
+    .await?;
+
+    tx.commit().await?;
+
+    info!("Enqueued {} ingest job(s) in batch", jobs.len());
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::IngestMetadataPayload;

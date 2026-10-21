@@ -4,7 +4,7 @@ use crate::handlers::common::utils::{get_thumbnail_folders, require_media_mounte
 use app_state::IngestSettings;
 use color_eyre::Result;
 use common_services::database::jobs::{Job, JobType};
-use common_services::job_queue::enqueue_job;
+use common_services::job_queue::bulk_enqueue_ingest_jobs;
 use sqlx::PgPool;
 use std::collections::HashSet;
 use tokio::fs;
@@ -33,6 +33,7 @@ async fn repair_incomplete_ingest_with_thumb_ids(
     .await?;
 
     let mut skipped = 0_usize;
+    let mut jobs = Vec::with_capacity(rows.len() * 2);
     for row in rows {
         let needs_thumbnails = !row.has_thumbnails || !thumb_ids.contains(&row.id);
         let repair_thumbnails = needs_thumbnails && !row.thumbnail_repair_blocked;
@@ -58,19 +59,23 @@ async fn repair_incomplete_ingest_with_thumb_ids(
         }
 
         if repair_thumbnails {
-            enqueue_job::<()>(pool, settings, JobType::IngestThumbnails)
-                .relative_path(row.relative_path.clone())
-                .user_id(row.user_id)
-                .call()
-                .await?;
+            jobs.push((
+                row.relative_path.clone(),
+                row.user_id,
+                JobType::IngestThumbnails,
+            ));
         }
         if repair_analysis {
-            enqueue_job::<()>(pool, settings, JobType::IngestAnalysis)
-                .relative_path(row.relative_path.clone())
-                .user_id(row.user_id)
-                .call()
-                .await?;
+            jobs.push((
+                row.relative_path.clone(),
+                row.user_id,
+                JobType::IngestAnalysis,
+            ));
         }
+    }
+
+    if !jobs.is_empty() {
+        bulk_enqueue_ingest_jobs(pool, settings, &jobs).await?;
     }
 
     if skipped > 0 {
