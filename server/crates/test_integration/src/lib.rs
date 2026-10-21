@@ -24,7 +24,9 @@ mod test_runner {
     use crate::tests::test_auth::{
         test_login, test_logout, test_refresh, test_register, test_second_register_attempt,
     };
-    use crate::tests::test_jobs::test_cancel_all_ingest_jobs;
+    use crate::tests::test_jobs::{
+        test_cancel_all_ingest_jobs, test_cancelled_job_is_not_resurrected,
+    };
     use crate::tests::test_onboarding::{test_onboarding, test_start_processing};
     use crate::tests::test_photos::{
         test_get_color_theme, test_get_full_item, test_get_full_item_albums, test_get_random_photo,
@@ -83,6 +85,7 @@ mod test_runner {
                 test_takeout_import_flow,
                 // -- Jobs --
                 test_cancel_all_ingest_jobs,
+                test_cancelled_job_is_not_resurrected,
             ]
         );
 

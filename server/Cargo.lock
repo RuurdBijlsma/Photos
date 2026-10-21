@@ -8532,6 +8532,7 @@ dependencies = [
  "tracing-subscriber",
  "url",
  "walkdir",
+ "worker",
  "zip",
 ]
 

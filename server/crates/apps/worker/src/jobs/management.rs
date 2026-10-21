@@ -161,7 +161,7 @@ pub async fn update_job_on_failure(pool: &PgPool, job: &Job, error: &Report) -> 
 /// Marks a job as done in the database.
 async fn mark_job_done(pool: &PgPool, job_id: i64) -> Result<()> {
     sqlx::query!(
-        "UPDATE jobs SET status = 'done', finished_at = now() WHERE id = $1",
+        "UPDATE jobs SET status = 'done', finished_at = now() WHERE id = $1 AND status <> 'cancelled'",
         job_id
     )
     .execute(pool)
@@ -181,7 +181,7 @@ async fn mark_job_cancelled(pool: &PgPool, job_id: i64) -> Result<()> {
 async fn mark_job_failed(pool: &PgPool, job_id: i64, last_error: &str) -> Result<()> {
     alert!("🚨 Marking job {} as failed: {}", job_id, last_error);
     sqlx::query!(
-        "UPDATE jobs SET status = 'failed', finished_at = now(), last_error = $2, attempts = attempts + 1 WHERE id = $1",
+        "UPDATE jobs SET status = 'failed', finished_at = now(), last_error = $2, attempts = attempts + 1 WHERE id = $1 AND status <> 'cancelled'",
         job_id,
         last_error
     )
@@ -201,7 +201,7 @@ async fn reschedule_for_retry(
     println!("{last_error}");
     let scheduled_at = Utc::now() + Duration::seconds(backoff_secs);
     sqlx::query!(
-        "UPDATE jobs SET status = 'queued', scheduled_at = $2, attempts = attempts + 1, owner = NULL, started_at = NULL, last_error = $3 WHERE id = $1",
+        "UPDATE jobs SET status = 'queued', scheduled_at = $2, attempts = attempts + 1, owner = NULL, started_at = NULL, last_error = $3 WHERE id = $1 AND status <> 'cancelled'",
         job_id,
         scheduled_at,
         last_error
@@ -220,7 +220,7 @@ async fn reschedule_storage_unavailable(
     warn!("Media folder unavailable for job {job_id}. Requeueing in 180s: {last_error}");
     let scheduled_at = Utc::now() + Duration::seconds(180);
     sqlx::query!(
-        "UPDATE jobs SET status = 'queued', scheduled_at = $2, owner = NULL, started_at = NULL, last_error = $3 WHERE id = $1",
+        "UPDATE jobs SET status = 'queued', scheduled_at = $2, owner = NULL, started_at = NULL, last_error = $3 WHERE id = $1 AND status <> 'cancelled'",
         job_id,
         scheduled_at,
         last_error
@@ -234,7 +234,7 @@ async fn reschedule_storage_unavailable(
 async fn reschedule_file_not_found(pool: &PgPool, job_id: i64, backoff_secs: i64) -> Result<()> {
     let scheduled_at = Utc::now() + Duration::seconds(backoff_secs);
     sqlx::query!(
-        "UPDATE jobs SET status = 'queued', scheduled_at = $2, dependency_attempts = dependency_attempts + 1, owner = NULL, started_at = NULL, last_error = 'File not found on disk' WHERE id = $1",
+        "UPDATE jobs SET status = 'queued', scheduled_at = $2, dependency_attempts = dependency_attempts + 1, owner = NULL, started_at = NULL, last_error = 'File not found on disk' WHERE id = $1 AND status <> 'cancelled'",
         job_id,
         scheduled_at
     )
@@ -251,7 +251,7 @@ async fn dependency_reschedule_job(pool: &PgPool, job_id: i64, backoff_secs: i64
     );
     let scheduled_at = Utc::now() + Duration::seconds(backoff_secs);
     sqlx::query!(
-        "UPDATE jobs SET status = 'queued', scheduled_at = $2, dependency_attempts = dependency_attempts + 1, owner = NULL, started_at = NULL, last_error = NULL WHERE id = $1",
+        "UPDATE jobs SET status = 'queued', scheduled_at = $2, dependency_attempts = dependency_attempts + 1, owner = NULL, started_at = NULL, last_error = NULL WHERE id = $1 AND status <> 'cancelled'",
         job_id,
         scheduled_at
     )
