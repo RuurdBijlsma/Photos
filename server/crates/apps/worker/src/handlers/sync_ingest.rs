@@ -1,67 +1,20 @@
 use crate::context::WorkerContext;
 use crate::handlers::JobResult;
-use crate::handlers::common::utils::require_media_mounted;
+use crate::handlers::common::utils::{get_thumbnail_folders, require_media_mounted};
 use app_state::IngestSettings;
 use color_eyre::Result;
 use common_services::database::jobs::{Job, JobType};
 use common_services::job_queue::enqueue_job;
 use sqlx::PgPool;
 use std::collections::HashSet;
-use std::path::Path;
 use tokio::fs;
-use tracing::{debug, info, warn};
-
-/// Reads the thumbnails directory and returns a set of all subdirectory names (media item IDs).
-async fn get_thumbnail_folders(thumbnail_folder: &Path) -> Result<HashSet<String>> {
-    if !thumbnail_folder.exists() {
-        fs::create_dir_all(thumbnail_folder).await?;
-    }
-    let mut set = HashSet::new();
-    let mut entries = fs::read_dir(thumbnail_folder).await?;
-    while let Some(entry) = entries.next_entry().await? {
-        if entry.file_type().await?.is_dir()
-            && let Some(name) = entry.file_name().to_str()
-        {
-            set.insert(name.to_owned());
-        }
-    }
-    Ok(set)
-}
-
-/// Synchronises thumbnail folders with the database, deleting orphans and re-ingesting incomplete items.
-async fn sync_ingest(pool: &PgPool, settings: &IngestSettings) -> Result<()> {
-    let thumbnails_root = &settings.thumbnails_root;
-
-    let (thumb_ids, db_ids) = tokio::try_join!(get_thumbnail_folders(thumbnails_root), async {
-        let rows: Vec<String> = sqlx::query_scalar!("SELECT id FROM media_item")
-            .fetch_all(pool)
-            .await?;
-        Ok::<HashSet<String>, color_eyre::Report>(rows.into_iter().collect())
-    })?;
-
-    let to_delete: Vec<_> = thumb_ids.difference(&db_ids).cloned().collect();
-    for id in to_delete {
-        let path_to_remove = thumbnails_root.join(id);
-        // Another cleanup path may have already removed the orphan.
-        if let Err(e) = fs::remove_dir_all(&path_to_remove).await
-            && e.kind() != std::io::ErrorKind::NotFound
-        {
-            warn!(
-                "Couldn't remove dir {:?} in `sync_ingest` job: {:?}",
-                &path_to_remove, e
-            );
-        }
-    }
-
-    repair_incomplete_ingest_with_thumb_ids(pool, settings, &thumb_ids).await?;
-
-    Ok(())
-}
+use tracing::{debug, info};
 
 async fn repair_incomplete_ingest_with_thumb_ids(
     pool: &PgPool,
     settings: &IngestSettings,
     thumb_ids: &HashSet<String>,
+    user_id: Option<i32>,
 ) -> Result<()> {
     let rows = sqlx::query!(
         r#"
@@ -72,7 +25,9 @@ async fn repair_incomplete_ingest_with_thumb_ids(
                ) AS "needs_analysis!"
         FROM media_item mi
         WHERE mi.deleted = false AND mi.missing_since IS NULL
-        "#
+          AND ($1::int IS NULL OR mi.user_id = $1)
+        "#,
+        user_id
     )
     .fetch_all(pool)
     .await?;
@@ -125,17 +80,21 @@ async fn repair_incomplete_ingest_with_thumb_ids(
     Ok(())
 }
 
-pub async fn repair_incomplete_ingest(pool: &PgPool, settings: &IngestSettings) -> Result<()> {
+pub async fn repair_incomplete_ingest(
+    pool: &PgPool,
+    settings: &IngestSettings,
+    user_id: Option<i32>,
+) -> Result<()> {
     let thumb_ids = get_thumbnail_folders(&settings.thumbnails_root).await?;
-    repair_incomplete_ingest_with_thumb_ids(pool, settings, &thumb_ids).await
+    repair_incomplete_ingest_with_thumb_ids(pool, settings, &thumb_ids, user_id).await
 }
 
-pub async fn handle(context: &WorkerContext, _job: &Job) -> Result<JobResult> {
+pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
     if let Some(result) =
         require_media_mounted(&context.pool, &context.settings.ingest.media_root).await?
     {
         return Ok(result);
     }
-    sync_ingest(&context.pool, &context.settings.ingest).await?;
+    repair_incomplete_ingest(&context.pool, &context.settings.ingest, job.user_id).await?;
     Ok(JobResult::Done)
 }

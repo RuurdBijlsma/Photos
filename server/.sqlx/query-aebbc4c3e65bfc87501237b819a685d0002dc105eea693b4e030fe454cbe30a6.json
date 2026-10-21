@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT mi.id, mi.relative_path, mi.user_id, mi.has_thumbnails,\n               mi.thumbnail_repair_blocked, mi.analysis_repair_blocked,\n               NOT EXISTS (\n                   SELECT 1 FROM visual_analysis va WHERE va.media_item_id = mi.id\n               ) AS \"needs_analysis!\"\n        FROM media_item mi\n        WHERE mi.deleted = false AND mi.missing_since IS NULL\n        ",
+  "query": "\n        SELECT mi.id, mi.relative_path, mi.user_id, mi.has_thumbnails,\n               mi.thumbnail_repair_blocked, mi.analysis_repair_blocked,\n               NOT EXISTS (\n                   SELECT 1 FROM visual_analysis va WHERE va.media_item_id = mi.id\n               ) AS \"needs_analysis!\"\n        FROM media_item mi\n        WHERE mi.deleted = false AND mi.missing_since IS NULL\n          AND ($1::int IS NULL OR mi.user_id = $1)\n        ",
   "describe": {
     "columns": [
       {
@@ -77,7 +77,9 @@
       }
     ],
     "parameters": {
-      "Left": []
+      "Left": [
+        "Int4"
+      ]
     },
     "nullable": [
       false,
@@ -89,5 +91,5 @@
       null
     ]
   },
-  "hash": "5a0342a7d183176addab4d9c261841b5582c6821b7f7251a836594dd16f27b4c"
+  "hash": "aebbc4c3e65bfc87501237b819a685d0002dc105eea693b4e030fe454cbe30a6"
 }

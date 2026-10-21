@@ -36,6 +36,7 @@ pub enum JobType {
     Remove,
     Scan,
     CleanDb,
+    CleanThumbnails,
     ClusterFaces,
     ClusterPhotos,
     SyncIngest,
@@ -68,6 +69,7 @@ impl JobType {
             | Self::ClusterPhotos
             | Self::Scan
             | Self::CleanDb
+            | Self::CleanThumbnails
             | Self::ImportAlbumItem
             | Self::SyncIngest => 50,
             Self::UpdateGlobalCentroid | Self::CalcSystemStats => 60,
@@ -92,6 +94,7 @@ impl JobType {
             | Self::ClusterFaces
             | Self::ClusterPhotos
             | Self::SyncIngest
+            | Self::CleanThumbnails
             | Self::GenerateDailyCards => JobScope::Global,
         }
     }
@@ -128,7 +131,7 @@ impl JobType {
             Self::CalcSystemStats => 110,
             Self::ClusterFaces => 120,
             Self::ClusterPhotos => 130,
-            Self::SyncIngest => 140,
+            Self::SyncIngest | Self::CleanThumbnails => 140,
             Self::GenerateDailyCards => 160,
             Self::HandleWebUpload | Self::IngestTakeoutBatch => 10,
         }

@@ -9,6 +9,7 @@ pub mod common;
 // Jobs
 pub mod calc_system_stats;
 pub mod clean_db;
+pub mod clean_thumbnails;
 pub mod cluster_faces;
 pub mod cluster_photos;
 pub mod generate_daily_cards;
@@ -44,6 +45,7 @@ pub async fn handle_job(context: &WorkerContext, job: &Job) -> Result<JobResult>
         JobType::Remove => remove::handle(context, job).await,
         JobType::Scan => scan::handle(context, job).await,
         JobType::CleanDb => clean_db::handle(context, job).await,
+        JobType::CleanThumbnails => clean_thumbnails::handle(context, job).await,
         JobType::ClusterFaces => cluster_faces::handle(context, job).await,
         JobType::ClusterPhotos => cluster_photos::handle(context, job).await,
         JobType::SyncIngest => sync_ingest::handle(context, job).await,

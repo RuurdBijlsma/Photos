@@ -5,6 +5,7 @@ use common_services::media_mount::{
     MediaMountStatus, media_mount_status, media_mount_status_fresh,
 };
 use sqlx::PgPool;
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use tokio::fs;
 
@@ -29,6 +30,23 @@ pub async fn result_if_source_missing(
             }
         }
     }
+}
+
+/// Reads the thumbnails directory and returns a set of all subdirectory names (media item IDs).
+pub async fn get_thumbnail_folders(thumbnail_folder: &Path) -> Result<HashSet<String>> {
+    if !thumbnail_folder.exists() {
+        fs::create_dir_all(thumbnail_folder).await?;
+    }
+    let mut set = HashSet::new();
+    let mut entries = fs::read_dir(thumbnail_folder).await?;
+    while let Some(entry) = entries.next_entry().await? {
+        if entry.file_type().await?.is_dir()
+            && let Some(name) = entry.file_name().to_str()
+        {
+            set.insert(name.to_owned());
+        }
+    }
+    Ok(set)
 }
 
 /// Returns `StorageUnavailable` when the media folder looks unmounted (cached check).

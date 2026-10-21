@@ -25,7 +25,8 @@
                 "generate_daily_cards",
                 "calc_system_stats",
                 "handle_web_upload",
-                "ingest_takeout_batch"
+                "ingest_takeout_batch",
+                "clean_thumbnails"
               ]
             }
           }

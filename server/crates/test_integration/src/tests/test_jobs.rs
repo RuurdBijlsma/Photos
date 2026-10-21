@@ -11,6 +11,7 @@ use std::sync::Arc;
 use tokio::fs;
 use tokio::sync::Barrier;
 use worker::handlers::JobResult;
+use worker::handlers::clean_thumbnails::clean_thumbnail_orphans;
 use worker::handlers::sync_ingest::repair_incomplete_ingest;
 use worker::jobs::management::{update_job_on_completion, update_job_on_failure};
 
@@ -157,11 +158,13 @@ pub async fn test_cancel_all_ingest_jobs(context: &TestContext) -> Result<()> {
     assert_eq!(status_of(&context.pool, takeout_id).await?, "queued");
     assert_eq!(status_of(&context.pool, other_user_job_id).await?, "queued");
 
-    // The active repair is left alone, and a fresh global repair is started.
+    // The active repair is left alone, and a fresh repair is started for the user.
     let repair_count: i64 = sqlx::query_scalar!(
         r#"SELECT COUNT(*)::bigint AS "repair_count!" FROM jobs
-           WHERE id > $1 AND job_type = 'sync_ingest' AND relative_path IS NULL"#,
-        max_id
+           WHERE id > $1 AND job_type = 'sync_ingest' AND relative_path IS NULL
+             AND user_id = $2"#,
+        max_id,
+        user_id
     )
     .fetch_one(&context.pool)
     .await?;
@@ -293,7 +296,7 @@ pub async fn test_bulk_enqueue_full_ingest_concurrent_overlap(context: &TestCont
     Ok(())
 }
 
-pub async fn test_sync_ingest_is_global_singleton(context: &TestContext) -> Result<()> {
+pub async fn test_sync_ingest_is_user_scoped(context: &TestContext) -> Result<()> {
     sqlx::query!(
         "DELETE FROM jobs WHERE job_type = 'sync_ingest' \
          AND status IN ('queued', 'running')"
@@ -301,48 +304,199 @@ pub async fn test_sync_ingest_is_global_singleton(context: &TestContext) -> Resu
     .execute(&context.pool)
     .await?;
 
-    let other_user_id: i32 = sqlx::query_scalar!(
+    let user_a: i32 = sqlx::query_scalar!(
         "INSERT INTO app_user (email, password, name) \
-         VALUES ('sync-singleton-other@test.local', 'x', 'Other') RETURNING id"
+         VALUES ('sync-scope-a@test.local', 'x', 'A') RETURNING id"
     )
     .fetch_one(&context.pool)
     .await?;
-    let second_user_id: i32 = sqlx::query_scalar!(
+    let user_b: i32 = sqlx::query_scalar!(
         "INSERT INTO app_user (email, password, name) \
-         VALUES ('sync-singleton-second@test.local', 'x', 'Second') RETURNING id"
+         VALUES ('sync-scope-b@test.local', 'x', 'B') RETURNING id"
     )
     .fetch_one(&context.pool)
     .await?;
 
     let first = enqueue_job::<()>(&context.pool, &context.settings.ingest, JobType::SyncIngest)
-        .user_id(other_user_id)
+        .user_id(user_a)
         .call()
         .await?;
-    let second = enqueue_job::<()>(&context.pool, &context.settings.ingest, JobType::SyncIngest)
-        .user_id(second_user_id)
+    let duplicate = enqueue_job::<()>(&context.pool, &context.settings.ingest, JobType::SyncIngest)
+        .user_id(user_a)
         .call()
         .await?;
+    let other_user =
+        enqueue_job::<()>(&context.pool, &context.settings.ingest, JobType::SyncIngest)
+            .user_id(user_b)
+            .call()
+            .await?;
     assert!(first);
-    assert!(!second);
+    assert!(!duplicate);
+    assert!(other_user);
 
     let rows = sqlx::query!(
         "SELECT id, user_id FROM jobs \
-         WHERE job_type = 'sync_ingest' AND status IN ('queued', 'running')"
+         WHERE job_type = 'sync_ingest' AND status IN ('queued', 'running') \
+         ORDER BY user_id"
     )
     .fetch_all(&context.pool)
     .await?;
-    assert_eq!(rows.len(), 1);
-    assert!(rows[0].user_id.is_none());
+    assert_eq!(rows.len(), 2);
+    assert_eq!(rows[0].user_id, Some(user_a));
+    assert_eq!(rows[1].user_id, Some(user_b));
 
-    sqlx::query!("DELETE FROM jobs WHERE id = $1", rows[0].id)
+    sqlx::query!(
+        "DELETE FROM jobs WHERE job_type = 'sync_ingest' \
+         AND status IN ('queued', 'running')"
+    )
+    .execute(&context.pool)
+    .await?;
+    sqlx::query!("DELETE FROM app_user WHERE id = $1", user_a)
+        .execute(&context.pool)
+        .await?;
+    sqlx::query!("DELETE FROM app_user WHERE id = $1", user_b)
+        .execute(&context.pool)
+        .await?;
+
+    Ok(())
+}
+
+pub async fn test_sync_ingest_repair_is_user_scoped(context: &TestContext) -> Result<()> {
+    let user_id: i32 = sqlx::query_scalar!("SELECT id FROM app_user WHERE email = $1", EMAIL)
+        .fetch_one(&context.pool)
+        .await?;
+    let template = sqlx::query!(
+        "SELECT id, relative_path FROM media_item WHERE user_id = $1 AND is_video = false LIMIT 1",
+        user_id
+    )
+    .fetch_one(&context.pool)
+    .await?;
+    let other_user_id: i32 = sqlx::query_scalar!(
+        "INSERT INTO app_user (email, password, name) \
+         VALUES ('sync-repair-scope-other@test.local', 'x', 'Other') RETURNING id"
+    )
+    .fetch_one(&context.pool)
+    .await?;
+
+    let own_path = "sync-ingest-scope-own.jpg";
+    let other_path = "sync-ingest-scope-other.jpg";
+    insert_incomplete_media_item(&context.pool, &template.id, "synctest07", own_path, false)
+        .await?;
+    insert_incomplete_media_item(&context.pool, &template.id, "synctest08", other_path, false)
+        .await?;
+    sqlx::query!(
+        "UPDATE media_item SET user_id = $1 WHERE id = 'synctest08'",
+        other_user_id
+    )
+    .execute(&context.pool)
+    .await?;
+
+    let source = context
+        .settings
+        .ingest
+        .media_root
+        .join(&template.relative_path);
+    fs::copy(&source, context.settings.ingest.media_root.join(own_path)).await?;
+    fs::copy(&source, context.settings.ingest.media_root.join(other_path)).await?;
+
+    let max_id: i64 = sqlx::query_scalar!(r#"SELECT COALESCE(MAX(id), 0) AS "max_id!" FROM jobs"#)
+        .fetch_one(&context.pool)
+        .await?;
+    repair_incomplete_ingest(&context.pool, &context.settings.ingest, Some(user_id)).await?;
+
+    let rows = sqlx::query!(
+        r#"
+        SELECT relative_path, job_type::text AS "job_type!"
+        FROM jobs
+        WHERE id > $1 AND relative_path IN ($2, $3)
+        "#,
+        max_id,
+        own_path,
+        other_path
+    )
+    .fetch_all(&context.pool)
+    .await?;
+    assert!(rows.iter().any(|row| {
+        row.relative_path.as_deref() == Some(own_path) && row.job_type == "ingest_thumbnails"
+    }));
+    assert!(
+        !rows
+            .iter()
+            .any(|row| row.relative_path.as_deref() == Some(other_path))
+    );
+
+    sqlx::query!(
+        "DELETE FROM jobs WHERE relative_path IN ($1, $2)",
+        own_path,
+        other_path
+    )
+    .execute(&context.pool)
+    .await?;
+    sqlx::query!("DELETE FROM media_item WHERE id IN ('synctest07', 'synctest08')")
         .execute(&context.pool)
         .await?;
     sqlx::query!("DELETE FROM app_user WHERE id = $1", other_user_id)
         .execute(&context.pool)
         .await?;
-    sqlx::query!("DELETE FROM app_user WHERE id = $1", second_user_id)
-        .execute(&context.pool)
+    let _ = fs::remove_file(context.settings.ingest.media_root.join(own_path)).await;
+    let _ = fs::remove_file(context.settings.ingest.media_root.join(other_path)).await;
+    let _ = fs::remove_dir_all(context.settings.ingest.thumbnails_root.join("synctest07")).await;
+    let _ = fs::remove_dir_all(context.settings.ingest.thumbnails_root.join("synctest08")).await;
+
+    Ok(())
+}
+
+pub async fn test_clean_thumbnails_removes_orphans(context: &TestContext) -> Result<()> {
+    let real_id: String = sqlx::query_scalar!("SELECT id FROM media_item LIMIT 1")
+        .fetch_one(&context.pool)
         .await?;
+    let thumbnails_root = &context.settings.ingest.thumbnails_root;
+    let real_dir = thumbnails_root.join(&real_id);
+    let orphan_dir = thumbnails_root.join("clean-thumbnails-orphan-test");
+    let created_real_dir = !real_dir.exists();
+
+    fs::create_dir_all(&real_dir).await?;
+    fs::create_dir_all(&orphan_dir).await?;
+
+    clean_thumbnail_orphans(&context.pool, &context.settings.ingest).await?;
+
+    assert!(real_dir.exists());
+    assert!(!orphan_dir.exists());
+
+    let first = enqueue_job::<()>(
+        &context.pool,
+        &context.settings.ingest,
+        JobType::CleanThumbnails,
+    )
+    .call()
+    .await?;
+    let duplicate = enqueue_job::<()>(
+        &context.pool,
+        &context.settings.ingest,
+        JobType::CleanThumbnails,
+    )
+    .call()
+    .await?;
+    assert!(first);
+    assert!(!duplicate);
+    let job = sqlx::query!(
+        "SELECT job_type::text AS \"job_type!\", user_id FROM jobs \
+         WHERE job_type = 'clean_thumbnails' AND status IN ('queued', 'running')"
+    )
+    .fetch_one(&context.pool)
+    .await?;
+    assert_eq!(job.job_type, "clean_thumbnails");
+    assert!(job.user_id.is_none());
+
+    sqlx::query!(
+        "DELETE FROM jobs WHERE job_type = 'clean_thumbnails' AND status IN ('queued', 'running')"
+    )
+    .execute(&context.pool)
+    .await?;
+
+    if created_real_dir {
+        let _ = fs::remove_dir_all(&real_dir).await;
+    }
 
     Ok(())
 }
@@ -366,12 +520,15 @@ pub async fn test_scan_enqueues_sync_ingest(context: &TestContext) -> Result<()>
     let response = context.http_client.post(&url).send().await?;
     assert_eq!(response.status(), StatusCode::OK);
 
+    let user_id: i32 = sqlx::query_scalar!("SELECT id FROM app_user WHERE email = $1", EMAIL)
+        .fetch_one(&context.pool)
+        .await?;
     let rows = sqlx::query!(
         r#"
-        SELECT job_type::text AS "job_type!", COUNT(*)::bigint AS "count!"
+        SELECT job_type::text AS "job_type!", user_id, COUNT(*)::bigint AS "count!"
         FROM jobs
         WHERE id > $1 AND job_type IN ('scan', 'sync_ingest')
-        GROUP BY job_type
+        GROUP BY job_type, user_id
         "#,
         max_id
     )
@@ -380,12 +537,11 @@ pub async fn test_scan_enqueues_sync_ingest(context: &TestContext) -> Result<()>
 
     assert!(
         rows.iter()
-            .any(|row| row.job_type == "scan" && row.count == 1)
+            .any(|row| row.job_type == "scan" && row.user_id == Some(user_id) && row.count == 1)
     );
-    assert!(
-        rows.iter()
-            .any(|row| row.job_type == "sync_ingest" && row.count == 1)
-    );
+    assert!(rows.iter().any(|row| row.job_type == "sync_ingest"
+        && row.user_id == Some(user_id)
+        && row.count == 1));
 
     sqlx::query!(
         "DELETE FROM jobs WHERE id > $1 AND job_type IN ('scan', 'sync_ingest')",
@@ -495,7 +651,7 @@ pub async fn test_sync_ingest_repairs_incomplete_items(context: &TestContext) ->
     fs::create_dir_all(context.settings.ingest.thumbnails_root.join("synctest02")).await?;
     fs::create_dir_all(context.settings.ingest.thumbnails_root.join("synctest05")).await?;
 
-    repair_incomplete_ingest(&context.pool, &context.settings.ingest).await?;
+    repair_incomplete_ingest(&context.pool, &context.settings.ingest, Some(user_id)).await?;
 
     let rows = sqlx::query!(
         r#"
@@ -641,7 +797,7 @@ pub async fn test_permanently_failed_ingest_blocks_repair(context: &TestContext)
     let max_id: i64 = sqlx::query_scalar!(r#"SELECT COALESCE(MAX(id), 0) AS "max_id!" FROM jobs"#)
         .fetch_one(&context.pool)
         .await?;
-    repair_incomplete_ingest(&context.pool, &context.settings.ingest).await?;
+    repair_incomplete_ingest(&context.pool, &context.settings.ingest, Some(user_id)).await?;
     let new_jobs: i64 = sqlx::query_scalar!(
         r#"SELECT COUNT(*)::bigint AS "count!" FROM jobs
            WHERE id > $1 AND relative_path = $2"#,
@@ -663,7 +819,7 @@ pub async fn test_permanently_failed_ingest_blocks_repair(context: &TestContext)
     let max_id: i64 = sqlx::query_scalar!(r#"SELECT COALESCE(MAX(id), 0) AS "max_id!" FROM jobs"#)
         .fetch_one(&context.pool)
         .await?;
-    repair_incomplete_ingest(&context.pool, &context.settings.ingest).await?;
+    repair_incomplete_ingest(&context.pool, &context.settings.ingest, Some(user_id)).await?;
     let repaired: i64 = sqlx::query_scalar!(
         r#"SELECT COUNT(*)::bigint AS "count!" FROM jobs
            WHERE id > $1 AND relative_path = $2 AND job_type = 'ingest_thumbnails'"#,
