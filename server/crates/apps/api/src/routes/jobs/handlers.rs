@@ -5,14 +5,14 @@ use axum::{Extension, Json};
 use axum_extra::extract::Query;
 use common_services::api::app_error::AppError;
 use common_services::api::jobs::interfaces::{
-    BulkRetryResponse, IngestOverviewResponse, JobInfo, JobsQuery, PaginatedJobsResponse,
-    RetryJobPayload, UserJobsQuery,
+    BulkCancelResponse, BulkRetryResponse, IngestOverviewResponse, JobInfo, JobsQuery,
+    PaginatedJobsResponse, RetryJobPayload, UserJobsQuery,
 };
 use common_services::api::jobs::service::{
     cancel_job, get_job_overview, retry_cancelled_jobs, retry_job,
 };
 use common_services::api::jobs::user_level::{
-    get_failed_ingest_jobs, get_running_ingest_jobs, get_user_ingest_jobs,
+    cancel_user_ingest_jobs, get_failed_ingest_jobs, get_running_ingest_jobs, get_user_ingest_jobs,
     get_user_ingest_overview, retry_user_job,
 };
 use common_services::database::jobs::JobType;
@@ -106,6 +106,15 @@ pub async fn retry_ingest_job_handler(
 ) -> Result<Json<()>, AppError> {
     retry_user_job(&pool, payload.id, user.id).await?;
     Ok(Json(()))
+}
+
+#[instrument(skip(pool, user), err(Debug))]
+pub async fn cancel_all_ingest_jobs_handler(
+    State(pool): State<PgPool>,
+    Extension(user): Extension<ApiUser>,
+) -> Result<Json<BulkCancelResponse>, AppError> {
+    let cancelled = cancel_user_ingest_jobs(&pool, user.id).await?;
+    Ok(Json(BulkCancelResponse { cancelled }))
 }
 
 #[instrument(skip(pool, user), err(Debug))]

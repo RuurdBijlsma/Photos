@@ -277,3 +277,22 @@ pub async fn get_user_ingest_jobs(
         offset,
     })
 }
+
+/// Cancels all queued and running per-file ingest jobs owned by one user.
+pub async fn cancel_user_ingest_jobs(pool: &PgPool, user_id: i32) -> Result<i64, AppError> {
+    let result = sqlx::query!(
+        r#"
+        UPDATE jobs
+        SET status = 'cancelled'::job_status,
+            finished_at = NOW()
+        WHERE user_id = $1
+          AND status IN ('queued'::job_status, 'running'::job_status)
+          AND job_type IN ('ingest_metadata'::job_type, 'ingest_thumbnails'::job_type, 'ingest_analysis'::job_type)
+        "#,
+        user_id
+    )
+    .execute(pool)
+    .await?;
+
+    Ok(result.rows_affected() as i64)
+}
