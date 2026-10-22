@@ -1,8 +1,9 @@
 use app_state::{IngestSettings, MakeRelativePath};
 use color_eyre::eyre::eyre;
+use common_services::database::jobs::JobType;
 use common_services::database::media_item_store::MediaItemStore;
 use common_services::database::user_store::UserStore;
-use common_services::job_queue::enqueue_full_ingest;
+use common_services::job_queue::{enqueue_full_ingest, enqueue_job};
 use sqlx::PgPool;
 use std::path::Path;
 use tracing::info;
@@ -68,7 +69,10 @@ async fn handle_file_create(
 
     let existing = sqlx::query!(
         r#"
-        SELECT (missing_since IS NOT NULL) AS "is_missing!"
+        SELECT deleted,
+               (missing_since IS NOT NULL) AS "is_missing!",
+               thumbnails_status::text AS "thumbnails_status!",
+               analysis_status::text AS "analysis_status!"
         FROM media_item
         WHERE relative_path = $1
         "#,
@@ -78,9 +82,26 @@ async fn handle_file_create(
     .await?;
 
     if let Some(item) = existing {
+        if item.deleted {
+            return Ok(());
+        }
         if item.is_missing {
             info!("Re-discovered missing file on disk: {relative_path}, clearing missing status.");
-            MediaItemStore::unmark_relative_paths_as_missing(pool, &[relative_path]).await?;
+            MediaItemStore::unmark_relative_paths_as_missing(pool, &[relative_path.clone()])
+                .await?;
+        }
+        if item.thumbnails_status == "pending" {
+            enqueue_job::<()>(pool, settings, JobType::IngestThumbnails)
+                .relative_path(&relative_path)
+                .user_id(user.id)
+                .call()
+                .await?;
+        } else if item.thumbnails_status == "done" && item.analysis_status == "pending" {
+            enqueue_job::<()>(pool, settings, JobType::IngestAnalysis)
+                .relative_path(&relative_path)
+                .user_id(user.id)
+                .call()
+                .await?;
         }
         return Ok(());
     }

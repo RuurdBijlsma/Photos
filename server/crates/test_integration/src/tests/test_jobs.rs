@@ -1,9 +1,13 @@
 use crate::runner::context::test_context::TestContext;
+use crate::test_helpers::media_dir_contents;
 use color_eyre::Result;
+use color_eyre::eyre::{bail, eyre};
 use common_services::database::jobs::JobType;
 use common_services::database::media_item::media_item::CreateFullMediaItem;
 use common_services::database::media_item_store::MediaItemStore;
 use sqlx::PgPool;
+use std::time::{Duration, Instant};
+use tokio::time::sleep;
 
 #[allow(dead_code)]
 pub(crate) async fn insert_media_item_copy(
@@ -286,6 +290,110 @@ pub async fn test_media_reconcile_removal(context: &TestContext) -> Result<()> {
     sqlx::query!("DELETE FROM media_item WHERE id = ANY($1)", &ids)
         .execute(&context.pool)
         .await?;
+    Ok(())
+}
+
+pub async fn test_watcher_delete(context: &TestContext) -> Result<()> {
+    let (photos, _) = media_dir_contents(context)?;
+    let source = photos
+        .iter()
+        .find(|path| !path.to_string_lossy().contains("watcher-e2e"))
+        .or_else(|| photos.first())
+        .ok_or_else(|| eyre!("no photo asset found for watcher test"))?;
+    let media_folder: Option<String> =
+        sqlx::query_scalar!("SELECT media_folder FROM app_user ORDER BY id LIMIT 1")
+            .fetch_one(&context.pool)
+            .await?;
+    let folder = media_folder.unwrap_or_default();
+    let prefix = if folder.is_empty() {
+        "watcher-e2e".to_owned()
+    } else {
+        format!("{folder}/watcher-e2e")
+    };
+    let test_dir = context.settings.ingest.media_root.join(&prefix);
+    tokio::fs::create_dir_all(&test_dir).await?;
+    let relative_path = format!("{prefix}/delete-source.jpg");
+    let path = context.settings.ingest.media_root.join(&relative_path);
+    tokio::fs::copy(source, &path).await?;
+
+    let start = Instant::now();
+    let id = loop {
+        let id: Option<String> = sqlx::query_scalar!(
+            "SELECT id FROM media_item WHERE relative_path = $1",
+            &relative_path
+        )
+        .fetch_optional(&context.pool)
+        .await?;
+        if let Some(id) = id {
+            break id;
+        }
+        if start.elapsed() > Duration::from_secs(30) {
+            let _ = tokio::fs::remove_file(&path).await;
+            bail!("watcher did not create media item for {relative_path}");
+        }
+        sleep(Duration::from_millis(100)).await;
+    };
+
+    let start = Instant::now();
+    loop {
+        let ready: bool = sqlx::query_scalar!(
+            r#"
+            SELECT (
+                EXISTS (
+                    SELECT 1 FROM jobs
+                    WHERE relative_path = $1
+                      AND job_type = 'ingest_metadata'
+                      AND status = 'done'
+                )
+                AND EXISTS (
+                    SELECT 1 FROM jobs
+                    WHERE relative_path = $1
+                      AND job_type = 'ingest_thumbnails'
+                      AND status IN ('done', 'cancelled', 'failed')
+                )
+            ) AS "ready!"
+            "#,
+            &relative_path
+        )
+        .fetch_one(&context.pool)
+        .await?;
+        if ready {
+            break;
+        }
+        if start.elapsed() > Duration::from_secs(60) {
+            let _ = tokio::fs::remove_file(&path).await;
+            bail!("watcher media item was not fully ingested: {relative_path}");
+        }
+        sleep(Duration::from_millis(100)).await;
+    }
+
+    tokio::fs::remove_file(&path).await?;
+    let start = Instant::now();
+    loop {
+        let missing: bool = sqlx::query_scalar!(
+            r#"SELECT (missing_since IS NOT NULL) AS "missing!" FROM media_item WHERE id = $1"#,
+            &id
+        )
+        .fetch_one(&context.pool)
+        .await?;
+        if missing {
+            break;
+        }
+        if start.elapsed() > Duration::from_secs(30) {
+            bail!("watcher did not mark {relative_path} missing after deletion");
+        }
+        sleep(Duration::from_millis(100)).await;
+    }
+
+    sqlx::query!("DELETE FROM jobs WHERE relative_path = $1", &relative_path)
+        .execute(&context.pool)
+        .await?;
+    sqlx::query!("DELETE FROM media_item WHERE id = $1", &id)
+        .execute(&context.pool)
+        .await?;
+    if test_dir.exists() {
+        tokio::fs::remove_dir_all(&test_dir).await?;
+    }
     Ok(())
 }
 
