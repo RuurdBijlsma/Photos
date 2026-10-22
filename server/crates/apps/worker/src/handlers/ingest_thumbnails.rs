@@ -4,8 +4,9 @@ use crate::handlers::common::cache::thumbnail_cache::{get_thumbnail_cache, write
 use crate::handlers::common::utils::result_if_source_missing;
 use crate::jobs::management::is_job_cancelled;
 use color_eyre::{Result, eyre::eyre};
-use common_services::database::jobs::Job;
+use common_services::database::jobs::{Job, JobType};
 use common_services::database::media_item_store::MediaItemStore;
+use common_services::job_queue::enqueue_job;
 use generate_thumbnails::{ThumbnailConfig, generate_thumbnails};
 use serde_json::Value;
 use sqlx::PgPool;
@@ -22,7 +23,7 @@ pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
     let media_root = &context.settings.ingest.media_root;
     let file_path = media_root.join(relative_path);
     let Some(row) = sqlx::query!(
-        "SELECT hash, media_item_id, use_panorama_viewer, orientation, mf.is_motion_photo
+        "SELECT hash, media_item_id, user_id, use_panorama_viewer, orientation, mf.is_motion_photo
         FROM media_item
                  INNER JOIN media_features mf ON mf.media_item_id = media_item.id
         WHERE relative_path = $1",
@@ -73,6 +74,29 @@ pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
     )
     .execute(&context.pool)
     .await?;
+
+    let analysis_pending: bool = sqlx::query_scalar!(
+        r#"
+        SELECT (analysis_status = 'pending') AS "pending!"
+        FROM media_item
+        WHERE id = $1 AND deleted = false AND missing_since IS NULL
+        "#,
+        &row.media_item_id
+    )
+    .fetch_optional(&context.pool)
+    .await?
+    .unwrap_or(false);
+    if analysis_pending {
+        enqueue_job::<()>(
+            &context.pool,
+            &context.settings.ingest,
+            JobType::IngestAnalysis,
+        )
+        .relative_path(relative_path)
+        .user_id(row.user_id)
+        .call()
+        .await?;
+    }
     Ok(JobResult::Done)
 }
 

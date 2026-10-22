@@ -15,7 +15,7 @@ pub fn init_task_scheduler(pool: &PgPool, settings: &AppSettings) -> Result<()> 
                 JobType::PruneMissingIngestJobs,
                 JobType::Scan,
                 JobType::CleanDb,
-                JobType::SyncThumbnails,
+                JobType::CleanThumbnails,
                 JobType::ClusterPhotos,
                 JobType::ClusterFaces,
                 JobType::UpdateGlobalCentroid,

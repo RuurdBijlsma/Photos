@@ -96,8 +96,7 @@ pub async fn enqueue_full_scan(
         .user_id(target_user_id)
         .call()
         .await?;
-    enqueue_job::<()>(pool, settings, JobType::SyncThumbnails)
-        .user_id(target_user_id)
+    enqueue_job::<()>(pool, settings, JobType::CleanThumbnails)
         .call()
         .await?;
     Ok(())
@@ -239,7 +238,9 @@ pub async fn bulk_enqueue_full_ingest(
     let mut all_priorities = Vec::with_capacity(capacity);
     let mut all_payloads = Vec::with_capacity(capacity);
 
-    for (path, payload) in items {
+    let mut sorted: Vec<_> = items.iter().collect();
+    sorted.sort_unstable_by(|a, b| a.0.cmp(&b.0));
+    for (path, payload) in sorted {
         let file_path = ingest_settings.media_root.join(path);
         let is_video = ingest_settings.is_video_file(&file_path);
 

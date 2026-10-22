@@ -293,6 +293,196 @@ pub async fn test_media_reconcile_removal(context: &TestContext) -> Result<()> {
     Ok(())
 }
 
+pub async fn test_scan_repairs_incomplete_items(context: &TestContext) -> Result<()> {
+    let source = sqlx::query!("SELECT id, user_id FROM media_item WHERE deleted = false LIMIT 1")
+        .fetch_one(&context.pool)
+        .await?;
+    let ids = vec![
+        "repair-1".to_owned(),
+        "repair-2".to_owned(),
+        "repair-3".to_owned(),
+        "repair-4".to_owned(),
+    ];
+    let paths = vec![
+        "repair-test/thumbs.jpg".to_owned(),
+        "repair-test/analysis.jpg".to_owned(),
+        "repair-test/failed.jpg".to_owned(),
+        "repair-test/done.jpg".to_owned(),
+    ];
+    for ((id, path), statuses) in ids.iter().zip(&paths).zip([
+        ("pending", "pending"),
+        ("done", "pending"),
+        ("done", "failed"),
+        ("done", "done"),
+    ]) {
+        insert_media_item_copy(&context.pool, &source.id, id, path).await?;
+        sqlx::query!(
+            "UPDATE media_item SET thumbnails_status = $2::text::ingest_stage_status, analysis_status = $3::text::ingest_stage_status WHERE id = $1",
+            id,
+            statuses.0,
+            statuses.1
+        )
+        .execute(&context.pool)
+        .await?;
+    }
+    let baseline: i64 = sqlx::query_scalar!(r#"SELECT COALESCE(MAX(id), 0) AS "max!" FROM jobs"#)
+        .fetch_one(&context.pool)
+        .await?;
+
+    let repaired = worker::handlers::scan::repair_incomplete_stages(
+        &context.pool,
+        &context.settings.ingest,
+        source.user_id,
+    )
+    .await?;
+    assert!(repaired >= 2);
+
+    let rows = sqlx::query!(
+        r#"
+        SELECT relative_path, job_type::text AS "job_type!"
+        FROM jobs
+        WHERE id > $1 AND relative_path = ANY($2)
+        ORDER BY id
+        "#,
+        baseline,
+        &paths
+    )
+    .fetch_all(&context.pool)
+    .await?;
+    let mut jobs_by_path: std::collections::HashMap<String, Vec<String>> =
+        std::collections::HashMap::new();
+    for row in rows {
+        if let Some(path) = row.relative_path {
+            jobs_by_path.entry(path).or_default().push(row.job_type);
+        }
+    }
+    assert_eq!(
+        jobs_by_path.get(&paths[0]),
+        Some(&vec!["ingest_thumbnails".to_owned()])
+    );
+    assert_eq!(
+        jobs_by_path.get(&paths[1]),
+        Some(&vec!["ingest_analysis".to_owned()])
+    );
+    assert!(!jobs_by_path.contains_key(&paths[2]));
+    assert!(!jobs_by_path.contains_key(&paths[3]));
+
+    sqlx::query!("DELETE FROM jobs WHERE relative_path = ANY($1)", &paths)
+        .execute(&context.pool)
+        .await?;
+    sqlx::query!("DELETE FROM media_item WHERE id = ANY($1)", &ids)
+        .execute(&context.pool)
+        .await?;
+    Ok(())
+}
+
+pub async fn test_thumbnail_drift_reset(context: &TestContext) -> Result<()> {
+    let source = sqlx::query!("SELECT id, user_id FROM media_item WHERE deleted = false LIMIT 1")
+        .fetch_one(&context.pool)
+        .await?;
+    let id = "drift-1";
+    insert_media_item_copy(&context.pool, &source.id, id, "drift-test/no-folder.jpg").await?;
+    sqlx::query!(
+        "UPDATE media_item SET thumbnails_status = 'done', analysis_status = 'done' WHERE id = $1",
+        id
+    )
+    .execute(&context.pool)
+    .await?;
+    assert!(
+        !context.settings.ingest.thumbnails_root.join(id).exists(),
+        "drift test needs an item without a thumbnail folder"
+    );
+
+    let real_id: Option<String> = sqlx::query_scalar!(
+        r#"
+        SELECT id FROM media_item
+        WHERE deleted = false AND thumbnails_status = 'done' AND id != $1
+        "#,
+        id
+    )
+    .fetch_all(&context.pool)
+    .await?
+    .into_iter()
+    .find(|real_id| {
+        context
+            .settings
+            .ingest
+            .thumbnails_root
+            .join(real_id)
+            .is_dir()
+    });
+
+    worker::handlers::scan::reset_missing_thumbnail_statuses(
+        &context.pool,
+        &context.settings.ingest,
+    )
+    .await?;
+
+    let after = sqlx::query!(
+        r#"
+        SELECT thumbnails_status::text AS "thumbnails_status!", thumbnails_error
+        FROM media_item WHERE id = $1
+        "#,
+        id
+    )
+    .fetch_one(&context.pool)
+    .await?;
+    assert_eq!(after.thumbnails_status, "pending");
+    assert!(after.thumbnails_error.is_none());
+
+    if let Some(real_id) = real_id {
+        let status: String = sqlx::query_scalar!(
+            r#"SELECT thumbnails_status::text AS "status!" FROM media_item WHERE id = $1"#,
+            &real_id
+        )
+        .fetch_one(&context.pool)
+        .await?;
+        assert_eq!(status, "done");
+    }
+
+    sqlx::query!("DELETE FROM media_item WHERE id = $1", id)
+        .execute(&context.pool)
+        .await?;
+    Ok(())
+}
+
+pub async fn test_clean_thumbnail_orphans(context: &TestContext) -> Result<()> {
+    let thumbnails_root = &context.settings.ingest.thumbnails_root;
+    let orphan = thumbnails_root.join("orphan0001");
+    tokio::fs::create_dir_all(&orphan).await?;
+    tokio::fs::write(orphan.join("dummy.txt"), b"x").await?;
+
+    let source = sqlx::query!("SELECT id FROM media_item WHERE deleted = false LIMIT 1")
+        .fetch_one(&context.pool)
+        .await?;
+    let real_id: Option<String> = sqlx::query_scalar!("SELECT id FROM media_item")
+        .fetch_all(&context.pool)
+        .await?
+        .into_iter()
+        .find(|id| thumbnails_root.join(id).is_dir());
+    let created_real = real_id.is_none();
+    let real_id = real_id.unwrap_or(source.id);
+    let real_folder = thumbnails_root.join(&real_id);
+    tokio::fs::create_dir_all(&real_folder).await?;
+    let preserved = real_folder.join("preserve.txt");
+    tokio::fs::write(&preserved, b"x").await?;
+
+    worker::handlers::clean_thumbnails::clean_thumbnail_orphans(
+        &context.pool,
+        &context.settings.ingest,
+    )
+    .await?;
+
+    assert!(!orphan.exists(), "orphan thumbnail folder must be removed");
+    assert!(real_folder.exists(), "known thumbnail folder must remain");
+
+    tokio::fs::remove_file(&preserved).await?;
+    if created_real {
+        tokio::fs::remove_dir_all(&real_folder).await?;
+    }
+    Ok(())
+}
+
 pub async fn test_prune_missing_ingest_jobs(context: &TestContext) -> Result<()> {
     let source = sqlx::query!("SELECT id, user_id FROM media_item WHERE deleted = false LIMIT 1")
         .fetch_one(&context.pool)
