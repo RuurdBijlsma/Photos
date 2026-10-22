@@ -18,6 +18,7 @@ pub mod ingest_analysis;
 pub mod ingest_metadata;
 pub mod ingest_takeout_batch;
 pub mod ingest_thumbnails;
+pub mod prune_missing_ingest_jobs;
 pub mod remove;
 pub mod scan;
 pub mod sync_thumbnails;
@@ -53,6 +54,7 @@ pub async fn handle_job(context: &WorkerContext, job: &Job) -> Result<JobResult>
         JobType::GenerateDailyCards => generate_daily_cards::handle(context, job).await,
         JobType::UpdateGlobalCentroid => update_global_centroid::handle(context, job).await,
         JobType::IngestTakeoutBatch => ingest_takeout_batch::handle(context, job).await,
+        JobType::PruneMissingIngestJobs => prune_missing_ingest_jobs::handle(context, job).await,
     };
 
     heartbeat_handle.abort();

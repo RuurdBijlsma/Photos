@@ -293,6 +293,136 @@ pub async fn test_media_reconcile_removal(context: &TestContext) -> Result<()> {
     Ok(())
 }
 
+pub async fn test_prune_missing_ingest_jobs(context: &TestContext) -> Result<()> {
+    let source = sqlx::query!("SELECT id, user_id FROM media_item WHERE deleted = false LIMIT 1")
+        .fetch_one(&context.pool)
+        .await?;
+    let ids = vec![
+        "sweep-1".to_owned(),
+        "sweep-2".to_owned(),
+        "sweep-3".to_owned(),
+    ];
+    insert_media_item_copy(&context.pool, &source.id, &ids[0], "sweep-test/missing.jpg").await?;
+    insert_media_item_copy(
+        &context.pool,
+        &source.id,
+        &ids[1],
+        "sweep-test/soft-deleted.jpg",
+    )
+    .await?;
+    insert_media_item_copy(
+        &context.pool,
+        &source.id,
+        &ids[2],
+        "import/sweep-test-present.jpg",
+    )
+    .await?;
+    sqlx::query!(
+        "UPDATE media_item SET deleted = true WHERE id = $1",
+        &ids[1]
+    )
+    .execute(&context.pool)
+    .await?;
+    sqlx::query!(
+        "UPDATE media_item SET missing_since = now() WHERE id = $1",
+        &ids[2]
+    )
+    .execute(&context.pool)
+    .await?;
+
+    let present_path = context
+        .settings
+        .ingest
+        .media_root
+        .join("import/sweep-test-present.jpg");
+    if let Some(parent) = present_path.parent() {
+        tokio::fs::create_dir_all(parent).await?;
+    }
+    tokio::fs::write(&present_path, b"x").await?;
+
+    let jobs = vec![
+        insert_job(
+            &context.pool,
+            source.user_id,
+            "sweep-test/missing.jpg",
+            JobType::IngestMetadata,
+            "queued",
+            0,
+            3,
+        )
+        .await?,
+        insert_job(
+            &context.pool,
+            source.user_id,
+            "sweep-test/soft-deleted.jpg",
+            JobType::IngestThumbnails,
+            "queued",
+            0,
+            3,
+        )
+        .await?,
+        insert_job(
+            &context.pool,
+            source.user_id,
+            "import/sweep-test-present.jpg",
+            JobType::IngestAnalysis,
+            "queued",
+            0,
+            3,
+        )
+        .await?,
+    ];
+
+    let result = worker::handlers::prune_missing_ingest_jobs::prune_missing_ingest_jobs(
+        &context.pool,
+        &context.settings.ingest,
+    )
+    .await?;
+    assert!(matches!(result, worker::handlers::JobResult::Done));
+
+    let rows = sqlx::query!(
+        r#"
+        SELECT id, (missing_since IS NOT NULL) AS "missing!"
+        FROM media_item
+        WHERE id = ANY($1)
+        ORDER BY id
+        "#,
+        &ids
+    )
+    .fetch_all(&context.pool)
+    .await?;
+    assert_eq!(rows.len(), 3);
+    assert!(rows[0].missing, "missing file should be marked");
+    assert!(!rows[2].missing, "present file should be restored");
+
+    let statuses = sqlx::query!(
+        r#"
+        SELECT id, status::text AS "status!"
+        FROM jobs
+        WHERE id = ANY($1)
+        ORDER BY id
+        "#,
+        &jobs
+    )
+    .fetch_all(&context.pool)
+    .await?;
+    assert_eq!(statuses.len(), 3);
+    assert_eq!(statuses[0].status, "cancelled");
+    assert_eq!(statuses[1].status, "cancelled");
+    assert_eq!(statuses[2].status, "queued");
+
+    sqlx::query!("DELETE FROM jobs WHERE id = ANY($1)", &jobs)
+        .execute(&context.pool)
+        .await?;
+    sqlx::query!("DELETE FROM media_item WHERE id = ANY($1)", &ids)
+        .execute(&context.pool)
+        .await?;
+    if present_path.exists() {
+        tokio::fs::remove_file(&present_path).await?;
+    }
+    Ok(())
+}
+
 pub async fn test_watcher_delete(context: &TestContext) -> Result<()> {
     let (photos, _) = media_dir_contents(context)?;
     let source = photos

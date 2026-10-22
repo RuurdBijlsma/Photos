@@ -12,6 +12,7 @@ pub fn init_task_scheduler(pool: &PgPool, settings: &AppSettings) -> Result<()> 
         TaskSchedule {
             interval: Duration::from_hours(24),
             jobs: vec![
+                JobType::PruneMissingIngestJobs,
                 JobType::Scan,
                 JobType::CleanDb,
                 JobType::SyncThumbnails,

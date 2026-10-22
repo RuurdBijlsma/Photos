@@ -45,6 +45,7 @@ pub enum JobType {
     GenerateDailyCards,
     UpdateGlobalCentroid,
     IngestTakeoutBatch,
+    PruneMissingIngestJobs,
 }
 
 impl JobType {
@@ -59,7 +60,7 @@ impl JobType {
     //            Because it is global scope (not path scoped), and it has a higher phase than the ingest jobs.
     pub const fn phase(&self) -> i32 {
         match self {
-            Self::Remove => 5,
+            Self::PruneMissingIngestJobs | Self::Remove => 5,
             Self::HandleWebUpload | Self::IngestTakeoutBatch => 10,
             Self::IngestMetadata => 20,
             Self::IngestThumbnails => 30,
@@ -92,6 +93,7 @@ impl JobType {
             | Self::ClusterFaces
             | Self::ClusterPhotos
             | Self::SyncThumbnails
+            | Self::PruneMissingIngestJobs
             | Self::GenerateDailyCards => JobScope::Global,
         }
     }
@@ -121,6 +123,7 @@ impl JobType {
                 }
             }
             Self::Remove => 0,
+            Self::PruneMissingIngestJobs => 1,
             Self::CleanDb => 20,
             Self::ImportAlbumItem => 25,
             Self::Scan => 70,

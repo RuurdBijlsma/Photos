@@ -297,6 +297,7 @@ watch(
                   'import_album_item',
                   'update_global_centroid',
                   'sync_thumbnails',
+                  'prune_missing_ingest_jobs',
                   'delayed_scan',
                   'generate_daily_cards',
                   'calc_system_stats',
