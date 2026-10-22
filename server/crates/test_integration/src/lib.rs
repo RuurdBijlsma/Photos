@@ -25,8 +25,8 @@ mod test_runner {
         test_login, test_logout, test_refresh, test_register, test_second_register_attempt,
     };
     use crate::tests::test_jobs::{
-        test_generated_thumbnails_status, test_update_full_resets_ingest_stages,
-        test_visual_analysis_unique_percentage,
+        test_generated_thumbnails_status, test_media_reconcile_removal,
+        test_update_full_resets_ingest_stages, test_visual_analysis_unique_percentage,
     };
     use crate::tests::test_onboarding::{test_onboarding, test_start_processing};
     use crate::tests::test_photos::{
@@ -88,6 +88,7 @@ mod test_runner {
                 test_generated_thumbnails_status,
                 test_update_full_resets_ingest_stages,
                 test_visual_analysis_unique_percentage,
+                test_media_reconcile_removal,
             ]
         );
 

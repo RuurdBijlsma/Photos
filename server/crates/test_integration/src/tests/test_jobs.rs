@@ -178,6 +178,117 @@ pub async fn test_update_full_resets_ingest_stages(context: &TestContext) -> Res
     Ok(())
 }
 
+pub async fn test_media_reconcile_removal(context: &TestContext) -> Result<()> {
+    let source = sqlx::query!("SELECT id, user_id FROM media_item WHERE deleted = false LIMIT 1")
+        .fetch_one(&context.pool)
+        .await?;
+    let ids = vec![
+        "recon-1".to_owned(),
+        "recon-2".to_owned(),
+        "recon-3".to_owned(),
+    ];
+    insert_media_item_copy(&context.pool, &source.id, &ids[0], "recon-test/file.jpg").await?;
+    insert_media_item_copy(
+        &context.pool,
+        &source.id,
+        &ids[1],
+        "recon-test/dir/child.jpg",
+    )
+    .await?;
+    insert_media_item_copy(&context.pool, &source.id, &ids[2], "recon-test/keep.jpg").await?;
+
+    let jobs = vec![
+        insert_job(
+            &context.pool,
+            source.user_id,
+            "recon-test/file.jpg",
+            JobType::IngestMetadata,
+            "queued",
+            0,
+            3,
+        )
+        .await?,
+        insert_job(
+            &context.pool,
+            source.user_id,
+            "recon-test/dir/child.jpg",
+            JobType::IngestMetadata,
+            "queued",
+            0,
+            3,
+        )
+        .await?,
+        insert_job(
+            &context.pool,
+            source.user_id,
+            "recon-test/keep.jpg",
+            JobType::IngestMetadata,
+            "queued",
+            0,
+            3,
+        )
+        .await?,
+    ];
+
+    let result = common_services::media_reconcile::reconcile_removed_paths(
+        &context.pool,
+        &context.settings.ingest,
+        &[
+            "recon-test/file.jpg".to_owned(),
+            "recon-test/dir".to_owned(),
+        ],
+    )
+    .await?;
+    assert_eq!(result.marked_missing, 2);
+    assert_eq!(result.cancelled_jobs, 2);
+
+    let rows = sqlx::query!(
+        r#"
+        SELECT id, relative_path, (missing_since IS NOT NULL) AS "missing!"
+        FROM media_item
+        WHERE id = ANY($1)
+        ORDER BY id
+        "#,
+        &ids
+    )
+    .fetch_all(&context.pool)
+    .await?;
+    assert_eq!(rows.len(), 3);
+    for row in rows {
+        let missing = row.relative_path != "recon-test/keep.jpg";
+        assert_eq!(row.missing, missing, "{}", row.relative_path);
+    }
+
+    let statuses = sqlx::query!(
+        r#"
+        SELECT id, status::text AS "status!"
+        FROM jobs
+        WHERE id = ANY($1)
+        ORDER BY id
+        "#,
+        &jobs
+    )
+    .fetch_all(&context.pool)
+    .await?;
+    assert_eq!(statuses.len(), 3);
+    for row in statuses {
+        let expected = if row.id == jobs[2] {
+            "queued"
+        } else {
+            "cancelled"
+        };
+        assert_eq!(row.status, expected, "job {}", row.id);
+    }
+
+    sqlx::query!("DELETE FROM jobs WHERE id = ANY($1)", &jobs)
+        .execute(&context.pool)
+        .await?;
+    sqlx::query!("DELETE FROM media_item WHERE id = ANY($1)", &ids)
+        .execute(&context.pool)
+        .await?;
+    Ok(())
+}
+
 pub async fn test_visual_analysis_unique_percentage(context: &TestContext) -> Result<()> {
     let mut tx = context.pool.begin().await?;
     let count: i64 = sqlx::query_scalar!("SELECT COUNT(*) FROM visual_analysis")

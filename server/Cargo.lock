@@ -8518,6 +8518,7 @@ dependencies = [
  "common_types",
  "futures-util",
  "material-color-utils",
+ "media_analyzer",
  "model_provider",
  "photos_app",
  "prost",
@@ -8532,6 +8533,7 @@ dependencies = [
  "tracing-subscriber",
  "url",
  "walkdir",
+ "worker",
  "zip",
 ]
 
