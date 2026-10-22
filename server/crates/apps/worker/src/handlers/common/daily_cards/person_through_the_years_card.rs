@@ -154,7 +154,7 @@ impl DailyCardGenerator for PersonThroughTheYearsCardGenerator {
                     mi.height,
                     mi.is_video,
                     mi.duration_ms,
-                    mi.has_thumbnails,
+                    mi.has_thumbnails AS "has_thumbnails!",
                     mi.use_panorama_viewer,
                     mi.taken_at_local,
                     f.width as "face_w!: f32",

@@ -376,7 +376,7 @@ impl AlbumStore {
             SELECT
                 mi.id,
                 is_video,
-                has_thumbnails,
+                has_thumbnails AS "has_thumbnails!",
                 duration_ms::INT as duration_ms,
                 (width::real / height::real) as "ratio!"
             FROM album_media_item as ami
@@ -476,7 +476,7 @@ impl AlbumStore {
             SELECT
                 mi.id,
                 mi.is_video,
-                mi.has_thumbnails,
+                mi.has_thumbnails AS "has_thumbnails!",
                 mi.duration_ms::INT as duration_ms,
                 mi.taken_at_local::TEXT as "timestamp!",
                 ami.added_at

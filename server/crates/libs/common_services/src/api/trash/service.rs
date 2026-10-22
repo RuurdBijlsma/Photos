@@ -18,7 +18,7 @@ pub async fn get_trash_items(
         SELECT
             id,
             is_video,
-            has_thumbnails,
+            has_thumbnails AS "has_thumbnails!",
             duration_ms::INT AS duration_ms,
             (width::real / height::real) AS "ratio!"
         FROM media_item

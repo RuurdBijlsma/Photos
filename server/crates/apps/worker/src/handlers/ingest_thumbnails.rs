@@ -65,8 +65,9 @@ pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
     sqlx::query!(
         r"
         UPDATE media_item
-        SET has_thumbnails = TRUE,
-        updated_at = now()
+        SET thumbnails_status = 'done',
+            thumbnails_error = NULL,
+            updated_at = now()
         WHERE id = $1;",
         &row.media_item_id
     )

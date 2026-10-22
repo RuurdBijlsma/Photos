@@ -93,7 +93,7 @@ pub async fn get_camera_photos(
             SELECT
                 mi.id,
                 mi.is_video,
-                mi.has_thumbnails,
+                mi.has_thumbnails AS "has_thumbnails!",
                 mi.duration_ms::INT AS "duration_ms",
                 (mi.width::real / mi.height::real) AS "ratio!"
             FROM camera_settings c

@@ -143,6 +143,12 @@ async fn save_results(
     {
         return Ok(result);
     }
+    sqlx::query!(
+        "DELETE FROM visual_analysis WHERE media_item_id = $1",
+        media_item_id
+    )
+    .execute(&mut *tx)
+    .await?;
     for analysis in analyses {
         VisualAnalysisStore::create_fast_analysis(
             &mut tx,
@@ -152,6 +158,18 @@ async fn save_results(
         )
         .await?;
     }
+    sqlx::query!(
+        r#"
+        UPDATE media_item
+        SET analysis_status = 'done',
+            analysis_error = NULL,
+            updated_at = now()
+        WHERE id = $1
+        "#,
+        media_item_id
+    )
+    .execute(&mut *tx)
+    .await?;
     tx.commit().await?;
     Ok(JobResult::Done)
 }

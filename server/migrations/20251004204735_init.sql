@@ -1,4 +1,5 @@
 CREATE TYPE user_role AS ENUM ('admin', 'user');
+CREATE TYPE ingest_stage_status AS ENUM ('pending', 'done', 'failed');
 
 CREATE TABLE location
 (
@@ -82,9 +83,14 @@ CREATE TABLE media_item
     timezone_name              TEXT,
     timezone_offset_seconds    INT,
     og_timezone_offset_seconds INT,
+    -- Ingest stages
+    thumbnails_status          ingest_stage_status NOT NULL DEFAULT 'pending',
+    analysis_status            ingest_stage_status NOT NULL DEFAULT 'pending',
+    thumbnails_error           TEXT,
+    analysis_error             TEXT,
     -- Frontend fields
     use_panorama_viewer        BOOLEAN     NOT NULL,
-    has_thumbnails             BOOLEAN     NOT NULL DEFAULT false,
+    has_thumbnails             BOOLEAN GENERATED ALWAYS AS (thumbnails_status = 'done') STORED,
     month_id                   DATE GENERATED ALWAYS AS (date_trunc('month', taken_at_local)) STORED,
     user_caption               TEXT,
     -- Other

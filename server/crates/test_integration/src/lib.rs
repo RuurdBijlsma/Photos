@@ -24,6 +24,10 @@ mod test_runner {
     use crate::tests::test_auth::{
         test_login, test_logout, test_refresh, test_register, test_second_register_attempt,
     };
+    use crate::tests::test_jobs::{
+        test_generated_thumbnails_status, test_update_full_resets_ingest_stages,
+        test_visual_analysis_unique_percentage,
+    };
     use crate::tests::test_onboarding::{test_onboarding, test_start_processing};
     use crate::tests::test_photos::{
         test_get_color_theme, test_get_full_item, test_get_full_item_albums, test_get_random_photo,
@@ -80,6 +84,10 @@ mod test_runner {
                 test_search_filters,
                 // -- Takeout Import --
                 test_takeout_import_flow,
+                // -- Ingest Jobs --
+                test_generated_thumbnails_status,
+                test_update_full_resets_ingest_stages,
+                test_visual_analysis_unique_percentage,
             ]
         );
 
