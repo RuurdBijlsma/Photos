@@ -87,8 +87,11 @@ async fn handle_file_create(
         }
         if item.is_missing {
             info!("Re-discovered missing file on disk: {relative_path}, clearing missing status.");
-            MediaItemStore::unmark_relative_paths_as_missing(pool, &[relative_path.clone()])
-                .await?;
+            MediaItemStore::unmark_relative_paths_as_missing(
+                pool,
+                std::slice::from_ref(&relative_path),
+            )
+            .await?;
         }
         if item.thumbnails_status == "pending" {
             enqueue_job::<()>(pool, settings, JobType::IngestThumbnails)

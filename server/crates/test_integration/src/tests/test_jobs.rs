@@ -182,6 +182,7 @@ pub async fn test_update_full_resets_ingest_stages(context: &TestContext) -> Res
     Ok(())
 }
 
+#[allow(clippy::too_many_lines)]
 pub async fn test_media_reconcile_removal(context: &TestContext) -> Result<()> {
     let source = sqlx::query!("SELECT id, user_id FROM media_item WHERE deleted = false LIMIT 1")
         .fetch_one(&context.pool)
@@ -687,6 +688,7 @@ pub async fn test_clean_thumbnail_orphans(context: &TestContext) -> Result<()> {
     Ok(())
 }
 
+#[allow(clippy::too_many_lines)]
 pub async fn test_prune_missing_ingest_jobs(context: &TestContext) -> Result<()> {
     let source = sqlx::query!("SELECT id, user_id FROM media_item WHERE deleted = false LIMIT 1")
         .fetch_one(&context.pool)

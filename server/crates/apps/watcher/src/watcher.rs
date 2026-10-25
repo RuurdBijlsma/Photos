@@ -61,7 +61,7 @@ pub async fn create_watcher(
                 };
                 match result {
                     Ok(event) => {
-                        if let Some(action) = action_for_event(&event.kind, &event.paths) {
+                        if let Some(action) = action_for_event(event.kind, &event.paths) {
                             for path in event.paths {
                                 batch.insert(path, action);
                             }
@@ -97,7 +97,7 @@ fn log_flush_result(result: Result<()>) {
     }
 }
 
-fn action_for_event(kind: &EventKind, paths: &[PathBuf]) -> Option<BatchAction> {
+const fn action_for_event(kind: EventKind, paths: &[PathBuf]) -> Option<BatchAction> {
     if paths.is_empty() {
         return None;
     }
@@ -189,22 +189,22 @@ mod tests {
     fn classifies_create_and_remove_only() {
         let paths = [PathBuf::from("photo.jpg")];
         assert_eq!(
-            action_for_event(&EventKind::Create(CreateKind::File), &paths),
+            action_for_event(EventKind::Create(CreateKind::File), &paths),
             Some(BatchAction::Upsert)
         );
         assert_eq!(
-            action_for_event(&EventKind::Remove(RemoveKind::File), &paths),
+            action_for_event(EventKind::Remove(RemoveKind::File), &paths),
             Some(BatchAction::Remove)
         );
         assert_eq!(
             action_for_event(
-                &EventKind::Modify(ModifyKind::Name(RenameMode::Both)),
+                EventKind::Modify(ModifyKind::Name(RenameMode::Both)),
                 &paths
             ),
             None
         );
         assert_eq!(
-            action_for_event(&EventKind::Remove(RemoveKind::File), &[]),
+            action_for_event(EventKind::Remove(RemoveKind::File), &[]),
             None
         );
     }
