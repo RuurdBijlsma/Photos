@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            SELECT\n                mi.id,\n                mi.is_video,\n                mi.has_thumbnails,\n                mi.duration_ms::INT as duration_ms,\n                (mi.width::real / mi.height::real) as \"ratio!\",\n                g.latitude,\n                g.longitude\n            FROM media_item mi\n            JOIN gps g ON mi.id = g.media_item_id\n            WHERE mi.user_id = $1 AND mi.deleted = false\n              AND ($2::TIMESTAMPTZ IS NULL OR mi.sort_timestamp >= $2)\n              AND ($3::TIMESTAMPTZ IS NULL OR mi.sort_timestamp <= $3)\n            ORDER BY mi.sort_timestamp DESC\n            ",
+  "query": "\n            SELECT\n                mi.id,\n                mi.is_video,\n                mi.has_thumbnails AS \"has_thumbnails!\",\n                mi.duration_ms::INT as duration_ms,\n                (mi.width::real / mi.height::real) as \"ratio!\",\n                g.latitude,\n                g.longitude\n            FROM media_item mi\n            JOIN gps g ON mi.id = g.media_item_id\n            WHERE mi.user_id = $1 AND mi.deleted = false\n              AND ($2::TIMESTAMPTZ IS NULL OR mi.sort_timestamp >= $2)\n              AND ($3::TIMESTAMPTZ IS NULL OR mi.sort_timestamp <= $3)\n            ORDER BY mi.sort_timestamp DESC\n            ",
   "describe": {
     "columns": [
       {
@@ -27,7 +27,7 @@
       },
       {
         "ordinal": 2,
-        "name": "has_thumbnails",
+        "name": "has_thumbnails!",
         "type_info": "Bool",
         "origin": {
           "Table": {
@@ -81,12 +81,12 @@
     "nullable": [
       false,
       false,
-      false,
+      true,
       null,
       null,
       false,
       false
     ]
   },
-  "hash": "53d43f546452a4f6b999d45dcbfef4f9da2e0c533f34cb835ef9513898fa0a74"
+  "hash": "fdad508e95379ee1876bb1e9e647d261d150be9328e157e43efdbc6f375bcd56"
 }

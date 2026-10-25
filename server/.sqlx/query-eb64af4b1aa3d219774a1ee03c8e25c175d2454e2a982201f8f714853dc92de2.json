@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT\n            id,\n            is_video,\n            has_thumbnails,\n            duration_ms::INT AS duration_ms,\n            (width::real / height::real) AS \"ratio!\"\n        FROM media_item\n        WHERE user_id = $1 AND deleted = true\n        ORDER BY sort_timestamp DESC\n        ",
+  "query": "\n        SELECT\n            id,\n            is_video,\n            has_thumbnails AS \"has_thumbnails!\",\n            duration_ms::INT AS duration_ms,\n            (width::real / height::real) AS \"ratio!\"\n        FROM media_item\n        WHERE user_id = $1 AND deleted = true\n        ORDER BY sort_timestamp DESC\n        ",
   "describe": {
     "columns": [
       {
@@ -27,7 +27,7 @@
       },
       {
         "ordinal": 2,
-        "name": "has_thumbnails",
+        "name": "has_thumbnails!",
         "type_info": "Bool",
         "origin": {
           "Table": {
@@ -57,10 +57,10 @@
     "nullable": [
       false,
       false,
-      false,
+      true,
       null,
       null
     ]
   },
-  "hash": "96201653cf54cbcaee06d6b980460b647e4a3db3293eb4ef46fb1323e3fc7a8a"
+  "hash": "eb64af4b1aa3d219774a1ee03c8e25c175d2454e2a982201f8f714853dc92de2"
 }

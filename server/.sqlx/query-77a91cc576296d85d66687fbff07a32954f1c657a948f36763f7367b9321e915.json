@@ -1,0 +1,65 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE jobs\n        SET status = 'queued'::job_status,\n            attempts = 0,\n            scheduled_at = NOW(),\n            finished_at = NULL,\n            started_at = NULL,\n            last_error = NULL,\n            owner = NULL\n        WHERE id = $1\n          AND user_id = $2\n          AND status IN ('failed'::job_status, 'done'::job_status, 'cancelled'::job_status)\n          AND job_type IN ('ingest_metadata', 'ingest_thumbnails', 'ingest_analysis', 'ingest_takeout_batch')\n        RETURNING job_type AS \"job_type: JobType\", relative_path\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "job_type: JobType",
+        "type_info": {
+          "Custom": {
+            "name": "job_type",
+            "kind": {
+              "Enum": [
+                "ingest_metadata",
+                "ingest_thumbnails",
+                "ingest_analysis",
+                "remove",
+                "scan",
+                "clean_db",
+                "cluster_faces",
+                "cluster_photos",
+                "import_album_item",
+                "update_global_centroid",
+                "clean_thumbnails",
+                "generate_daily_cards",
+                "calc_system_stats",
+                "handle_web_upload",
+                "ingest_takeout_batch",
+                "prune_missing_ingest_jobs"
+              ]
+            }
+          }
+        },
+        "origin": {
+          "Table": {
+            "table": "jobs",
+            "name": "job_type"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "relative_path",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "jobs",
+            "name": "relative_path"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int4"
+      ]
+    },
+    "nullable": [
+      false,
+      true
+    ]
+  },
+  "hash": "77a91cc576296d85d66687fbff07a32954f1c657a948f36763f7367b9321e915"
+}

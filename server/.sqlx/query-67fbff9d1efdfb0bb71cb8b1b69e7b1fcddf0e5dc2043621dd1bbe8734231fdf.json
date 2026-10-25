@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT hash, media_item_id, use_panorama_viewer, orientation, mf.is_motion_photo\n        FROM media_item\n                 INNER JOIN media_features mf ON mf.media_item_id = media_item.id\n        WHERE relative_path = $1",
+  "query": "SELECT hash, media_item_id, user_id, use_panorama_viewer, orientation, mf.is_motion_photo\n        FROM media_item\n                 INNER JOIN media_features mf ON mf.media_item_id = media_item.id\n        WHERE relative_path = $1",
   "describe": {
     "columns": [
       {
@@ -27,6 +27,17 @@
       },
       {
         "ordinal": 2,
+        "name": "user_id",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "media_item",
+            "name": "user_id"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
         "name": "use_panorama_viewer",
         "type_info": "Bool",
         "origin": {
@@ -37,7 +48,7 @@
         }
       },
       {
-        "ordinal": 3,
+        "ordinal": 4,
         "name": "orientation",
         "type_info": "Int4",
         "origin": {
@@ -48,7 +59,7 @@
         }
       },
       {
-        "ordinal": 4,
+        "ordinal": 5,
         "name": "is_motion_photo",
         "type_info": "Bool",
         "origin": {
@@ -69,8 +80,9 @@
       false,
       false,
       false,
+      false,
       false
     ]
   },
-  "hash": "58b5c9db2772dc72730e151a8bdcc9805fc85845027d260a996db6850437125c"
+  "hash": "67fbff9d1efdfb0bb71cb8b1b69e7b1fcddf0e5dc2043621dd1bbe8734231fdf"
 }

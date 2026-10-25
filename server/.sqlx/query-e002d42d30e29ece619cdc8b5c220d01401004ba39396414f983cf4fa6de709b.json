@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                UPDATE media_item\n                SET analysis_status = 'failed',\n                    analysis_error = $2\n                WHERE relative_path = $1\n                  AND deleted = false\n                  AND analysis_status <> 'done'\n                ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "e002d42d30e29ece619cdc8b5c220d01401004ba39396414f983cf4fa6de709b"
+}

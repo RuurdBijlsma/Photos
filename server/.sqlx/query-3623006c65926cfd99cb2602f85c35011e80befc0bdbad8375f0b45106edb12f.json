@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT (analysis_status = 'pending') AS \"pending!\"\n        FROM media_item\n        WHERE id = $1 AND deleted = false AND missing_since IS NULL\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "pending!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "3623006c65926cfd99cb2602f85c35011e80befc0bdbad8375f0b45106edb12f"
+}
