@@ -151,7 +151,13 @@ pub async fn update_job_on_completion(pool: &PgPool, job: &Job, result: JobResul
 pub async fn update_job_on_failure(pool: &PgPool, job: &Job, error: &Report) -> Result<()> {
     let error_string = &format!("{error:?}");
     if job.attempts + 1 >= job.max_attempts {
-        mark_job_failed(pool, job.id, error_string).await
+        let mut tx = pool.begin().await?;
+        let updated = mark_job_failed(&mut *tx, job.id, error_string).await?;
+        if updated == 1 {
+            mark_stage_failed(&mut *tx, job, error_string).await?;
+        }
+        tx.commit().await?;
+        Ok(())
     } else {
         let delay = backoff_seconds(job.attempts);
         reschedule_for_retry(pool, job.id, delay, error_string).await
@@ -161,7 +167,7 @@ pub async fn update_job_on_failure(pool: &PgPool, job: &Job, error: &Report) -> 
 /// Marks a job as done in the database.
 async fn mark_job_done(pool: &PgPool, job_id: i64) -> Result<()> {
     sqlx::query!(
-        "UPDATE jobs SET status = 'done', finished_at = now() WHERE id = $1",
+        "UPDATE jobs SET status = 'done', finished_at = now() WHERE id = $1 AND status <> 'cancelled'",
         job_id
     )
     .execute(pool)
@@ -171,22 +177,76 @@ async fn mark_job_done(pool: &PgPool, job_id: i64) -> Result<()> {
 
 /// Marks a job as cancelled in the database.
 async fn mark_job_cancelled(pool: &PgPool, job_id: i64) -> Result<()> {
-    sqlx::query!("UPDATE jobs SET status = 'cancelled' WHERE id = $1", job_id)
-        .execute(pool)
-        .await?;
+    sqlx::query!(
+        "UPDATE jobs SET status = 'cancelled' WHERE id = $1 AND status NOT IN ('done', 'cancelled')",
+        job_id
+    )
+    .execute(pool)
+    .await?;
     Ok(())
 }
 
 /// Marks a job as failed in the database.
-async fn mark_job_failed(pool: &PgPool, job_id: i64, last_error: &str) -> Result<()> {
+async fn mark_job_failed(
+    executor: impl Executor<'_, Database = Postgres>,
+    job_id: i64,
+    last_error: &str,
+) -> Result<u64> {
     alert!("🚨 Marking job {} as failed: {}", job_id, last_error);
-    sqlx::query!(
-        "UPDATE jobs SET status = 'failed', finished_at = now(), last_error = $2, attempts = attempts + 1 WHERE id = $1",
+    let result = sqlx::query!(
+        "UPDATE jobs SET status = 'failed', finished_at = now(), last_error = $2, attempts = attempts + 1 WHERE id = $1 AND status <> 'cancelled'",
         job_id,
         last_error
     )
-        .execute(pool)
+        .execute(executor)
         .await?;
+    Ok(result.rows_affected())
+}
+
+/// Marks the failed ingest stage without overwriting a completed stage.
+async fn mark_stage_failed(
+    executor: impl Executor<'_, Database = Postgres>,
+    job: &Job,
+    last_error: &str,
+) -> Result<()> {
+    let Some(relative_path) = job.relative_path.as_deref() else {
+        return Ok(());
+    };
+    match job.job_type {
+        JobType::IngestThumbnails => {
+            sqlx::query!(
+                r#"
+                UPDATE media_item
+                SET thumbnails_status = 'failed',
+                    thumbnails_error = $2
+                WHERE relative_path = $1
+                  AND deleted = false
+                  AND thumbnails_status <> 'done'
+                "#,
+                relative_path,
+                last_error
+            )
+            .execute(executor)
+            .await?;
+        }
+        JobType::IngestAnalysis => {
+            sqlx::query!(
+                r#"
+                UPDATE media_item
+                SET analysis_status = 'failed',
+                    analysis_error = $2
+                WHERE relative_path = $1
+                  AND deleted = false
+                  AND analysis_status <> 'done'
+                "#,
+                relative_path,
+                last_error
+            )
+            .execute(executor)
+            .await?;
+        }
+        _ => {}
+    }
     Ok(())
 }
 
@@ -201,7 +261,7 @@ async fn reschedule_for_retry(
     println!("{last_error}");
     let scheduled_at = Utc::now() + Duration::seconds(backoff_secs);
     sqlx::query!(
-        "UPDATE jobs SET status = 'queued', scheduled_at = $2, attempts = attempts + 1, owner = NULL, started_at = NULL, last_error = $3 WHERE id = $1",
+        "UPDATE jobs SET status = 'queued', scheduled_at = $2, attempts = attempts + 1, owner = NULL, started_at = NULL, last_error = $3 WHERE id = $1 AND status <> 'cancelled'",
         job_id,
         scheduled_at,
         last_error
@@ -220,7 +280,7 @@ async fn reschedule_storage_unavailable(
     warn!("Media folder unavailable for job {job_id}. Requeueing in 180s: {last_error}");
     let scheduled_at = Utc::now() + Duration::seconds(180);
     sqlx::query!(
-        "UPDATE jobs SET status = 'queued', scheduled_at = $2, owner = NULL, started_at = NULL, last_error = $3 WHERE id = $1",
+        "UPDATE jobs SET status = 'queued', scheduled_at = $2, owner = NULL, started_at = NULL, last_error = $3 WHERE id = $1 AND status <> 'cancelled'",
         job_id,
         scheduled_at,
         last_error
@@ -234,7 +294,7 @@ async fn reschedule_storage_unavailable(
 async fn reschedule_file_not_found(pool: &PgPool, job_id: i64, backoff_secs: i64) -> Result<()> {
     let scheduled_at = Utc::now() + Duration::seconds(backoff_secs);
     sqlx::query!(
-        "UPDATE jobs SET status = 'queued', scheduled_at = $2, dependency_attempts = dependency_attempts + 1, owner = NULL, started_at = NULL, last_error = 'File not found on disk' WHERE id = $1",
+        "UPDATE jobs SET status = 'queued', scheduled_at = $2, dependency_attempts = dependency_attempts + 1, owner = NULL, started_at = NULL, last_error = 'File not found on disk' WHERE id = $1 AND status <> 'cancelled'",
         job_id,
         scheduled_at
     )
@@ -251,7 +311,7 @@ async fn dependency_reschedule_job(pool: &PgPool, job_id: i64, backoff_secs: i64
     );
     let scheduled_at = Utc::now() + Duration::seconds(backoff_secs);
     sqlx::query!(
-        "UPDATE jobs SET status = 'queued', scheduled_at = $2, dependency_attempts = dependency_attempts + 1, owner = NULL, started_at = NULL, last_error = NULL WHERE id = $1",
+        "UPDATE jobs SET status = 'queued', scheduled_at = $2, dependency_attempts = dependency_attempts + 1, owner = NULL, started_at = NULL, last_error = NULL WHERE id = $1 AND status <> 'cancelled'",
         job_id,
         scheduled_at
     )

@@ -25,11 +25,12 @@ mod test_runner {
         test_login, test_logout, test_refresh, test_register, test_second_register_attempt,
     };
     use crate::tests::test_jobs::{
+        test_bulk_enqueue_sorts_paths, test_cancelled_job_not_overwritten,
         test_clean_thumbnail_orphans, test_generated_thumbnails_status,
         test_media_reconcile_removal, test_prune_missing_ingest_jobs,
-        test_scan_repairs_incomplete_items, test_thumbnail_drift_reset,
-        test_update_full_resets_ingest_stages, test_visual_analysis_unique_percentage,
-        test_watcher_delete,
+        test_scan_repairs_incomplete_items, test_stage_failure_and_retry,
+        test_thumbnail_drift_reset, test_update_full_resets_ingest_stages,
+        test_visual_analysis_unique_percentage, test_watcher_delete,
     };
     use crate::tests::test_onboarding::{test_onboarding, test_start_processing};
     use crate::tests::test_photos::{
@@ -93,6 +94,9 @@ mod test_runner {
                 test_visual_analysis_unique_percentage,
                 test_media_reconcile_removal,
                 test_scan_repairs_incomplete_items,
+                test_bulk_enqueue_sorts_paths,
+                test_stage_failure_and_retry,
+                test_cancelled_job_not_overwritten,
                 test_thumbnail_drift_reset,
                 test_clean_thumbnail_orphans,
                 test_prune_missing_ingest_jobs,

@@ -2,7 +2,7 @@ use crate::runner::context::test_context::TestContext;
 use crate::test_helpers::media_dir_contents;
 use color_eyre::Result;
 use color_eyre::eyre::{bail, eyre};
-use common_services::database::jobs::JobType;
+use common_services::database::jobs::{Job, JobType};
 use common_services::database::media_item::media_item::CreateFullMediaItem;
 use common_services::database::media_item_store::MediaItemStore;
 use sqlx::PgPool;
@@ -288,6 +288,210 @@ pub async fn test_media_reconcile_removal(context: &TestContext) -> Result<()> {
         .execute(&context.pool)
         .await?;
     sqlx::query!("DELETE FROM media_item WHERE id = ANY($1)", &ids)
+        .execute(&context.pool)
+        .await?;
+    Ok(())
+}
+
+fn retry_failure_job(job_id: i64, relative_path: &str, user_id: i32, job_type: JobType) -> Job {
+    Job {
+        id: job_id,
+        payload: None,
+        relative_path: Some(relative_path.to_owned()),
+        user_id: Some(user_id),
+        job_type,
+        scope: job_type.scope(),
+        phase: job_type.phase(),
+        priority: job_type.get_priority(false),
+        attempts: 4,
+        max_attempts: 5,
+        dependency_attempts: 0,
+    }
+}
+
+pub async fn test_bulk_enqueue_sorts_paths(context: &TestContext) -> Result<()> {
+    let source = sqlx::query!("SELECT user_id FROM media_item WHERE deleted = false LIMIT 1")
+        .fetch_one(&context.pool)
+        .await?;
+    let paths = vec![
+        "bulk-sort-test/z.jpg".to_owned(),
+        "bulk-sort-test/a.jpg".to_owned(),
+        "bulk-sort-test/m.jpg".to_owned(),
+    ];
+    let items: Vec<_> = paths.iter().map(|path| (path.clone(), None)).collect();
+    common_services::job_queue::bulk_enqueue_full_ingest(
+        &context.pool,
+        &context.settings.ingest,
+        &items,
+        source.user_id,
+    )
+    .await?;
+
+    let rows = sqlx::query!(
+        r#"
+        SELECT relative_path
+        FROM jobs
+        WHERE relative_path = ANY($1) AND job_type = 'ingest_metadata'
+        ORDER BY id
+        "#,
+        &paths
+    )
+    .fetch_all(&context.pool)
+    .await?;
+    let inserted: Vec<_> = rows
+        .into_iter()
+        .filter_map(|row| row.relative_path)
+        .collect();
+    assert_eq!(
+        inserted,
+        vec![
+            "bulk-sort-test/a.jpg".to_owned(),
+            "bulk-sort-test/m.jpg".to_owned(),
+            "bulk-sort-test/z.jpg".to_owned()
+        ]
+    );
+
+    sqlx::query!("DELETE FROM jobs WHERE relative_path = ANY($1)", &paths)
+        .execute(&context.pool)
+        .await?;
+    Ok(())
+}
+
+pub async fn test_stage_failure_and_retry(context: &TestContext) -> Result<()> {
+    let source = sqlx::query!("SELECT id, user_id FROM media_item WHERE deleted = false LIMIT 1")
+        .fetch_one(&context.pool)
+        .await?;
+    let path = "retry-test/thumb.jpg";
+    let id = "retry-1";
+    insert_media_item_copy(&context.pool, &source.id, id, path).await?;
+    let job_id = insert_job(
+        &context.pool,
+        source.user_id,
+        path,
+        JobType::IngestThumbnails,
+        "running",
+        4,
+        5,
+    )
+    .await?;
+    sqlx::query!(
+        "UPDATE jobs SET owner = 'test', started_at = now(), last_heartbeat = now() WHERE id = $1",
+        job_id
+    )
+    .execute(&context.pool)
+    .await?;
+    let job = retry_failure_job(job_id, path, source.user_id, JobType::IngestThumbnails);
+
+    worker::jobs::management::update_job_on_failure(&context.pool, &job, &eyre!("boom")).await?;
+
+    let job_status: String = sqlx::query_scalar!(
+        r#"SELECT status::text AS "status!" FROM jobs WHERE id = $1"#,
+        job_id
+    )
+    .fetch_one(&context.pool)
+    .await?;
+    assert_eq!(job_status, "failed");
+    let stage = sqlx::query!(
+        r#"
+        SELECT thumbnails_status::text AS "thumbnails_status!", thumbnails_error
+        FROM media_item WHERE id = $1
+        "#,
+        id
+    )
+    .fetch_one(&context.pool)
+    .await?;
+    assert_eq!(stage.thumbnails_status, "failed");
+    assert!(stage.thumbnails_error.is_some());
+
+    common_services::api::jobs::user_level::retry_user_job(&context.pool, job_id, source.user_id)
+        .await?;
+    let job_status: String = sqlx::query_scalar!(
+        r#"SELECT status::text AS "status!" FROM jobs WHERE id = $1"#,
+        job_id
+    )
+    .fetch_one(&context.pool)
+    .await?;
+    assert_ne!(job_status, "failed");
+    let stage = sqlx::query!(
+        r#"
+        SELECT thumbnails_status::text AS "thumbnails_status!", thumbnails_error
+        FROM media_item WHERE id = $1
+        "#,
+        id
+    )
+    .fetch_one(&context.pool)
+    .await?;
+    assert_eq!(stage.thumbnails_status, "pending");
+    assert!(stage.thumbnails_error.is_none());
+
+    sqlx::query!("DELETE FROM jobs WHERE id = $1", job_id)
+        .execute(&context.pool)
+        .await?;
+    sqlx::query!("DELETE FROM media_item WHERE id = $1", id)
+        .execute(&context.pool)
+        .await?;
+    Ok(())
+}
+
+pub async fn test_cancelled_job_not_overwritten(context: &TestContext) -> Result<()> {
+    let source = sqlx::query!("SELECT id, user_id FROM media_item WHERE deleted = false LIMIT 1")
+        .fetch_one(&context.pool)
+        .await?;
+    let path = "retry-test/cancelled.jpg";
+    let id = "retry-2";
+    insert_media_item_copy(&context.pool, &source.id, id, path).await?;
+    let job_id = insert_job(
+        &context.pool,
+        source.user_id,
+        path,
+        JobType::IngestThumbnails,
+        "running",
+        4,
+        5,
+    )
+    .await?;
+    sqlx::query!(
+        "UPDATE jobs SET status = 'cancelled', owner = 'test', started_at = now() WHERE id = $1",
+        job_id
+    )
+    .execute(&context.pool)
+    .await?;
+    let job = retry_failure_job(job_id, path, source.user_id, JobType::IngestThumbnails);
+
+    worker::jobs::management::update_job_on_failure(&context.pool, &job, &eyre!("boom")).await?;
+    let job_status: String = sqlx::query_scalar!(
+        r#"SELECT status::text AS "status!" FROM jobs WHERE id = $1"#,
+        job_id
+    )
+    .fetch_one(&context.pool)
+    .await?;
+    assert_eq!(job_status, "cancelled");
+    let stage: String = sqlx::query_scalar!(
+        r#"SELECT thumbnails_status::text AS "stage!" FROM media_item WHERE id = $1"#,
+        id
+    )
+    .fetch_one(&context.pool)
+    .await?;
+    assert_eq!(stage, "pending");
+
+    worker::jobs::management::update_job_on_completion(
+        &context.pool,
+        &job,
+        worker::handlers::JobResult::Done,
+    )
+    .await?;
+    let job_status: String = sqlx::query_scalar!(
+        r#"SELECT status::text AS "status!" FROM jobs WHERE id = $1"#,
+        job_id
+    )
+    .fetch_one(&context.pool)
+    .await?;
+    assert_eq!(job_status, "cancelled");
+
+    sqlx::query!("DELETE FROM jobs WHERE id = $1", job_id)
+        .execute(&context.pool)
+        .await?;
+    sqlx::query!("DELETE FROM media_item WHERE id = $1", id)
         .execute(&context.pool)
         .await?;
     Ok(())
