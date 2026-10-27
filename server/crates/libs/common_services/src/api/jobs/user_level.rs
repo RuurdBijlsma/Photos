@@ -92,7 +92,7 @@ pub async fn get_running_ingest_jobs(
             last_error
         FROM jobs
         WHERE user_id = $1
-          AND job_type IN ('ingest_metadata', 'ingest_thumbnails', 'ingest_analysis')
+          AND job_type IN ('ingest_metadata', 'ingest_thumbnails', 'ingest_analysis', 'ingest_takeout_batch')
           AND (
               (status = 'running'::job_status AND last_heartbeat >= NOW() - INTERVAL '1 minute 30 seconds')
               OR (status = 'done'::job_status AND finished_at >= NOW() - INTERVAL '5 seconds')
@@ -133,7 +133,7 @@ pub async fn get_failed_ingest_jobs(pool: &PgPool, user_id: i32) -> Result<Vec<J
         FROM jobs
         WHERE user_id = $1
           AND status = 'failed'::job_status
-          AND job_type IN ('ingest_metadata', 'ingest_thumbnails', 'ingest_analysis')
+          AND job_type IN ('ingest_metadata', 'ingest_thumbnails', 'ingest_analysis', 'ingest_takeout_batch')
         ORDER BY finished_at DESC NULLS LAST
         "#,
         user_id
@@ -146,7 +146,8 @@ pub async fn get_failed_ingest_jobs(pool: &PgPool, user_id: i32) -> Result<Vec<J
 
 /// Scopes retry requests safely to the authorized user's own ingestion pipeline.
 pub async fn retry_user_job(pool: &PgPool, job_id: i64, user_id: i32) -> Result<(), AppError> {
-    let result = sqlx::query!(
+    let mut tx = pool.begin().await?;
+    let row = sqlx::query!(
         r#"
         UPDATE jobs
         SET status = 'queued'::job_status,
@@ -159,20 +160,54 @@ pub async fn retry_user_job(pool: &PgPool, job_id: i64, user_id: i32) -> Result<
         WHERE id = $1
           AND user_id = $2
           AND status IN ('failed'::job_status, 'done'::job_status, 'cancelled'::job_status)
-          AND job_type IN ('ingest_metadata', 'ingest_thumbnails', 'ingest_analysis')
+          AND job_type IN ('ingest_metadata', 'ingest_thumbnails', 'ingest_analysis', 'ingest_takeout_batch')
+        RETURNING job_type AS "job_type: JobType", relative_path
         "#,
         job_id,
         user_id
     )
-    .execute(pool)
+    .fetch_optional(&mut *tx)
     .await?;
 
-    if result.rows_affected() == 0 {
+    let Some(row) = row else {
         return Err(AppError::BadRequest(
             "Job cannot be retried (it might not exist, belongs to another user, or is not in a retryable state)".to_owned(),
         ));
+    };
+
+    if let Some(relative_path) = row.relative_path {
+        match row.job_type {
+            JobType::IngestThumbnails => {
+                sqlx::query!(
+                    r#"
+                    UPDATE media_item
+                    SET thumbnails_status = 'pending', thumbnails_error = NULL
+                    WHERE relative_path = $1 AND user_id = $2 AND deleted = false
+                    "#,
+                    relative_path,
+                    user_id
+                )
+                .execute(&mut *tx)
+                .await?;
+            }
+            JobType::IngestAnalysis => {
+                sqlx::query!(
+                    r#"
+                    UPDATE media_item
+                    SET analysis_status = 'pending', analysis_error = NULL
+                    WHERE relative_path = $1 AND user_id = $2 AND deleted = false
+                    "#,
+                    relative_path,
+                    user_id
+                )
+                .execute(&mut *tx)
+                .await?;
+            }
+            _ => {}
+        }
     }
 
+    tx.commit().await?;
     Ok(())
 }
 
@@ -190,7 +225,7 @@ pub async fn get_user_ingest_jobs(
     let mut count_builder =
         QueryBuilder::<Postgres>::new("SELECT COUNT(*) FROM jobs WHERE user_id = ");
     count_builder.push_bind(user_id);
-    count_builder.push(" AND job_type IN ('ingest_metadata'::job_type, 'ingest_thumbnails'::job_type, 'ingest_analysis'::job_type)");
+    count_builder.push(" AND job_type IN ('ingest_metadata'::job_type, 'ingest_thumbnails'::job_type, 'ingest_analysis'::job_type, 'ingest_takeout_batch'::job_type)");
 
     // Add status filter
     if let Some(status) = &query.status {
@@ -231,7 +266,7 @@ pub async fn get_user_ingest_jobs(
          scheduled_at, last_heartbeat, last_error FROM jobs WHERE user_id = ",
     );
     select_builder.push_bind(user_id);
-    select_builder.push(" AND job_type IN ('ingest_metadata'::job_type, 'ingest_thumbnails'::job_type, 'ingest_analysis'::job_type)");
+    select_builder.push(" AND job_type IN ('ingest_metadata'::job_type, 'ingest_thumbnails'::job_type, 'ingest_analysis'::job_type, 'ingest_takeout_batch'::job_type)");
 
     // Add status filter
     if let Some(status) = &query.status {

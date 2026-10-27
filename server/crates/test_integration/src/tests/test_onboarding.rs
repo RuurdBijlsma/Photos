@@ -117,7 +117,8 @@ pub async fn test_start_processing(context: &TestContext) -> Result<()> {
     assert_eq!(response.status(), StatusCode::NO_CONTENT);
 
     // 4. Poll database until all media items are inserted
-    let timeout = Duration::from_mins(1);
+    // Model loading takes ~50 s on Windows CPU, before the first scan job can insert items.
+    let timeout = Duration::from_mins(3);
     let start = Instant::now();
     info!(
         "Waiting for {} media items to be inserted into DB...",

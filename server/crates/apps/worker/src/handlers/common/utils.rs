@@ -6,6 +6,7 @@ use common_services::media_mount::{
 };
 use sqlx::PgPool;
 use std::path::{Path, PathBuf};
+use tokio::fs;
 
 /// If the source file is missing, verify the mount status freshly to avoid stale cache cancellations.
 ///
@@ -36,6 +37,37 @@ pub async fn require_media_mounted(pool: &PgPool, media_root: &Path) -> Result<O
         MediaMountStatus::Available => Ok(None),
         MediaMountStatus::Unavailable { reason } => Ok(Some(JobResult::StorageUnavailable(reason))),
     }
+}
+
+/// Appends `_1`, `_2`, ... until the destination path does not exist.
+pub async fn get_unique_filename(dest_folder: &Path, destination_path: &Path) -> PathBuf {
+    let mut unique_destination_path = destination_path.to_path_buf();
+    let mut counter = 1;
+
+    while fs::try_exists(&unique_destination_path)
+        .await
+        .unwrap_or(false)
+    {
+        let stem = destination_path
+            .file_stem()
+            .unwrap_or_default()
+            .to_string_lossy();
+        let extension = destination_path
+            .extension()
+            .unwrap_or_default()
+            .to_string_lossy();
+
+        let new_filename = if extension.is_empty() {
+            format!("{stem}_{counter}")
+        } else {
+            format!("{stem}_{counter}.{extension}")
+        };
+
+        unique_destination_path = dest_folder.join(new_filename);
+        counter += 1;
+    }
+
+    unique_destination_path
 }
 
 /// Returns `StorageUnavailable` when the media folder looks unmounted (fresh/uncached check).

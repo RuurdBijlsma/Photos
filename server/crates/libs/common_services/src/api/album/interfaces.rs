@@ -281,7 +281,8 @@ impl From<FullMediaItem> for SharedMediaItem {
 #[serde(rename_all = "camelCase")]
 pub struct AlbumItemBackup {
     pub hash: String,
-    pub rank: f64,
+    /// When album has `SortMode` (ex. by date), rank will be None
+    pub rank: Option<f64>,
     pub added_at: DateTime<Utc>,
     pub added_by_user: Option<i32>,
 }

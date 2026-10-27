@@ -79,7 +79,7 @@
     "nullable": [
       null,
       false,
-      false,
+      true,
       true,
       null
     ]

@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE jobs j\n        SET status = 'cancelled'\n        FROM media_item mi\n        WHERE mi.deleted = true\n          AND j.relative_path = mi.relative_path\n          AND j.status IN ('queued', 'running')\n          AND j.job_type IN ('ingest_metadata', 'ingest_thumbnails', 'ingest_analysis')\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "cf6901bf5f702dbe2e872a1513c1b5b862aaedb6e19e5d89807e74733419d46a"
+}

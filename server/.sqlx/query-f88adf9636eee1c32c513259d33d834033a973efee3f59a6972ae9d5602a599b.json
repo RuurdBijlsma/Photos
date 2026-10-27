@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE media_item\n        SET thumbnails_status = 'pending',\n            thumbnails_error = NULL,\n            updated_at = now()\n        WHERE thumbnails_status = 'done'\n          AND deleted = false\n          AND NOT (id = ANY($1))\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "TextArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "f88adf9636eee1c32c513259d33d834033a973efee3f59a6972ae9d5602a599b"
+}

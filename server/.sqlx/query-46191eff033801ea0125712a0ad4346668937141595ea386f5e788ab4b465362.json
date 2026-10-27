@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                UPDATE media_item\n                SET thumbnails_status = 'failed',\n                    thumbnails_error = $2\n                WHERE relative_path = $1\n                  AND deleted = false\n                  AND thumbnails_status <> 'done'\n                ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "46191eff033801ea0125712a0ad4346668937141595ea386f5e788ab4b465362"
+}

@@ -54,10 +54,12 @@
                 "cluster_photos",
                 "import_album_item",
                 "update_global_centroid",
-                "sync_thumbnails",
+                "clean_thumbnails",
                 "generate_daily_cards",
                 "calc_system_stats",
-                "handle_web_upload"
+                "handle_web_upload",
+                "ingest_takeout_batch",
+                "prune_missing_ingest_jobs"
               ]
             }
           }

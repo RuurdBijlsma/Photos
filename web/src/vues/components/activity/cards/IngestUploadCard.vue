@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { ref, shallowRef } from 'vue'
 import { useUploadStore } from '@/scripts/stores/uploadStore.ts'
+import TakeoutImportDialog from '@/vues/components/activity/cards/TakeoutImportDialog.vue'
+import MdiArchiveArrowUpOutline from '~icons/mdi/archive-arrow-up-outline'
 import MdiFolderOpen from '~icons/mdi/folder-open'
 import MdiTrashCanOutline from '~icons/mdi/trash-can-outline'
 import MdiTrayArrowUp from '~icons/mdi/tray-arrow-up'
@@ -9,6 +11,7 @@ const uploadStore = useUploadStore()
 
 const fileInput = shallowRef<HTMLInputElement | null>(null)
 const folderInput = shallowRef<HTMLInputElement | null>(null)
+const takeoutDialog = ref(false)
 const dragover = ref(false)
 
 function triggerFileSelect() {
@@ -30,7 +33,7 @@ function onDragLeave() {
 function onDrop(e: DragEvent) {
   dragover.value = false
   if (e.dataTransfer?.files?.length) {
-    uploadStore.addFiles(Array.from(e.dataTransfer.files))
+    uploadStore.addFiles(e.dataTransfer.files)
   }
 }
 
@@ -90,6 +93,14 @@ function onFolderChanged(e: Event) {
           Upload Folder
         </v-btn>
         <v-btn
+          variant="text"
+          size="small"
+          :prepend-icon="MdiArchiveArrowUpOutline"
+          @click="takeoutDialog = true"
+        >
+          Import Google Photos Takeout
+        </v-btn>
+        <v-btn
           v-if="uploadStore.uploads.length > 0"
           variant="plain"
           color="error"
@@ -101,6 +112,8 @@ function onFolderChanged(e: Event) {
           Clear Completed
         </v-btn>
       </div>
+
+      <TakeoutImportDialog v-model="takeoutDialog" />
     </div>
   </v-card>
 </template>

@@ -1,0 +1,47 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT relative_path, deleted, (missing_since IS NOT NULL) AS \"is_missing!\"\n        FROM media_item\n        WHERE user_id = $1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "relative_path",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "media_item",
+            "name": "relative_path"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "deleted",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "media_item",
+            "name": "deleted"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "is_missing!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      null
+    ]
+  },
+  "hash": "362695337d4ce1ad5d9985a2f94d908d80ce2af9e53aea4b255ec3fd779a1ee8"
+}

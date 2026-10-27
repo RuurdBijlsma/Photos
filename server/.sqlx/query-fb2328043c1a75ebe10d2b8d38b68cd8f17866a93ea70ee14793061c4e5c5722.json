@@ -1,0 +1,67 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                id,\n                is_video,\n                has_thumbnails AS \"has_thumbnails!\",\n                duration_ms::INT as duration_ms,\n                ratio as \"ratio!\"\n            FROM (\n                SELECT DISTINCT ON (mi.id)\n                    mi.id,\n                    mi.is_video,\n                    mi.has_thumbnails,\n                    mi.duration_ms,\n                    (mi.width::real / mi.height::real) as ratio,\n                    mi.sort_timestamp\n                FROM person p\n                JOIN face_cluster fc ON fc.person_id = p.id\n                JOIN face f ON f.face_cluster_id = fc.id\n                JOIN visual_analysis va ON f.visual_analysis_id = va.id\n                JOIN media_item mi ON va.media_item_id = mi.id\n                WHERE p.id = $1 AND mi.user_id = $2 AND mi.deleted = false\n                ORDER BY mi.id\n            ) sub\n            ORDER BY sub.sort_timestamp DESC\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "media_item",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "is_video",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "media_item",
+            "name": "is_video"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "has_thumbnails!",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "media_item",
+            "name": "has_thumbnails"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "duration_ms",
+        "type_info": "Int4",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 4,
+        "name": "ratio!",
+        "type_info": "Float4",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Int4"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      null,
+      null
+    ]
+  },
+  "hash": "fb2328043c1a75ebe10d2b8d38b68cd8f17866a93ea70ee14793061c4e5c5722"
+}

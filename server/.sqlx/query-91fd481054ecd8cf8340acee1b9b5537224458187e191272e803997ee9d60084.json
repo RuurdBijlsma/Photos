@@ -1,0 +1,68 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                mi.id,\n                mi.is_video,\n                mi.has_thumbnails AS \"has_thumbnails!\",\n                mi.duration_ms::INT AS \"duration_ms\",\n                (mi.width::real / mi.height::real) AS \"ratio!\"\n            FROM camera_settings c\n            INNER JOIN media_item mi ON c.media_item_id = mi.id\n            WHERE mi.user_id = $1\n              AND mi.deleted = false\n              AND LOWER(TRIM(c.camera_make)) = LOWER(TRIM($2))\n              AND LOWER(REGEXP_REPLACE(TRIM(c.camera_model), '\\s*\\(.*\\)$', '', 'i')) = LOWER(TRIM($3))\n            ORDER BY mi.sort_timestamp DESC;\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "media_item",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "is_video",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "media_item",
+            "name": "is_video"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "has_thumbnails!",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "media_item",
+            "name": "has_thumbnails"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "duration_ms",
+        "type_info": "Int4",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 4,
+        "name": "ratio!",
+        "type_info": "Float4",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      null,
+      null
+    ]
+  },
+  "hash": "91fd481054ecd8cf8340acee1b9b5537224458187e191272e803997ee9d60084"
+}

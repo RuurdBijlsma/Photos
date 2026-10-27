@@ -27,6 +27,7 @@
 * import albums from google photos
 * duplicate photo remover tool
 * better error if exiftool isnt there (worker wont work then)
+* Google Takeout sidecar timestamps are treated as UTC; derive the real photo timezone/local time instead of storing and displaying UTC wall time.
 * apply rotation immidiately when going next/prev to other media item.
 * AVI toevoegen aan settings video_extensions
 * The original `PXL_20260911_122108760.jpg` puts exiftool in an infinite loop.

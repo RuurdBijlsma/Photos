@@ -4,6 +4,7 @@ import * as tus from 'tus-js-client'
 import uploadService from '@/scripts/services/uploadService.ts'
 import { SERVER_BASE_URL } from '@/scripts/services/api.ts'
 import { useSettingStore } from '@/scripts/stores/settingsStore.ts'
+import { useSnackbarsStore } from '@/scripts/stores/snackbarStore.ts'
 
 export interface UploadItem {
   id: string
@@ -13,16 +14,19 @@ export interface UploadItem {
   status: 'pending' | 'uploading' | 'success' | 'failed' | 'stopped'
   error?: string
   tusUpload?: tus.Upload | null
+  extraMetadata?: Record<string, string>
 }
 
 export const useUploadStore = defineStore('upload', () => {
   const uploads = ref<UploadItem[]>([])
   const settings = useSettingStore()
+  const snackbarStore = useSnackbarsStore()
 
   const fileMap = new Map<string, File>()
 
   let cachedJwt = ''
   let jwtFetchedAt = 0
+  let takeoutImportRequested = false
 
   // Cached status counts: these only recompute when upload items are added, removed, or change status
   // They DO NOT recalculate on progress ticks!
@@ -65,9 +69,30 @@ export const useUploadStore = defineStore('upload', () => {
   }
 
   function addFiles(files: FileList | File[]) {
+    const fileList = Array.from(files)
+    const isZip = (file: File) => file.name.toLowerCase().endsWith('.zip')
+
+    if (fileList.some(isZip)) {
+      snackbarStore.warning(
+        'ZIP files are not uploaded here. Use "Import Google Photos Takeout" instead.',
+      )
+    }
+
+    addFilesInternal(fileList.filter((file) => !isZip(file)))
+  }
+
+  function addTakeoutFiles(files: FileList | File[]) {
+    const fileList = Array.from(files).filter((f) => f.name.toLowerCase().endsWith('.zip'))
+    if (fileList.length === 0) return
+
+    takeoutImportRequested = false
+    addFilesInternal(fileList, { isTakeout: 'true' })
+  }
+
+  function addFilesInternal(files: File[], extraMetadata?: Record<string, string>) {
     const itemsToAdd: UploadItem[] = []
 
-    for (const file of Array.from(files)) {
+    for (const file of files) {
       // Filter out 0-byte entries, which are highly likely to be directories or invalid uploads
       if (file.size === 0) {
         console.warn(`File "${file.name}" was skipped because it is empty (0 bytes).`)
@@ -87,6 +112,7 @@ export const useUploadStore = defineStore('upload', () => {
         existingItem.status = 'pending'
         existingItem.bytesUploaded = 0
         existingItem.error = undefined
+        existingItem.extraMetadata = extraMetadata
         fileMap.set(existingItem.id, file)
       } else {
         const id = `${file.name}-${file.size}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`
@@ -97,6 +123,7 @@ export const useUploadStore = defineStore('upload', () => {
           bytesUploaded: 0,
           status: 'pending',
           tusUpload: null,
+          extraMetadata,
         })
         fileMap.set(id, file)
       }
@@ -109,13 +136,45 @@ export const useUploadStore = defineStore('upload', () => {
   }
 
   function processQueue() {
-    if (activeCount.value >= settings.uploadConcurrencyLimit) return
+    if (activeCount.value < settings.uploadConcurrencyLimit) {
+      const nextPending = uploads.value.find((u) => u.status === 'pending')
+      if (nextPending) {
+        startUpload(nextPending)
+        processQueue()
+        return
+      }
+    }
+    maybeStartTakeoutImport()
+  }
 
-    const nextPending = uploads.value.find((u) => u.status === 'pending')
-    if (!nextPending) return
+  // Takeout ZIPs are imported once the browser's queue is done, so a refresh can
+  // simply reselect the ZIPs and reuse whatever already finished uploading.
+  function maybeStartTakeoutImport() {
+    if (takeoutImportRequested) return
 
-    startUpload(nextPending)
-    processQueue()
+    const takeoutUploads = uploads.value.filter((u) => u.extraMetadata?.isTakeout === 'true')
+    if (takeoutUploads.length === 0 || !takeoutUploads.every((u) => u.status === 'success')) return
+
+    takeoutImportRequested = true
+    uploadService
+      .startTakeoutImport()
+      .then(({ data }) => {
+        if (data.started) {
+          snackbarStore.success(`Takeout import started for ${data.zipCount} ZIP(s).`)
+        } else {
+          takeoutImportRequested = false
+          snackbarStore.warning(
+            'No finished Takeout ZIPs were found to import. Select the ZIPs again.',
+          )
+        }
+      })
+      .catch((err) => {
+        takeoutImportRequested = false
+        console.error('[UploadStore] Failed to start Takeout import:', err)
+        snackbarStore.error(
+          'Uploads finished, but the Takeout import could not be started. Select the ZIPs again to retry.',
+        )
+      })
   }
 
   async function startUpload(item: UploadItem) {
@@ -152,6 +211,7 @@ export const useUploadStore = defineStore('upload', () => {
         filename: file.name,
         filetype: file.type,
         jwt: jwtToken,
+        ...item.extraMetadata,
       },
       onError: (error) => {
         if (item.status === 'stopped') return
@@ -221,6 +281,7 @@ export const useUploadStore = defineStore('upload', () => {
     if (idx !== -1) {
       uploads.value.splice(idx, 1)
     }
+    maybeStartTakeoutImport()
   }
 
   function clearCompleted() {
@@ -231,6 +292,7 @@ export const useUploadStore = defineStore('upload', () => {
       }
       return true
     })
+    maybeStartTakeoutImport()
   }
 
   function abortAll() {
@@ -250,6 +312,7 @@ export const useUploadStore = defineStore('upload', () => {
     totalCount,
     isUploading,
     addFiles,
+    addTakeoutFiles,
     stopUpload,
     removeUpload,
     clearCompleted,

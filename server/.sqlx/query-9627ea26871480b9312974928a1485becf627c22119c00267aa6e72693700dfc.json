@@ -1,0 +1,49 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT deleted,\n               (missing_since IS NOT NULL) AS \"is_missing!\",\n               thumbnails_status::text AS \"thumbnails_status!\",\n               analysis_status::text AS \"analysis_status!\"\n        FROM media_item\n        WHERE relative_path = $1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "deleted",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "media_item",
+            "name": "deleted"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "is_missing!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 2,
+        "name": "thumbnails_status!",
+        "type_info": "Text",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 3,
+        "name": "analysis_status!",
+        "type_info": "Text",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "9627ea26871480b9312974928a1485becf627c22119c00267aa6e72693700dfc"
+}

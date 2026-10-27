@@ -1,0 +1,41 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT DISTINCT ON (filename) filename, id\n            FROM media_item\n            WHERE user_id = $1 AND filename = ANY($2) AND deleted = false\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "filename",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "media_item",
+            "name": "filename"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "id",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "media_item",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4",
+        "TextArray"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "3948d0d4546a5f217cbb63664ba2528930438b7f8ec25db39bf362bda29c8eec"
+}

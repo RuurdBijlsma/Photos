@@ -54,6 +54,26 @@ impl MediaItemStore {
         .await?)
     }
 
+    pub async fn find_existing_filenames_map(
+        executor: impl Executor<'_, Database = Postgres>,
+        user_id: i32,
+        filenames: &[String],
+    ) -> Result<std::collections::HashMap<String, String>, DbError> {
+        let rows = sqlx::query!(
+            r#"
+            SELECT DISTINCT ON (filename) filename, id
+            FROM media_item
+            WHERE user_id = $1 AND filename = ANY($2) AND deleted = false
+            "#,
+            user_id,
+            filenames
+        )
+        .fetch_all(executor)
+        .await?;
+
+        Ok(rows.into_iter().map(|r| (r.filename, r.id)).collect())
+    }
+
     pub async fn find_id_and_hash_by_relative_path(
         executor: impl Executor<'_, Database = Postgres>,
         relative_path: &str,
@@ -158,7 +178,7 @@ impl MediaItemStore {
             mi.timezone_offset_seconds,
             mi.og_timezone_offset_seconds,
             mi.use_panorama_viewer,
-            mi.has_thumbnails,
+            mi.has_thumbnails AS "has_thumbnails!",
             mi.user_caption,
 
             COALESCE(va.data, '[]'::jsonb) AS "visual_analyses!: Json<Vec<ReadVisualAnalysis>>",
@@ -260,7 +280,7 @@ impl MediaItemStore {
             if let Some(remote_uid) = remote_user_id {
                 Self::update_remote_user_id(&mut **tx, &existing_id, remote_uid).await?;
             }
-            Self::update_full(tx, &existing_id, false, media_item).await?;
+            Self::update_full(tx, &existing_id, media_item).await?;
             Ok(existing_id)
         } else {
             let new_id = nice_id(constants().database.media_item_id_length);
@@ -281,7 +301,6 @@ impl MediaItemStore {
     pub async fn update_full(
         tx: &mut PgTransaction<'_>,
         id: &str,
-        has_thumbnails: bool,
         media_item: &CreateFullMediaItem,
     ) -> Result<(), DbError> {
         // Clear child metadata tables for clean re-insertion
@@ -298,12 +317,19 @@ impl MediaItemStore {
         )
         .execute(&mut **tx)
         .await?;
+        sqlx::query!("DELETE FROM visual_analysis WHERE media_item_id = $1", id)
+            .execute(&mut **tx)
+            .await?;
 
         // Update main media_item table
         sqlx::query!(
             r#"
             UPDATE media_item
-            SET has_thumbnails = $8,
+            SET thumbnails_status = 'pending',
+                analysis_status = 'pending',
+                thumbnails_error = NULL,
+                analysis_error = NULL,
+                missing_since = NULL,
                 hash = $2,
                 width = $3,
                 height = $4,
@@ -328,7 +354,6 @@ impl MediaItemStore {
             media_item.is_video,
             media_item.duration_ms,
             media_item.orientation,
-            has_thumbnails,
         )
         .execute(&mut **tx)
         .await?;
@@ -634,7 +659,7 @@ impl MediaItemStore {
             SELECT
                 mi.id,
                 mi.is_video,
-                mi.has_thumbnails,
+                mi.has_thumbnails AS "has_thumbnails!",
                 mi.duration_ms::INT as duration_ms,
                 (mi.width::real / mi.height::real) as "ratio!",
                 g.latitude,
@@ -715,7 +740,9 @@ impl MediaItemStore {
             WITH inserted_mi AS (
                 INSERT INTO media_item (
                     id, user_id, remote_user_id, filename, relative_path,
-                    hash, deleted, is_video, has_thumbnails, width, height, duration_ms,
+                    hash, deleted, is_video, thumbnails_status, analysis_status,
+                    thumbnails_error, analysis_error,
+                    width, height, duration_ms,
                     taken_at_local, taken_at_utc, og_taken_at_local, sort_timestamp,
                     timezone_name, timezone_offset_seconds, og_timezone_offset_seconds,
                     use_panorama_viewer, orientation, user_caption, search_vector,
@@ -723,7 +750,9 @@ impl MediaItemStore {
                 )
                 SELECT
                     $2, user_id, remote_user_id, filename, REPLACE(relative_path, '__temp_' || $1, ''),
-                    hash, deleted, is_video, has_thumbnails, width, height, duration_ms,
+                    hash, deleted, is_video, thumbnails_status, analysis_status,
+                    thumbnails_error, analysis_error,
+                    width, height, duration_ms,
                     taken_at_local, taken_at_utc, og_taken_at_local, sort_timestamp,
                     timezone_name, timezone_offset_seconds, og_timezone_offset_seconds,
                     use_panorama_viewer, orientation, user_caption, search_vector,

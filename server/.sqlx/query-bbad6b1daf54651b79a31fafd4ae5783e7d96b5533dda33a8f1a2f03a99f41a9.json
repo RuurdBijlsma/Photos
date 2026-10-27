@@ -1,0 +1,50 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT j.relative_path, j.user_id, u.media_folder\n        FROM jobs j\n        LEFT JOIN app_user u ON u.id = j.user_id\n        WHERE j.status IN ('queued', 'running')\n          AND j.job_type IN ('ingest_metadata', 'ingest_thumbnails', 'ingest_analysis')\n          AND j.relative_path IS NOT NULL\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "relative_path",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "jobs",
+            "name": "relative_path"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "user_id",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "jobs",
+            "name": "user_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "media_folder",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "app_user",
+            "name": "media_folder"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "bbad6b1daf54651b79a31fafd4ae5783e7d96b5533dda33a8f1a2f03a99f41a9"
+}

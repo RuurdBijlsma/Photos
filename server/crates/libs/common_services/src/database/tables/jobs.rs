@@ -38,12 +38,14 @@ pub enum JobType {
     CleanDb,
     ClusterFaces,
     ClusterPhotos,
-    SyncThumbnails,
+    CleanThumbnails,
     ImportAlbumItem,
     CalcSystemStats,
     HandleWebUpload,
     GenerateDailyCards,
     UpdateGlobalCentroid,
+    IngestTakeoutBatch,
+    PruneMissingIngestJobs,
 }
 
 impl JobType {
@@ -58,8 +60,8 @@ impl JobType {
     //            Because it is global scope (not path scoped), and it has a higher phase than the ingest jobs.
     pub const fn phase(&self) -> i32 {
         match self {
-            Self::Remove => 5,
-            Self::HandleWebUpload => 10,
+            Self::PruneMissingIngestJobs | Self::Remove => 5,
+            Self::HandleWebUpload | Self::IngestTakeoutBatch => 10,
             Self::IngestMetadata => 20,
             Self::IngestThumbnails => 30,
             Self::IngestAnalysis => 40,
@@ -68,7 +70,7 @@ impl JobType {
             | Self::Scan
             | Self::CleanDb
             | Self::ImportAlbumItem
-            | Self::SyncThumbnails => 50,
+            | Self::CleanThumbnails => 50,
             Self::UpdateGlobalCentroid | Self::CalcSystemStats => 60,
             Self::GenerateDailyCards => 80,
         }
@@ -83,13 +85,15 @@ impl JobType {
 
             Self::Scan
             | Self::HandleWebUpload
+            | Self::IngestTakeoutBatch
             | Self::ImportAlbumItem
             | Self::CleanDb
             | Self::UpdateGlobalCentroid
             | Self::CalcSystemStats
             | Self::ClusterFaces
             | Self::ClusterPhotos
-            | Self::SyncThumbnails
+            | Self::CleanThumbnails
+            | Self::PruneMissingIngestJobs
             | Self::GenerateDailyCards => JobScope::Global,
         }
     }
@@ -119,6 +123,7 @@ impl JobType {
                 }
             }
             Self::Remove => 0,
+            Self::PruneMissingIngestJobs => 1,
             Self::CleanDb => 20,
             Self::ImportAlbumItem => 25,
             Self::Scan => 70,
@@ -126,9 +131,9 @@ impl JobType {
             Self::CalcSystemStats => 110,
             Self::ClusterFaces => 120,
             Self::ClusterPhotos => 130,
-            Self::SyncThumbnails => 140,
+            Self::CleanThumbnails => 140,
             Self::GenerateDailyCards => 160,
-            Self::HandleWebUpload => 10,
+            Self::HandleWebUpload | Self::IngestTakeoutBatch => 10,
         }
     }
 }

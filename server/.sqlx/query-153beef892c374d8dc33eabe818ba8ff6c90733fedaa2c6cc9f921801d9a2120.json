@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE jobs SET status = 'cancelled' WHERE id = $1 AND status NOT IN ('done', 'cancelled')",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "153beef892c374d8dc33eabe818ba8ff6c90733fedaa2c6cc9f921801d9a2120"
+}

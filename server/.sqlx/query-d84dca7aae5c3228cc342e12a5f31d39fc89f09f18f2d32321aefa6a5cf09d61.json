@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO album_media_item (album_id, media_item_id, rank, added_by_user)\n            SELECT\n                $1::TEXT,\n                items.id,\n                CASE\n                    WHEN (SELECT a.sort_mode = 'none' FROM album a WHERE a.id = $1::TEXT) THEN\n                        COALESCE((SELECT MAX(rank) FROM album_media_item WHERE album_id = $1::TEXT), 0.0)\n                            + (ROW_NUMBER() OVER (ORDER BY mi.sort_timestamp ASC) * 1000.0)\n                    ELSE NULL\n                END,\n                $2\n            FROM UNNEST($3::TEXT[]) AS items(id)\n            JOIN media_item mi ON mi.id = items.id\n            ON CONFLICT (album_id, media_item_id) DO NOTHING\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Int4",
+        "TextArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "d84dca7aae5c3228cc342e12a5f31d39fc89f09f18f2d32321aefa6a5cf09d61"
+}

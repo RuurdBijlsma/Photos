@@ -15,7 +15,8 @@ CREATE TABLE visual_analysis
 ALTER TABLE visual_analysis
     ALTER
         COLUMN embedding SET STORAGE MAIN;
-CREATE INDEX idx_visual_analysis_media_item_id ON visual_analysis (media_item_id);
+CREATE UNIQUE INDEX idx_visual_analysis_media_percentage
+    ON visual_analysis (media_item_id, percentage);
 CREATE INDEX idx_visual_analysis_embedding_hnsw
     ON visual_analysis
         USING hnsw (embedding vector_cosine_ops)

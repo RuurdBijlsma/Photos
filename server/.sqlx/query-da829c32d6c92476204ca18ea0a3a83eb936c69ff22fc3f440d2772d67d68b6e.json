@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE media_item\n        SET thumbnails_status = 'done',\n            thumbnails_error = NULL,\n            updated_at = now()\n        WHERE id = $1;",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "da829c32d6c92476204ca18ea0a3a83eb936c69ff22fc3f440d2772d67d68b6e"
+}

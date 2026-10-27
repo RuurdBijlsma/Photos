@@ -62,7 +62,7 @@ pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
     {
         let mut tx = context.pool.begin().await?;
         AlbumStore::add_media_items(
-            &mut *tx,
+            &mut tx,
             &payload.local_album_id,
             slice::from_ref(&existing_id),
             user_id,
@@ -89,8 +89,9 @@ pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
         &relative_path,
         user_id,
         Some(IngestMetadataPayload {
-            album_id: payload.local_album_id,
-            remote_user_identity: remote_identity,
+            album_ids: vec![payload.local_album_id],
+            remote_user_identity: Some(remote_identity),
+            fallback_taken_at: None,
         }),
     )
     .await?;

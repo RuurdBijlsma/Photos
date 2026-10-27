@@ -9,6 +9,7 @@ pub mod common;
 // Jobs
 pub mod calc_system_stats;
 pub mod clean_db;
+pub mod clean_thumbnails;
 pub mod cluster_faces;
 pub mod cluster_photos;
 pub mod generate_daily_cards;
@@ -16,10 +17,11 @@ pub mod handle_web_upload;
 pub mod import_album_item;
 pub mod ingest_analysis;
 pub mod ingest_metadata;
+pub mod ingest_takeout_batch;
 pub mod ingest_thumbnails;
+pub mod prune_missing_ingest_jobs;
 pub mod remove;
 pub mod scan;
-pub mod sync_thumbnails;
 pub mod update_global_centroid;
 
 /// The outcome of a job handler's execution.
@@ -45,12 +47,14 @@ pub async fn handle_job(context: &WorkerContext, job: &Job) -> Result<JobResult>
         JobType::CleanDb => clean_db::handle(context, job).await,
         JobType::ClusterFaces => cluster_faces::handle(context, job).await,
         JobType::ClusterPhotos => cluster_photos::handle(context, job).await,
-        JobType::SyncThumbnails => sync_thumbnails::handle(context, job).await,
+        JobType::CleanThumbnails => clean_thumbnails::handle(context, job).await,
         JobType::HandleWebUpload => handle_web_upload::handle(context, job).await,
         JobType::CalcSystemStats => calc_system_stats::handle(context, job).await,
         JobType::ImportAlbumItem => import_album_item::handle(context, job).await,
         JobType::GenerateDailyCards => generate_daily_cards::handle(context, job).await,
         JobType::UpdateGlobalCentroid => update_global_centroid::handle(context, job).await,
+        JobType::IngestTakeoutBatch => ingest_takeout_batch::handle(context, job).await,
+        JobType::PruneMissingIngestJobs => prune_missing_ingest_jobs::handle(context, job).await,
     };
 
     heartbeat_handle.abort();

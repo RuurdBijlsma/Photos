@@ -8,7 +8,7 @@ use crate::database::structs::CreateAlbumPayload;
 use crate::database::{DbError, UpdateField};
 use common_types::pb::api::{CollaboratorSummary, SimpleTimelineItem, TimelineItem};
 use sqlx::postgres::PgQueryResult;
-use sqlx::{PgConnection, PgExecutor};
+use sqlx::{PgConnection, PgExecutor, PgTransaction};
 
 pub struct AlbumStore;
 
@@ -155,6 +155,39 @@ impl AlbumStore {
         .await?)
     }
 
+    /// Retrieves an album by its owner and name.
+    pub async fn find_by_name(
+        executor: impl PgExecutor<'_>,
+        owner_id: i32,
+        name: &str,
+    ) -> Result<Option<Album>, DbError> {
+        Ok(sqlx::query_as!(
+            Album,
+            r#"
+            SELECT
+                id,
+                owner_id,
+                name,
+                description,
+                thumbnail_id,
+                is_public,
+                media_count,
+                latest_media_item_timestamp,
+                earliest_media_item_timestamp,
+                updated_at,
+                created_at,
+                sort_mode as "sort_mode: AlbumSort"
+            FROM album
+            WHERE owner_id = $1 AND name = $2
+            LIMIT 1
+            "#,
+            owner_id,
+            name
+        )
+        .fetch_optional(executor)
+        .await?)
+    }
+
     /// Retrieves all albums a user is a collaborator on.
     pub async fn list_by_user_id(
         executor: impl PgExecutor<'_>,
@@ -260,23 +293,38 @@ impl AlbumStore {
     // Album Media Item Management
     //================================================================================
 
-    /// Adds multiple media items.
-    /// Ranks are assigned by taking the current max rank and adding increments
-    /// based on the `sort_timestamp` of the new items.
+    /// Adds multiple media items to an album (pure append, O(new items)).
+    /// New items get a manual position (rank) only when the album is
+    /// manually sorted (`sort_mode = 'none'`); otherwise rank stays NULL and
+    /// display order derives from data columns at read time.
+    ///
+    /// The album row is locked before `MAX(rank)` is read so concurrent
+    /// appends cannot compute the same rank. The lock lives until the
+    /// transaction ends, so this must run inside one.
     pub async fn add_media_items(
-        executor: impl PgExecutor<'_>,
+        executor: &mut PgTransaction<'_>,
         album_id: &str,
         media_item_ids: &[String],
         added_by_user_id: i32,
     ) -> Result<PgQueryResult, DbError> {
+        // Separate statement: the insert must start with a snapshot taken after
+        // the previous writer committed, or MAX(rank) misses its new row.
+        let _ = sqlx::query!("SELECT id FROM album WHERE id = $1 FOR UPDATE", album_id)
+            .fetch_optional(&mut **executor)
+            .await?;
+
         Ok(sqlx::query!(
             r#"
             INSERT INTO album_media_item (album_id, media_item_id, rank, added_by_user)
             SELECT
                 $1::TEXT,
                 items.id,
-                COALESCE((SELECT MAX(rank) FROM album_media_item WHERE album_id = $1::TEXT), 0.0)
-                    + (ROW_NUMBER() OVER (ORDER BY mi.sort_timestamp ASC) * 1000.0),
+                CASE
+                    WHEN (SELECT a.sort_mode = 'none' FROM album a WHERE a.id = $1::TEXT) THEN
+                        COALESCE((SELECT MAX(rank) FROM album_media_item WHERE album_id = $1::TEXT), 0.0)
+                            + (ROW_NUMBER() OVER (ORDER BY mi.sort_timestamp ASC) * 1000.0)
+                    ELSE NULL
+                END,
                 $2
             FROM UNNEST($3::TEXT[]) AS items(id)
             JOIN media_item mi ON mi.id = items.id
@@ -286,7 +334,7 @@ impl AlbumStore {
             added_by_user_id,
             media_item_ids
         )
-        .execute(executor)
+        .execute(&mut **executor)
         .await?)
     }
 
@@ -328,7 +376,7 @@ impl AlbumStore {
             SELECT
                 mi.id,
                 is_video,
-                has_thumbnails,
+                has_thumbnails AS "has_thumbnails!",
                 duration_ms::INT as duration_ms,
                 (width::real / height::real) as "ratio!"
             FROM album_media_item as ami
@@ -341,7 +389,9 @@ impl AlbumStore {
                 CASE WHEN $2 = 'date_desc' THEN mi.created_at END DESC,
                 CASE WHEN $2 = 'added_asc' THEN ami.added_at END ASC,
                 CASE WHEN $2 = 'added_desc' THEN ami.added_at END DESC,
-                ami.rank ASC
+                CASE WHEN $2 = 'none' THEN ami.rank END ASC,
+                ami.added_at ASC,
+                ami.media_item_id ASC
             "#,
             album_id,
             sort_mode as AlbumSort
@@ -380,6 +430,23 @@ impl AlbumStore {
         Ok(())
     }
 
+    /// Drops all manual-order positions of an album.
+    pub async fn clear_ranks(
+        executor: impl PgExecutor<'_>,
+        album_id: &str,
+    ) -> Result<PgQueryResult, DbError> {
+        Ok(sqlx::query!(
+            r#"
+            UPDATE album_media_item
+            SET rank = NULL
+            WHERE album_id = $1
+            "#,
+            album_id
+        )
+        .execute(executor)
+        .await?)
+    }
+
     pub async fn remove_media_items_by_id(
         executor: impl PgExecutor<'_>,
         album_id: &str,
@@ -398,16 +465,18 @@ impl AlbumStore {
     }
 
     /// Retrieves all media items associated with an album, joined with their metadata.
+    /// Ordered by the album's `sort_mode`.
     pub async fn list_media_items(
         executor: impl PgExecutor<'_>,
         album_id: &str,
+        sort_mode: AlbumSort,
     ) -> Result<Vec<AlbumMediaItemSummary>, DbError> {
         let rows = sqlx::query!(
             r#"
             SELECT
                 mi.id,
                 mi.is_video,
-                mi.has_thumbnails,
+                mi.has_thumbnails AS "has_thumbnails!",
                 mi.duration_ms::INT as duration_ms,
                 mi.taken_at_local::TEXT as "timestamp!",
                 ami.added_at
@@ -415,9 +484,19 @@ impl AlbumStore {
             JOIN media_item mi ON ami.media_item_id = mi.id
             WHERE ami.album_id = $1
             AND mi.deleted = false
-            ORDER BY ami.rank ASC
+            ORDER BY
+                CASE WHEN $2 = 'date_asc' THEN mi.sort_timestamp END ASC,
+                CASE WHEN $2 = 'date_asc' THEN mi.created_at END ASC,
+                CASE WHEN $2 = 'date_desc' THEN mi.sort_timestamp END DESC,
+                CASE WHEN $2 = 'date_desc' THEN mi.created_at END DESC,
+                CASE WHEN $2 = 'added_asc' THEN ami.added_at END ASC,
+                CASE WHEN $2 = 'added_desc' THEN ami.added_at END DESC,
+                CASE WHEN $2 = 'none' THEN ami.rank END ASC,
+                ami.added_at ASC,
+                ami.media_item_id ASC
             "#,
-            album_id
+            album_id,
+            sort_mode as AlbumSort
         )
         .fetch_all(executor)
         .await?;
@@ -481,11 +560,21 @@ impl AlbumStore {
             SELECT media_item_id as id
             FROM (
                 SELECT
-                    media_item_id,
-                    ROW_NUMBER() OVER (ORDER BY rank ASC) as rn,
+                    ami.media_item_id,
+                    ROW_NUMBER() OVER (ORDER BY
+                        CASE WHEN a.sort_mode = 'date_asc' THEN mi.sort_timestamp END ASC,
+                        CASE WHEN a.sort_mode = 'date_desc' THEN mi.sort_timestamp END DESC,
+                        CASE WHEN a.sort_mode = 'added_asc' THEN ami.added_at END ASC,
+                        CASE WHEN a.sort_mode = 'added_desc' THEN ami.added_at END DESC,
+                        CASE WHEN a.sort_mode = 'none' THEN ami.rank END ASC,
+                        ami.added_at ASC,
+                        ami.media_item_id ASC
+                    ) as rn,
                     COUNT(*) OVER () as total_count
-                FROM album_media_item
-                WHERE album_id = $1
+                FROM album_media_item ami
+                JOIN album a ON a.id = ami.album_id
+                JOIN media_item mi ON mi.id = ami.media_item_id
+                WHERE ami.album_id = $1 AND mi.deleted = false
             ) t
             WHERE rn = (total_count / 2) + 1
             LIMIT 1

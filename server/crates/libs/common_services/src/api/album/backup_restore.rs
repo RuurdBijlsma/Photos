@@ -170,7 +170,7 @@ pub async fn restore_albums(
                 "#,
                 backup.id,
                 &batch_media_item_ids,
-                &batch_ranks,
+                &batch_ranks as &[Option<f64>],
                 &batch_added_ats as &[DateTime<Utc>],
                 &batch_added_by_users as &[Option<i32>]
             )

@@ -31,3 +31,35 @@ pub fn write_exif_orientation(file_path: &Path, orientation: i32) -> color_eyre:
     )?;
     Ok(())
 }
+
+/// Write/update datetime tags on a media file (photo or video) using exiftool.
+/// `formatted_datetime` is expected in "YYYY:MM:DD HH:MM:SS" format.
+pub fn write_media_datetime(
+    file_path: &Path,
+    formatted_datetime: &str,
+    is_video: bool,
+) -> color_eyre::Result<()> {
+    let et = exiftool::ExifTool::new()?;
+    if is_video {
+        et.write_tag(
+            file_path,
+            "QuickTime:CreateDate",
+            &formatted_datetime,
+            &["-overwrite_original"],
+        )?;
+        et.write_tag(
+            file_path,
+            "QuickTime:ModifyDate",
+            &formatted_datetime,
+            &["-overwrite_original"],
+        )?;
+    } else {
+        et.write_tag(
+            file_path,
+            "AllDates",
+            &formatted_datetime,
+            &["-overwrite_original"],
+        )?;
+    }
+    Ok(())
+}

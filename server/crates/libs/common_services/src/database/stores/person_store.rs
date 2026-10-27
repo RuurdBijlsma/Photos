@@ -246,7 +246,7 @@ impl PersonStore {
             SELECT
                 id,
                 is_video,
-                has_thumbnails,
+                has_thumbnails AS "has_thumbnails!",
                 duration_ms::INT as duration_ms,
                 ratio as "ratio!"
             FROM (

@@ -1,0 +1,42 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT relative_path,\n               thumbnails_status::text AS \"thumbnails_status!\",\n               analysis_status::text AS \"analysis_status!\"\n        FROM media_item\n        WHERE user_id = $1\n          AND deleted = false\n          AND missing_since IS NULL\n          AND (\n              thumbnails_status = 'pending'\n              OR (thumbnails_status = 'done' AND analysis_status = 'pending')\n          )\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "relative_path",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "media_item",
+            "name": "relative_path"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "thumbnails_status!",
+        "type_info": "Text",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 2,
+        "name": "analysis_status!",
+        "type_info": "Text",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4"
+      ]
+    },
+    "nullable": [
+      false,
+      null,
+      null
+    ]
+  },
+  "hash": "73941b97de435637aa5ac039a72b9520f46479ffacb74ccef76eac2c42643f15"
+}

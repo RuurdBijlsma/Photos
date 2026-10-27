@@ -1,6 +1,6 @@
 use crate::context::WorkerContext;
 use crate::handlers::JobResult;
-use crate::handlers::common::utils::require_media_mounted;
+use crate::handlers::common::utils::{get_unique_filename, require_media_mounted};
 use app_state::MakeRelativePath;
 use app_state::constants::{TUS_UPLOADS_FOLDER, USER_UPLOAD_FOLDER};
 use color_eyre::Result;
@@ -11,38 +11,7 @@ use common_services::job_queue::enqueue_full_ingest;
 use fileloft_core::UploadInfo;
 use sanitize_filename::sanitize;
 use serde_json::from_value;
-use std::path::{Path, PathBuf};
 use tokio::fs;
-
-async fn get_unique_filename(dest_folder: &Path, destination_path: &Path) -> PathBuf {
-    let mut unique_destination_path = destination_path.to_path_buf();
-    let mut counter = 1;
-
-    while fs::try_exists(&unique_destination_path)
-        .await
-        .unwrap_or(false)
-    {
-        let stem = destination_path
-            .file_stem()
-            .unwrap_or_default()
-            .to_string_lossy();
-        let extension = destination_path
-            .extension()
-            .unwrap_or_default()
-            .to_string_lossy();
-
-        let new_filename = if extension.is_empty() {
-            format!("{stem}_{counter}")
-        } else {
-            format!("{stem}_{counter}.{extension}")
-        };
-
-        unique_destination_path = dest_folder.join(new_filename);
-        counter += 1;
-    }
-
-    unique_destination_path
-}
 
 pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
     if let Some(result) =

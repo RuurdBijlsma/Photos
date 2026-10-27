@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE jobs SET status = 'queued', scheduled_at = $2, dependency_attempts = dependency_attempts + 1, owner = NULL, started_at = NULL, last_error = 'File not found on disk' WHERE id = $1 AND status <> 'cancelled'",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "bce7e19fb735041e3dc32b55719d865c78d76d961c6eae8e7b5154af620f63a3"
+}

@@ -512,16 +512,8 @@ pub async fn reprocess_media_item(
 
     let mut tx = pool.begin().await?;
 
-    // Delete visual_analysis records
-    sqlx::query!(
-        "DELETE FROM visual_analysis WHERE media_item_id = $1",
-        media_item_id
-    )
-    .execute(&mut *tx)
-    .await?;
-
     // Update main item and metadata child tables
-    MediaItemStore::update_full(&mut tx, media_item_id, false, &create_item).await?;
+    MediaItemStore::update_full(&mut tx, media_item_id, &create_item).await?;
 
     tx.commit().await?;
 
