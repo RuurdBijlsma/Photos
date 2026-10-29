@@ -10,9 +10,122 @@
   "panels": [
     {
       "id": 1,
+      "type": "timeseries",
+      "title": "Job queue depth",
+      "description": "Queued vs running jobs over time, from the app's own jobs table.",
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 0 },
+      "datasource": { "type": "postgres", "uid": "postgres" },
+      "targets": [
+        {
+          "refId": "A",
+          "editorMode": "code",
+          "rawQuery": true,
+          "format": "time_series",
+          "rawSql": "SELECT $__timeGroupAlias(created_at,$__interval), count(*) FILTER (WHERE status='queued') AS queued, count(*) FILTER (WHERE status='running') AS running FROM jobs WHERE $__timeFilter(created_at) GROUP BY 1 ORDER BY 1"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Failed jobs per interval",
+      "description": "Jobs that ended in status 'failed'. Rising failures mean a job type is broken, not that the server is slow.",
+      "gridPos": { "h": 7, "w": 6, "x": 12, "y": 0 },
+      "datasource": { "type": "postgres", "uid": "postgres" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "drawStyle": "bars", "fillOpacity": 60, "lineWidth": 1 }
+        },
+        "overrides": []
+      },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "targets": [
+        {
+          "refId": "A",
+          "editorMode": "code",
+          "rawQuery": true,
+          "format": "time_series",
+          "rawSql": "SELECT $__timeGroupAlias(finished_at,$__interval), count(*) FROM jobs WHERE status='failed' AND $__timeFilter(finished_at) GROUP BY 1 ORDER BY 1"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Media items with failed analysis",
+      "description": "Non-deleted media items whose analysis never succeeded.",
+      "gridPos": { "h": 7, "w": 6, "x": 18, "y": 0 },
+      "datasource": { "type": "postgres", "uid": "postgres" },
+      "targets": [
+        {
+          "refId": "A",
+          "editorMode": "code",
+          "rawQuery": true,
+          "format": "table",
+          "rawSql": "SELECT count(*) AS failed FROM media_item WHERE analysis_status='failed' AND deleted = false"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Jobs finished per interval by type",
+      "description": "Throughput of completed work, split by job type.",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 7 },
+      "datasource": { "type": "postgres", "uid": "postgres" },
+      "fieldConfig": {
+        "defaults": { "custom": { "drawStyle": "bars", "fillOpacity": 80, "stacking": { "mode": "normal" } } },
+        "overrides": []
+      },
+      "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["sum"] } },
+      "targets": [
+        {
+          "refId": "A",
+          "editorMode": "code",
+          "rawQuery": true,
+          "format": "time_series",
+          "rawSql": "SELECT $__timeGroupAlias(finished_at,$__interval), job_type, count(*) FROM jobs WHERE status='done' AND $__timeFilter(finished_at) GROUP BY 1,2 ORDER BY 1"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "table",
+      "title": "Most common failure reasons",
+      "description": "Grouped jobs.last_error: what actually broke, most frequent first.",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 7 },
+      "datasource": { "type": "postgres", "uid": "postgres" },
+      "targets": [
+        {
+          "refId": "A",
+          "editorMode": "code",
+          "rawQuery": true,
+          "format": "table",
+          "rawSql": "SELECT last_error, count(*) AS occurrences, max(finished_at) AS last_seen FROM jobs WHERE status='failed' AND $__timeFilter(finished_at) GROUP BY last_error ORDER BY occurrences DESC LIMIT 20"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Error log volume",
+      "description": "Count of ERROR lines in the shipped JSON logs.",
+      "gridPos": { "h": 7, "w": 24, "x": 0, "y": 15 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "refId": "A",
+          "queryType": "range",
+          "expr": "sum(count_over_time({job=\"photos-backend\", level=\"ERROR\"} [$__interval]))"
+        }
+      ]
+    },
+    {
+      "id": 7,
       "type": "logs",
       "title": "Backend log stream",
-      "gridPos": { "h": 16, "w": 24, "x": 0, "y": 0 },
+      "description": "Every line, including request spans. Use `| json` to filter on any field.",
+      "gridPos": { "h": 16, "w": 24, "x": 0, "y": 22 },
       "datasource": { "type": "loki", "uid": "loki" },
       "options": {
         "showTime": true,
@@ -27,8 +140,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "{service=\"photos\", job=\"photos-backend\"} | json",
-          "queryType": "range"
+          "queryType": "range",
+          "expr": "{service=\"photos\", job=\"photos-backend\"} | json"
         }
       ]
     }
