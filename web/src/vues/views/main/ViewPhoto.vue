@@ -631,7 +631,11 @@ useDetailTitle(mediaDetailTitle, { fallback: 'Photo' })
               <v-list-item v-if="id" @click="mediaItemStore.reprocessMediaItem(id)"
                 >Reprocess item</v-list-item
               >
-              <v-list-item :to="`/search?mode=similar&ids=${id}`">Find similar images</v-list-item>
+              <v-list-item
+                v-if="fullImage?.visual_analyses.length"
+                :to="`/search?mode=similar&ids=${id}`"
+                >Find similar images</v-list-item
+              >
               <v-list-item v-if="id" @click="profileStore.setProfilePic(id)">
                 Set as profile picture
               </v-list-item>

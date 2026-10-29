@@ -20,14 +20,16 @@ import { useSnackbarsStore } from '@/scripts/stores/snackbarStore.ts'
 import { useMediaItemStore } from '@/scripts/stores/timeline/mediaItemStore.ts'
 import { useResponsive } from '@/scripts/composables/useResponsive.ts'
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     excludeAlbumIds?: string[]
     context?: TimelineContext
+    items?: { id: string; hasThumbnails: boolean }[]
   }>(),
   {
     excludeAlbumIds: () => [],
     context: () => ({}),
+    items: () => [],
   },
 )
 
@@ -62,6 +64,14 @@ async function setAlbumCover(albumId: string) {
 const searchSimilarUrl = computed(() => {
   return `/search?mode=similar&ids=${[...selectionStore.selection].join(',')}`
 })
+
+const itemsWithThumbnails = computed(
+  () => new Set(props.items.filter((item) => item.hasThumbnails).map((item) => item.id)),
+)
+// Thumbnails are the cheap proxy for "has analysis data" on timeline items.
+const canFindSimilar = computed(() =>
+  [...selectionStore.selection].some((id) => itemsWithThumbnails.value.has(id)),
+)
 
 const SNACK_HEIGHT = 66
 const SNACK_GAP = 8
@@ -137,7 +147,7 @@ const avoidSnackbarBottom = computed(() => {
             >
               <v-list-item-title>Reprocess media item</v-list-item-title>
             </v-list-item>
-            <v-list-item :to="searchSimilarUrl">
+            <v-list-item v-if="canFindSimilar" :to="searchSimilarUrl">
               <v-list-item-title>Find similar images</v-list-item-title>
             </v-list-item>
             <v-list-item @click="downloadStore.multiDownloadItems([...selectionStore.selection])">
