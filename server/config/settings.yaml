@@ -93,6 +93,22 @@ logging:
       object_detector: warn
       face_id: warn
       sqlx: warn
+  file:
+    enabled: true
+    max_files: 7
+    filters:
+      main: info
+      targets:
+        ort: warn
+        hf_hub: error
+        xet_client: warn
+        xet_data: warn
+        xet_runtime: warn
+        xet: warn
+        open_clip_inference: warn
+        object_detector: warn
+        face_id: warn
+        sqlx: warn
 
 api:
   host: "0.0.0.0"

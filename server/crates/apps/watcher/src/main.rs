@@ -5,7 +5,7 @@ use watcher::watcher::create_watcher;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let (settings, pool) = setup_binary().await?;
+    let (settings, pool, _log_guard) = setup_binary().await?;
     let kill_signal = get_kill_signal();
     create_watcher(&pool, &settings.ingest, kill_signal).await?;
 

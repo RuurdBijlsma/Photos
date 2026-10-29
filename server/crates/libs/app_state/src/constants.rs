@@ -13,6 +13,7 @@ pub const MANAGED_FOLDERS: &[&str] = &[ALBUM_IMPORT_FOLDER, TAKEOUT_IMPORT_FOLDE
 
 // app_data folders
 pub const CACHE_FOLDER: &str = "cache";
+pub const LOGS_FOLDER: &str = "logs";
 pub const ON_DEMAND_THUMBNAIL_CACHE_FOLDER: &str = "cache/on-demand-thumbnails";
 pub const TUS_UPLOADS_FOLDER: &str = "tus/uploads";
 pub const TUS_LOCKS_FOLDER: &str = "tus/locks";
