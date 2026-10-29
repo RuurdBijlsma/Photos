@@ -1,0 +1,17 @@
+# The app's own Postgres, reached by service name on the compose network.
+# `$__env{...}` is expanded by Grafana's provisioning loader; missing values become
+# empty strings and there is no `:-` default syntax, so never use `$` in passwords.
+apiVersion: 1
+
+datasources:
+  - name: PostgreSQL
+    uid: postgres
+    type: postgres
+    access: proxy
+    url: database:5432
+    user: $__env{POSTGRES_USER}
+    jsonData:
+      database: $__env{POSTGRES_DB}
+      sslmode: disable
+    secureJsonData:
+      password: $__env{POSTGRES_PASSWORD}

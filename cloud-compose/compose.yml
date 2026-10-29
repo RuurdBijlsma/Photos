@@ -89,8 +89,29 @@ services:
     depends_on:
       - loki
 
+  grafana:
+    image: grafana/grafana:13.3.0
+    container_name: photos_grafana
+    restart: unless-stopped
+    profiles: ["monitoring"]
+    ports:
+      - "${GRAFANA_PORT:-9476}:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      POSTGRES_USER: ${DB_USER:-photos_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-dev-password}
+      POSTGRES_DB: ${DB_NAME:-photos}
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - photos_grafana_data:/var/lib/grafana
+    depends_on:
+      - loki
+      - database
+
 volumes:
   photos_pgdata:
   photos_app_data:
   photos_loki_data:
   photos_alloy_data:
+  photos_grafana_data:
