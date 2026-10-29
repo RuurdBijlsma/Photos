@@ -103,6 +103,10 @@ npm run dev   # http://localhost:5173; proxies /api, /thumbnails, /hosted to 127
 
 ## Build and run
 
+GENERALLY when running, use release profile, otherwise crates like `image` slow down and tests/running takes minutes
+instead of seconds. Also using release profile will take advantage of incremental compilation, since I do all
+runs/builds with release.
+
 ```powershell
 # Backend (all from server/)
 cargo run -p photos_app                       # full stack in one process
@@ -178,7 +182,7 @@ npm run lint
 - **Rust**: `rustfmt` with `max_width = 100` (`server/.rustfmt.toml`). Clippy `pedantic` + `nursery` are errors. Every
   production crate has `#![deny(clippy::unwrap_used)]` — return `Result`/`Option` and use `?`; each crate's `lib.rs`
   lists deliberate allow-lists (e.g. `large_futures`, lossy casts), but only for lints that are reasonable to ignore
-  crate-wide.
+  crate-wide. Avoid panics, but in tests, or some exception cases, we can use `expect("..")`. Never `unwrap()`.
 - **API layering**: keep `apps/api/src/routes/**` handlers thin; put logic and request/response DTOs in
   `common_services/src/api/<domain>/`, and SQL in `common_services/src/database/{tables,stores}`. HTTP failures go
   through `AppError`.
