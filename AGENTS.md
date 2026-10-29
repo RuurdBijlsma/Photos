@@ -4,6 +4,11 @@ Self-hosted Google Photos alternative ("Ruurd Photos"): a Rust backend (axum, sq
 and a Vue 3 + Vuetify web client. This file tells coding agents how the repo is laid out and how to build, test, and
 change it.
 
+There is effectively one developer (Ruurd), so a few tracked files deliberately contain this machine's paths: the
+`ORT_DYLIB_PATH` and `DATABASE_URL` exports in `server/justfile` and `server/scripts/all.ps1`, and the media/app-data
+folders in `server/config/settings.yaml`. Don't portabilize or "clean up" those — if your setup differs, override with
+env vars (`ORT_DYLIB_PATH`, `DATABASE_URL`, `RP__INGEST__MEDIA_FOLDER`, `RP__INGEST__APP_DATA_FOLDER`).
+
 ## Repository layout
 
 | Path                        | Contents                                                             |
@@ -80,6 +85,7 @@ cd server
 cp example.env .env          # DATABASE_URL + RP__SECRETS__JWT
 ./scripts/start_postgres.ps1 # Podman: pgvector on localhost:5432, photos_user/dev-password, db "photos"
 cargo sqlx migrate run       # optional; the binaries also run migrations on startup
+./scripts/recreate_db.ps1    # or: drop/recreate/migrate the dev db and seed the dev user
 ```
 
 `config/settings.yaml` is resolved relative to the current directory, so run binaries from `server/`, not the repo
@@ -120,17 +126,24 @@ Docker: `docker compose up -d` needs `MEDIA_LOCATION` and `JWT_SECRET` in the ro
 Only tests that really matter are the integration tests.
 
 ```powershell
+# Fast loop, no database or models needed (from server/):
+cargo fmt --all -- --check
+cargo clippy --all-features
+
 # End-to-end suite (from server/): creates and drops database "test_db", starts photos_app in-process,
 # copies crates/test_integration/assets/media_dir, needs local Postgres, exiftool and model downloads.
 cargo test -p test_integration -- --nocapture
 
-# CI-equivalent run (release profile + dynamically loaded ONNX Runtime)
+# Local full run (release profile + dynamically loaded ONNX Runtime; CI runs no tests at all)
 just test    # = cargo test --profile release --features load-dynamic -- --nocapture
 
 # Benchmarks (need a populated local DB; from server/)
 cargo bench --bench system_bench --features load-dynamic
 cargo bench --bench timeline_benchmark --features load-dynamic
 ```
+
+Without `DATABASE_URL`, `cargo build`/`clippy` resolve SQL through the committed `.sqlx` cache, so SQL that has no
+cache entry fails to compile until you point `DATABASE_URL` at a migrated dev DB.
 
 The web app has no unit-test suite. Frontend performance is guarded by `web/tests/perf` (Playwright):
 
@@ -149,12 +162,16 @@ newest result on `main`. Details: `web/tests/perf/README.md`.
 Run linting whenever you want. Never revert auto formatting changes.
 
 ```powershell
-# Backend (from server/) - same checks as CI
-./scripts/all.ps1 # Requires running db
+# Backend (from server/)
+just fmt     # cargo fmt --all
+just clippy  # --all-features --tests --benches, clippy::pedantic + nursery denied
 
 # Frontend (from web/)
 npm run lint
 ```
+
+`./scripts/all.ps1` is not a plain lint: it ends with `cargo sqlx prepare` (see the SQLx rule below) and also runs
+`cargo doc`. Only run it when you want those side effects.
 
 ## Code style
 
@@ -191,8 +208,11 @@ npm run lint
 
 ## CI and PRs
 
-- `Rust CI` (`.github/workflows/server-quality.yml`): `cargo fmt --check`, clippy with `-D clippy::all -D
-  clippy::pedantic -D clippy::nursery`, and `cargo build` with `SQLX_OFFLINE=true`.
+- `Rust CI` (`.github/workflows/server-quality.yml`): `cargo fmt --check`, `cargo clippy --no-deps` with `-D
+  clippy::all -D clippy::pedantic -D clippy::nursery`, and `cargo build` with `SQLX_OFFLINE=true`. It runs no tests, so
+  a failing test passes CI; and it builds for Linux, where `load-dynamic` isn't needed — every build on this Windows
+  machine requires it, so breakage that only appears under `--features load-dynamic` passes CI too. `just test` + `just
+  clippy` locally are the real gate.
 - `Web CI` (`web-quality.yml`): `npm ci`, `lint:oxlint`, `lint:eslint`, `build`, `prettier:check`.
 - `Frontend Performance Regression` (`perf-gate.yml`): every PR touching `web/**` must add a perf result file.
 - Releases publish multi-arch Docker images and attach `cloud-compose/compose.yml` + `example.env`; `pages.yml`
@@ -204,12 +224,19 @@ npm run lint
 ## Gotchas
 
 - Run backend commands from `server/` — `config/settings.yaml` and `migrations/` are resolved from the CWD.
+- SQL is compile-time checked: `just` exports `DATABASE_URL`, so queries are validated against the dev DB — after a
+  migration or a new query, a stale schema means the crate won't compile. Recreate the dev DB freely:
+  `./scripts/recreate_db.ps1` drops it, migrates and re-seeds the dev user, and there is never data worth keeping.
+  `./scripts/disconnect_postgres.ps1` clears blocking connections.
 - The integration suite is destructive to the `test_db` database and slow on first run (model downloads).
 - `--features load-dynamic` requires `ORT_DYLIB_PATH` pointing at `onnxruntime`; the default build links it statically.
 - In Docker the backend runs only `photos_app`; do not start `api`/`watcher`/`worker` as separate containers.
 - Thumbnails and the Hugging Face cache live under `app_data/` (gitignored). The API serves them at `/thumbnails` and
   `/hosted` when `api.serve_static_assets` is true; nginx does it in compose.
-- Manual API poking: Bruno collection in `server/bruno/ruurd_photos`.
+- Manual API poking: Bruno collection in `server/bruno/ruurd_photos`. The first `POST /api/auth/register` on an empty
+  DB needs no invite and creates the admin user; every later registration needs an invite token. After
+  `recreate_db.ps1` a dev user already exists (`common_types::dev_constants` — `ruurd@example.com` / `kibbeling`), so
+  `POST /api/auth/login` is the quick path; it sets the auth cookies. `/api/health` is public.
 - On Windows, `load-dynamic` is required. Default bundled onnxruntime is not recent enough.
 - Supporting crates are pulled from crates.io by version. To try an unpublished change, publish and bump the version
   here (each version is repeated across several `apps/*` and `libs/*` manifests, so update all of them), or add a
