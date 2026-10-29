@@ -34,6 +34,35 @@ change it.
 - `libs/tasks` — scheduled task runner.
 - `test_integration` — end-to-end API/ingest suite.
 
+## Supporting crates
+
+The heavy media and ML work lives in separate crates, checked out beside this repo (`../media_analyzer_rs`,
+`../open-clip-rs`, `../face_id-rs`, …) and consumed here as published crates.io versions — there are no `path` or `git`
+dependencies. Fix or extend the behavior there, bump the version here, and keep the `crates/libs` wrappers thin.
+
+- `media_analyzer` — metadata/EXIF extraction, resolved timestamps and timezones, offline geolocation, historical
+  weather and sun times; shells out to the `exiftool` binary. Used by `common_services` (ingest, `media_item` tables),
+  `worker` (ingest/takeout handlers), `worker_scaler`, `test_integration`.
+- `exiftool` — ExifTool wrapper for writing tags; orientation and datetime are written through it in
+  `common_services/src/utils.rs` and `generate_thumbnails/src/motion_photo.rs`.
+- `meteostat` — historic weather from weather stations. Not a direct dependency: `media_analyzer` uses it and the
+  result lands in the `weather` table.
+- `open_clip_inference` — CLIP image/text embeddings on ONNX Runtime; drives search and photo clustering. Used by
+  `model_provider` (lazy model loading), `ml_analysis`, `common_services` (search), `api`, `worker`.
+- `face_id` — face detection (boxes, landmarks) plus face embeddings. Used by `ml_analysis`, `common_types` (shared
+  types), `common_services` (faces table), `worker` (`cluster_faces`).
+- `object_detector` — YOLOE-26-seg detection: a tag, pixel mask and box per object, 4000+ object vocabulary. Used by
+  `ml_analysis`, `common_types`, `common_services` (objects table).
+- `material-color-utils` — Material You color: prominent colors from an image and theme palettes generated from a seed
+  color. Used by `ml_analysis` (`color_data.rs`), `app_state` (theme `variant` setting), `common_services`/`api`
+  (theme routes).
+- `panorama-tiler` — turns equirectangular/cylindrical panoramas into multi-resolution cubemap tiles
+  (`generate_thumbnails/src/pano.rs`).
+
+Production deployment is not built here: the `compose-services` repo (`stacks/photos/compose.yml`) runs the published
+`ghcr.io/ruurdbijlsma/photos-server` and `photos-web` images and joins the external `proxy-net`; the root `compose.yml`
+in this repo builds from source for local runs.
+
 ## Prerequisites
 
 - Rust stable (edition 2024; Docker builds with Rust 1.98)
@@ -120,7 +149,7 @@ newest result on `main`. Details: `web/tests/perf/README.md`.
 Run linting whenever you want. Never revert auto formatting changes.
 
 ```powershell
-# Backend (from server/) — same checks as CI
+# Backend (from server/) - same checks as CI
 ./scripts/all.ps1 # Requires running db
 
 # Frontend (from web/)
@@ -169,7 +198,7 @@ npm run lint
 - Releases publish multi-arch Docker images and attach `cloud-compose/compose.yml` + `example.env`; `pages.yml`
   deploys the web client as a demo (built with `GITHUB_PAGES=true`).
 - Branch from `develop`; PRs target `main`. History uses conventional prefixes (`feat:`, `fix:`, `chore:`,
-  `refactor:`, `docs:`, `perf:`) — follow that. Keep committed artifacts in sync (`.sqlx/`, generated proto, perf
+  `refactor:`, `docs:`, `perf:`) - follow that. Keep committed artifacts in sync (`.sqlx/`, generated proto, perf
   result) in the same PR as the change that caused them.
 
 ## Gotchas
@@ -182,3 +211,9 @@ npm run lint
   `/hosted` when `api.serve_static_assets` is true; nginx does it in compose.
 - Manual API poking: Bruno collection in `server/bruno/ruurd_photos`.
 - On Windows, `load-dynamic` is required. Default bundled onnxruntime is not recent enough.
+- Supporting crates are pulled from crates.io by version. To try an unpublished change, publish and bump the version
+  here (each version is repeated across several `apps/*` and `libs/*` manifests, so update all of them), or add a
+  temporary `[patch.crates-io]` entry in `server/Cargo.toml` — remove it (and the `Cargo.lock` churn) before the MR.
+- A dependency that links ONNX Runtime must have `load-dynamic` forwarded through its wrapper crate and every app that
+  pulls it in (`ml_analysis`, `model_provider`, `common_types`, `common_services`, `tasks`, `api`, `worker`,
+  `photos_app`); `just check` runs clippy with `--all-features`, so a missing forward fails linting, not only tests.
