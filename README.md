@@ -85,3 +85,20 @@
 9. **Start processing**
 
    Click "Start Processing". Your photos and videos will begin appearing in the timeline.
+
+# Optional: monitoring
+
+The backend always keeps its last seven days of logs as JSON files in
+`<app_data>/logs`, so they survive container restarts even without anything else
+running. To search them and see dashboards for the job queue and ingest health, add
+the optional Grafana + Loki stack:
+
+```bash
+wget https://github.com/ruurdbijlsma/Photos/releases/latest/download/monitoring.zip
+unzip monitoring.zip
+docker compose --profile monitoring up -d
+```
+
+Then open <http://localhost:9476> (`admin` / `GRAFANA_ADMIN_PASSWORD` from `.env`).
+Without the `--profile monitoring` flag nothing extra starts. Details, retention knobs
+and caveats: [`monitoring/README.md`](cloud-compose/monitoring/README.md).
