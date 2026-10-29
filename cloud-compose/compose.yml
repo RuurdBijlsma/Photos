@@ -73,7 +73,24 @@ services:
       - ./monitoring/loki/config.yaml:/etc/loki/config.yaml:ro
       - photos_loki_data:/loki
 
+  alloy:
+    image: grafana/alloy:v1.21.3
+    container_name: photos_alloy
+    restart: unless-stopped
+    profiles: ["monitoring"]
+    command:
+      - run
+      - /etc/alloy/config.alloy
+      - --storage.path=/var/lib/alloy/data
+    volumes:
+      - ./monitoring/alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - photos_alloy_data:/var/lib/alloy/data
+      - ${APP_DATA_LOCATION:-photos_app_data}:/app_data:ro
+    depends_on:
+      - loki
+
 volumes:
   photos_pgdata:
   photos_app_data:
   photos_loki_data:
+  photos_alloy_data:
