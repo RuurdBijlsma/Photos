@@ -64,6 +64,24 @@ services:
       backend:
         condition: service_healthy
 
+  # Optional monitoring stack. Off by default:
+  #   docker compose --profile monitoring up -d
+  # Requires the `monitoring/` directory from the release assets beside this file.
+  loki:
+    image: grafana/loki:3.7.9
+    container_name: photos_loki
+    restart: unless-stopped
+    profiles: ["monitoring"]
+    command:
+      - -config.file=/etc/loki/config.yaml
+      - -config.expand-env=true
+    environment:
+      LOKI_RETENTION_DAYS: ${LOKI_RETENTION_DAYS:-30}
+    volumes:
+      - ./cloud-compose/monitoring/loki/config.yaml:/etc/loki/config.yaml:ro
+      - photos_loki_data:/loki
+
 volumes:
   photos_pgdata:
   photos_app_data:
+  photos_loki_data:
