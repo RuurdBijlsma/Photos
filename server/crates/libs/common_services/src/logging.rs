@@ -49,7 +49,18 @@ where
         .with_ansi(false)
         .with_writer(writer);
 
-    Ok((filters.and_then(layer), guard))
+    // Per-layer filter: the file sink must not obey the console's filter, and a
+    // filter layered globally would gate every layer added after it.
+    Ok((layer.with_filter(filters), guard))
+}
+
+/// `RUST_LOG` wins over `logging.filters` for the console sink.
+///
+/// The file sink is deliberately not derived from this: a debug session must not
+/// inflate the archive that gets shipped to Loki.
+#[must_use]
+pub fn console_directives(rust_log: Option<&str>, configured: &str) -> String {
+    rust_log.unwrap_or(configured).to_owned()
 }
 
 /// Installs the global subscriber: console always, JSON file when enabled.
@@ -57,14 +68,14 @@ where
 /// A file sink that cannot be opened never takes the process down: the console
 /// sink is installed first and the failure is reported through it.
 pub fn init_logging(settings: &AppSettings) -> LoggingGuard {
-    let console_filter = EnvFilter::new(settings.logging.filters.to_filter_string());
-    let console_layer = fmt::layer();
+    let console_filter = EnvFilter::new(console_directives(
+        std::env::var("RUST_LOG").ok().as_deref(),
+        &settings.logging.filters.to_filter_string(),
+    ));
+    let console_layer = fmt::layer().with_filter(console_filter);
 
     if !settings.logging.file.enabled {
-        tracing_subscriber::registry()
-            .with(console_filter)
-            .with(console_layer)
-            .init();
+        tracing_subscriber::registry().with(console_layer).init();
         return LoggingGuard(None);
     }
 
@@ -74,10 +85,7 @@ pub fn init_logging(settings: &AppSettings) -> LoggingGuard {
         file_filter,
         settings.logging.file.max_files,
     ) else {
-        tracing_subscriber::registry()
-            .with(console_filter)
-            .with(console_layer)
-            .init();
+        tracing_subscriber::registry().with(console_layer).init();
         warn!(
             path = %settings.ingest.logs_root.display(),
             "File logging is disabled: the log directory could not be opened"
@@ -86,7 +94,6 @@ pub fn init_logging(settings: &AppSettings) -> LoggingGuard {
     };
 
     tracing_subscriber::registry()
-        .with(console_filter)
         .with(console_layer)
         .with(file)
         .init();
@@ -96,11 +103,11 @@ pub fn init_logging(settings: &AppSettings) -> LoggingGuard {
 
 #[cfg(test)]
 mod tests {
-    use super::file_layer;
+    use super::{console_directives, file_layer};
     use std::fs;
     use std::path::Path;
     use tracing_subscriber::EnvFilter;
-    use tracing_subscriber::layer::SubscriberExt;
+    use tracing_subscriber::layer::{Layer, SubscriberExt};
 
     fn log_file_names(dir: &Path) -> Vec<String> {
         let mut names: Vec<String> = fs::read_dir(dir)
@@ -111,6 +118,79 @@ mod tests {
             .collect();
         names.sort();
         names
+    }
+
+    #[test]
+    fn console_filter_does_not_gate_the_file_sink() {
+        let dir = tempfile::tempdir().expect("test setup");
+
+        let (file, guard) = file_layer(dir.path(), EnvFilter::new("info"), 7).expect("test setup");
+        // Mirrors `init_logging`: each sink carries its own filter, so a user running
+        // with `RUST_LOG=warn` cannot silently narrow the archive.
+        let subscriber = tracing_subscriber::registry()
+            .with(
+                tracing_subscriber::fmt::layer()
+                    .with_writer(std::io::sink)
+                    .with_filter(EnvFilter::new("warn")),
+            )
+            .with(file);
+        tracing::subscriber::with_default(subscriber, || {
+            tracing::info!(target: "t1", "kept despite narrow console");
+            let span = tracing::info_span!("request", method = "GET");
+            let _entered = span.enter();
+            tracing::info!(target: "tower_http::trace::on_response", "in span");
+        });
+        drop(guard);
+
+        let names = log_file_names(dir.path());
+        assert_eq!(
+            names.len(),
+            1,
+            "expected the file sink to write, got {names:?}"
+        );
+        let content = fs::read_to_string(dir.path().join(&names[0])).expect("test setup");
+        assert!(
+            content.contains("kept despite narrow console"),
+            "console filter leaked into the file sink: {content:?}"
+        );
+        assert!(
+            content.contains("in span"),
+            "file sink dropped events inside a span: {content:?}"
+        );
+    }
+
+    #[test]
+    fn file_sink_applies_its_own_filter() {
+        let dir = tempfile::tempdir().expect("test setup");
+
+        let (file, guard) = file_layer(dir.path(), EnvFilter::new("warn"), 7).expect("test setup");
+        let subscriber = tracing_subscriber::registry()
+            .with(EnvFilter::new("info"))
+            .with(tracing_subscriber::fmt::layer().with_writer(std::io::sink))
+            .with(file);
+        tracing::subscriber::with_default(subscriber, || {
+            tracing::info!(target: "noisy", "must not be archived");
+            tracing::warn!(target: "noisy", "must be archived");
+        });
+        drop(guard);
+
+        let names = log_file_names(dir.path());
+        assert_eq!(names.len(), 1, "expected one log file, got {names:?}");
+        let content = fs::read_to_string(dir.path().join(&names[0])).expect("test setup");
+        assert!(
+            !content.contains("must not be archived"),
+            "file filter did not apply: {content:?}"
+        );
+        assert!(
+            content.contains("must be archived"),
+            "file filter dropped a warning: {content:?}"
+        );
+    }
+
+    #[test]
+    fn rust_log_overrides_settings_for_console() {
+        assert_eq!(console_directives(Some("debug"), "info,api=debug"), "debug");
+        assert_eq!(console_directives(None, "info,api=debug"), "info,api=debug");
     }
 
     #[test]
@@ -150,7 +230,8 @@ mod tests {
     fn prunes_to_max_files_on_start() {
         let dir = tempfile::tempdir().expect("test setup");
         for day in 21..=24 {
-            fs::write(dir.path().join(format!("photos.2026-10-{day}.log")), "{}").expect("test setup");
+            fs::write(dir.path().join(format!("photos.2026-10-{day}.log")), "{}")
+                .expect("test setup");
         }
 
         let (_layer, _guard) =

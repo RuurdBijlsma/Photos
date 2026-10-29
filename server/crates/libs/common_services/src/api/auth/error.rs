@@ -6,7 +6,7 @@ use axum::response::{IntoResponse, Response};
 use color_eyre::eyre;
 use serde_json::json;
 use thiserror::Error;
-use tracing::{info, warn};
+use tracing::{error, info, warn};
 
 #[derive(Debug, Error)]
 pub enum AuthError {
@@ -51,7 +51,7 @@ fn log_auth_failure(error: &AuthError) {
             );
         }
         AuthError::InvalidInvite => info!("Registration failed: Invalid or expired invite token."),
-        AuthError::Internal(e) => println!("Error in /auth: {e:?}"),
+        AuthError::Internal(e) => error!("Error in /auth: {e:?}"),
     }
 }
 

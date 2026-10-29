@@ -22,8 +22,8 @@ use tower_http::cors::CorsLayer;
 use tower_http::sensitive_headers::SetSensitiveRequestHeadersLayer;
 use tower_http::services::ServeDir;
 use tower_http::set_header::SetResponseHeaderLayer;
-use tower_http::trace::TraceLayer;
-use tracing::info;
+use tower_http::trace::{DefaultMakeSpan, DefaultOnResponse, TraceLayer};
+use tracing::{Level, info};
 
 pub async fn serve(
     pool: PgPool,
@@ -47,7 +47,12 @@ pub async fn serve(
     let cors = get_cors(&settings.api.allowed_origins);
 
     let base_app = create_router(api_state)
-        .layer(TraceLayer::new_for_http().on_request(()))
+        .layer(
+            TraceLayer::new_for_http()
+                .make_span_with(DefaultMakeSpan::new().level(Level::INFO))
+                .on_request(())
+                .on_response(DefaultOnResponse::new().level(Level::INFO)),
+        )
         .layer(cors.clone())
         .layer(CompressionLayer::new())
         .layer(SetSensitiveRequestHeadersLayer::new(once(
