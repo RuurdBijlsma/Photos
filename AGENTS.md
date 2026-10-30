@@ -17,6 +17,7 @@ env vars (`ORT_DYLIB_PATH`, `DATABASE_URL`, `RP__INGEST__MEDIA_FOLDER`, `RP__ING
 | `web/`                      | Vue 3 + TypeScript SPA (Vite, Pinia, Vuetify)                        |
 | `compose.yml`               | Production stack: pgvector DB + backend + nginx web                  |
 | `cloud-compose/compose.yml` | Compose file attached to GitHub releases                             |
+| `cloud-compose/monitoring/` | Optional observability stack: Loki, Alloy config, Grafana dashboards |
 | `.github/workflows/`        | Rust CI, Web CI, frontend perf gate, release images, GitHub Pages    |
 | `scripts/`                  | Windows helpers (start Postgres, copy app data into a Podman volume) |
 
@@ -124,6 +125,9 @@ npm run preview      # serve dist/ on :4173, proxies to :5272
 ```
 
 Docker: `docker compose up -d` needs `MEDIA_LOCATION` and `JWT_SECRET` in the root `.env`; the UI is on port 9475.
+Development can also use `podman` instead of docker.
+To run the optional observability stack alongside it: `docker compose --profile monitoring up -d` (Grafana is on port
+9476; dev login `admin` / `kibbeling`).
 
 ## Testing
 
@@ -209,6 +213,12 @@ npm run lint
   needed. SQL migration files are located at `server/migrations`.
 - **Setting**: add the field to `app_state` (`raw_settings.rs` + `settings.rs`) and to `config/settings.yaml`; expose it
   through the frontend settings/admin API if users should change it at runtime.
+- **Dashboard / Grafana panel**: the dashboard model is in `cloud-compose/monitoring/grafana/dashboards/photos-logs.json`
+  and is provisioned read-only (`allowUiUpdates: false`, polling every 30s) — edit the JSON file directly. Adding new
+  panels directly to the main part of the dashboard without a group is fine; if adding panels after a grouped section,
+  Grafana's flat JSON puts all subsequent panels inside that group unless separated by an explicit `row` panel. In
+  general, Grafana's default `No data` state is expected when a query returns zero rows; only special exceptions 
+  synthesize zero data points or fallback rows.
 
 ## CI and PRs
 
@@ -219,8 +229,8 @@ npm run lint
   clippy` locally are the real gate.
 - `Web CI` (`web-quality.yml`): `npm ci`, `lint:oxlint`, `lint:eslint`, `build`, `prettier:check`.
 - `Frontend Performance Regression` (`perf-gate.yml`): every PR touching `web/**` must add a perf result file.
-- Releases publish multi-arch Docker images and attach `cloud-compose/compose.yml` + `example.env`; `pages.yml`
-  deploys the web client as a demo (built with `GITHUB_PAGES=true`).
+- Releases publish multi-arch Docker images and attach `cloud-compose/compose.yml` + `example.env` + `monitoring.zip`
+  (packaged `cloud-compose/monitoring/`); `pages.yml` deploys the web client as a demo (built with `GITHUB_PAGES=true`).
 - Branch from `develop`; PRs target `main`. History uses conventional prefixes (`feat:`, `fix:`, `chore:`,
   `refactor:`, `docs:`, `perf:`) - follow that. Keep committed artifacts in sync (`.sqlx/`, generated proto, perf
   result) in the same PR as the change that caused them.
@@ -248,3 +258,9 @@ npm run lint
 - A dependency that links ONNX Runtime must have `load-dynamic` forwarded through its wrapper crate and every app that
   pulls it in (`ml_analysis`, `model_provider`, `common_types`, `common_services`, `tasks`, `api`, `worker`,
   `photos_app`); `just check` runs clippy with `--all-features`, so a missing forward fails linting, not only tests.
+- In the optional monitoring stack (`--profile monitoring`), Grafana connects to the compose database service
+  (`database:5432`), not the standalone host dev Postgres. Grafana's datasource provisioning expands `$__env{...}`
+  without escape syntax, so avoid `$` in `POSTGRES_PASSWORD`.
+- Backend logs are written as daily rolling JSON files to `<app_data>/logs/photos.YYYY-MM-DD.log` (settings:
+  `logging.file.*`). Alloy tails them read-only and pushes to Loki, where Grafana queries them with
+  `{job="photos-backend"} | json`.
