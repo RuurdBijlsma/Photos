@@ -94,8 +94,6 @@ running. To search them and see dashboards for the job queue and ingest health, 
 the optional Grafana + Loki stack:
 
 ```bash
-wget https://github.com/ruurdbijlsma/Photos/releases/latest/download/monitoring.zip
-unzip monitoring.zip
 docker compose --profile monitoring up -d
 ```
 
