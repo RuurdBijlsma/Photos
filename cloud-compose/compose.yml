@@ -101,6 +101,8 @@ services:
       POSTGRES_USER: ${DB_USER:-photos_user}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-dev-password}
       POSTGRES_DB: ${DB_NAME:-photos}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
     volumes:
       - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
       - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro

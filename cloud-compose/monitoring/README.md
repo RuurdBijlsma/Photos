@@ -72,6 +72,19 @@ Useful starting points in Grafana's Explore:
 The dashboard is provisioned from `grafana/dashboards/`; edits made in the UI are not
 saved back (`allowUiUpdates: false`).
 
+## Telegram alerts
+
+Grafana Unified Alerting is provisioned under `grafana/provisioning/alerting/` with a default
+contact point for Telegram:
+
+1. Create a bot using [@BotFather](https://t.me/BotFather) and copy the token.
+2. Message [@userinfobot](https://t.me/userinfobot) or start a chat with your bot to get your chat ID.
+3. Set `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` in your `.env`.
+
+Default provisioned alert rules:
+- **`ALERT:` Macro**: Fires immediately if any Rust backend component logs via the `alert!` macro.
+- **Background Job Failures**: Fires if background jobs fail within a 5-minute window.
+
 ## Caveats
 
 - **Passwords**: Grafana's provisioning loader expands `$__env{...}` and has no
