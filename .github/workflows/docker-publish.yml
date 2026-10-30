@@ -108,8 +108,12 @@ jobs:
 
       - name: Set lowercase image names
         run: |
-          echo "SERVER_IMAGE_NAME=$(echo '${{ github.repository_owner }}/photos-server' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
-          echo "WEB_IMAGE_NAME=$(echo '${{ github.repository_owner }}/photos-web' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+          OWNER_LC=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')
+          echo "SERVER_IMAGE_NAME=${OWNER_LC}/photos-server" >> $GITHUB_ENV
+          echo "WEB_IMAGE_NAME=${OWNER_LC}/photos-web" >> $GITHUB_ENV
+          echo "LOKI_IMAGE_NAME=${OWNER_LC}/photos-loki" >> $GITHUB_ENV
+          echo "ALLOY_IMAGE_NAME=${OWNER_LC}/photos-alloy" >> $GITHUB_ENV
+          echo "GRAFANA_IMAGE_NAME=${OWNER_LC}/photos-grafana" >> $GITHUB_ENV
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -174,11 +178,66 @@ jobs:
           DIGESTS=$(ls * | awk -v repo="${{ env.REGISTRY }}/${{ env.WEB_IMAGE_NAME }}" '{print repo "@sha256:" $1}')
           docker buildx imagetools create $TAGS $DIGESTS
 
-      # Package the optional monitoring stack as `monitoring/` at the archive root, so
-      # unzipping it beside compose.yml matches the paths that file mounts.
-      - name: Package monitoring stack
-        working-directory: cloud-compose
-        run: zip -r ../monitoring.zip monitoring
+      # Build and push monitoring images (config-only, no compiled code — cross-build is instant)
+      - name: Extract Metadata for Loki Image
+        id: meta-loki
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.LOKI_IMAGE_NAME }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest
+
+      - name: Extract Metadata for Alloy Image
+        id: meta-alloy
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.ALLOY_IMAGE_NAME }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest
+
+      - name: Extract Metadata for Grafana Image
+        id: meta-grafana
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.GRAFANA_IMAGE_NAME }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest
+
+      - name: Build and Push Loki Image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./cloud-compose/monitoring/loki
+          file: ./cloud-compose/monitoring/loki/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta-loki.outputs.tags }}
+          labels: ${{ steps.meta-loki.outputs.labels }}
+
+      - name: Build and Push Alloy Image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./cloud-compose/monitoring/alloy
+          file: ./cloud-compose/monitoring/alloy/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta-alloy.outputs.tags }}
+          labels: ${{ steps.meta-alloy.outputs.labels }}
+
+      - name: Build and Push Grafana Image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./cloud-compose/monitoring/grafana
+          file: ./cloud-compose/monitoring/grafana/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta-grafana.outputs.tags }}
+          labels: ${{ steps.meta-grafana.outputs.labels }}
 
       # Attach compose.yml and example.env directly to the GitHub Release
       - name: Upload Compose files to GitHub Release
@@ -187,4 +246,3 @@ jobs:
           files: |
             cloud-compose/compose.yml
             example.env
-            monitoring.zip

@@ -58,9 +58,8 @@ services:
 
   # Optional monitoring stack. Off by default:
   #   docker compose --profile monitoring up -d
-  # Requires `monitoring/` (from the release assets) beside this file.
   loki:
-    image: grafana/loki:3.7.9
+    image: ghcr.io/ruurdbijlsma/photos-loki:latest
     container_name: photos_loki
     restart: unless-stopped
     profiles: ["monitoring"]
@@ -70,11 +69,10 @@ services:
     environment:
       LOKI_RETENTION_DAYS: ${LOKI_RETENTION_DAYS:-30}
     volumes:
-      - ./monitoring/loki/config.yaml:/etc/loki/config.yaml:ro
       - photos_loki_data:/loki
 
   alloy:
-    image: grafana/alloy:v1.21.3
+    image: ghcr.io/ruurdbijlsma/photos-alloy:latest
     container_name: photos_alloy
     restart: unless-stopped
     profiles: ["monitoring"]
@@ -83,14 +81,13 @@ services:
       - /etc/alloy/config.alloy
       - --storage.path=/var/lib/alloy/data
     volumes:
-      - ./monitoring/alloy/config.alloy:/etc/alloy/config.alloy:ro
       - photos_alloy_data:/var/lib/alloy/data
       - ${APP_DATA_LOCATION:-photos_app_data}:/app_data:ro
     depends_on:
       - loki
 
   grafana:
-    image: grafana/grafana:13.3.0
+    image: ghcr.io/ruurdbijlsma/photos-grafana:latest
     container_name: photos_grafana
     restart: unless-stopped
     profiles: ["monitoring"]
@@ -104,8 +101,6 @@ services:
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
     volumes:
-      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
-      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
       - photos_grafana_data:/var/lib/grafana
     depends_on:
       - loki

@@ -3,16 +3,17 @@
 Logs survive container restarts and are searchable, and Grafana charts the job queue
 and ingest health straight from the app's own Postgres tables.
 
-This directory is optional. The default install (`docker compose up -d`) never
+The monitoring stack is optional. The default install (`docker compose up -d`) never
 starts any of it.
 
 ## Enable
 
-Unzip `monitoring.zip` beside `compose.yml`, then:
-
 ```bash
 docker compose --profile monitoring up -d
 ```
+
+That's it — the monitoring config is baked into the images, so no extra files are
+needed beside `compose.yml`.
 
 Open <http://localhost:9476>. The login is `admin` and `GRAFANA_ADMIN_PASSWORD` from
 your `.env` (default `admin` — change it, the container can read your database
@@ -28,9 +29,9 @@ docker compose stop photos_loki photos_alloy photos_grafana
 
 | Service | Image | Purpose | Port |
 | --- | --- | --- | --- |
-| `loki` | `grafana/loki:3.7.9` | Log store, filesystem + TSDB, retention | none published |
-| `alloy` | `grafana/alloy:v1.21.3` | Tails `<app_data>/logs` and pushes to Loki | none published |
-| `grafana` | `grafana/grafana:13.3.0` | UI, provisioned datasources and dashboard | `${GRAFANA_PORT:-9476}` |
+| `loki` | `photos-loki` | Log store, filesystem + TSDB, retention | none published |
+| `alloy` | `photos-alloy` | Tails `<app_data>/logs` and pushes to Loki | none published |
+| `grafana` | `photos-grafana` | UI, provisioned datasources and dashboard | `${GRAFANA_PORT:-9476}` |
 
 Only Grafana publishes a port, because it is the only one with a login. Loki and
 Alloy have no authentication at all.
@@ -69,13 +70,12 @@ Useful starting points in Grafana's Explore:
 {job="photos-backend"} | json | target = "api::server"
 ```
 
-The dashboard is provisioned from `grafana/dashboards/`; edits made in the UI are not
-saved back (`allowUiUpdates: false`).
+The dashboard is provisioned read-only; edits made in the UI are not saved back
+(`allowUiUpdates: false`).
 
 ## Telegram alerts
 
-Grafana Unified Alerting is provisioned under `grafana/provisioning/alerting/` with a default
-contact point for Telegram:
+Grafana Unified Alerting is provisioned with a default contact point for Telegram:
 
 1. Create a bot using [@BotFather](https://t.me/BotFather) and copy the token.
 2. Message [@userinfobot](https://t.me/userinfobot) or start a chat with your bot to get your chat ID.
@@ -89,7 +89,7 @@ Default provisioned alert rules:
 
 - **Passwords**: Grafana's provisioning loader expands `$__env{...}` and has no
   default syntax, so a `$` inside `DB_PASSWORD` will be mangled. Avoid `$` in that
-  password, or edit `grafana/provisioning/datasources/postgres.yml`.
+  password, or override the datasource provisioning by mounting a custom file.
 - **Podman**: the "off by default" guarantee assumes a Compose implementation that
   honours `profiles`. If `podman compose up` starts `photos_loki`/`photos_alloy`/
   `photos_grafana` without the flag, your podman-compose version ignores profiles —

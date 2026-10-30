@@ -127,7 +127,8 @@ npm run preview      # serve dist/ on :4173, proxies to :5272
 Docker: `docker compose up -d` needs `MEDIA_LOCATION` and `JWT_SECRET` in the root `.env`; the UI is on port 9475.
 Development can also use `podman` instead of docker.
 To run the optional observability stack alongside it: `docker compose --profile monitoring up -d` (Grafana is on port
-9476; dev login `admin` / `kibbeling`).
+9476; dev login `admin` / `kibbeling`). The monitoring config is baked into dedicated images (`photos-loki`,
+`photos-alloy`, `photos-grafana`), so no extra files are needed beside `compose.yml`.
 
 ## Testing
 
@@ -232,8 +233,9 @@ npm run lint
   clippy` locally are the real gate.
 - `Web CI` (`web-quality.yml`): `npm ci`, `lint:oxlint`, `lint:eslint`, `build`, `prettier:check`.
 - `Frontend Performance Regression` (`perf-gate.yml`): every PR touching `web/**` must add a perf result file.
-- Releases publish multi-arch Docker images and attach `cloud-compose/compose.yml` + `example.env` + `monitoring.zip`
-  (packaged `cloud-compose/monitoring/`); `pages.yml` deploys the web client as a demo (built with `GITHUB_PAGES=true`).
+- Releases publish multi-arch Docker images (server, web, and three monitoring images: loki, alloy, grafana) and attach
+  `cloud-compose/compose.yml` + `example.env`; `pages.yml` deploys the web client as a demo (built with
+  `GITHUB_PAGES=true`).
 - Branch from `develop`; PRs target `main`. History uses conventional prefixes (`feat:`, `fix:`, `chore:`,
   `refactor:`, `docs:`, `perf:`) - follow that. Keep committed artifacts in sync (`.sqlx/`, generated proto, perf
   result) in the same PR as the change that caused them.
@@ -272,6 +274,6 @@ npm run lint
   `| regexp `"latency":\s*"(?P<latency_ms>\d+)\s*ms"` | unwrap latency_ms | __error__=""`.
 - When aggregating access logs by `span.uri` with `sum by (uri)`, filter with `| uri != ""` first so log entries without
   an active span do not group into an untitled series named `"Value"`.
-- Compose files are duplicated: the root `compose.yml` mounts `./cloud-compose/monitoring/...` for local testing, while
-  `cloud-compose/compose.yml` mounts `./monitoring/...` for releases. Keep services, mounts, and env variables in sync
-  across both and list defaults in `example.env`.
+- Compose files are duplicated: the root `compose.yml` bind-mounts `./cloud-compose/monitoring/...` for local testing,
+  while `cloud-compose/compose.yml` uses the published `photos-loki`/`photos-alloy`/`photos-grafana` images with config
+  baked in. Keep services and env variables in sync across both and list defaults in `example.env`.
