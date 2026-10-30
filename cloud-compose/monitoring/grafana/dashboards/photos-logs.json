@@ -45,7 +45,7 @@
           "editorMode": "code",
           "rawQuery": true,
           "format": "time_series",
-          "rawSql": "SELECT $__timeGroupAlias(finished_at,$__interval), count(*) FROM jobs WHERE status='failed' AND $__timeFilter(finished_at) GROUP BY 1 ORDER BY 1"
+          "rawSql": "WITH p AS (\n  SELECT $__timeFrom()::timestamptz AS t0, $__timeTo()::timestamptz AS t1, ($__interval_ms * interval '1 millisecond') AS iv\n), b AS (\n  SELECT generate_series(p.t0, p.t1, p.iv) AS t FROM p\n), f AS (\n  SELECT date_bin(p.iv, j.finished_at, p.t0) AS bin, count(*) AS n FROM jobs j, p WHERE j.status = 'failed' AND j.finished_at >= p.t0 AND j.finished_at <= p.t1 GROUP BY 1\n)\nSELECT b.t AS time, coalesce(f.n, 0) AS failed FROM b LEFT JOIN f ON f.bin = b.t ORDER BY 1"
         }
       ]
     },
@@ -84,7 +84,7 @@
           "editorMode": "code",
           "rawQuery": true,
           "format": "table",
-          "rawSql": "SELECT last_error, count(*) AS occurrences, max(finished_at) AS last_seen FROM jobs WHERE status='failed' AND $__timeFilter(finished_at) GROUP BY last_error ORDER BY occurrences DESC LIMIT 20"
+          "rawSql": "WITH failures AS (\n  SELECT coalesce(last_error, 'Unknown error') AS last_error, count(*)::bigint AS occurrences, max(finished_at) AS last_seen\n  FROM jobs\n  WHERE status = 'failed' AND $__timeFilter(finished_at)\n  GROUP BY 1\n)\nSELECT last_error, occurrences, last_seen FROM failures\nUNION ALL\nSELECT 'None' AS last_error, 0::bigint AS occurrences, NULL::timestamptz AS last_seen\nWHERE NOT EXISTS (SELECT 1 FROM failures)\nORDER BY occurrences DESC\nLIMIT 20"
         }
       ]
     },
@@ -160,11 +160,19 @@
       ]
     },
     {
+      "id": 12,
+      "type": "row",
+      "title": "Logs",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 23 },
+      "panels": []
+    },
+    {
       "id": 6,
       "type": "timeseries",
       "title": "Error log volume",
       "description": "Count of ERROR lines in the shipped JSON logs.",
-      "gridPos": { "h": 7, "w": 24, "x": 0, "y": 23 },
+      "gridPos": { "h": 7, "w": 24, "x": 0, "y": 24 },
       "datasource": { "type": "loki", "uid": "loki" },
       "targets": [
         {
@@ -179,7 +187,7 @@
       "type": "logs",
       "title": "Backend log stream",
       "description": "Every line, including request spans. Use `| json` to filter on any field.",
-      "gridPos": { "h": 16, "w": 24, "x": 0, "y": 22 },
+      "gridPos": { "h": 16, "w": 24, "x": 0, "y": 31 },
       "datasource": { "type": "loki", "uid": "loki" },
       "options": {
         "showTime": true,
