@@ -22,7 +22,7 @@ fn parse_job_type(s: &str) -> Result<JobType, String> {
 #[tokio::main]
 #[allow(clippy::large_futures)]
 async fn main() -> Result<()> {
-    let (settings, pool) = setup_binary().await?;
+    let (settings, pool, _log_guard) = setup_binary().await?;
     let kill_signal = get_kill_signal();
     let excluded_jobs = Args::parse().exclude;
     let models = WorkerModels::load_for_jobs(&settings, &excluded_jobs).await?;

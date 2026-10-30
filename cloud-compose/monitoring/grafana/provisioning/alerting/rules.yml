@@ -1,0 +1,104 @@
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: Photos Alerts
+    folder: Photos
+    interval: 1m
+    rules:
+      - uid: photos_alert_macro
+        title: Photos backend ALERT! log fired
+        condition: B
+        data:
+          - refId: A
+            queryType: range
+            relativeTimeRange:
+              from: 60
+              to: 0
+            datasourceUid: loki
+            model:
+              editorMode: code
+              expr: sum(count_over_time({job="photos-backend"} |= "ALERT:" [1m]))
+              queryType: range
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - A
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              reducer: last
+              refId: B
+              type: threshold
+        noDataState: OK
+        execErrState: Error
+        for: 0s
+        annotations:
+          summary: Photos backend ALERT! log fired
+          description: A log line with 'ALERT:' prefix was recorded in the backend log within the last minute.
+        labels:
+          severity: critical
+
+      - uid: photos_job_failures
+        title: Photos background job failed
+        condition: B
+        data:
+          - refId: A
+            queryType: table
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: postgres
+            model:
+              editorMode: code
+              format: table
+              rawQuery: true
+              rawSql: "SELECT count(*)::bigint AS failed_count FROM jobs WHERE status = 'failed' AND finished_at >= NOW() - INTERVAL '5 minutes'"
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - A
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              reducer: last
+              refId: B
+              type: threshold
+        noDataState: OK
+        execErrState: Error
+        for: 1m
+        annotations:
+          summary: Background job failures detected
+          description: One or more background jobs failed in the last 5 minutes.
+        labels:
+          severity: warning

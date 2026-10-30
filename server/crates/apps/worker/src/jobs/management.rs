@@ -257,8 +257,7 @@ async fn reschedule_for_retry(
     backoff_secs: i64,
     last_error: &str,
 ) -> Result<()> {
-    warn!("⚠️ Rescheduling job {}. Backoff: {}s", job_id, backoff_secs);
-    println!("{last_error}");
+    warn!("⚠️ Rescheduling job {job_id}. Backoff: {backoff_secs}s: {last_error}");
     let scheduled_at = Utc::now() + Duration::seconds(backoff_secs);
     sqlx::query!(
         "UPDATE jobs SET status = 'queued', scheduled_at = $2, attempts = attempts + 1, owner = NULL, started_at = NULL, last_error = $3 WHERE id = $1 AND status <> 'cancelled'",

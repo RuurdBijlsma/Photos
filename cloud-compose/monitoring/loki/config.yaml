@@ -1,0 +1,47 @@
+# Loki, single binary, filesystem storage.
+# Retention lives in `limits_config` but is only enforced by the compactor, which
+# refuses to start without `delete_request_store`.
+auth_enabled: false
+
+server:
+  http_listen_port: 3100
+  grpc_listen_port: 9096
+
+common:
+  path_prefix: /loki
+  replication_factor: 1
+  ring:
+    kvstore:
+      store: inmemory
+
+storage_config:
+  tsdb_shipper:
+    active_index_directory: /loki/tsdb-index
+    cache_location: /loki/tsdb-cache
+  filesystem:
+    directory: /loki/chunks
+
+schema_config:
+  configs:
+    - from: "2024-04-01"
+      store: tsdb
+      object_store: filesystem
+      schema: v13
+      index:
+        prefix: index_
+        period: 24h
+
+limits_config:
+  # `LOKI_RETENTION_DAYS` is expanded by `-config.expand-env=true`.
+  retention_period: "${LOKI_RETENTION_DAYS:-30}d"
+  # Deliberately off: Alloy ships the log files already on disk the first time the
+  # profile is enabled, and those lines carry old timestamps.
+  reject_old_samples: false
+
+compactor:
+  working_directory: /loki/compactor
+  compaction_interval: 10m
+  retention_enabled: true
+  delete_request_store: filesystem
+  retention_delete_delay: 2h
+  retention_delete_worker_count: 150

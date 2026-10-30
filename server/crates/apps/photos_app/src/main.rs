@@ -10,7 +10,7 @@ use std::sync::Arc;
 #[allow(clippy::large_futures)]
 async fn main() -> Result<()> {
     let options = AppOptions::parse();
-    let (settings, pool) = setup_binary().await?;
+    let (settings, pool, _log_guard) = setup_binary().await?;
     let shutdown_rx = get_kill_signal();
 
     let model_provider = Arc::new(ModelProvider::new(

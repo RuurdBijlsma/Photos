@@ -789,7 +789,7 @@ if (!timelineStore.isInitialized) timelineStore.initialize()
 <template>
   <div class="timeline-container">
     <main-layout-container>
-      <selection-overlay />
+      <selection-overlay :items="timelineStore.mediaItems" />
       <date-overlay :date="overlayDate" @date-picked="onDatePick" />
       <teleport to="body">
         <router-view />

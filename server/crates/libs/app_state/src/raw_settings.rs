@@ -125,7 +125,50 @@ pub struct VideoThumbOptions {
 /// Logging configuration.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct LoggingSettings {
+    /// Console (stdout) sink filters.
     pub filters: LoggingFilterSettings,
+    /// Machine-readable file sink. Defaulted so settings files written before it existed still load.
+    #[serde(default)]
+    pub file: FileLoggingSettings,
+}
+
+/// Configuration for the JSON file sink under `app_data/logs`.
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct FileLoggingSettings {
+    pub enabled: bool,
+    /// Own filter set: the console's debug targets would otherwise flood the archive.
+    pub filters: LoggingFilterSettings,
+    /// Number of daily files kept; the appender deletes the oldest on rotation.
+    pub max_files: usize,
+}
+
+impl Default for FileLoggingSettings {
+    fn default() -> Self {
+        let targets = [
+            ("ort", "warn"),
+            ("hf_hub", "error"),
+            ("xet_client", "warn"),
+            ("xet_data", "warn"),
+            ("xet_runtime", "warn"),
+            ("xet", "warn"),
+            ("open_clip_inference", "warn"),
+            ("object_detector", "warn"),
+            ("face_id", "warn"),
+            ("sqlx", "warn"),
+        ]
+        .into_iter()
+        .map(|(target, level)| (target.to_owned(), level.to_owned()))
+        .collect();
+
+        Self {
+            enabled: true,
+            filters: LoggingFilterSettings {
+                main: "info".to_owned(),
+                targets,
+            },
+            max_files: 7,
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -234,4 +277,34 @@ pub struct RawScalerSettings {
     pub system_memory_buffer_maximum_mb: u64,
     pub unload_models_timeout_secs: u64,
     pub profiles: HashMap<String, RawProfileSettings>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{FileLoggingSettings, LoggingSettings};
+
+    fn parse_logging(yaml: &str) -> LoggingSettings {
+        config::Config::builder()
+            .add_source(config::File::from_str(yaml, config::FileFormat::Yaml))
+            .build()
+            .expect("test config builds")
+            .try_deserialize()
+            .expect("test logging settings deserialize")
+    }
+
+    #[test]
+    fn logging_settings_default_file_block_when_absent() {
+        let parsed = parse_logging("filters:\n  main: info\n  targets: {}\n");
+        assert!(parsed.file.enabled);
+        assert_eq!(parsed.file.max_files, 7);
+        assert_eq!(parsed.file.filters.main, "info");
+    }
+
+    #[test]
+    fn file_filter_string_includes_quieted_targets() {
+        let filter_string = FileLoggingSettings::default().filters.to_filter_string();
+        assert!(filter_string.starts_with("info,"));
+        assert!(filter_string.contains("hf_hub=error"));
+        assert!(filter_string.contains("ort=warn"));
+    }
 }

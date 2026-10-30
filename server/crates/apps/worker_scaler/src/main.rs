@@ -8,7 +8,7 @@ use worker_scaler::start_scaler;
 #[tokio::main]
 #[allow(clippy::large_futures)]
 async fn main() -> Result<()> {
-    let (settings, pool) = setup_binary().await?;
+    let (settings, pool, _log_guard) = setup_binary().await?;
     let shutdown_rx = get_kill_signal();
     let model_provider = Arc::new(ModelProvider::new(
         settings.clone(),

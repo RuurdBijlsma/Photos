@@ -64,6 +64,64 @@ services:
       backend:
         condition: service_healthy
 
+  # Optional monitoring stack. Off by default:
+  #   docker compose --profile monitoring up -d
+  # Requires the `monitoring/` directory from the release assets beside this file.
+  loki:
+    image: grafana/loki:3.7.9
+    container_name: photos_loki
+    restart: unless-stopped
+    profiles: ["monitoring"]
+    command:
+      - -config.file=/etc/loki/config.yaml
+      - -config.expand-env=true
+    environment:
+      LOKI_RETENTION_DAYS: ${LOKI_RETENTION_DAYS:-30}
+    volumes:
+      - ./cloud-compose/monitoring/loki/config.yaml:/etc/loki/config.yaml:ro
+      - photos_loki_data:/loki
+
+  alloy:
+    image: grafana/alloy:v1.21.3
+    container_name: photos_alloy
+    restart: unless-stopped
+    profiles: ["monitoring"]
+    command:
+      - run
+      - /etc/alloy/config.alloy
+      - --storage.path=/var/lib/alloy/data
+    volumes:
+      - ./cloud-compose/monitoring/alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - photos_alloy_data:/var/lib/alloy/data
+      - ${APP_DATA_LOCATION:-photos_app_data}:/app_data:ro
+    depends_on:
+      - loki
+
+  grafana:
+    image: grafana/grafana:13.3.0
+    container_name: photos_grafana
+    restart: unless-stopped
+    profiles: ["monitoring"]
+    ports:
+      - "${GRAFANA_PORT:-9476}:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      POSTGRES_USER: ${DB_USER:-photos_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-dev-password}
+      POSTGRES_DB: ${DB_NAME:-photos}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+    volumes:
+      - ./cloud-compose/monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./cloud-compose/monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - photos_grafana_data:/var/lib/grafana
+    depends_on:
+      - loki
+      - database
+
 volumes:
   photos_pgdata:
   photos_app_data:
+  photos_loki_data:
+  photos_alloy_data:
+  photos_grafana_data:

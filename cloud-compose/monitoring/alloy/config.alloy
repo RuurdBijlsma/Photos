@@ -1,0 +1,49 @@
+// Ships the app's JSON log files to Loki.
+//
+// The app writes one file per UTC day (`photos.YYYY-MM-DD.log`) and never renames
+// them, so a new file is a new path with no stored position: `tail_from_end = false`
+// reads it from the top. Re-shipping on restart is prevented by the positions file
+// under /var/lib/alloy/data, not by the tail setting.
+
+local.file_match "photos_logs" {
+  path_targets = [
+    {
+      __path__ = "/app_data/logs/*.log*",
+      service  = "photos",
+      job      = "photos-backend",
+    },
+  ]
+  sync_period = "10s"
+}
+
+loki.source.file "photos_logs" {
+  targets       = local.file_match.photos_logs.targets
+  forward_to    = [loki.process.photos_logs.receiver]
+  tail_from_end = false
+}
+
+loki.process "photos_logs" {
+  forward_to = [loki.write.loki.receiver]
+
+  // Promote only the two bounded-cardinality fields to labels; everything else
+  // (message, span fields, latency, status) stays queryable with `| json`.
+  stage.json {
+    expressions = {
+      level  = "level",
+      target = "target",
+    }
+  }
+
+  stage.labels {
+    values = {
+      level  = "",
+      target = "",
+    }
+  }
+}
+
+loki.write "loki" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}

@@ -1,6 +1,6 @@
 use crate::constants::{
-    CACHE_FOLDER, FACE_CLUSTERS_FOLDER, HUGGINGFACE_CACHE_FOLDER, ON_DEMAND_THUMBNAIL_CACHE_FOLDER,
-    PANO_FOLDER, THUMBNAILS_FOLDER,
+    CACHE_FOLDER, FACE_CLUSTERS_FOLDER, HUGGINGFACE_CACHE_FOLDER, LOGS_FOLDER,
+    ON_DEMAND_THUMBNAIL_CACHE_FOLDER, PANO_FOLDER, THUMBNAILS_FOLDER,
 };
 use crate::{
     AnalyzerSettings, ApiSettings, DailyCardsSettings, FileDetectionSettings, LoggingSettings,
@@ -32,6 +32,7 @@ pub struct IngestSettings {
     pub thumbnails_root: PathBuf,
     pub on_demand_thumbs_cache_root: PathBuf,
     pub cache_root: PathBuf,
+    pub logs_root: PathBuf,
     pub pano_root: PathBuf,
     pub hf_cache_root: PathBuf,
     pub face_clusters_root: PathBuf,
@@ -51,6 +52,7 @@ impl From<RawSettings> for AppSettings {
         let on_demand_thumbs_cache_root = app_data_root.join(ON_DEMAND_THUMBNAIL_CACHE_FOLDER);
         let pano_root = app_data_root.join(PANO_FOLDER);
         let cache_root = app_data_root.join(CACHE_FOLDER);
+        let logs_root = app_data_root.join(LOGS_FOLDER);
         let face_clusters_root = app_data_root.join(FACE_CLUSTERS_FOLDER);
         let thumbnails_root = app_data_root.join(THUMBNAILS_FOLDER);
         let hf_cache_root = app_data_root.join(HUGGINGFACE_CACHE_FOLDER);
@@ -68,6 +70,7 @@ impl From<RawSettings> for AppSettings {
             face_clusters_root,
             thumbnails_root,
             cache_root,
+            logs_root,
         };
 
         let mut scaler_profiles: Vec<ProfileSettings> = raw
