@@ -12,7 +12,7 @@
       "id": 1,
       "type": "timeseries",
       "title": "Job queue depth",
-      "description": "Queued vs running jobs over time, from the app's own jobs table.",
+      "description": "Jobs in flight at each point in time, split into not-yet-started and started. Reconstructed from created/started/finished timestamps, so a retried job counts as queued from its creation.",
       "gridPos": { "h": 7, "w": 12, "x": 0, "y": 0 },
       "datasource": { "type": "postgres", "uid": "postgres" },
       "targets": [
@@ -21,7 +21,7 @@
           "editorMode": "code",
           "rawQuery": true,
           "format": "time_series",
-          "rawSql": "SELECT $__timeGroupAlias(created_at,$__interval), count(*) FILTER (WHERE status='queued') AS queued, count(*) FILTER (WHERE status='running') AS running FROM jobs WHERE $__timeFilter(created_at) GROUP BY 1 ORDER BY 1"
+          "rawSql": "WITH p AS (\n  SELECT $__timeFrom()::timestamptz AS t0, $__timeTo()::timestamptz AS t1, ($__interval_ms * interval '1 millisecond') AS iv\n), b AS (\n  SELECT generate_series(p.t0, p.t1, p.iv) AS t FROM p\n), ev AS (\n  SELECT bin, sum(qd) AS qd, sum(rd) AS rd FROM (\n    SELECT date_bin(p.iv, j.created_at, p.t0) AS bin, 1 AS qd, 0 AS rd FROM jobs j, p WHERE j.created_at >= p.t0\n    UNION ALL\n    SELECT date_bin(p.iv, j.started_at, p.t0), -1, 1 FROM jobs j, p WHERE j.started_at >= p.t0\n    UNION ALL\n    SELECT date_bin(p.iv, j.finished_at, p.t0), CASE WHEN j.started_at IS NULL THEN -1 ELSE 0 END, CASE WHEN j.started_at IS NULL THEN 0 ELSE -1 END FROM jobs j, p WHERE j.finished_at >= p.t0\n  ) x GROUP BY 1\n), base AS (\n  SELECT count(*) FILTER (WHERE j.started_at IS NULL OR j.started_at >= p.t0) AS q, count(*) FILTER (WHERE j.started_at < p.t0) AS r FROM jobs j, p WHERE j.created_at < p.t0 AND (j.finished_at IS NULL OR j.finished_at >= p.t0)\n)\nSELECT b.t AS time, base.q + coalesce(sum(ev.qd) OVER (ORDER BY b.t), 0) AS queued, base.r + coalesce(sum(ev.rd) OVER (ORDER BY b.t), 0) AS running FROM b CROSS JOIN base LEFT JOIN ev ON ev.bin = b.t ORDER BY 1"
         }
       ]
     },
