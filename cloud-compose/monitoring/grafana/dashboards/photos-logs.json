@@ -30,7 +30,7 @@
       "type": "timeseries",
       "title": "Failed jobs per interval",
       "description": "Jobs that ended in status 'failed'. Rising failures mean a job type is broken, not that the server is slow.",
-      "gridPos": { "h": 7, "w": 6, "x": 12, "y": 0 },
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 0 },
       "datasource": { "type": "postgres", "uid": "postgres" },
       "fieldConfig": {
         "defaults": {
@@ -46,23 +46,6 @@
           "rawQuery": true,
           "format": "time_series",
           "rawSql": "SELECT $__timeGroupAlias(finished_at,$__interval), count(*) FROM jobs WHERE status='failed' AND $__timeFilter(finished_at) GROUP BY 1 ORDER BY 1"
-        }
-      ]
-    },
-    {
-      "id": 3,
-      "type": "stat",
-      "title": "Media items with failed analysis",
-      "description": "Non-deleted media items whose analysis never succeeded.",
-      "gridPos": { "h": 7, "w": 6, "x": 18, "y": 0 },
-      "datasource": { "type": "postgres", "uid": "postgres" },
-      "targets": [
-        {
-          "refId": "A",
-          "editorMode": "code",
-          "rawQuery": true,
-          "format": "table",
-          "rawSql": "SELECT count(*) AS failed FROM media_item WHERE analysis_status='failed' AND deleted = false"
         }
       ]
     },
@@ -106,11 +89,82 @@
       ]
     },
     {
+      "id": 8,
+      "type": "row",
+      "title": "Media health",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 15 },
+      "panels": []
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Media items with failed analysis",
+      "description": "Cumulative count of non-deleted items whose analysis status is 'failed', placed at each row's updated_at (the table keeps no status history). Ends at the count right now.",
+      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 16 },
+      "datasource": { "type": "postgres", "uid": "postgres" },
+      "fieldConfig": {
+        "defaults": { "custom": { "drawStyle": "line", "lineInterpolation": "stepAfter", "fillOpacity": 10 } },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "editorMode": "code",
+          "rawQuery": true,
+          "format": "time_series",
+          "rawSql": "WITH p AS (\n  SELECT $__timeFrom()::timestamptz AS t0, $__timeTo()::timestamptz AS t1, ($__interval_ms * interval '1 millisecond') AS iv\n), b AS (\n  SELECT generate_series(p.t0, p.t1, p.iv) AS t FROM p\n), ev AS (\n  SELECT date_bin(p.iv, m.updated_at, p.t0) AS bin, count(*) AS n FROM media_item m, p WHERE m.analysis_status = 'failed' AND m.deleted = false AND m.updated_at >= p.t0 GROUP BY 1\n), base AS (\n  SELECT count(*) AS n FROM media_item m, p WHERE m.analysis_status = 'failed' AND m.deleted = false AND m.updated_at < p.t0\n)\nSELECT b.t AS time, base.n + coalesce(sum(ev.n) OVER (ORDER BY b.t), 0) AS failed_analysis FROM b CROSS JOIN base LEFT JOIN ev ON ev.bin = b.t ORDER BY 1"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Media items with failed thumbnails",
+      "description": "Cumulative count of non-deleted items whose thumbnails status is 'failed', placed at each row's updated_at.",
+      "gridPos": { "h": 7, "w": 8, "x": 8, "y": 16 },
+      "datasource": { "type": "postgres", "uid": "postgres" },
+      "fieldConfig": {
+        "defaults": { "custom": { "drawStyle": "line", "lineInterpolation": "stepAfter", "fillOpacity": 10 } },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "editorMode": "code",
+          "rawQuery": true,
+          "format": "time_series",
+          "rawSql": "WITH p AS (\n  SELECT $__timeFrom()::timestamptz AS t0, $__timeTo()::timestamptz AS t1, ($__interval_ms * interval '1 millisecond') AS iv\n), b AS (\n  SELECT generate_series(p.t0, p.t1, p.iv) AS t FROM p\n), ev AS (\n  SELECT date_bin(p.iv, m.updated_at, p.t0) AS bin, count(*) AS n FROM media_item m, p WHERE m.thumbnails_status = 'failed' AND m.deleted = false AND m.updated_at >= p.t0 GROUP BY 1\n), base AS (\n  SELECT count(*) AS n FROM media_item m, p WHERE m.thumbnails_status = 'failed' AND m.deleted = false AND m.updated_at < p.t0\n)\nSELECT b.t AS time, base.n + coalesce(sum(ev.n) OVER (ORDER BY b.t), 0) AS failed_thumbnails FROM b CROSS JOIN base LEFT JOIN ev ON ev.bin = b.t ORDER BY 1"
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "Media items with missing files",
+      "description": "Cumulative count of non-deleted items whose file is missing, placed at missing_since. An item that comes back disappears from this line entirely.",
+      "gridPos": { "h": 7, "w": 8, "x": 16, "y": 16 },
+      "datasource": { "type": "postgres", "uid": "postgres" },
+      "fieldConfig": {
+        "defaults": { "custom": { "drawStyle": "line", "lineInterpolation": "stepAfter", "fillOpacity": 10 } },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "editorMode": "code",
+          "rawQuery": true,
+          "format": "time_series",
+          "rawSql": "WITH p AS (\n  SELECT $__timeFrom()::timestamptz AS t0, $__timeTo()::timestamptz AS t1, ($__interval_ms * interval '1 millisecond') AS iv\n), b AS (\n  SELECT generate_series(p.t0, p.t1, p.iv) AS t FROM p\n), ev AS (\n  SELECT date_bin(p.iv, m.missing_since, p.t0) AS bin, count(*) AS n FROM media_item m, p WHERE m.missing_since IS NOT NULL AND m.deleted = false AND m.missing_since >= p.t0 GROUP BY 1\n), base AS (\n  SELECT count(*) AS n FROM media_item m, p WHERE m.missing_since IS NOT NULL AND m.deleted = false AND m.missing_since < p.t0\n)\nSELECT b.t AS time, base.n + coalesce(sum(ev.n) OVER (ORDER BY b.t), 0) AS missing_items FROM b CROSS JOIN base LEFT JOIN ev ON ev.bin = b.t ORDER BY 1"
+        }
+      ]
+    },
+    {
       "id": 6,
       "type": "timeseries",
       "title": "Error log volume",
       "description": "Count of ERROR lines in the shipped JSON logs.",
-      "gridPos": { "h": 7, "w": 24, "x": 0, "y": 15 },
+      "gridPos": { "h": 7, "w": 24, "x": 0, "y": 23 },
       "datasource": { "type": "loki", "uid": "loki" },
       "targets": [
         {
