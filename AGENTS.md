@@ -213,12 +213,15 @@ npm run lint
   needed. SQL migration files are located at `server/migrations`.
 - **Setting**: add the field to `app_state` (`raw_settings.rs` + `settings.rs`) and to `config/settings.yaml`; expose it
   through the frontend settings/admin API if users should change it at runtime.
-- **Dashboard / Grafana panel**: the dashboard model is in `cloud-compose/monitoring/grafana/dashboards/photos-logs.json`
+- **Dashboard / Grafana panel / Alerting**: the dashboard model is in `cloud-compose/monitoring/grafana/dashboards/photos-logs.json`
   and is provisioned read-only (`allowUiUpdates: false`, polling every 30s) — edit the JSON file directly. Adding new
   panels directly to the main part of the dashboard without a group is fine; if adding panels after a grouped section,
   Grafana's flat JSON puts all subsequent panels inside that group unless separated by an explicit `row` panel. In
   general, Grafana's default `No data` state is expected when a query returns zero rows; only special exceptions 
-  synthesize zero data points or fallback rows.
+  synthesize zero data points or fallback rows. When displaying table rows in a Pie Chart, set
+  `options.reduceOptions.values: true` so each row becomes a slice rather than reducing columns. Alert rules and contact
+  points live under `cloud-compose/monitoring/grafana/provisioning/alerting/`; threshold conditions in rule files require
+  `evaluator:` (e.g. `evaluator: { type: gt, params: [0] }`), not `eval:`.
 
 ## CI and PRs
 
@@ -264,3 +267,11 @@ npm run lint
 - Backend logs are written as daily rolling JSON files to `<app_data>/logs/photos.YYYY-MM-DD.log` (settings:
   `logging.file.*`). Alloy tails them read-only and pushes to Loki, where Grafana queries them with
   `{job="photos-backend"} | json`.
+- `tower_http::trace::DefaultOnResponse` logs request latency formatted as `"X ms"` with a space. Loki's Go duration
+  parser (`duration_seconds()`) fails on spaces with `SampleExtractionErr`. In LogQL, unwrap it using regex:
+  `| regexp `"latency":\s*"(?P<latency_ms>\d+)\s*ms"` | unwrap latency_ms | __error__=""`.
+- When aggregating access logs by `span.uri` with `sum by (uri)`, filter with `| uri != ""` first so log entries without
+  an active span do not group into an untitled series named `"Value"`.
+- Compose files are duplicated: the root `compose.yml` mounts `./cloud-compose/monitoring/...` for local testing, while
+  `cloud-compose/compose.yml` mounts `./monitoring/...` for releases. Keep services, mounts, and env variables in sync
+  across both and list defaults in `example.env`.
