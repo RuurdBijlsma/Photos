@@ -420,11 +420,7 @@ const showCameraSection = computed(() => {
           >
         </div>
       </div>
-      <media-location-map class="map-info" :media-item="mediaItem" />
-      <div class="add-location-text">
-        <v-spacer />
-        <span>Add location info</span>
-      </div>
+      <media-location-map :media-item="mediaItem" />
     </template>
   </div>
 </template>
@@ -617,10 +613,6 @@ const showCameraSection = computed(() => {
   opacity: 0.35;
 }
 
-.map-info {
-  margin: 10px;
-}
-
 .camera-info {
   margin: 8px 20px;
   margin-bottom: 15px;
@@ -715,6 +707,6 @@ const showCameraSection = computed(() => {
 
 .add-location-text {
   display: flex;
-  padding:10px;
+  padding: 10px;
 }
 </style>
