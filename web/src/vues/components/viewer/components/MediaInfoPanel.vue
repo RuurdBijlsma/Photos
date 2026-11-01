@@ -421,6 +421,10 @@ const showCameraSection = computed(() => {
         </div>
       </div>
       <media-location-map class="map-info" :media-item="mediaItem" />
+      <div class="add-location-text">
+        <v-spacer />
+        <span>Add location info</span>
+      </div>
     </template>
   </div>
 </template>
@@ -707,5 +711,10 @@ const showCameraSection = computed(() => {
 
 .exposure-cell:last-child {
   border-right: none;
+}
+
+.add-location-text {
+  display: flex;
+  padding:10px;
 }
 </style>

@@ -233,10 +233,22 @@ async function copyCoordinates() {
 }
 
 .click-info {
-  text-align: center;
-  margin-top: 15px;
-  font-size: 14px;
-  font-weight: 500;
-  color: rgba(var(--v-theme-on-surface-variant), 1);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin-top: 16px;
+}
+
+.coord-chip {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12.5px;
+  letter-spacing: 0.2px;
+}
+
+.click-hint {
+  font-size: 13px;
+  color: rgba(var(--v-theme-on-surface-variant), 0.75);
+  margin: 0;
 }
 </style>

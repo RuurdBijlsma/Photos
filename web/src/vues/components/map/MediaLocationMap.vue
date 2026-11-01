@@ -80,7 +80,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="map-info" v-if="mediaItem?.gps || canEdit">
+  <div class="map-info" v-if="mediaItem?.gps">
     <div class="media-location-map" v-if="mediaItem?.gps">
       <base-map
         class="base-map-comp"
@@ -119,8 +119,7 @@ onUnmounted(() => {
           color="primary"
           class="edit-button"
           @click="locationDialogOpen = true"
-        >
-          {{ mediaItem?.gps ? 'Edit' : 'Add location' }}
+          >Edit
         </v-btn>
       </v-sheet>
     </v-theme-provider>
