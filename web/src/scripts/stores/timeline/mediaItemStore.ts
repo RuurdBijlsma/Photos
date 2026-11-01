@@ -38,7 +38,7 @@ export const useMediaItemStore = defineStore('mediaItem', () => {
       await mediaItemService.update(mediaItemId, itemDetails)
       requestIdleCallback(() => fetchMediaItem(mediaItemId, false))
     } catch (e) {
-      snackbarStore.error(`Failed to update album.`, e as Error)
+      snackbarStore.error(`Failed to update media item.`, e as Error)
     }
   }
 

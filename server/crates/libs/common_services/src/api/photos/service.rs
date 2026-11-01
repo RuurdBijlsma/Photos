@@ -1,5 +1,5 @@
 use crate::api::app_error::AppError;
-use crate::api::photos::interfaces::{UpdateMediaItemRequest, UpdateMediaItemResponse};
+use crate::api::photos::interfaces::{GpsEdit, UpdateMediaItemRequest, UpdateMediaItemResponse};
 use crate::database::app_user::UserRole;
 use crate::database::cached_store::cached_store;
 use crate::database::jobs::JobType;
@@ -7,7 +7,7 @@ use crate::database::media_item::media_item::CreateFullMediaItem;
 use crate::database::media_item_store::MediaItemStore;
 use crate::database::{UpdateField, UpdateMediaItemPayload, with_fallback_timezone};
 use crate::job_queue::enqueue_job;
-use crate::utils::{nice_id, write_exif_orientation};
+use crate::utils::{nice_id, write_exif_orientation, write_media_gps};
 use app_state::{IngestSettings, MakeRelativePath, constants};
 use axum::body::Body;
 use axum_extra::headers::Range;
@@ -532,6 +532,37 @@ pub async fn reprocess_media_item(
     Ok(())
 }
 
+async fn apply_gps_edit(
+    pool: &PgPool,
+    settings: &IngestSettings,
+    media_item_id: &str,
+    user_id: i32,
+    gps: &GpsEdit,
+) -> Result<(), AppError> {
+    if !(-90.0..=90.0).contains(&gps.latitude) || !(-180.0..=180.0).contains(&gps.longitude) {
+        return Err(AppError::BadRequest(format!(
+            "Invalid coordinates: {}, {}",
+            gps.latitude, gps.longitude
+        )));
+    }
+
+    let relative_path = MediaItemStore::find_relative_path_by_id(pool, media_item_id)
+        .await?
+        .ok_or_else(|| AppError::NotFound(media_item_id.to_owned()))?;
+
+    let file_path = settings.media_root.join(&relative_path);
+    if !file_path.exists() {
+        return Err(AppError::BadRequest(
+            "Cannot modify location because the media file is missing from disk.".to_string(),
+        ));
+    }
+
+    write_media_gps(&file_path, gps.latitude, gps.longitude)?;
+
+    // Re-analyze the file so the reverse-geocoded location and weather match the new position.
+    reprocess_media_item(pool, settings, media_item_id, user_id, &relative_path).await
+}
+
 pub async fn update_media_item(
     pool: &PgPool,
     settings: &IngestSettings,
@@ -555,6 +586,7 @@ pub async fn update_media_item(
         use_panorama_viewer,
         timezone_offset_seconds,
         orientation,
+        gps,
     } = payload;
 
     // Validate timezone offset if provided
@@ -598,7 +630,12 @@ pub async fn update_media_item(
         current_id = new_id;
     }
 
-    // 2. Process caption / timestamp / panorama updates if provided
+    // 2. Process GPS update if provided
+    if let Some(gps) = gps {
+        apply_gps_edit(pool, settings, &current_id, user_id, gps).await?;
+    }
+
+    // 3. Process caption / timestamp / panorama updates if provided
     let has_metadata_updates = taken_at_local.is_some()
         || !matches!(user_caption, UpdateField::Ignore)
         || use_panorama_viewer.is_some()

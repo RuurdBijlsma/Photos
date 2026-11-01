@@ -4,6 +4,7 @@ export interface UpdateMediaItemRequest {
   takenAtLocal?: string
   timezoneOffsetSeconds?: number | null
   orientation?: number
+  gps?: { latitude: number; longitude: number }
 }
 
 export interface UpdateMediaItemResponse {

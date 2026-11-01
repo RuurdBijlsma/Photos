@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import MdiArrowTopRight from '~icons/mdi/arrow-top-right'
-import { computed, onUnmounted, shallowRef, watch } from 'vue'
+import { computed, onUnmounted, ref, shallowRef, watch } from 'vue'
 import type { FullMediaItem } from '@/scripts/types/api/fullPhoto.ts'
 import type { SharedMediaItem } from '@/scripts/types/api/album.ts'
 import BaseMap from '@/vues/components/map/BaseMap.vue'
+import EditLocationCard from '@/vues/components/viewer/components/EditLocationCard.vue'
 import { useTheme } from 'vuetify/framework'
 import { makeLocationString } from '@/scripts/utils.ts'
 import { useSettingStore } from '@/scripts/stores/settingsStore.ts'
+import { useAuthStore } from '@/scripts/stores/authStore.ts'
 import { Map as LibreMap, Marker } from 'maplibre-gl'
 
 const props = defineProps<{
@@ -14,6 +16,10 @@ const props = defineProps<{
 }>()
 const theme = useTheme()
 const settings = useSettingStore()
+const authStore = useAuthStore()
+
+const locationDialogOpen = ref(false)
+const canEdit = computed(() => authStore.isAuthenticated && 'user_id' in props.mediaItem)
 
 const mapInstance = shallowRef<LibreMap | null>(null)
 let markerInstance: Marker | null = null
@@ -74,14 +80,13 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="map-info" v-if="mediaItem?.gps">
-    <div class="media-location-map">
+  <div class="map-info" v-if="mediaItem?.gps || canEdit">
+    <div class="media-location-map" v-if="mediaItem?.gps">
       <base-map
-        v-if="props.mediaItem?.gps"
         class="base-map-comp"
-        :map-style="settings.lightPhotoViewerMap || !theme.current.value.dark ? 'LIBERTY' : 'DARK'"
+        :map-style="mapTheme === 'light' ? 'LIBERTY' : 'DARK'"
         :map-options="{
-          center: { lat: props.mediaItem.gps.latitude, lon: props.mediaItem.gps.longitude },
+          center: { lat: mediaItem.gps.latitude, lon: mediaItem.gps.longitude },
           zoom: 9,
           attributionControl: {
             compact: true,
@@ -93,6 +98,7 @@ onUnmounted(() => {
     <v-theme-provider with-background :theme="mapTheme">
       <v-sheet class="map-buttons">
         <a
+          v-if="mediaItem?.gps"
           v-ripple
           :href="`https://www.google.com/maps/place/${mediaItem.gps.latitude},${mediaItem.gps.longitude}`"
           target="_blank"
@@ -103,6 +109,30 @@ onUnmounted(() => {
           }}</span>
           <v-icon size="15" class="ml-2 map-button-icon" :icon="MdiArrowTopRight" />
         </a>
+        <span v-else class="no-location">No location</span>
+
+        <v-dialog v-if="canEdit" max-width="560" persistent v-model="locationDialogOpen">
+          <template v-slot:activator="{ props: activatorProps }">
+            <v-btn
+              variant="plain"
+              density="compact"
+              rounded
+              color="primary"
+              class="edit-button"
+              v-bind="activatorProps"
+            >
+              {{ mediaItem?.gps ? 'Edit' : 'Add location' }}
+            </v-btn>
+          </template>
+
+          <template v-slot:default="{ isActive }">
+            <edit-location-card
+              v-if="'user_id' in mediaItem"
+              :media-item="mediaItem"
+              @close-dialog="isActive.value = false"
+            />
+          </template>
+        </v-dialog>
       </v-sheet>
     </v-theme-provider>
   </div>
@@ -116,6 +146,10 @@ onUnmounted(() => {
 
 .map-buttons {
   background-color: rgba(var(--v-theme-surface), 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-right: 6px;
 }
 
 .map-buttons a {
@@ -127,6 +161,20 @@ onUnmounted(() => {
   font-weight: 500;
   font-size: 13px;
   padding: 7px 20px;
+  flex: 1;
+  min-width: 0;
+}
+
+.no-location {
+  color: rgba(var(--v-theme-on-surface-variant), 1);
+  font-weight: 500;
+  font-size: 13px;
+  padding: 7px 20px;
+  opacity: 0.7;
+}
+
+.edit-button {
+  font-size: 14px;
 }
 
 .map-button-icon {

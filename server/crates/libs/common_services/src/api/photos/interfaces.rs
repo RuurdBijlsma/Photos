@@ -34,6 +34,15 @@ pub struct UpdateMediaItemRequest {
     pub timezone_offset_seconds: UpdateField<i32>,
     #[serde(default)]
     pub orientation: Option<i32>,
+    #[serde(default)]
+    pub gps: Option<GpsEdit>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct GpsEdit {
+    pub latitude: f64,
+    pub longitude: f64,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
