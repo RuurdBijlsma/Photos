@@ -19,10 +19,14 @@ const theme = useTheme()
 const latitude = ref<number | string>(props.mediaItem.gps?.latitude ?? '')
 const longitude = ref<number | string>(props.mediaItem.gps?.longitude ?? '')
 const saving = ref(false)
+const showManualInput = ref(false)
 
-const mapStyle = computed(() =>
-  settings.lightPhotoViewerMap || !theme.current.value.dark ? 'LIBERTY' : 'DARK',
+const mapTheme = computed(() =>
+  settings.lightPhotoViewerMap || !theme.current.value.dark ? 'light' : 'dark',
 )
+const mapStyle = computed(() => (mapTheme.value === 'light' ? 'LIBERTY' : 'DARK'))
+const primaryColor = computed(() => String(theme.themes.value[mapTheme.value].colors.primary))
+const bgColor = computed(() => String(theme.themes.value[mapTheme.value].colors['on-primary']))
 
 const coordinates = computed(() => {
   const lat = Number(latitude.value)
@@ -54,7 +58,7 @@ function moveMarker() {
   if (marker) {
     marker.setLngLat(position)
   } else {
-    marker = new Marker().setLngLat(position).addTo(mapInstance)
+    marker = new Marker({ color: primaryColor.value }).setLngLat(position).addTo(mapInstance)
   }
 }
 
@@ -93,6 +97,7 @@ async function save() {
 
     <div class="map-picker">
       <base-map
+        class="base-map"
         :map-style="mapStyle"
         :map-options="mapOptions"
         show-zoom-buttons
@@ -100,26 +105,50 @@ async function save() {
       />
     </div>
 
-    <p class="hint">Click the map to place the pin, or type the coordinates.</p>
+    <v-expand-transition>
+      <div v-if="showManualInput" class="coordinates">
+        <v-text-field
+          v-model.number="latitude"
+          type="number"
+          label="Latitude"
+          variant="outlined"
+          base-color="outline"
+          color="primary"
+          density="comfortable"
+          rounded
+          hide-details
+        />
+        <v-text-field
+          v-model.number="longitude"
+          type="number"
+          label="Longitude"
+          variant="outlined"
+          base-color="outline"
+          color="primary"
+          density="comfortable"
+          rounded
+          hide-details
+        />
+      </div>
+    </v-expand-transition>
 
-    <div class="coordinates">
-      <v-text-field
-        v-model.number="latitude"
-        type="number"
-        label="Latitude"
-        density="compact"
-        hide-details
-      />
-      <v-text-field
-        v-model.number="longitude"
-        type="number"
-        label="Longitude"
-        density="compact"
-        hide-details
-      />
-    </div>
-
-    <v-card-actions class="mt-7">
+    <v-card-actions class="mt-5">
+      <p class="hint">
+        <span v-if="coordinates.valid">
+          {{ coordinates.lat.toFixed(5) }}, {{ coordinates.lon.toFixed(5) }}
+        </span>
+        <span v-else>Click the map to place the pin.</span>
+        <v-btn
+          variant="text"
+          density="compact"
+          size="small"
+          class="manual-toggle"
+          @click="showManualInput = !showManualInput"
+        >
+          {{ showManualInput ? 'Hide input' : 'Enter manually' }}
+        </v-btn>
+      </p>
+      <v-spacer />
       <v-btn variant="text" rounded @click="emit('closeDialog')"> Cancel </v-btn>
       <v-btn
         variant="tonal"
@@ -148,15 +177,34 @@ async function save() {
   overflow: hidden;
 }
 
+.base-map {
+  width: 100%;
+  height: 100%;
+}
+
 .hint {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   font-size: 13px;
   opacity: 0.7;
   margin-top: 10px;
+  min-height: 32px;
+}
+
+.manual-toggle {
+  font-size: 12px;
+  margin-left: 10px;
 }
 
 .coordinates {
   display: flex;
   gap: 12px;
-  margin-top: 10px;
+  margin-top: 30px;
+}
+
+/* Custom styling for MapLibre GL default SVG marker, matching the info panel map */
+:deep(.maplibregl-marker circle) {
+  fill: v-bind(bgColor) !important;
 }
 </style>

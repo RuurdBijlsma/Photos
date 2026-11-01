@@ -111,30 +111,27 @@ onUnmounted(() => {
         </a>
         <span v-else class="no-location">No location</span>
 
-        <v-dialog v-if="canEdit" max-width="560" persistent v-model="locationDialogOpen">
-          <template v-slot:activator="{ props: activatorProps }">
-            <v-btn
-              variant="plain"
-              density="compact"
-              rounded
-              color="primary"
-              class="edit-button"
-              v-bind="activatorProps"
-            >
-              {{ mediaItem?.gps ? 'Edit' : 'Add location' }}
-            </v-btn>
-          </template>
-
-          <template v-slot:default="{ isActive }">
-            <edit-location-card
-              v-if="'user_id' in mediaItem"
-              :media-item="mediaItem"
-              @close-dialog="isActive.value = false"
-            />
-          </template>
-        </v-dialog>
+        <v-btn
+          v-if="canEdit"
+          variant="plain"
+          density="compact"
+          rounded
+          color="primary"
+          class="edit-button"
+          @click="locationDialogOpen = true"
+        >
+          {{ mediaItem?.gps ? 'Edit' : 'Add location' }}
+        </v-btn>
       </v-sheet>
     </v-theme-provider>
+
+    <v-dialog v-if="canEdit" max-width="560" persistent v-model="locationDialogOpen">
+      <edit-location-card
+        v-if="'user_id' in mediaItem"
+        :media-item="mediaItem"
+        @close-dialog="locationDialogOpen = false"
+      />
+    </v-dialog>
   </div>
 </template>
 
