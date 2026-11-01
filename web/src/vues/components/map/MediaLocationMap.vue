@@ -180,6 +180,7 @@ onUnmounted(() => {
 }
 
 .media-location-map {
+  --marker-dot-color: v-bind(bgColor);
   width: 100%;
   height: 300px;
   position: relative;
@@ -188,10 +189,5 @@ onUnmounted(() => {
 .base-map-comp {
   width: 100%;
   height: 100%;
-}
-
-/* Custom styling for MapLibre GL default SVG marker */
-:deep(.maplibregl-marker circle) {
-  fill: v-bind(bgColor) !important;
 }
 </style>

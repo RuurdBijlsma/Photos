@@ -175,6 +175,7 @@ async function save() {
   height: 300px;
   border-radius: 16px;
   overflow: hidden;
+  --marker-dot-color: v-bind(bgColor);
 }
 
 .base-map {
@@ -201,10 +202,5 @@ async function save() {
   display: flex;
   gap: 12px;
   margin-top: 30px;
-}
-
-/* Custom styling for MapLibre GL default SVG marker, matching the info panel map */
-:deep(.maplibregl-marker circle) {
-  fill: v-bind(bgColor) !important;
 }
 </style>
