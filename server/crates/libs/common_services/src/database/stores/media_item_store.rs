@@ -19,6 +19,12 @@ use sqlx::types::Json;
 use sqlx::{Executor, PgTransaction, Postgres};
 use std::path::Path;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ReprocessScope {
+    Full,
+    MetadataOnly,
+}
+
 pub struct MediaItemStore;
 
 impl MediaItemStore {
@@ -108,10 +114,6 @@ impl MediaItemStore {
     }
 
     /// Fetches a full media item with all related analyses and metadata.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the database query fails or the connection pool is invalid.
     #[allow(clippy::too_many_lines)]
     pub async fn find_by_id(
         executor: impl Executor<'_, Database = Postgres>,
@@ -232,7 +234,6 @@ impl MediaItemStore {
             |f| f.to_string_lossy().to_string(),
         );
 
-        // Insert into the main media_item table
         sqlx::query!(
             r#"
             INSERT INTO media_item (
@@ -280,7 +281,7 @@ impl MediaItemStore {
             if let Some(remote_uid) = remote_user_id {
                 Self::update_remote_user_id(&mut **tx, &existing_id, remote_uid).await?;
             }
-            Self::update_full(tx, &existing_id, media_item).await?;
+            Self::update_full(tx, &existing_id, media_item, ReprocessScope::Full).await?;
             Ok(existing_id)
         } else {
             let new_id = nice_id(constants().database.media_item_id_length);
@@ -297,67 +298,144 @@ impl MediaItemStore {
         }
     }
 
-    /// Updates a media item's main attributes and refreshes its child metadata tables.
+    /// Updates a media item's attributes and refreshes child metadata tables.
+    ///
+    /// If `scope == ReprocessScope::Full`, visual analyses are wiped and pipeline statuses reset to `'pending'`.
+    /// If `scope == ReprocessScope::MetadataOnly`, visual analyses and pipeline statuses remain untouched.
+    ///
+    /// Preserves user-customized datetime and timezone offsets if the user has modified either.
     pub async fn update_full(
         tx: &mut PgTransaction<'_>,
         id: &str,
         media_item: &CreateFullMediaItem,
+        scope: ReprocessScope,
     ) -> Result<(), DbError> {
-        // Clear child metadata tables for clean re-insertion
+        // 1. Clear child metadata tables for clean re-insertion
         sqlx::query!(
             r#"
             WITH d1 AS (DELETE FROM gps WHERE media_item_id = $1),
-                 d2 AS (DELETE FROM panorama_config WHERE media_item_id = $1),
-                 d3 AS (DELETE FROM time WHERE media_item_id = $1),
-                 d4 AS (DELETE FROM weather WHERE media_item_id = $1),
-                 d5 AS (DELETE FROM media_features WHERE media_item_id = $1)
+                 d2 AS (DELETE FROM time WHERE media_item_id = $1),
+                 d3 AS (DELETE FROM weather WHERE media_item_id = $1),
+                 d4 AS (DELETE FROM media_features WHERE media_item_id = $1)
             DELETE FROM camera_settings WHERE media_item_id = $1
             "#,
             id
         )
         .execute(&mut **tx)
         .await?;
-        sqlx::query!("DELETE FROM visual_analysis WHERE media_item_id = $1", id)
-            .execute(&mut **tx)
-            .await?;
 
-        // Update main media_item table
+        // 2. Only wipe visual analysis and panorama config if performing a full reprocess
+        if scope == ReprocessScope::Full {
+            sqlx::query!("DELETE FROM panorama_config WHERE media_item_id = $1", id)
+                .execute(&mut **tx)
+                .await?;
+            sqlx::query!("DELETE FROM visual_analysis WHERE media_item_id = $1", id)
+                .execute(&mut **tx)
+                .await?;
+        }
+
+        // 3. Inspect existing time state: keep user edits if either local time OR timezone offset was customized
+        let current = sqlx::query!(
+            r#"
+            SELECT
+                taken_at_local,
+                og_taken_at_local,
+                taken_at_utc,
+                sort_timestamp,
+                timezone_offset_seconds,
+                og_timezone_offset_seconds,
+                timezone_name
+            FROM media_item
+            WHERE id = $1
+            "#,
+            id
+        )
+        .fetch_one(&mut **tx)
+        .await?;
+
+        let is_time_edited = current.taken_at_local != current.og_taken_at_local;
+        let is_tz_edited = current.timezone_offset_seconds != current.og_timezone_offset_seconds;
+        let user_edited_time = is_time_edited || is_tz_edited;
+
+        let (
+            effective_local,
+            effective_utc,
+            effective_og_local,
+            effective_sort_timestamp,
+            effective_tz_name,
+            effective_offset,
+            effective_og_offset,
+        ) = if user_edited_time {
+            (
+                current.taken_at_local,
+                current.taken_at_utc,
+                current.og_taken_at_local,
+                current.sort_timestamp,
+                current.timezone_name,
+                current.timezone_offset_seconds,
+                current.og_timezone_offset_seconds,
+            )
+        } else {
+            let sort_timestamp =
+                with_fallback_timezone(media_item.taken_at_utc, &media_item.taken_at_local);
+            (
+                media_item.taken_at_local,
+                media_item.taken_at_utc,
+                media_item.og_taken_at_local,
+                sort_timestamp,
+                media_item.timezone_name.clone(),
+                media_item.timezone_offset_seconds,
+                media_item.og_timezone_offset_seconds,
+            )
+        };
+
+        // 4. Update the main media_item record
+        let reset_pipeline = scope == ReprocessScope::Full;
+
         sqlx::query!(
             r#"
             UPDATE media_item
-            SET thumbnails_status = 'pending',
-                analysis_status = 'pending',
-                thumbnails_error = NULL,
-                analysis_error = NULL,
-                missing_since = NULL,
-                hash = $2,
-                width = $3,
-                height = $4,
-                is_video = $5,
-                duration_ms = $6,
-                taken_at_local = media_item.taken_at_local,
-                taken_at_utc = media_item.taken_at_utc,
-                og_taken_at_local = media_item.og_taken_at_local,
-                sort_timestamp = media_item.sort_timestamp,
-                orientation = $7,
-                use_panorama_viewer = media_item.use_panorama_viewer,
-                timezone_name = media_item.timezone_name,
-                timezone_offset_seconds = media_item.timezone_offset_seconds,
-                og_timezone_offset_seconds = media_item.og_timezone_offset_seconds,
-                updated_at = now()
+            SET thumbnails_status = CASE WHEN $2::boolean THEN 'pending'::ingest_stage_status ELSE thumbnails_status END,
+                analysis_status   = CASE WHEN $2::boolean THEN 'pending'::ingest_stage_status ELSE analysis_status END,
+                thumbnails_error  = CASE WHEN $2::boolean THEN NULL ELSE thumbnails_error END,
+                analysis_error    = CASE WHEN $2::boolean THEN NULL ELSE analysis_error END,
+                missing_since     = NULL,
+                hash              = $3,
+                width             = $4,
+                height            = $5,
+                is_video          = $6,
+                duration_ms       = $7,
+                taken_at_local    = $8,
+                taken_at_utc      = $9,
+                og_taken_at_local = $10,
+                sort_timestamp    = $11,
+                orientation       = $12,
+                timezone_name     = $13,
+                timezone_offset_seconds    = $14,
+                og_timezone_offset_seconds = $15,
+                updated_at        = now()
             WHERE id = $1
             "#,
             id,
+            reset_pipeline,
             &media_item.hash,
             media_item.width,
             media_item.height,
             media_item.is_video,
             media_item.duration_ms,
+            effective_local,
+            effective_utc,
+            effective_og_local,
+            effective_sort_timestamp,
             media_item.orientation,
+            effective_tz_name,
+            effective_offset,
+            effective_og_offset,
         )
-        .execute(&mut **tx)
-        .await?;
+            .execute(&mut **tx)
+            .await?;
 
+        // 5. Re-insert fresh child metadata records
         Self::insert_child_metadata(tx, id, media_item).await
     }
 

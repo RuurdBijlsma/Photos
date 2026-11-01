@@ -6,8 +6,8 @@ use common_services::api::photos::interfaces::{
     DownloadMediaParams, GeoPhotosParams, UpdateMediaItemRequest, UpdateMediaItemResponse,
 };
 use common_services::api::photos::service::{
-    download_media_file, reprocess_media_item, stream_video_file, thumbnail_on_demand_cached,
-    update_media_item,
+    ReprocessScope, download_media_file, reprocess_media_item, stream_video_file,
+    thumbnail_on_demand_cached, update_media_item,
 };
 use common_services::database::album_store::AlbumStore;
 
@@ -179,6 +179,7 @@ pub async fn reprocess_media_item_handler(
         &media_item_id,
         user.id,
         &relative_path,
+        ReprocessScope::Full,
     )
     .await?;
     Ok(())

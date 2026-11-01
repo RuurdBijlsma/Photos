@@ -5,6 +5,7 @@ use crate::database::cached_store::cached_store;
 use crate::database::jobs::JobType;
 use crate::database::media_item::media_item::CreateFullMediaItem;
 use crate::database::media_item_store::MediaItemStore;
+pub use crate::database::media_item_store::ReprocessScope;
 use crate::database::{UpdateField, UpdateMediaItemPayload, with_fallback_timezone};
 use crate::job_queue::enqueue_job;
 use crate::utils::{nice_id, write_exif_orientation, write_media_gps};
@@ -31,13 +32,7 @@ use tokio_util::codec::{BytesCodec, FramedRead};
 use tokio_util::io::ReaderStream;
 use tracing::{debug, warn};
 
-/// Securely streams a validated media file to the client after performing authorization checks.
-///
-/// # Errors
-///
-/// Returns a `AppError` if path validation fails, the user is not authorized,
-/// the file is not found, the media type is unsupported, or if any file system
-/// or response building error occurs.
+/// Streams a validated media file to the client
 pub async fn download_media_file(
     ingestion: &IngestSettings,
     user_id: i32,
@@ -490,6 +485,7 @@ pub async fn reprocess_media_item(
     media_item_id: &str,
     user_id: i32,
     relative_path: &str,
+    scope: ReprocessScope,
 ) -> Result<(), AppError> {
     let file_path = settings.media_root.join(relative_path);
     if !file_path.exists() {
@@ -512,22 +508,24 @@ pub async fn reprocess_media_item(
 
     let mut tx = pool.begin().await?;
 
-    // Update main item and metadata child tables
-    MediaItemStore::update_full(&mut tx, media_item_id, &create_item).await?;
+    // Update main item and metadata child tables with the specified scope
+    MediaItemStore::update_full(&mut tx, media_item_id, &create_item, scope).await?;
 
     tx.commit().await?;
 
-    // Enqueue worker reprocessing jobs
-    enqueue_job::<()>(pool, settings, JobType::IngestThumbnails)
-        .relative_path(relative_path)
-        .user_id(user_id)
-        .call()
-        .await?;
-    enqueue_job::<()>(pool, settings, JobType::IngestAnalysis)
-        .relative_path(relative_path)
-        .user_id(user_id)
-        .call()
-        .await?;
+    // Only enqueue pipeline worker jobs if this was a Full reprocess
+    if scope == ReprocessScope::Full {
+        enqueue_job::<()>(pool, settings, JobType::IngestThumbnails)
+            .relative_path(relative_path)
+            .user_id(user_id)
+            .call()
+            .await?;
+        enqueue_job::<()>(pool, settings, JobType::IngestAnalysis)
+            .relative_path(relative_path)
+            .user_id(user_id)
+            .call()
+            .await?;
+    }
 
     Ok(())
 }
@@ -559,8 +557,16 @@ async fn apply_gps_edit(
 
     write_media_gps(&file_path, gps.latitude, gps.longitude)?;
 
-    // Re-analyze the file so the reverse-geocoded location and weather match the new position.
-    reprocess_media_item(pool, settings, media_item_id, user_id, &relative_path).await
+    // Re-analyze metadata only without wiping thumbnails or running visual neural analysis
+    reprocess_media_item(
+        pool,
+        settings,
+        media_item_id,
+        user_id,
+        &relative_path,
+        ReprocessScope::MetadataOnly,
+    )
+    .await
 }
 
 pub async fn update_media_item(
@@ -615,7 +621,15 @@ pub async fn update_media_item(
 
         write_exif_orientation(&file_path, *new_orientation)?;
 
-        reprocess_media_item(pool, settings, media_item_id, user_id, &relative_path).await?;
+        reprocess_media_item(
+            pool,
+            settings,
+            media_item_id,
+            user_id,
+            &relative_path,
+            ReprocessScope::Full,
+        )
+        .await?;
 
         let thumb_dir = settings.thumbnails_root.join(media_item_id);
         if thumb_dir.exists() {
@@ -630,7 +644,7 @@ pub async fn update_media_item(
         current_id = new_id;
     }
 
-    // 2. Process GPS update if provided
+    // 2. Process GPS update if provided (metadata-only)
     if let Some(gps) = gps {
         apply_gps_edit(pool, settings, &current_id, user_id, gps).await?;
     }
