@@ -36,7 +36,10 @@ export const useMediaItemStore = defineStore('mediaItem', () => {
   async function updateMediaItem(mediaItemId: string, itemDetails: UpdateMediaItemRequest) {
     try {
       await mediaItemService.update(mediaItemId, itemDetails)
-      requestIdleCallback(() => fetchMediaItem(mediaItemId, false))
+      requestIdleCallback(async () => {
+        await fetchMediaItem(mediaItemId, false)
+        refreshStore.counter++
+      })
     } catch (e) {
       snackbarStore.error(`Failed to update media item.`, e as Error)
     }
