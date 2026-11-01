@@ -334,87 +334,42 @@ impl MediaItemStore {
                 .await?;
         }
 
-        // 3. Inspect existing time state: keep user edits if either local time OR timezone offset was customized
-        let current = sqlx::query!(
-            r#"
-            SELECT
-                taken_at_local,
-                og_taken_at_local,
-                taken_at_utc,
-                sort_timestamp,
-                timezone_offset_seconds,
-                og_timezone_offset_seconds,
-                timezone_name
-            FROM media_item
-            WHERE id = $1
-            "#,
-            id
-        )
-        .fetch_one(&mut **tx)
-        .await?;
-
-        let is_time_edited = current.taken_at_local != current.og_taken_at_local;
-        let is_tz_edited = current.timezone_offset_seconds != current.og_timezone_offset_seconds;
-        let user_edited_time = is_time_edited || is_tz_edited;
-
-        let (
-            effective_local,
-            effective_utc,
-            effective_og_local,
-            effective_sort_timestamp,
-            effective_tz_name,
-            effective_offset,
-            effective_og_offset,
-        ) = if user_edited_time {
-            (
-                current.taken_at_local,
-                current.taken_at_utc,
-                current.og_taken_at_local,
-                current.sort_timestamp,
-                current.timezone_name,
-                current.timezone_offset_seconds,
-                current.og_timezone_offset_seconds,
-            )
-        } else {
-            let sort_timestamp =
-                with_fallback_timezone(media_item.taken_at_utc, &media_item.taken_at_local);
-            (
-                media_item.taken_at_local,
-                media_item.taken_at_utc,
-                media_item.og_taken_at_local,
-                sort_timestamp,
-                media_item.timezone_name.clone(),
-                media_item.timezone_offset_seconds,
-                media_item.og_timezone_offset_seconds,
-            )
-        };
-
-        // 4. Update the main media_item record
+        // 3. Update media_item with a single evaluation of the user edit flag
         let reset_pipeline = scope == ReprocessScope::Full;
+        let fresh_sort_timestamp =
+            with_fallback_timezone(media_item.taken_at_utc, &media_item.taken_at_local);
 
         sqlx::query!(
             r#"
             UPDATE media_item
-            SET thumbnails_status = CASE WHEN $2::boolean THEN 'pending'::ingest_stage_status ELSE thumbnails_status END,
-                analysis_status   = CASE WHEN $2::boolean THEN 'pending'::ingest_stage_status ELSE analysis_status END,
-                thumbnails_error  = CASE WHEN $2::boolean THEN NULL ELSE thumbnails_error END,
-                analysis_error    = CASE WHEN $2::boolean THEN NULL ELSE analysis_error END,
+            SET thumbnails_status = CASE WHEN $2::boolean THEN 'pending'::ingest_stage_status ELSE media_item.thumbnails_status END,
+                analysis_status   = CASE WHEN $2::boolean THEN 'pending'::ingest_stage_status ELSE media_item.analysis_status END,
+                thumbnails_error  = CASE WHEN $2::boolean THEN NULL ELSE media_item.thumbnails_error END,
+                analysis_error    = CASE WHEN $2::boolean THEN NULL ELSE media_item.analysis_error END,
                 missing_since     = NULL,
                 hash              = $3,
                 width             = $4,
                 height            = $5,
                 is_video          = $6,
                 duration_ms       = $7,
-                taken_at_local    = $8,
-                taken_at_utc      = $9,
-                og_taken_at_local = $10,
-                sort_timestamp    = $11,
-                orientation       = $12,
-                timezone_name     = $13,
-                timezone_offset_seconds    = $14,
-                og_timezone_offset_seconds = $15,
+                orientation       = $8,
+                taken_at_local             = CASE WHEN flags.is_time_edited THEN media_item.taken_at_local ELSE $9 END,
+                taken_at_utc               = CASE WHEN flags.is_time_edited THEN media_item.taken_at_utc ELSE $10 END,
+                og_taken_at_local          = CASE WHEN flags.is_time_edited THEN media_item.og_taken_at_local ELSE $11 END,
+                sort_timestamp             = CASE WHEN flags.is_time_edited THEN media_item.sort_timestamp ELSE $12 END,
+                timezone_name              = CASE WHEN flags.is_time_edited THEN media_item.timezone_name ELSE $13 END,
+                timezone_offset_seconds    = CASE WHEN flags.is_time_edited THEN media_item.timezone_offset_seconds ELSE $14 END,
+                og_timezone_offset_seconds = CASE WHEN flags.is_time_edited THEN media_item.og_timezone_offset_seconds ELSE $15 END,
                 updated_at        = now()
-            WHERE id = $1
+            FROM (
+                SELECT
+                    id,
+                    (taken_at_local IS DISTINCT FROM og_taken_at_local
+                     OR timezone_offset_seconds IS DISTINCT FROM og_timezone_offset_seconds) AS is_time_edited
+                FROM media_item
+                WHERE id = $1
+            ) AS flags
+            WHERE media_item.id = flags.id
             "#,
             id,
             reset_pipeline,
@@ -423,19 +378,19 @@ impl MediaItemStore {
             media_item.height,
             media_item.is_video,
             media_item.duration_ms,
-            effective_local,
-            effective_utc,
-            effective_og_local,
-            effective_sort_timestamp,
             media_item.orientation,
-            effective_tz_name,
-            effective_offset,
-            effective_og_offset,
+            media_item.taken_at_local,
+            media_item.taken_at_utc,
+            media_item.og_taken_at_local,
+            fresh_sort_timestamp,
+            media_item.timezone_name,
+            media_item.timezone_offset_seconds,
+            media_item.og_timezone_offset_seconds,
         )
             .execute(&mut **tx)
             .await?;
 
-        // 5. Re-insert fresh child metadata records
+        // 4. Re-insert fresh child metadata records
         Self::insert_child_metadata(tx, id, media_item).await
     }
 

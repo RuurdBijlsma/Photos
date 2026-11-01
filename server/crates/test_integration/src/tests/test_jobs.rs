@@ -4,7 +4,7 @@ use color_eyre::Result;
 use color_eyre::eyre::{bail, eyre};
 use common_services::database::jobs::{Job, JobType};
 use common_services::database::media_item::media_item::CreateFullMediaItem;
-use common_services::database::media_item_store::MediaItemStore;
+use common_services::database::media_item_store::{MediaItemStore, ReprocessScope};
 use sqlx::PgPool;
 use std::time::{Duration, Instant};
 use tokio::time::sleep;
@@ -150,7 +150,7 @@ pub async fn test_update_full_resets_ingest_stages(context: &TestContext) -> Res
         "onboarding must produce analysis before this test"
     );
 
-    MediaItemStore::update_full(&mut tx, &row.id, &create_item).await?;
+    MediaItemStore::update_full(&mut tx, &row.id, &create_item, ReprocessScope::Full).await?;
 
     let after = sqlx::query!(
         r#"
