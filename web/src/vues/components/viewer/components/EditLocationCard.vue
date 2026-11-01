@@ -6,6 +6,7 @@ import type { FullMediaItem } from '@/scripts/types/api/fullPhoto.js'
 import { useMediaItemStore } from '@/scripts/stores/timeline/mediaItemStore.js'
 import { useSettingStore } from '@/scripts/stores/settingsStore.js'
 import { useTheme } from 'vuetify/framework'
+import { copyToClipboard } from '@/scripts/utils.ts'
 
 const props = defineProps<{
   mediaItem: FullMediaItem
@@ -39,6 +40,16 @@ const coordinates = computed(() => {
     Math.abs(lat) <= 90 &&
     Math.abs(lon) <= 180
   return { lat, lon, valid }
+})
+const formattedCoordinates = computed(() => {
+  if (!coordinates.value.valid) return ''
+  const lat = coordinates.value.lat
+  const lon = coordinates.value.lon
+
+  const latDir = lat >= 0 ? 'N' : 'S'
+  const lonDir = lon >= 0 ? 'E' : 'W'
+
+  return `${Math.abs(lat).toFixed(4)}° ${latDir}, ${Math.abs(lon).toFixed(4)}° ${lonDir}`
 })
 
 const mapOptions = computed(() => ({
@@ -87,6 +98,11 @@ async function save() {
   saving.value = false
   emit('closeDialog')
 }
+
+async function copyCoordinates() {
+  if (!coordinates.value.valid) return
+  await copyToClipboard(`${coordinates.value.lat.toFixed(6)}, ${coordinates.value.lon.toFixed(6)}`)
+}
 </script>
 
 <template>
@@ -131,13 +147,25 @@ async function save() {
         />
       </div>
     </v-expand-transition>
+    <div class="click-info">
+      <div v-if="coordinates.valid && !showManualInput" class="coord-badge-wrapper">
+        <v-chip
+          variant="tonal"
+          color="primary"
+          size="small"
+          prepend-icon="mdi-crosshairs-gps"
+          class="coord-chip font-weight-medium"
+          @click="copyCoordinates"
+        >
+          {{ formattedCoordinates }}
+          <v-tooltip activator="parent" location="top">Click to copy</v-tooltip>
+        </v-chip>
+      </div>
+      <p class="click-hint">Click the map to place the pin</p>
+    </div>
 
-    <v-card-actions class="mt-5">
+    <v-card-actions>
       <p class="hint">
-        <span v-if="coordinates.valid">
-          {{ coordinates.lat.toFixed(5) }}, {{ coordinates.lon.toFixed(5) }}
-        </span>
-        <span v-else>Click the map to place the pin.</span>
         <v-btn
           variant="text"
           density="compact"
@@ -202,5 +230,13 @@ async function save() {
   display: flex;
   gap: 12px;
   margin-top: 30px;
+}
+
+.click-info {
+  text-align: center;
+  margin-top: 15px;
+  font-size: 14px;
+  font-weight: 500;
+  color: rgba(var(--v-theme-on-surface-variant), 1);
 }
 </style>
