@@ -13,6 +13,7 @@ use sqlx::PgPool;
 use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
+use std::time::Instant;
 use tracing::{debug, warn};
 
 pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
@@ -45,6 +46,8 @@ pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
         warn!("File is 0 bytes: {relative_path}. Cancelling thumbnail generation.");
         return Ok(JobResult::Cancelled);
     }
+    let thumbnail_started = Instant::now();
+    tracing::info!(relative_path, "Starting thumbnail generation");
     process_thumbnails(
         context,
         &file_path,
@@ -57,6 +60,11 @@ pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
         },
     )
     .await?;
+    tracing::info!(
+        relative_path,
+        elapsed_ms = thumbnail_started.elapsed().as_millis(),
+        "Thumbnail generation complete"
+    );
     if is_job_cancelled(&context.pool, job.id).await? {
         return Ok(JobResult::Cancelled);
     }

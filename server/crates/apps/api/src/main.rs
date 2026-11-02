@@ -16,6 +16,11 @@ struct Args {
 #[tokio::main]
 async fn main() -> Result<()> {
     let (settings, pool, _log_guard) = setup_binary().await?;
+    common_services::stall_watchdog::spawn_stall_watchdog(
+        "api",
+        &settings.ingest.app_data_root.join("logs"),
+        pool.clone(),
+    );
     let shutdown_rx = get_kill_signal();
     let model_provider = Arc::new(ModelProvider::new(
         settings.clone(),

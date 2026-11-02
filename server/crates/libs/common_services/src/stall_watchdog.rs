@@ -32,6 +32,12 @@ pub fn spawn_stall_watchdog(runtime_label: &'static str, logs_root: &Path, pool:
     let metrics = tokio::runtime::Handle::current().metrics();
     tokio::spawn(async move {
         let mut last = Instant::now();
+        let mut previous_busy: Vec<_> = (0..metrics.num_workers())
+            .map(|worker| metrics.worker_total_busy_duration(worker))
+            .collect();
+        let mut previous_polls: Vec<_> = (0..metrics.num_workers())
+            .map(|worker| metrics.worker_park_count(worker))
+            .collect();
         loop {
             tokio::time::sleep(Duration::from_secs(1)).await;
             let now = Instant::now();
@@ -39,10 +45,26 @@ pub fn spawn_stall_watchdog(runtime_label: &'static str, logs_root: &Path, pool:
                 .duration_since(last)
                 .saturating_sub(Duration::from_secs(1));
             last = now;
+            let busy_deltas: Vec<_> = (0..metrics.num_workers())
+                .map(|worker| {
+                    let busy = metrics.worker_total_busy_duration(worker);
+                    let delta_ms = busy.saturating_sub(previous_busy[worker]).as_millis();
+                    previous_busy[worker] = busy;
+                    delta_ms
+                })
+                .collect();
+            let poll_deltas: Vec<_> = (0..metrics.num_workers())
+                .map(|worker| {
+                    let polls = metrics.worker_park_count(worker);
+                    let delta = polls.saturating_sub(previous_polls[worker]);
+                    previous_polls[worker] = polls;
+                    delta
+                })
+                .collect();
             write_line(
                 &path,
                 &format!(
-                    "tokio rt={runtime_label} drift_ms={} workers={} tasks={} queue={} db_size={} db_idle={}",
+                    "tokio rt={runtime_label} drift_ms={} workers={} tasks={} queue={} db_size={} db_idle={} worker_busy_ms={busy_deltas:?} worker_park_delta={poll_deltas:?}",
                     drift.as_millis(),
                     metrics.num_workers(),
                     metrics.num_alive_tasks(),

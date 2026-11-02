@@ -11,6 +11,11 @@ use std::sync::Arc;
 async fn main() -> Result<()> {
     let options = AppOptions::parse();
     let (settings, pool, _log_guard) = setup_binary().await?;
+    common_services::stall_watchdog::spawn_stall_watchdog(
+        "photos_app",
+        &settings.ingest.app_data_root.join("logs"),
+        pool.clone(),
+    );
     let shutdown_rx = get_kill_signal();
 
     let model_provider = Arc::new(ModelProvider::new(

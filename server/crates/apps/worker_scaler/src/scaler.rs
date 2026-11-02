@@ -175,6 +175,7 @@ impl Scaler {
     }
 
     async fn spawn_worker(&mut self, profile: &ProfileSettings) -> Result<()> {
+        let spawn_started = Instant::now();
         self.worker_counter += 1;
         let worker_id = format!("w{}-{}", self.worker_counter, profile.name);
         let (shutdown_tx, shutdown_rx) = watch::channel(false);
@@ -188,19 +189,40 @@ impl Scaler {
             .filter_map(|job_str| JobType::parse_from_str(job_str).ok())
             .collect();
 
+        let phase_started = Instant::now();
         let visual_analyzer = if excluded_jobs.contains(&JobType::IngestAnalysis) {
             None
         } else {
             Some(self.model_provider.get_or_load_visual_analyzer().await?)
         };
+        info!(
+            worker_id,
+            phase = "visual_analyzer",
+            elapsed_ms = phase_started.elapsed().as_millis(),
+            "Worker initialization phase complete"
+        );
 
+        let phase_started = Instant::now();
         let text_embedder = if excluded_jobs.contains(&JobType::ClusterPhotos) {
             None
         } else {
             Some(self.model_provider.get_or_load_text_embedder().await?)
         };
+        info!(
+            worker_id,
+            phase = "text_embedder",
+            elapsed_ms = phase_started.elapsed().as_millis(),
+            "Worker initialization phase complete"
+        );
 
+        let phase_started = Instant::now();
         let media_analyzer = Arc::new(MediaAnalyzer::builder().build().await?);
+        info!(
+            worker_id,
+            phase = "media_analyzer",
+            elapsed_ms = phase_started.elapsed().as_millis(),
+            "Worker initialization phase complete"
+        );
 
         let worker_models = WorkerModels::new(media_analyzer, visual_analyzer, text_embedder);
 
@@ -219,7 +241,7 @@ impl Scaler {
         });
 
         self.active_workers.push(ActiveWorker {
-            id: worker_id,
+            id: worker_id.clone(),
             profile: profile.name.clone(),
             spawned_at: Instant::now(),
             shutdown_tx,
@@ -227,6 +249,11 @@ impl Scaler {
         });
 
         self.log_worker_state_change(&format!("[➕ ] Spawned {} worker", profile.name));
+        info!(
+            worker_id,
+            elapsed_ms = spawn_started.elapsed().as_millis(),
+            "Worker initialization complete"
+        );
         Ok(())
     }
 
