@@ -65,6 +65,26 @@ dependencies. Fix or extend the behavior there, bump the version here, and keep 
 - `panorama-tiler` — turns equirectangular/cylindrical panoramas into multi-resolution cubemap tiles
   (`generate_thumbnails/src/pano.rs`).
 
+## Worker job duration reference
+
+These timings are a reference sample from one stall reproduction on 2026-11-02, on a local Windows setup.
+Two new photo files were copied into the media folder to trigger ingest while the existing collection was present.
+The durations below are elapsed wall-clock time recorded from the job start and completion timestamps; jobs could
+overlap, so these are not measurements of isolated CPU time.
+
+| Job                | Scope                 | Observed duration |
+|--------------------|-----------------------|------------------:|
+| `IngestMetadata`   | One media item        |          42–44 ms |
+| `IngestThumbnails` | One media item        |          24–35 ms |
+| `IngestAnalysis`   | One media item        |         94–143 ms |
+| `ClusterFaces`     | One user's face data  |       34.6–35.5 s |
+| `ClusterPhotos`    | One user's photo data |       24.5–25.7 s |
+
+The ingest jobs process an individual item, while clustering jobs can process a user's broader collection. Their
+durations therefore are not directly comparable. Treat these values as observations from that specific dataset,
+hardware, cache state, and concurrent workload, not as normal limits or service-level expectations. When diagnosing a
+current run, use its own job timestamps and dataset size.
+
 Production deployment is not built here: the `compose-services` repo (`stacks/photos/compose.yml`) runs the published
 `ghcr.io/ruurdbijlsma/photos-server` and `photos-web` images and joins the external `proxy-net`. The root `compose.yml`
 builds from source and is used to test Podman/Docker-specific behavior; typical development runs the backend and web
