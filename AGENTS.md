@@ -163,8 +163,30 @@ npm run preview   # terminal A, proxies /api to a running backend on :5272
 npm run perf      # terminal B: 5 measured runs, writes tests/perf/results/<date>_<branch>_<sha>.json
 ```
 
-Commit that JSON file — CI's perf gate rejects PRs touching `web/**` without a new result file and compares it to the
+Commit that JSON file - CI's perf gate rejects PRs touching `web/**` without a new result file and compares it to the
 newest result on `main`. Details: `web/tests/perf/README.md`.
+
+### Browser testing
+
+If you want to to check a UI change in the actual browser: make sure the backend & vite dev server are running,
+then open `http://localhost:5173`.
+
+- Log in through the form. A `fetch('/api/auth/login')` from the page sets cookies but not the SPA's session, and every
+  navigation bounces back to `/login`. The endpoint also rate-limits (429 after a few tries), so log in once and keep
+  the tab.
+- Vuetify inputs ignore `input.value = ...`: write through the native setter and dispatch
+  `new Event('input', { bubbles: true })`, otherwise the model never updates. The email field is `type="text"` with
+  `autocomplete="email"`, so `input[type=email]` finds nothing.
+- `click` takes a `ref` from a snapshot, so for elements you found by class or aria-label, click them from `evaluate`:
+  `[...document.querySelectorAll('.edit-button')].forEach((b) => b.click())`.
+- Screenshots fail unless the tab is focused and its window is visible; call `tabs.focus` first.
+- Deep-link the viewer with `/view/<mediaItemId>`.
+- A freshly started Vite server can re-optimises dependencies and reload once or twice, which drops in-memory auth and
+  logs you out. Load a page, let it settle, then start clicking.
+- There are no `data-testid` attributes: selectors are CSS classes and visible text (`Extra info`, `Remove location`),
+  so re-read the DOM before asserting on it.
+- Stop what you started when you are done, and stop a running `photos_app` before rebuilding: Windows will not let
+  cargo replace the locked exe.
 
 ## Linting and formatting
 
@@ -277,3 +299,12 @@ npm run lint
 - Compose files are duplicated: the root `compose.yml` bind-mounts `./cloud-compose/monitoring/...` for local testing,
   while `cloud-compose/compose.yml` uses the published `photos-loki`/`photos-alloy`/`photos-grafana` images with config
   baked in. Keep services and env variables in sync across both and list defaults in `example.env`.
+- Location/orientation edits are file writes, not DB writes: they go through `common_services/src/utils.rs`
+  (`write_media_gps`, `remove_media_gps`, `write_exif_orientation`) and exiftool, then `reprocess_media_item`.
+- The API binds `0.0.0.0` (IPv4) while Vite binds `localhost` (IPv6): the backend answers on `http://127.0.0.1:5272` and
+  the web client on `http://localhost:5173`. The other pairing hangs or is refused, which looks like a dead server.
+- If there's a backend process running that you didn't start, feel free to end it if you need to try changes. The
+  host has no `psql`; query the dev database with `podman exec photos-db-dev psql -U photos_user -d photos -c "…"`.
+- `just test` rewrites the tracked model cache `crates/test_integration/assets/static-cache/tag-vocab/*.bin`, so it shows
+  up as a modified binary after every suite run. Drop it from the diff (`git checkout -- <file>`) unless the model
+  actually changed.
