@@ -17,7 +17,9 @@ tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 sysinfo = "0.39.6"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"
-ort = { version = "2.0.0-rc.15" }
+# The published face_id, object_detector, and open_clip_inference crates still target rc.13.
+# Keep this exact until those crates release rc.15-compatible versions.
+ort = { version = "=2.0.0-rc.13" }
 
 [features]
 load-dynamic = [
