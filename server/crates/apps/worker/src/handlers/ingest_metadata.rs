@@ -19,7 +19,6 @@ use media_analyzer::MediaMetadata;
 use serde_json::from_value;
 use sqlx::PgPool;
 use std::path::Path;
-use std::time::Instant;
 use tracing::{debug, warn};
 
 pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
@@ -42,17 +41,7 @@ pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
         warn!("File is 0 bytes: {relative_path}. Cancelling ingest job.");
         return Ok(JobResult::Cancelled);
     }
-    tracing::info!(
-        file = %file_path.display(),
-        "Starting media analysis"
-    );
-    let phase_started = Instant::now();
     let file_hash = hash_file(&file_path)?;
-    tracing::info!(
-        relative_path,
-        elapsed_ms = phase_started.elapsed().as_millis(),
-        "Ingest metadata phase complete: file hash"
-    );
     let mut media_info = get_media_info(context, &file_path, &file_hash).await?;
     let payload = if let Some(payload_json) = &job.payload {
         let payload: IngestMetadataPayload = from_value(payload_json.clone())?;
@@ -94,17 +83,11 @@ async fn get_media_info(
         debug!("Using ingest cache for {:?}", file_path.file_name());
         return Ok(cached);
     }
-    let phase_started = Instant::now();
     let media_info = context
         .media_analyzer
         .analyze_media(file_path)
         .await
         .wrap_err(file_path.to_string_lossy().to_string())?;
-    tracing::info!(
-        file = %file_path.display(),
-        elapsed_ms = phase_started.elapsed().as_millis(),
-        "Ingest metadata phase complete: media analysis"
-    );
     if context.settings.ingest.enable_cache {
         write_ingest_cache(
             &context.settings.ingest.cache_root,
