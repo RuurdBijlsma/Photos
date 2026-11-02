@@ -36,7 +36,7 @@ async fn store_empty_vars(pool: &PgPool) -> Result<()> {
     Ok(())
 }
 
-fn find_most_frequent_location(coordinates: &Vec<ItemCoord>) -> Option<ItemCoord> {
+async fn find_most_frequent_location(coordinates: &[ItemCoord]) -> Option<ItemCoord> {
     // Cluster by lat/lon coordinates with HDBSCAN
     let min_cluster_size = 2;
     let min_samples = 2;
@@ -51,10 +51,12 @@ fn find_most_frequent_location(coordinates: &Vec<ItemCoord>) -> Option<ItemCoord
 
     if embeddings.len() > min_samples {
         match crate::handlers::common::clustering::run_hdbscan(
-            &embeddings,
+            embeddings,
             min_cluster_size,
             min_samples,
-        ) {
+        )
+        .await
+        {
             Ok((labels, centroids)) => {
                 let mut cluster_counts = HashMap::new();
                 for &label in &labels {
@@ -184,13 +186,15 @@ pub async fn handle(context: &WorkerContext, _job: &Job) -> Result<JobResult> {
         .await?;
 
         // Calc and store most frequent location
-        let location_val =
-            find_most_frequent_location(&coordinates).map_or(serde_json::Value::Null, |centroid| {
+        let location_val = find_most_frequent_location(&coordinates).await.map_or(
+            serde_json::Value::Null,
+            |centroid| {
                 serde_json::json!({
                     "latitude": centroid.latitude,
                     "longitude": centroid.longitude,
                 })
-            });
+            },
+        );
         KeyJsonStore::set_value(
             &context.pool,
             "most_frequent_location",
