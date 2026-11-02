@@ -55,6 +55,9 @@ pub async fn run_worker_loop(
 
         if let Some(job) = maybe_job {
             sleepiness = 0;
+            // Empty log because bug causes this one to not show up.
+            // See docs/worker-pickup-log-investigation.md
+            info!("-");
             info!(
                 "🐜 Picked up {:?} job: {:?}",
                 job.job_type, job.relative_path
