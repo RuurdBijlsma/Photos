@@ -8,7 +8,7 @@ use crate::database::media_item_store::MediaItemStore;
 pub use crate::database::media_item_store::ReprocessScope;
 use crate::database::{UpdateField, UpdateMediaItemPayload, with_fallback_timezone};
 use crate::job_queue::enqueue_job;
-use crate::utils::{nice_id, write_exif_orientation, write_media_gps};
+use crate::utils::{nice_id, remove_media_gps, write_exif_orientation, write_media_gps};
 use app_state::{IngestSettings, MakeRelativePath, constants};
 use axum::body::Body;
 use axum_extra::headers::Range;
@@ -535,9 +535,14 @@ async fn apply_gps_edit(
     settings: &IngestSettings,
     media_item_id: &str,
     user_id: i32,
-    gps: &GpsEdit,
+    gps: &UpdateField<GpsEdit>,
 ) -> Result<(), AppError> {
-    if !(-90.0..=90.0).contains(&gps.latitude) || !(-180.0..=180.0).contains(&gps.longitude) {
+    if gps.is_ignore() {
+        return Ok(());
+    }
+    if let UpdateField::Value(gps) = gps
+        && (!(-90.0..=90.0).contains(&gps.latitude) || !(-180.0..=180.0).contains(&gps.longitude))
+    {
         return Err(AppError::BadRequest(format!(
             "Invalid coordinates: {}, {}",
             gps.latitude, gps.longitude
@@ -555,7 +560,10 @@ async fn apply_gps_edit(
         ));
     }
 
-    write_media_gps(&file_path, gps.latitude, gps.longitude)?;
+    match gps {
+        UpdateField::Value(gps) => write_media_gps(&file_path, gps.latitude, gps.longitude)?,
+        _ => remove_media_gps(&file_path)?,
+    }
 
     // Re-analyze metadata only without wiping thumbnails or running visual neural analysis
     reprocess_media_item(
@@ -645,7 +653,7 @@ pub async fn update_media_item(
     }
 
     // 2. Process GPS update if provided (metadata-only)
-    if let Some(gps) = gps {
+    if gps.not_ignore() {
         apply_gps_edit(pool, settings, &current_id, user_id, gps).await?;
     }
 

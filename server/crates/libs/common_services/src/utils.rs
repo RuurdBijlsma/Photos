@@ -98,6 +98,28 @@ pub fn write_media_gps(file_path: &Path, latitude: f64, longitude: f64) -> color
     Ok(())
 }
 
+/// Remove the GPS coordinates from a media file (photo or video) using exiftool.
+pub fn remove_media_gps(file_path: &Path) -> color_eyre::Result<()> {
+    let et = exiftool::ExifTool::new()?;
+    let mime_type: String = et.read_tag(file_path, "MIMEType", &[])?;
+    // Same tags as written above, with `all:` so other groups (e.g. the Android
+    // ItemList location atom) are cleared too.
+    let tags: &[&str] = if mime_type.starts_with("video/") {
+        &["all:GPSCoordinates"]
+    } else {
+        &[
+            "all:GPSLatitude",
+            "all:GPSLatitudeRef",
+            "all:GPSLongitude",
+            "all:GPSLongitudeRef",
+        ]
+    };
+    for tag in tags {
+        et.write_tag(file_path, tag, "", &["-overwrite_original"])?;
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -141,6 +163,26 @@ mod tests {
                 (longitude - 4.895_168).abs() < 1e-4,
                 "{name}: unexpected longitude {longitude}"
             );
+        }
+    }
+
+    #[test]
+    fn remove_media_gps_clears_photo_and_video() {
+        let dir = tempfile::tempdir().expect("temp dir should be created");
+
+        for name in ["PXL_20250916_155329360.jpg", "VID_20190223_155900.mp4"] {
+            let path = copy_fixture(name, dir.path());
+
+            write_media_gps(&path, 52.1, 5.3).expect("gps should be written");
+            remove_media_gps(&path).expect("gps should be removed");
+
+            let et = exiftool::ExifTool::new().expect("exiftool should be installed");
+            for tag in ["GPSLatitude", "GPSLongitude"] {
+                assert!(
+                    et.read_tag::<f64>(&path, tag, &["-n"]).is_err(),
+                    "{name}: {tag} should be gone"
+                );
+            }
         }
     }
 }

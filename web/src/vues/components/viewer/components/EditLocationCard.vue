@@ -99,6 +99,13 @@ async function save() {
   emit('closeDialog')
 }
 
+async function remove() {
+  saving.value = true
+  await mediaItemStore.updateMediaItem(props.mediaItem.id, { gps: null })
+  saving.value = false
+  emit('closeDialog')
+}
+
 async function copyCoordinates() {
   if (!coordinates.value.valid) return
   await copyToClipboard(`${coordinates.value.lat.toFixed(6)}, ${coordinates.value.lon.toFixed(6)}`)
@@ -177,6 +184,9 @@ async function copyCoordinates() {
         </v-btn>
       </p>
       <v-spacer />
+      <v-btn v-if="mediaItem.gps" variant="text" color="error" rounded @click="remove">
+        Remove location
+      </v-btn>
       <v-btn variant="text" rounded @click="emit('closeDialog')"> Cancel </v-btn>
       <v-btn
         variant="tonal"

@@ -35,7 +35,7 @@ pub struct UpdateMediaItemRequest {
     #[serde(default)]
     pub orientation: Option<i32>,
     #[serde(default)]
-    pub gps: Option<GpsEdit>,
+    pub gps: UpdateField<GpsEdit>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -49,4 +49,28 @@ pub struct GpsEdit {
 #[serde(rename_all = "camelCase")]
 pub struct UpdateMediaItemResponse {
     pub media_item_id: String,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn parse_gps(payload: serde_json::Value) -> UpdateField<GpsEdit> {
+        serde_json::from_value::<UpdateMediaItemRequest>(payload)
+            .expect("request should parse")
+            .gps
+    }
+
+    #[test]
+    fn gps_is_absent_null_or_value() {
+        assert!(parse_gps(serde_json::json!({})).is_ignore());
+        assert!(matches!(
+            parse_gps(serde_json::json!({ "gps": null })),
+            UpdateField::SetNull
+        ));
+        assert!(matches!(
+            parse_gps(serde_json::json!({ "gps": { "latitude": 1.0, "longitude": 2.0 } })),
+            UpdateField::Value(_)
+        ));
+    }
 }
