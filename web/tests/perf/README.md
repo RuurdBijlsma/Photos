@@ -15,7 +15,6 @@ Backend stays local: Rust + podman postgres running, e.g. `cargo run --release`.
 
 ```bash
 cd web
-npm run build-only
 # terminal A: serve prod build (proxies /api -> 127.0.0.1:5272)
 npm run preview # -> http://localhost:4173
 # terminal B:
