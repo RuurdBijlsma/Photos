@@ -265,6 +265,12 @@ npm run lint
 
 ## Gotchas
 
+- **Tokio runtime responsiveness**: `photos_app` runs the API, worker scaler, watcher, and worker tasks together.
+  Synchronous CPU or blocking work called from an `async fn` still occupies a Tokio worker and can delay unrelated
+  API requests; this includes synchronous methods in dependency crates. Move substantial work such as HDBSCAN,
+  ONNX inference, and image decoding/processing to `tokio::task::spawn_blocking` or a dedicated bounded pool. Keep
+  async database and network operations outside the blocking closure, audit every call site (including scheduled
+  jobs), and bound concurrent CPU work when needed to avoid oversubscribing the machine.
 - Run backend commands from `server/` — `config/settings.yaml` and `migrations/` are resolved from the CWD.
 - SQL is compile-time checked: `just` exports `DATABASE_URL`, so queries are validated against the dev DB — after a
   migration or a new query, a stale schema means the crate won't compile. Recreate the dev DB freely:
