@@ -2,7 +2,7 @@ use app_state::AppSettings;
 use color_eyre::Result;
 use common_services::database::jobs::JobType;
 use media_analyzer::MediaAnalyzer;
-use ml_analysis::VisualAnalyzer;
+use ml_analysis::{VisualAnalyzer, shared_onnx_environment};
 use open_clip_inference::TextEmbedder;
 use std::sync::Arc;
 use tracing::info;
@@ -49,9 +49,11 @@ impl WorkerModels {
             None
         } else {
             info!("Loading CLIP text embedder...");
+            let environment = shared_onnx_environment()?;
             let embedder =
                 TextEmbedder::from_hf(&settings.ingest.analyzer.search.embedder_model_id)
                     .cache_dir(&settings.ingest.hf_cache_root)
+                    .with_environment(&environment)
                     .with_inter_threads(settings.ingest.analyzer.onnx.inter_threads)
                     .with_intra_threads(settings.ingest.analyzer.onnx.intra_threads)
                     .build()

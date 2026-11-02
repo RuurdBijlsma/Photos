@@ -1,6 +1,7 @@
 use crate::color_data::get_color_data;
 use crate::convert_media_file_sync;
 use crate::quality_measure::get_quality_measurement;
+use crate::shared_onnx_environment;
 use app_state::{AnalyzerSettings, IngestSettings};
 use color_eyre::eyre::eyre;
 use common_types::ml_analysis::MLFastAnalysis;
@@ -21,9 +22,12 @@ pub struct VisualAnalyzer {
 impl VisualAnalyzer {
     /// Creates a new instance of the `VisualAnalyzer`.
     pub async fn new(settings: &IngestSettings) -> color_eyre::Result<Self> {
+        let environment = shared_onnx_environment()?;
+
         info!("Loading CLIP vision embedder...");
         let embedder = VisionEmbedder::from_hf(&settings.analyzer.search.embedder_model_id)
             .cache_dir(&settings.hf_cache_root)
+            .with_environment(&environment)
             .with_inter_threads(settings.analyzer.onnx.inter_threads)
             .with_intra_threads(settings.analyzer.onnx.intra_threads)
             .build()
@@ -31,6 +35,7 @@ impl VisualAnalyzer {
         info!("Loading Face Analyzer model...");
         let face_analyzer = FaceAnalyzer::from_hf()
             .cache_dir(&settings.hf_cache_root)
+            .with_environment(&environment)
             .with_inter_threads(settings.analyzer.onnx.inter_threads)
             .with_intra_threads(settings.analyzer.onnx.intra_threads)
             .build()
@@ -40,6 +45,7 @@ impl VisualAnalyzer {
             .cache_dir(&settings.hf_cache_root)
             .scale(ModelScale::Large)
             .include_mask(false)
+            .with_environment(&environment)
             .with_inter_threads(settings.analyzer.onnx.inter_threads)
             .with_intra_threads(settings.analyzer.onnx.intra_threads)
             .build()

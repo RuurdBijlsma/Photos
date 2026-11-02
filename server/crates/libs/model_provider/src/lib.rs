@@ -6,7 +6,7 @@ pub mod model_slot;
 
 use app_state::AppSettings;
 use color_eyre::Result;
-use ml_analysis::VisualAnalyzer;
+use ml_analysis::{VisualAnalyzer, shared_onnx_environment};
 use model_slot::ModelSlot;
 use open_clip_inference::{TextEmbedder, VisionEmbedder};
 use std::sync::Arc;
@@ -44,10 +44,12 @@ impl ModelProvider {
         self.text_embedder
             .get_or_load(|| async {
                 let embedder_model_id = &self.settings.ingest.analyzer.search.embedder_model_id;
+                let environment = shared_onnx_environment()?;
 
                 info!("Loading CLIP text embedder...");
                 let embedder = TextEmbedder::from_hf(embedder_model_id)
                     .cache_dir(&self.settings.ingest.hf_cache_root)
+                    .with_environment(&environment)
                     .with_inter_threads(self.settings.ingest.analyzer.onnx.inter_threads)
                     .with_intra_threads(self.settings.ingest.analyzer.onnx.intra_threads)
                     .build()

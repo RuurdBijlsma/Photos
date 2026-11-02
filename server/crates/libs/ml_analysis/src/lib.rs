@@ -7,11 +7,13 @@
 )]
 
 mod color_data;
+mod onnx_environment;
 mod quality_measure;
 mod utils;
 mod visual_analyzer;
 
 pub use color_data::get_color_data;
+pub use onnx_environment::shared_onnx_environment;
 pub use quality_measure::get_quality_measurement;
 pub use quality_measure::get_quality_measurement_from_image;
 pub use quality_measure::get_quality_measurement_from_luma;
