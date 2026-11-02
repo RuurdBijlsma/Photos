@@ -19,6 +19,7 @@ tracing = "0.1.44"
 face_id = "0.6.0"
 object_detector = { version = "0.6.0" }
 material-color-utils = "0.1.3"
+ort = { version = "=2.0.0-rc.15", default-features = false }
 
 [dev-dependencies]
 walkdir = "2.5.0"
@@ -26,6 +27,7 @@ rayon = "1.12.0"
 
 [features]
 load-dynamic = [
+    "ort/load-dynamic",
     "open_clip_inference/load-dynamic",
     "face_id/load-dynamic",
     "object_detector/load-dynamic"

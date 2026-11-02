@@ -4540,6 +4540,7 @@ dependencies = [
  "material-color-utils",
  "object_detector",
  "open_clip_inference",
+ "ort",
  "palette",
  "rayon",
  "serde",
