@@ -22,12 +22,13 @@ macro_rules! alert {
 
 /// Write/update the EXIF Orientation tag on a media file on disk.
 pub fn write_exif_orientation(file_path: &Path, orientation: i32) -> color_eyre::Result<()> {
+    // `-P` keeps the file mtime: a file without any EXIF date falls back to it for its datetime.
     let et = exiftool::ExifTool::new()?;
     et.write_tag(
         file_path,
         "all:Orientation",
         &orientation.to_string(),
-        &["-n", "-overwrite_original"],
+        &["-P", "-n", "-overwrite_original"],
     )?;
     Ok(())
 }
@@ -45,20 +46,20 @@ pub fn write_media_datetime(
             file_path,
             "QuickTime:CreateDate",
             &formatted_datetime,
-            &["-overwrite_original"],
+            &["-P", "-overwrite_original"],
         )?;
         et.write_tag(
             file_path,
             "QuickTime:ModifyDate",
             &formatted_datetime,
-            &["-overwrite_original"],
+            &["-P", "-overwrite_original"],
         )?;
     } else {
         et.write_tag(
             file_path,
             "AllDates",
             &formatted_datetime,
-            &["-overwrite_original"],
+            &["-P", "-overwrite_original"],
         )?;
     }
     Ok(())
@@ -75,7 +76,7 @@ pub fn write_media_gps(file_path: &Path, latitude: f64, longitude: f64) -> color
             file_path,
             "Keys:GPSCoordinates",
             &format!("{latitude:+.6}{longitude:+.6}/"),
-            &["-n", "-overwrite_original"],
+            &["-P", "-n", "-overwrite_original"],
         )?;
     } else {
         let latitude_ref = if latitude < 0.0 { "S" } else { "N" };
@@ -91,7 +92,7 @@ pub fn write_media_gps(file_path: &Path, latitude: f64, longitude: f64) -> color
                 file_path,
                 &format!("all:{tag}"),
                 &value,
-                &["-n", "-overwrite_original"],
+                &["-P", "-n", "-overwrite_original"],
             )?;
         }
     }
@@ -115,7 +116,7 @@ pub fn remove_media_gps(file_path: &Path) -> color_eyre::Result<()> {
         ]
     };
     for tag in tags {
-        et.write_tag(file_path, tag, "", &["-overwrite_original"])?;
+        et.write_tag(file_path, tag, "", &["-P", "-overwrite_original"])?;
     }
     Ok(())
 }
@@ -124,6 +125,7 @@ pub fn remove_media_gps(file_path: &Path) -> color_eyre::Result<()> {
 mod tests {
     use super::*;
     use std::path::PathBuf;
+    use std::time::SystemTime;
 
     fn copy_fixture(name: &str, dir: &Path) -> PathBuf {
         let source = Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -183,6 +185,37 @@ mod tests {
                     "{name}: {tag} should be gone"
                 );
             }
+        }
+    }
+
+    #[test]
+    fn metadata_writes_preserve_file_modify_date() {
+        let dir = tempfile::tempdir().expect("temp dir should be created");
+        // Photos without an EXIF date fall back to FileModifyDate, so a metadata write
+        // that resets it silently moves the item to today.
+        // 2000-12-30 23:00:00 UTC, the era these camera files report.
+        let mtime: SystemTime = chrono::DateTime::from_timestamp(978_217_200, 0)
+            .expect("timestamp should be valid")
+            .into();
+
+        for name in ["PXL_20250916_155329360.jpg", "VID_20190223_155900.mp4"] {
+            let path = copy_fixture(name, dir.path());
+            std::fs::File::options()
+                .write(true)
+                .open(&path)
+                .expect("fixture should open")
+                .set_modified(mtime)
+                .expect("mtime should be set");
+
+            write_media_gps(&path, 46.8, 1.3).expect("gps should be written");
+            write_exif_orientation(&path, 3).expect("orientation should be written");
+            remove_media_gps(&path).expect("gps should be removed");
+
+            let after = std::fs::metadata(&path)
+                .expect("metadata should be readable")
+                .modified()
+                .expect("mtime should be readable");
+            assert_eq!(after, mtime, "{name}: metadata writes must keep mtime");
         }
     }
 }

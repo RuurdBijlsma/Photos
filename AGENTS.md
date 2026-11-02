@@ -108,6 +108,9 @@ GENERALLY when running, use release profile, otherwise crates like `image` slow 
 instead of seconds. Also using release profile will take advantage of incremental compilation, since I do all
 runs/builds with release.
 
+Always stop a server as soon as it is no longer needed. One started from OpenCode cannot be stopped from the UI, and a
+running `photos_app` locks `target/release/photos_app.exe`, so cargo cannot relink it.
+
 ```powershell
 # Backend (all from server/)
 cargo run -p photos_app                       # full stack in one process
@@ -185,8 +188,6 @@ then open `http://localhost:5173`.
   logs you out. Load a page, let it settle, then start clicking.
 - There are no `data-testid` attributes: selectors are CSS classes and visible text (`Extra info`, `Remove location`),
   so re-read the DOM before asserting on it.
-- Stop what you started when you are done, and stop a running `photos_app` before rebuilding: Windows will not let
-  cargo replace the locked exe.
 
 ## Linting and formatting
 
