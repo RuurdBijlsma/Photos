@@ -12,5 +12,6 @@ pub fn shared_onnx_environment() -> color_eyre::Result<Environment> {
 
     let environment = ort::init().with_name("ruurd_photos").build()?;
     *slot = Some(environment.clone());
+    drop(slot);
     Ok(environment)
 }
