@@ -234,7 +234,7 @@ dependencies = [
  "mime_guess",
  "ml_analysis",
  "model_provider",
- "open_clip_inference 0.5.0",
+ "open_clip_inference",
  "reqwest 0.13.5",
  "serde",
  "serde_json",
@@ -1225,7 +1225,7 @@ dependencies = [
  "mime_guess",
  "moka",
  "object_detector",
- "open_clip_inference 0.5.0",
+ "open_clip_inference",
  "pgvector",
  "rand 0.10.3",
  "reqwest 0.13.5",
@@ -4539,7 +4539,7 @@ dependencies = [
  "imageproc",
  "material-color-utils",
  "object_detector",
- "open_clip_inference 0.5.0",
+ "open_clip_inference",
  "palette",
  "rayon",
  "serde",
@@ -4557,7 +4557,7 @@ dependencies = [
  "app_state",
  "color-eyre",
  "ml_analysis",
- "open_clip_inference 0.5.0",
+ "open_clip_inference",
  "tokio",
  "tracing",
 ]
@@ -5091,15 +5091,15 @@ dependencies = [
 
 [[package]]
 name = "object_detector"
-version = "0.5.2"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "935aeacb60396091ee413a3a05b7cbcc39b8c575fe32190b695b4df82e756c1c"
+checksum = "a735ed84e675677597d4d7f44ba76a6306c07a7789cddfafd3a388fb414f527e"
 dependencies = [
  "bon",
  "hf-hub",
  "image 0.25.10",
  "ndarray",
- "open_clip_inference 0.4.2",
+ "open_clip_inference",
  "ort",
  "rayon",
  "serde",
@@ -5190,26 +5190,6 @@ name = "oorandom"
 version = "11.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d6790f58c7ff633d8771f42965289203411a5e5c68388703c06e14f24770b41e"
-
-[[package]]
-name = "open_clip_inference"
-version = "0.4.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b3e7da8fcb6e8411a16dc438a81bc6242a9fa1c0ae674aa8a8319b8b7f675c98"
-dependencies = [
- "bon",
- "fast_image_resize",
- "hf-hub",
- "image 0.25.10",
- "ndarray",
- "ort",
- "rayon",
- "serde",
- "serde_json",
- "thiserror 2.0.21",
- "tokenizers",
- "tracing",
-]
 
 [[package]]
 name = "open_clip_inference"
@@ -10115,7 +10095,7 @@ dependencies = [
  "media_analyzer",
  "ml_analysis",
  "ndarray",
- "open_clip_inference 0.5.0",
+ "open_clip_inference",
  "pgvector",
  "plotters",
  "rand 0.10.3",
