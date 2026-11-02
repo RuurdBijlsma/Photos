@@ -149,6 +149,11 @@ watch(
 </template>
 
 <style>
+/* Default MapLibre marker: the pin body comes from Marker({ color }), the dot from this var. */
+.maplibregl-marker circle {
+  fill: var(--marker-dot-color, #fff);
+}
+
 /* --- Custom Rounded Compass with Red North Arrow --- */
 
 .maplibregl-ctrl-group:has(.maplibregl-ctrl-compass) {

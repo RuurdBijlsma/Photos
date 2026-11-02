@@ -35,8 +35,21 @@ pub fn l2_distance(a: &[f32], b: &[f32]) -> Result<f32> {
         .sqrt())
 }
 
+/// Runs HDBSCAN on Tokio's blocking thread pool so clustering cannot stall async workers.
+pub async fn run_hdbscan(
+    embeddings: Vec<Vec<f32>>,
+    min_cluster_size: usize,
+    min_samples: usize,
+) -> Result<(Vec<i32>, Vec<Vec<f32>>)> {
+    tokio::task::spawn_blocking(move || {
+        run_hdbscan_blocking(&embeddings, min_cluster_size, min_samples)
+    })
+    .await
+    .map_err(|error| eyre!("HDBSCAN task failed: {error}"))?
+}
+
 /// Runs the HDBSCAN algorithm to find clusters and their centroids.
-pub fn run_hdbscan(
+fn run_hdbscan_blocking(
     embeddings: &[Vec<f32>],
     min_cluster_size: usize,
     min_samples: usize,

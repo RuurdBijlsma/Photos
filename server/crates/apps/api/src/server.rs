@@ -51,7 +51,8 @@ pub async fn serve(
             TraceLayer::new_for_http()
                 .make_span_with(DefaultMakeSpan::new().level(Level::INFO))
                 .on_request(())
-                .on_response(DefaultOnResponse::new().level(Level::INFO)),
+                .on_response(DefaultOnResponse::new().level(Level::INFO))
+                .on_eos(()),
         )
         .layer(cors.clone())
         .layer(CompressionLayer::new())

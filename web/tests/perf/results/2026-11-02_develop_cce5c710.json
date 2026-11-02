@@ -1,0 +1,321 @@
+{
+  "version": 2,
+  "meta": {
+    "timestamp": "2026-11-02T21:01:51.327Z",
+    "commit": "cce5c710416ec17cf40c110111f77bbe2cd176fd",
+    "branch": "develop",
+    "url": "http://localhost:4173",
+    "viewport": "1920x1080",
+    "headed": true,
+    "runs": 5,
+    "scrollPxPerSec": 33000,
+    "chrome": "channel=chrome-or-chromium",
+    "user": "ruurd@example.com"
+  },
+  "metrics": {
+    "timelineLcpMs": {
+      "median": 192,
+      "values": [
+        220,
+        192,
+        192,
+        204,
+        168
+      ]
+    },
+    "exploreLcpMs": {
+      "median": 164,
+      "values": [
+        236,
+        160,
+        168,
+        164,
+        156
+      ]
+    },
+    "photoOpen": {
+      "medianOpenMs": 58,
+      "medianLcpMs": -1,
+      "values": [
+        {
+          "openMs": 102,
+          "lcpMs": -1,
+          "photoOnly": true,
+          "mediaId": "2KYkHuaW6q"
+        },
+        {
+          "openMs": 53,
+          "lcpMs": -1,
+          "photoOnly": true,
+          "mediaId": "2KYkHuaW6q"
+        },
+        {
+          "openMs": 55,
+          "lcpMs": -1,
+          "photoOnly": true,
+          "mediaId": "2KYkHuaW6q"
+        },
+        {
+          "openMs": 85,
+          "lcpMs": -1,
+          "photoOnly": true,
+          "mediaId": "2KYkHuaW6q"
+        },
+        {
+          "openMs": 58,
+          "lcpMs": -1,
+          "photoOnly": true,
+          "mediaId": "2KYkHuaW6q"
+        }
+      ]
+    },
+    "scroll": {
+      "medianFps": 178,
+      "medianP95Frame": 6.7,
+      "medianMaxFrame": 40.2,
+      "medianSpikes100": 0,
+      "values": [
+        {
+          "frames": 885,
+          "meanFps": 163,
+          "p50Frame": 5.6,
+          "p95Frame": 7.8,
+          "maxFrame": 341.8,
+          "dropped50ms": 1,
+          "spikes100ms": 1,
+          "detail": {
+            "loafSpikes": 1,
+            "itemsSeen": 1389,
+            "distancePx": 158400,
+            "wraps": 0
+          }
+        },
+        {
+          "frames": 898,
+          "meanFps": 166,
+          "p50Frame": 5.5,
+          "p95Frame": 6.7,
+          "maxFrame": 330.9,
+          "dropped50ms": 1,
+          "spikes100ms": 1,
+          "detail": {
+            "loafSpikes": 1,
+            "itemsSeen": 1492,
+            "distancePx": 160600,
+            "wraps": 0
+          }
+        },
+        {
+          "frames": 967,
+          "meanFps": 179,
+          "p50Frame": 5.5,
+          "p95Frame": 6.7,
+          "maxFrame": 40.2,
+          "dropped50ms": 0,
+          "spikes100ms": 0,
+          "detail": {
+            "loafSpikes": 0,
+            "itemsSeen": 1539,
+            "distancePx": 161700,
+            "wraps": 0
+          }
+        },
+        {
+          "frames": 970,
+          "meanFps": 179,
+          "p50Frame": 5.5,
+          "p95Frame": 6.7,
+          "maxFrame": 20,
+          "dropped50ms": 0,
+          "spikes100ms": 0,
+          "detail": {
+            "loafSpikes": 0,
+            "itemsSeen": 1539,
+            "distancePx": 162800,
+            "wraps": 0
+          }
+        },
+        {
+          "frames": 966,
+          "meanFps": 178,
+          "p50Frame": 5.5,
+          "p95Frame": 6.8,
+          "maxFrame": 31.5,
+          "dropped50ms": 0,
+          "spikes100ms": 0,
+          "detail": {
+            "loafSpikes": 0,
+            "itemsSeen": 1539,
+            "distancePx": 162250,
+            "wraps": 0
+          }
+        }
+      ],
+      "medianDistancePx": 161700,
+      "medianItemsSeen": 1539
+    },
+    "navigation": {
+      "medianFps": 181,
+      "medianP95Frame": 5.6,
+      "medianMaxFrame": 7.9,
+      "medianSpikes100": 0,
+      "values": [
+        {
+          "frames": 1357,
+          "meanFps": 180,
+          "p50Frame": 5.6,
+          "p95Frame": 5.6,
+          "maxFrame": 18.8,
+          "dropped50ms": 0,
+          "spikes100ms": 0,
+          "perRoute": {
+            "/": {
+              "fps": 181,
+              "p95Frame": 5.7,
+              "maxFrame": 7.5
+            },
+            "/explore": {
+              "fps": 181,
+              "p95Frame": 5.7,
+              "maxFrame": 8
+            },
+            "/map": {
+              "fps": 179,
+              "p95Frame": 5.6,
+              "maxFrame": 18.8
+            },
+            "/search": {
+              "fps": 181,
+              "p95Frame": 5.6,
+              "maxFrame": 6.4
+            }
+          }
+        },
+        {
+          "frames": 1365,
+          "meanFps": 181,
+          "p50Frame": 5.6,
+          "p95Frame": 5.6,
+          "maxFrame": 9.7,
+          "dropped50ms": 0,
+          "spikes100ms": 0,
+          "perRoute": {
+            "/": {
+              "fps": 181,
+              "p95Frame": 5.7,
+              "maxFrame": 6.6
+            },
+            "/explore": {
+              "fps": 181,
+              "p95Frame": 5.6,
+              "maxFrame": 5.8
+            },
+            "/map": {
+              "fps": 181,
+              "p95Frame": 5.6,
+              "maxFrame": 9.7
+            },
+            "/search": {
+              "fps": 181,
+              "p95Frame": 5.6,
+              "maxFrame": 7.6
+            }
+          }
+        },
+        {
+          "frames": 1366,
+          "meanFps": 181,
+          "p50Frame": 5.6,
+          "p95Frame": 5.6,
+          "maxFrame": 7.3,
+          "dropped50ms": 0,
+          "spikes100ms": 0,
+          "perRoute": {
+            "/": {
+              "fps": 181,
+              "p95Frame": 5.7,
+              "maxFrame": 6
+            },
+            "/explore": {
+              "fps": 181,
+              "p95Frame": 5.6,
+              "maxFrame": 6.9
+            },
+            "/map": {
+              "fps": 181,
+              "p95Frame": 5.6,
+              "maxFrame": 6
+            },
+            "/search": {
+              "fps": 181,
+              "p95Frame": 5.6,
+              "maxFrame": 7.3
+            }
+          }
+        },
+        {
+          "frames": 1361,
+          "meanFps": 181,
+          "p50Frame": 5.6,
+          "p95Frame": 5.6,
+          "maxFrame": 7.5,
+          "dropped50ms": 0,
+          "spikes100ms": 0,
+          "perRoute": {
+            "/": {
+              "fps": 181,
+              "p95Frame": 5.7,
+              "maxFrame": 7.5
+            },
+            "/explore": {
+              "fps": 181,
+              "p95Frame": 5.6,
+              "maxFrame": 6.8
+            },
+            "/map": {
+              "fps": 181,
+              "p95Frame": 5.6,
+              "maxFrame": 7.2
+            },
+            "/search": {
+              "fps": 181,
+              "p95Frame": 5.6,
+              "maxFrame": 6.8
+            }
+          }
+        },
+        {
+          "frames": 1361,
+          "meanFps": 181,
+          "p50Frame": 5.6,
+          "p95Frame": 5.6,
+          "maxFrame": 7.9,
+          "dropped50ms": 0,
+          "spikes100ms": 0,
+          "perRoute": {
+            "/": {
+              "fps": 181,
+              "p95Frame": 5.6,
+              "maxFrame": 5.7
+            },
+            "/explore": {
+              "fps": 181,
+              "p95Frame": 5.6,
+              "maxFrame": 7.9
+            },
+            "/map": {
+              "fps": 181,
+              "p95Frame": 5.6,
+              "maxFrame": 6.8
+            },
+            "/search": {
+              "fps": 181,
+              "p95Frame": 5.6,
+              "maxFrame": 5.8
+            }
+          }
+        }
+      ]
+    }
+  }
+}

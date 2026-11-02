@@ -1,19 +1,27 @@
 <script setup lang="ts">
 import MdiArrowTopRight from '~icons/mdi/arrow-top-right'
-import { computed, onUnmounted, shallowRef, watch } from 'vue'
+import MdiMapMarkerOutline from '~icons/mdi/map-marker-outline'
+import { computed, onUnmounted, ref, shallowRef, watch } from 'vue'
 import type { FullMediaItem } from '@/scripts/types/api/fullPhoto.ts'
 import type { SharedMediaItem } from '@/scripts/types/api/album.ts'
 import BaseMap from '@/vues/components/map/BaseMap.vue'
+import EditLocationCard from '@/vues/components/viewer/components/EditLocationCard.vue'
 import { useTheme } from 'vuetify/framework'
 import { makeLocationString } from '@/scripts/utils.ts'
 import { useSettingStore } from '@/scripts/stores/settingsStore.ts'
+import { useAuthStore } from '@/scripts/stores/authStore.ts'
 import { Map as LibreMap, Marker } from 'maplibre-gl'
+import MdiPencilOutline from '~icons/mdi/pencil-outline'
 
 const props = defineProps<{
   mediaItem: FullMediaItem | SharedMediaItem
 }>()
 const theme = useTheme()
 const settings = useSettingStore()
+const authStore = useAuthStore()
+
+const locationDialogOpen = ref(false)
+const canEdit = computed(() => authStore.isAuthenticated && 'user_id' in props.mediaItem)
 
 const mapInstance = shallowRef<LibreMap | null>(null)
 let markerInstance: Marker | null = null
@@ -45,7 +53,6 @@ function updateMarker() {
     markerInstance.setLngLat([lon, lat])
   }
 
-  // Focus the map view on the pin
   mapInstance.value.setCenter([lon, lat])
 }
 
@@ -74,48 +81,96 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="map-info" v-if="mediaItem?.gps">
-    <div class="media-location-map">
-      <base-map
-        v-if="props.mediaItem?.gps"
-        class="base-map-comp"
-        :map-style="settings.lightPhotoViewerMap || !theme.current.value.dark ? 'LIBERTY' : 'DARK'"
-        :map-options="{
-          center: { lat: props.mediaItem.gps.latitude, lon: props.mediaItem.gps.longitude },
-          zoom: 9,
-          attributionControl: {
-            compact: true,
-          },
-        }"
-        @load="handleMapLoad"
-      />
+  <div class="location-wrapper">
+    <div class="map-info" v-if="mediaItem?.gps">
+      <div class="media-location-map">
+        <base-map
+          class="base-map-comp"
+          :map-style="mapTheme === 'light' ? 'LIBERTY' : 'DARK'"
+          :map-options="{
+            center: { lat: mediaItem.gps.latitude, lon: mediaItem.gps.longitude },
+            zoom: 9,
+            attributionControl: { compact: true },
+          }"
+          @load="handleMapLoad"
+        />
+      </div>
+      <v-theme-provider with-background :theme="mapTheme">
+        <v-sheet class="map-buttons">
+          <a
+            v-ripple
+            :href="`https://www.google.com/maps/place/${mediaItem.gps.latitude},${mediaItem.gps.longitude}`"
+            target="_blank"
+            referrerpolicy="no-referrer"
+          >
+            <span v-if="mediaItem.gps.location">{{
+              makeLocationString(mediaItem.gps.location, 3)
+            }}</span>
+            <span v-else>View on Google Maps</span>
+            <v-icon size="15" class="ml-2 map-button-icon" :icon="MdiArrowTopRight" />
+          </a>
+
+          <v-btn
+            v-if="canEdit"
+            variant="plain"
+            rounded="xl"
+            density="comfortable"
+            color="primary"
+            class="edit-button"
+            @click="locationDialogOpen = true"
+            :icon="MdiPencilOutline"
+          >
+          </v-btn>
+        </v-sheet>
+      </v-theme-provider>
     </div>
-    <v-theme-provider with-background :theme="mapTheme">
-      <v-sheet class="map-buttons">
-        <a
-          v-ripple
-          :href="`https://www.google.com/maps/place/${mediaItem.gps.latitude},${mediaItem.gps.longitude}`"
-          target="_blank"
-          referrerpolicy="no-referrer"
-        >
-          <span v-if="mediaItem.gps.location">{{
-            makeLocationString(mediaItem.gps.location, 3)
-          }}</span>
-          <v-icon size="15" class="ml-2 map-button-icon" :icon="MdiArrowTopRight" />
-        </a>
-      </v-sheet>
-    </v-theme-provider>
+
+    <!-- 2. Add Location button -->
+    <div v-else-if="canEdit" class="no-location-row">
+      <div class="no-location-content">
+        <v-icon :icon="MdiMapMarkerOutline" size="18" class="mr-2 opacity-70" />
+        <span class="no-location-text">No location</span>
+      </div>
+      <v-btn
+        variant="plain"
+        density="compact"
+        rounded
+        color="primary"
+        class="edit-button"
+        @click="locationDialogOpen = true"
+      >
+        Add
+      </v-btn>
+    </div>
+
+    <!-- Edit gps dialog -->
+    <v-dialog v-if="canEdit" max-width="560" persistent v-model="locationDialogOpen">
+      <edit-location-card
+        v-if="'user_id' in mediaItem"
+        :media-item="mediaItem"
+        @close-dialog="locationDialogOpen = false"
+      />
+    </v-dialog>
   </div>
 </template>
 
 <style scoped>
+.location-wrapper {
+  width: 100%;
+}
+
 .map-info {
+  margin: 10px;
   border-radius: 20px;
   overflow: hidden;
 }
 
 .map-buttons {
   background-color: rgba(var(--v-theme-surface), 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-right: 6px;
 }
 
 .map-buttons a {
@@ -127,14 +182,12 @@ onUnmounted(() => {
   font-weight: 500;
   font-size: 13px;
   padding: 7px 20px;
-}
-
-.map-button-icon {
-  font-weight: lighter;
-  opacity: 0.8;
+  flex: 1;
+  min-width: 0;
 }
 
 .media-location-map {
+  --marker-dot-color: v-bind(bgColor);
   width: 100%;
   height: 300px;
   position: relative;
@@ -145,8 +198,31 @@ onUnmounted(() => {
   height: 100%;
 }
 
-/* Custom styling for MapLibre GL default SVG marker */
-:deep(.maplibregl-marker circle) {
-  fill: v-bind(bgColor) !important;
+.map-button-icon {
+  font-weight: lighter;
+  opacity: 0.8;
+}
+
+/* Matching the subtle row styling of caption / datetime */
+.no-location-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 30px 14px;
+}
+
+.no-location-content {
+  display: flex;
+  align-items: center;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.no-location-text {
+  opacity: 0.7;
+}
+
+.edit-button {
+  font-size: 14px;
 }
 </style>

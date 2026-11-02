@@ -100,7 +100,7 @@ async fn main() -> Result<()> {
 
     // --- 2. Run Clustering ---
     info!("Running HDBSCAN clustering...");
-    let (labels, _new_centroids) = run_hdbscan(&embeddings, 4, 5)?;
+    let (labels, _new_centroids) = run_hdbscan(embeddings, 4, 5).await?;
     info!("Clustering complete.");
 
     let clusters = group_by_cluster(&labels, &face_embeddings_for_clustering);

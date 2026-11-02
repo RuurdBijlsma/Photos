@@ -57,7 +57,7 @@ async fn main() -> Result<()> {
     // --- 2. Run Clustering Algorithm ---
     info!("Running HDBSCAN clustering...");
     let embeddings: Vec<Vec<f32>> = photos.iter().map(|p| p.embedding.to_vec()).collect();
-    let (labels, _centroids) = run_hdbscan(&embeddings, 2, 2)?;
+    let (labels, _centroids) = run_hdbscan(embeddings, 2, 2).await?;
     info!(
         "Clustering complete. Found {} clusters (excluding noise).",
         labels

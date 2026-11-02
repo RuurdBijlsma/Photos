@@ -14,6 +14,7 @@ use pgvector::Vector;
 use sqlx::{PgPool, QueryBuilder, Transaction, query, query_as, query_scalar};
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
+use std::sync::Arc;
 use std::time::Instant;
 use tokio::fs;
 use tracing::info;
@@ -85,7 +86,7 @@ async fn load_all_tags(pool: &PgPool) -> Result<HashSet<String>> {
 
 async fn load_tag_embeddings(
     pool: &PgPool,
-    text_embedder: &TextEmbedder,
+    text_embedder: &Arc<TextEmbedder>,
     model_id: &str,
 ) -> Result<()> {
     let tags = load_all_tags(pool).await?;
@@ -135,9 +136,12 @@ async fn load_tag_embeddings(
             let batch_size = 64;
             for chunk in uncached_tags.chunks(batch_size) {
                 let chunk_vec: Vec<String> = chunk.to_vec();
-                let embeddings_array = text_embedder
-                    .embed_texts(&chunk_vec)
-                    .map_err(|e| eyre!("CLIP embedding generation failed: {:?}", e))?;
+                let embedder = Arc::clone(text_embedder);
+                let embeddings_array =
+                    tokio::task::spawn_blocking(move || embedder.embed_texts(&chunk_vec))
+                        .await
+                        .map_err(|error| eyre!("CLIP text embedding task failed: {error}"))?
+                        .map_err(|e| eyre!("CLIP embedding generation failed: {:?}", e))?;
 
                 for (i, tag) in chunk.iter().enumerate() {
                     let mut row: Vec<f32> = embeddings_array.row(i).iter().copied().collect();
@@ -428,11 +432,17 @@ pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
         let existing_clusters = fetch_existing_clusters(&context.pool, user_id).await?;
         let items_to_cluster = fetch_media_items_for_clustering(&context.pool, user_id).await?;
 
-        let sessions = clustering::segment_into_sessions(
-            &items_to_cluster,
-            clustering_settings.session_time_gap_seconds,
-            clustering_settings.session_distance_meters,
-        );
+        let session_time_gap_seconds = clustering_settings.session_time_gap_seconds;
+        let session_distance_meters = clustering_settings.session_distance_meters;
+        let sessions = tokio::task::spawn_blocking(move || {
+            clustering::segment_into_sessions(
+                &items_to_cluster,
+                session_time_gap_seconds,
+                session_distance_meters,
+            )
+        })
+        .await
+        .map_err(|error| eyre!("Photo session segmentation task failed: {error}"))?;
 
         if sessions.len() < clustering_settings.min_cluster_size {
             info!(
@@ -447,10 +457,11 @@ pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
         let session_centroids: Vec<Vec<f32>> =
             sessions.iter().map(|s| s.centroid.clone()).collect();
         let (labels, new_centroids) = clustering::run_hdbscan(
-            &session_centroids,
+            session_centroids,
             clustering_settings.min_cluster_size,
             clustering_settings.min_samples,
-        )?;
+        )
+        .await?;
 
         let cluster_map = clustering::match_centroids(
             &new_centroids,

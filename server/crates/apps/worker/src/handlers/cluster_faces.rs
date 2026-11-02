@@ -130,10 +130,6 @@ async fn extract_and_save_cluster_thumbnail(
     ffmpeg.map_still_output("0:v", &temp_path);
     ffmpeg.run().await?;
 
-    let img = image::ImageReader::open(&temp_path)?
-        .with_guessed_format()?
-        .decode()?;
-
     let bbox = BoundingBox {
         x1: face.position_x,
         y1: face.position_y,
@@ -141,13 +137,20 @@ async fn extract_and_save_cluster_thumbnail(
         y2: face.position_y + face.height,
     };
 
-    let thumb = extract_face_thumbnail(&img, &bbox, PADDING_FACTOR, THUMBNAIL_SIZE);
-
     let out_dir = &context.settings.ingest.face_clusters_root;
     tokio::fs::create_dir_all(out_dir).await?;
-
     let out_path = out_dir.join(format!("{cluster_id}.webp"));
-    thumb.save(out_path)?;
+
+    tokio::task::spawn_blocking(move || -> Result<()> {
+        let img = image::ImageReader::open(&temp_path)?
+            .with_guessed_format()?
+            .decode()?;
+        let thumb = extract_face_thumbnail(&img, &bbox, PADDING_FACTOR, THUMBNAIL_SIZE);
+        thumb.save(out_path)?;
+        Ok(())
+    })
+    .await
+    .map_err(|error| eyre!("Face cluster thumbnail task failed: {error}"))??;
 
     Ok(())
 }
@@ -377,7 +380,7 @@ pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
 
         // Run clustering
         let (labels, new_centroids) =
-            clustering::run_hdbscan(&embeddings, MIN_ITEMS_TO_CLUSTER, MIN_SAMPLES)?;
+            clustering::run_hdbscan(embeddings, MIN_ITEMS_TO_CLUSTER, MIN_SAMPLES).await?;
         let cluster_map = clustering::match_centroids(
             &new_centroids,
             &existing_clusters,

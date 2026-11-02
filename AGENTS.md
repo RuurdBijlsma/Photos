@@ -15,8 +15,8 @@ env vars (`ORT_DYLIB_PATH`, `DATABASE_URL`, `RP__INGEST__MEDIA_FOLDER`, `RP__ING
 |-----------------------------|----------------------------------------------------------------------|
 | `server/`                   | Rust workspace (13 crates), migrations, settings, SQLx offline cache |
 | `web/`                      | Vue 3 + TypeScript SPA (Vite, Pinia, Vuetify)                        |
-| `compose.yml`               | Production stack: pgvector DB + backend + nginx web                  |
-| `cloud-compose/compose.yml` | Compose file attached to GitHub releases                             |
+| `compose.yml`               | Podman/Docker stack for testing container-specific changes           |
+| `cloud-compose/compose.yml` | Compose file attached to GitHub releases, used in production         |
 | `cloud-compose/monitoring/` | Optional observability stack: Loki, Alloy config, Grafana dashboards |
 | `.github/workflows/`        | Rust CI, Web CI, frontend perf gate, release images, GitHub Pages    |
 | `scripts/`                  | Windows helpers (start Postgres, copy app data into a Podman volume) |
@@ -66,8 +66,9 @@ dependencies. Fix or extend the behavior there, bump the version here, and keep 
   (`generate_thumbnails/src/pano.rs`).
 
 Production deployment is not built here: the `compose-services` repo (`stacks/photos/compose.yml`) runs the published
-`ghcr.io/ruurdbijlsma/photos-server` and `photos-web` images and joins the external `proxy-net`; the root `compose.yml`
-in this repo builds from source for local runs.
+`ghcr.io/ruurdbijlsma/photos-server` and `photos-web` images and joins the external `proxy-net`. The root `compose.yml`
+builds from source and is used to test Podman/Docker-specific behavior; typical development runs the backend and web
+directly on the host.
 
 ## Prerequisites
 
@@ -107,6 +108,9 @@ npm run dev   # http://localhost:5173; proxies /api, /thumbnails, /hosted to 127
 GENERALLY when running, use release profile, otherwise crates like `image` slow down and tests/running takes minutes
 instead of seconds. Also using release profile will take advantage of incremental compilation, since I do all
 runs/builds with release.
+
+Always stop a server as soon as it is no longer needed. One started from OpenCode cannot be stopped from the UI, and a
+running `photos_app` locks `target/release/photos_app.exe`, so cargo cannot relink it.
 
 ```powershell
 # Backend (all from server/)
@@ -163,8 +167,28 @@ npm run preview   # terminal A, proxies /api to a running backend on :5272
 npm run perf      # terminal B: 5 measured runs, writes tests/perf/results/<date>_<branch>_<sha>.json
 ```
 
-Commit that JSON file — CI's perf gate rejects PRs touching `web/**` without a new result file and compares it to the
+Commit that JSON file - CI's perf gate rejects PRs touching `web/**` without a new result file and compares it to the
 newest result on `main`. Details: `web/tests/perf/README.md`.
+
+### Browser testing
+
+If you want to to check a UI change in the actual browser: make sure the backend & vite dev server are running,
+then open `http://localhost:5173`.
+
+- Log in through the form. A `fetch('/api/auth/login')` from the page sets cookies but not the SPA's session, and every
+  navigation bounces back to `/login`. The endpoint also rate-limits (429 after a few tries), so log in once and keep
+  the tab.
+- Vuetify inputs ignore `input.value = ...`: write through the native setter and dispatch
+  `new Event('input', { bubbles: true })`, otherwise the model never updates. The email field is `type="text"` with
+  `autocomplete="email"`, so `input[type=email]` finds nothing.
+- `click` takes a `ref` from a snapshot, so for elements you found by class or aria-label, click them from `evaluate`:
+  `[...document.querySelectorAll('.edit-button')].forEach((b) => b.click())`.
+- Screenshots fail unless the tab is focused and its window is visible; call `tabs.focus` first.
+- Deep-link the viewer with `/view/<mediaItemId>`.
+- A freshly started Vite server can re-optimises dependencies and reload once or twice, which drops in-memory auth and
+  logs you out. Load a page, let it settle, then start clicking.
+- There are no `data-testid` attributes: selectors are CSS classes and visible text (`Extra info`, `Remove location`),
+  so re-read the DOM before asserting on it.
 
 ## Linting and formatting
 
@@ -214,14 +238,16 @@ npm run lint
   needed. SQL migration files are located at `server/migrations`.
 - **Setting**: add the field to `app_state` (`raw_settings.rs` + `settings.rs`) and to `config/settings.yaml`; expose it
   through the frontend settings/admin API if users should change it at runtime.
-- **Dashboard / Grafana panel / Alerting**: the dashboard model is in `cloud-compose/monitoring/grafana/dashboards/photos-logs.json`
+- **Dashboard / Grafana panel / Alerting**: the dashboard model is in
+  `cloud-compose/monitoring/grafana/dashboards/photos-logs.json`
   and is provisioned read-only (`allowUiUpdates: false`, polling every 30s) — edit the JSON file directly. Adding new
   panels directly to the main part of the dashboard without a group is fine; if adding panels after a grouped section,
   Grafana's flat JSON puts all subsequent panels inside that group unless separated by an explicit `row` panel. In
-  general, Grafana's default `No data` state is expected when a query returns zero rows; only special exceptions 
+  general, Grafana's default `No data` state is expected when a query returns zero rows; only special exceptions
   synthesize zero data points or fallback rows. When displaying table rows in a Pie Chart, set
   `options.reduceOptions.values: true` so each row becomes a slice rather than reducing columns. Alert rules and contact
-  points live under `cloud-compose/monitoring/grafana/provisioning/alerting/`; threshold conditions in rule files require
+  points live under `cloud-compose/monitoring/grafana/provisioning/alerting/`; threshold conditions in rule files
+  require
   `evaluator:` (e.g. `evaluator: { type: gt, params: [0] }`), not `eval:`.
 
 ## CI and PRs
@@ -242,6 +268,12 @@ npm run lint
 
 ## Gotchas
 
+- **Tokio runtime responsiveness**: `photos_app` runs the API, worker scaler, watcher, and worker tasks together.
+  Synchronous CPU or blocking work called from an `async fn` still occupies a Tokio worker and can delay unrelated
+  API requests; this includes synchronous methods in dependency crates. Move substantial work such as HDBSCAN,
+  ONNX inference, and image decoding/processing to `tokio::task::spawn_blocking` or a dedicated bounded pool. Keep
+  async database and network operations outside the blocking closure, audit every call site (including scheduled
+  jobs), and bound concurrent CPU work when needed to avoid oversubscribing the machine.
 - Run backend commands from `server/` — `config/settings.yaml` and `migrations/` are resolved from the CWD.
 - SQL is compile-time checked: `just` exports `DATABASE_URL`, so queries are validated against the dev DB — after a
   migration or a new query, a stale schema means the crate won't compile. Recreate the dev DB freely:
@@ -277,3 +309,13 @@ npm run lint
 - Compose files are duplicated: the root `compose.yml` bind-mounts `./cloud-compose/monitoring/...` for local testing,
   while `cloud-compose/compose.yml` uses the published `photos-loki`/`photos-alloy`/`photos-grafana` images with config
   baked in. Keep services and env variables in sync across both and list defaults in `example.env`.
+- Location/orientation edits are file writes, not DB writes: they go through `common_services/src/utils.rs`
+  (`write_media_gps`, `remove_media_gps`, `write_exif_orientation`) and exiftool, then `reprocess_media_item`.
+- The API binds `0.0.0.0` (IPv4) while Vite binds `localhost` (IPv6): the backend answers on `http://127.0.0.1:5272` and
+  the web client on `http://localhost:5173`. The other pairing hangs or is refused, which looks like a dead server.
+- If there's a backend process running that you didn't start, feel free to end it if you need to try changes. The
+  host has no `psql`; query the dev database with `podman exec photos-db-dev psql -U photos_user -d photos -c "…"`.
+- `just test` rewrites the tracked model cache `crates/test_integration/assets/static-cache/tag-vocab/*.bin`, so it
+  shows
+  up as a modified binary after every suite run. Drop it from the diff (`git checkout -- <file>`) unless the model
+  actually changed.
