@@ -15,8 +15,8 @@ env vars (`ORT_DYLIB_PATH`, `DATABASE_URL`, `RP__INGEST__MEDIA_FOLDER`, `RP__ING
 |-----------------------------|----------------------------------------------------------------------|
 | `server/`                   | Rust workspace (13 crates), migrations, settings, SQLx offline cache |
 | `web/`                      | Vue 3 + TypeScript SPA (Vite, Pinia, Vuetify)                        |
-| `compose.yml`               | Production stack: pgvector DB + backend + nginx web                  |
-| `cloud-compose/compose.yml` | Compose file attached to GitHub releases                             |
+| `compose.yml`               | Podman/Docker stack for testing container-specific changes           |
+| `cloud-compose/compose.yml` | Compose file attached to GitHub releases, used in production         |
 | `cloud-compose/monitoring/` | Optional observability stack: Loki, Alloy config, Grafana dashboards |
 | `.github/workflows/`        | Rust CI, Web CI, frontend perf gate, release images, GitHub Pages    |
 | `scripts/`                  | Windows helpers (start Postgres, copy app data into a Podman volume) |
@@ -66,8 +66,9 @@ dependencies. Fix or extend the behavior there, bump the version here, and keep 
   (`generate_thumbnails/src/pano.rs`).
 
 Production deployment is not built here: the `compose-services` repo (`stacks/photos/compose.yml`) runs the published
-`ghcr.io/ruurdbijlsma/photos-server` and `photos-web` images and joins the external `proxy-net`; the root `compose.yml`
-in this repo builds from source for local runs.
+`ghcr.io/ruurdbijlsma/photos-server` and `photos-web` images and joins the external `proxy-net`. The root `compose.yml`
+builds from source and is used to test Podman/Docker-specific behavior; typical development runs the backend and web
+directly on the host.
 
 ## Prerequisites
 
@@ -237,14 +238,16 @@ npm run lint
   needed. SQL migration files are located at `server/migrations`.
 - **Setting**: add the field to `app_state` (`raw_settings.rs` + `settings.rs`) and to `config/settings.yaml`; expose it
   through the frontend settings/admin API if users should change it at runtime.
-- **Dashboard / Grafana panel / Alerting**: the dashboard model is in `cloud-compose/monitoring/grafana/dashboards/photos-logs.json`
+- **Dashboard / Grafana panel / Alerting**: the dashboard model is in
+  `cloud-compose/monitoring/grafana/dashboards/photos-logs.json`
   and is provisioned read-only (`allowUiUpdates: false`, polling every 30s) — edit the JSON file directly. Adding new
   panels directly to the main part of the dashboard without a group is fine; if adding panels after a grouped section,
   Grafana's flat JSON puts all subsequent panels inside that group unless separated by an explicit `row` panel. In
-  general, Grafana's default `No data` state is expected when a query returns zero rows; only special exceptions 
+  general, Grafana's default `No data` state is expected when a query returns zero rows; only special exceptions
   synthesize zero data points or fallback rows. When displaying table rows in a Pie Chart, set
   `options.reduceOptions.values: true` so each row becomes a slice rather than reducing columns. Alert rules and contact
-  points live under `cloud-compose/monitoring/grafana/provisioning/alerting/`; threshold conditions in rule files require
+  points live under `cloud-compose/monitoring/grafana/provisioning/alerting/`; threshold conditions in rule files
+  require
   `evaluator:` (e.g. `evaluator: { type: gt, params: [0] }`), not `eval:`.
 
 ## CI and PRs
@@ -312,6 +315,7 @@ npm run lint
   the web client on `http://localhost:5173`. The other pairing hangs or is refused, which looks like a dead server.
 - If there's a backend process running that you didn't start, feel free to end it if you need to try changes. The
   host has no `psql`; query the dev database with `podman exec photos-db-dev psql -U photos_user -d photos -c "…"`.
-- `just test` rewrites the tracked model cache `crates/test_integration/assets/static-cache/tag-vocab/*.bin`, so it shows
+- `just test` rewrites the tracked model cache `crates/test_integration/assets/static-cache/tag-vocab/*.bin`, so it
+  shows
   up as a modified binary after every suite run. Drop it from the diff (`git checkout -- <file>`) unless the model
   actually changed.
