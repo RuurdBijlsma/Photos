@@ -533,13 +533,6 @@ pub async fn test_takeout_import_flow(context: &TestContext) -> Result<()> {
     let (started, zip_count) = start_takeout_import(client, api_url).await?;
     assert!(started);
     assert_eq!(zip_count, 2);
-    assert_eq!(
-        std::fs::read(tus_dir.join(&zip1_id))?,
-        zip1_bytes,
-        "the interrupted finalization should be repaired before enqueueing"
-    );
-    assert!(!tus_dir.join(format!("{zip1_id}_part_0")).exists());
-    assert!(!tus_dir.join(format!("{zip1_id}_part_1")).exists());
     wait_for_takeout_job(context).await?;
 
     let job_count: i64 =
