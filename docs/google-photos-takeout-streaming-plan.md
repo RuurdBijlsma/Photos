@@ -22,7 +22,7 @@
 - `/api/upload/takeout/start` no longer repairs uploads; it only reports ready ZIPs and enqueues the job. The worker calls `repair_tus_upload` per ZIP before reading it, which already exists.
 - No new job types, no migration, no per-job progress UI. Visibility comes from log lines and the existing job row.
 - Only `Takeout/Google Photos/<Album>/<file>` and `Google Photos/<Album>/<file>` are recognized. The old importer's last-resort "treat every top-level folder as an album" fallback is dropped on purpose; if the index finds no media at all, the job fails loudly instead of silently importing nothing.
-- The copy destination is always `<user>/takeout/<sanitized basename>`; ZIP paths are never recreated on disk, so `enclosed_name()` plus the basename is the whole path-safety story. `.part` files can live in that folder because the watcher ignores managed folders (`takeout` is in `MANAGED_FOLDERS`), so no separate scratch directory is needed.
+- The copy destination is always `<user>/takeout/<sanitized basename>`; ZIP paths are never recreated on disk, so the entry-name validator plus the sanitized basename is the whole path-safety story. Do **not** use `ZipFile::enclosed_name()`: zip 9.2.2 rejects any component ending in a space on Windows, and real Takeout folders are named `Photos from 2023 ` / `Vacation 2023 `, so every entry is silently skipped there (this already breaks the integration fixture on Windows). Use `name()` and reject absolute paths, drive prefixes, `.` and `..`, then trim each component. `.part` files can live in the destination folder because the watcher ignores managed folders (`takeout` is in `MANAGED_FOLDERS`), so no separate scratch directory is needed.
 - When a sanitized filename appears more than once, the first occurrence wins: ZIP order (`payload.tus_upload_ids`, already sorted by the API) and then central-directory order. Album memberships are unioned.
 - Out of scope: FileLoft's own peak of parts + assembled file per in-flight upload during finalization.
 
@@ -42,7 +42,8 @@
 - A sidecar stored in a different archive than its media must still supply the date — pinned by the existing `test_takeout_import_flow` fixture (`takeout_new.png` sidecar lives in ZIP 2, media in ZIP 1) (Tasks 4-5).
 - A ZIP entry with a bad CRC must be skipped while the rest of the batch imports — pinned by `skips_corrupt_entry_and_continues` (Task 5).
 - A destination left by an earlier failed attempt must be replaced, not duplicated as `name_1.ext` — pinned by `copies_over_an_existing_destination` (Task 3).
-- The import must not create anything under `cache_root` — pinned by the `takeout_tmp` absence assertion added to `assert_cleanup` (Task 4).
+- A ZIP entry name can never escape the destination — pinned by `takeout_parts_rejects_unsafe_names` (Task 3).
+- The import must not create anything under `cache_root` — pinned by the existing job-scoped `takeout_tmp` assertion in `assert_cleanup` (Task 4).
 
 ## Compared with `docs/google-photos-takeout-plan.md`
 
@@ -320,19 +321,24 @@ mod tests {
     #[test]
     fn takeout_parts_handles_roots_and_trailing_spaces() {
         assert_eq!(
-            takeout_parts(Path::new("Takeout/Google Photos/Vacation 2023 /a.jpg")),
+            takeout_parts("Takeout/Google Photos/Vacation 2023 /a.jpg"),
             Some(("Vacation 2023".to_owned(), "a.jpg".to_owned()))
         );
         assert_eq!(
-            takeout_parts(Path::new("Google Photos/Photos from 2013/b.png")),
+            takeout_parts("Google Photos/Photos from 2013/b.png"),
             Some(("Photos from 2013".to_owned(), "b.png".to_owned()))
         );
-        assert_eq!(takeout_parts(Path::new("Takeout/Other/a.jpg")), None);
-        assert_eq!(takeout_parts(Path::new("Takeout/Google Photos/a.jpg")), None);
-        assert_eq!(
-            takeout_parts(Path::new("Takeout/Google Photos/Album/sub/a.jpg")),
-            None
-        );
+        assert_eq!(takeout_parts("Takeout/Other/a.jpg"), None);
+        assert_eq!(takeout_parts("Takeout/Google Photos/a.jpg"), None);
+        assert_eq!(takeout_parts("Takeout/Google Photos/Album/sub/a.jpg"), None);
+    }
+
+    #[test]
+    fn takeout_parts_rejects_unsafe_names() {
+        assert_eq!(takeout_parts("Takeout/Google Photos/../a.jpg"), None);
+        assert_eq!(takeout_parts("/Takeout/Google Photos/Album/a.jpg"), None);
+        assert_eq!(takeout_parts("C:/Google Photos/Album/a.jpg"), None);
+        assert_eq!(takeout_parts("Takeout/Google Photos/Alb:um/a.jpg"), None);
     }
 
     #[test]
@@ -508,7 +514,9 @@ Expected: compile errors for the missing functions, or `todo!()` panics once the
 
 - [ ] **Step 3: Implement path normalization**
 
-`fn takeout_parts(path: &Path) -> Option<(String, String)>` — collect the path's components, trim each with `.to_string_lossy().trim()` and drop empties, strip a leading `Takeout`, then require exactly `["Google Photos", album, file]`. Return `(album, file)`. Any other depth or root returns `None`.
+`fn safe_components(name: &str) -> Option<Vec<String>>` — reject a name starting with `/` or `\`, reject any component containing `:` (drive or alternate-data-stream prefix), and reject `.` and `..` components; split on `/` and `\`, trim each component, and drop empties. This replaces `enclosed_name()`, which silently rejects trailing-space folders on Windows.
+
+`fn takeout_parts(name: &str) -> Option<(String, String)>` — `safe_components(name)?`, strip a leading `Takeout`, then require exactly `["Google Photos", album, file]`. Return `(album, file)`. Any other depth or root returns `None`.
 
 - [ ] **Step 4: Implement the JSON helpers**
 
@@ -523,7 +531,7 @@ Move the existing `SidecarTimestamp`/`SidecarJson` structs and `parse_sidecar_ti
 Open the ZIP with `ZipArchive::new(BufReader::new(File::open(zip_path)?))?`. For each index in `0..archive.len()`:
 
 - `archive.by_index(i)`; on `Err`, `tracing::warn!("Skipping unreadable Takeout entry {i} in {upload_id}: {e}")` and continue.
-- Skip directories and entries without `enclosed_name()`.
+- Skip directories and entries whose `name()` fails `safe_components`.
 - `takeout_parts`; skip entries outside the photos root.
 - Register the folder in `index.albums` with `or_default()`.
 - If the file has a `.json` extension: read it with `read_small_json`; when the file name (case-insensitive) is `metadata.json`, parse it as `AlbumMetadata` and copy `title`/`description` into the folder's metadata when present; otherwise parse the timestamp and insert `(folder, sanitize(file_name).to_lowercase()) -> Option<DateTime<Utc>>` with `or_insert` so the first occurrence wins.
@@ -553,7 +561,7 @@ with local counters for this archive. Do not call `zip::ZipReadOptions` anywhere
 
 - [ ] **Step 8: Run the unit tests to verify they pass**
 
-Same command as Step 2. Expected: 6 tests pass (the 2 moved sidecar tests plus the 4 new ones).
+Same command as Step 2. Expected: 7 tests pass (the 2 moved sidecar tests plus the 5 new ones).
 
 - [ ] **Step 9: Lint**
 
