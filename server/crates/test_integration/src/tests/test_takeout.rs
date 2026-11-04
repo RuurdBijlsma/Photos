@@ -6,6 +6,8 @@ use base64::engine::general_purpose::STANDARD;
 use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
 use color_eyre::Result;
 use color_eyre::eyre::{bail, eyre};
+use common_services::database::album_store::AlbumStore;
+use common_services::database::media_item_store::MediaItemStore;
 use reqwest::StatusCode;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -30,6 +32,8 @@ const NEW_PHOTO: &str = "takeout_new(1).png";
 const SIDECAR_TIMESTAMP: i64 = 1_690_000_000; // 2023-07-22 04:26:40 UTC
 const BROKEN_PHOTO: &str = "takeout_broken(1).jpg";
 const BROKEN_SIDECAR_TIMESTAMP: i64 = 1_690_000_060; // 2023-07-22 04:27:40 UTC
+const CORRUPT_PHOTO: &str = "takeout_corrupt(1).jpg";
+const GOOD_AFTER_CORRUPT: &str = "takeout_after_corrupt(1).png";
 
 fn build_zip(path: &Path, entries: &[(&str, &[u8])]) -> Result<()> {
     let file = std::fs::File::create(path)?;
@@ -42,8 +46,40 @@ fn build_zip(path: &Path, entries: &[(&str, &[u8])]) -> Result<()> {
     Ok(())
 }
 
+/// A ZIP whose first entry has valid metadata but one flipped data byte, so reading it fails CRC.
+fn create_corrupt_zip(folder: &Path) -> Result<PathBuf> {
+    let payload = b"unique-corrupt-payload-0123456789";
+    let path = folder.join("takeout-003.zip");
+    let file = std::fs::File::create(&path)?;
+    let mut zip = zip::ZipWriter::new(file);
+    let stored = SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
+    zip.start_file(
+        format!("Takeout/Google Photos/Broken Album/{CORRUPT_PHOTO}"),
+        stored,
+    )?;
+    zip.write_all(payload)?;
+    zip.start_file(
+        format!("Takeout/Google Photos/Broken Album/{GOOD_AFTER_CORRUPT}"),
+        SimpleFileOptions::default(),
+    )?;
+    zip.write_all(NO_METADATA_PNG)?;
+    zip.finish()?;
+
+    let mut bytes = std::fs::read(&path)?;
+    let start = bytes
+        .windows(payload.len())
+        .position(|window| window == payload)
+        .expect("corrupt payload should be stored verbatim");
+    bytes[start + payload.len() / 2] ^= 0xFF;
+    std::fs::write(&path, bytes)?;
+    Ok(path)
+}
+
 /// Takeout spreads one album over multiple ZIPs, so the archives together form one import batch.
-fn create_takeout_zips(context: &TestContext, folder: &Path) -> Result<(PathBuf, PathBuf)> {
+fn create_takeout_zips(
+    context: &TestContext,
+    folder: &Path,
+) -> Result<(PathBuf, PathBuf, PathBuf)> {
     let video = std::fs::read(context.settings.ingest.media_root.join(EXISTING_VIDEO))?;
     let sidecar = format!(
         r#"{{"title": "{NEW_PHOTO}", "photoTakenTime": {{"timestamp": "{SIDECAR_TIMESTAMP}"}}}}"#
@@ -113,7 +149,9 @@ fn create_takeout_zips(context: &TestContext, folder: &Path) -> Result<(PathBuf,
         ],
     )?;
 
-    Ok((zip1, zip2))
+    let zip3 = create_corrupt_zip(folder)?;
+
+    Ok((zip1, zip2, zip3))
 }
 
 async fn tus_create(
@@ -481,11 +519,12 @@ pub async fn test_takeout_import_flow(context: &TestContext) -> Result<()> {
         .await?;
 
     let temp_dir = tempfile::TempDir::new()?;
-    let (zip1_path, zip2_path) = create_takeout_zips(context, temp_dir.path())?;
+    let (zip1_path, zip2_path, zip3_path) = create_takeout_zips(context, temp_dir.path())?;
     let metadata = [("isTakeout", "true")];
 
     let zip1_bytes = std::fs::read(&zip1_path)?;
     let zip2_bytes = std::fs::read(&zip2_path)?;
+    let zip3_bytes = std::fs::read(&zip3_path)?;
 
     // Simulate an interrupted upload: zip2 is created and half uploaded, then the
     // browser is refreshed. The client only calls start once its queue is done.
@@ -517,6 +556,15 @@ pub async fn test_takeout_import_flow(context: &TestContext) -> Result<()> {
     )
     .await?;
     tus_patch(client, &zip2_location, split as u64, &zip2_bytes[split..]).await?;
+    let zip3_id = tus_upload(
+        client,
+        api_url,
+        &upload_jwt,
+        "takeout-003.zip",
+        &metadata,
+        &zip3_bytes,
+    )
+    .await?;
 
     // A refresh during the final PATCH leaves .info complete but the final file truncated.
     let tus_dir = context
@@ -532,7 +580,7 @@ pub async fn test_takeout_import_flow(context: &TestContext) -> Result<()> {
 
     let (started, zip_count) = start_takeout_import(client, api_url).await?;
     assert!(started);
-    assert_eq!(zip_count, 2);
+    assert_eq!(zip_count, 3);
     wait_for_takeout_job(context).await?;
 
     let job_count: i64 =
@@ -547,7 +595,7 @@ pub async fn test_takeout_import_flow(context: &TestContext) -> Result<()> {
     )
     .fetch_one(&context.pool)
     .await?;
-    let mut expected_ids = vec![zip1_id.clone(), zip2_id.clone()];
+    let mut expected_ids = vec![zip1_id.clone(), zip2_id.clone(), zip3_id.clone()];
     expected_ids.sort_unstable();
     let payload_ids: Vec<String> = payload
         .and_then(|payload| serde_json::from_value(payload.get("tus_upload_ids")?.clone()).ok())
@@ -607,10 +655,39 @@ pub async fn test_takeout_import_flow(context: &TestContext) -> Result<()> {
     assert_eq!(broken_time.source_details, "Google Takeout sidecar");
     assert_eq!(broken_time.source_confidence, "Medium");
 
+    // A corrupt entry is skipped instead of failing the batch: it never becomes a media item and
+    // leaves no `.part` behind, while its sibling and the album folder still come through.
+    let corrupt = MediaItemStore::find_existing_filenames_map(
+        &context.pool,
+        user_id,
+        &[CORRUPT_PHOTO.to_owned()],
+    )
+    .await?;
+    assert!(corrupt.is_empty(), "a corrupt entry must be skipped");
+
+    assert!(
+        !context
+            .settings
+            .ingest
+            .media_root
+            .join("takeout")
+            .join(format!("{CORRUPT_PHOTO}.part"))
+            .exists(),
+        "a skipped entry must not leave a partial file"
+    );
+
+    wait_for_media_item(context, user_id, GOOD_AFTER_CORRUPT).await?;
+    assert!(
+        AlbumStore::find_by_name(&context.pool, user_id, "Broken Album")
+            .await?
+            .is_some(),
+        "the album folder is still registered when one of its entries is unreadable"
+    );
+
     assert_album_linking(context, user_id, &new_media_id).await?;
     assert_album_linking(context, user_id, &broken_media_id).await?;
     assert_existing_media_linking(context, user_id).await?;
-    assert_cleanup(context, job_id, &[zip1_id, zip2_id]);
+    assert_cleanup(context, job_id, &[zip1_id, zip2_id, zip3_id]);
 
     let (started, zip_count) = start_takeout_import(client, api_url).await?;
     assert!(!started, "nothing should be left to import after cleanup");
