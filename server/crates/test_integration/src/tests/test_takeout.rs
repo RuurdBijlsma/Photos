@@ -460,7 +460,7 @@ fn assert_cleanup(context: &TestContext, job_id: i64, upload_ids: &[String]) {
             .join("takeout_tmp")
             .join(job_id.to_string())
             .exists(),
-        "extraction folder should be deleted"
+        "the import must not stage anything under app data"
     );
 }
 
