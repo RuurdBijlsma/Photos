@@ -92,14 +92,21 @@ function onFolderChanged(e: Event) {
         >
           Upload Folder
         </v-btn>
-        <v-btn
-          variant="text"
-          size="small"
-          :prepend-icon="MdiArchiveArrowUpOutline"
-          @click="takeoutDialog = true"
-        >
-          Import Google Photos Takeout
-        </v-btn>
+        <v-tooltip text="Import Google Photos Takeout" location="top">
+          <template #activator="{ props }">
+            <v-btn
+              icon
+              v-bind="props"
+              variant="plain"
+              color="on-surface-variant"
+              rounded="xl"
+              aria-label="Import Google Photos Takeout"
+              @click="takeoutDialog = true"
+            >
+              <v-icon :icon="MdiArchiveArrowUpOutline" />
+            </v-btn>
+          </template>
+        </v-tooltip>
         <v-btn
           v-if="uploadStore.uploads.length > 0"
           variant="plain"
