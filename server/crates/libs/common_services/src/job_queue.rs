@@ -12,9 +12,19 @@ use tracing::{debug, info};
 pub struct IngestMetadataPayload {
     pub album_ids: Vec<String>,
     pub remote_user_identity: Option<String>,
+    /// Takeout album thumbnails are selected after all imported media has been ingested.
+    #[serde(default)]
+    pub defer_album_thumbnail: bool,
     /// Takeout sidecar timestamp; applied only when ingest analysis is low-confidence.
     #[serde(default)]
     pub fallback_taken_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct FinalizeTakeoutImportPayload {
+    pub album_ids: Vec<String>,
+    /// Prevents separate imports of the same albums from sharing one active finalizer job.
+    pub batch_job_id: i64,
 }
 
 /// Enqueues a job for a specific file, such as ingestion or removal.

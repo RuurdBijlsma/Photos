@@ -130,7 +130,8 @@ async fn store_media_item(
         for album_id in &album_ids {
             AlbumStore::add_media_items(&mut tx, album_id, std::slice::from_ref(&item_id), user_id)
                 .await?;
-            if let Some(album) = AlbumStore::find_by_id(&mut *tx, album_id).await?
+            if !info.defer_album_thumbnail
+                && let Some(album) = AlbumStore::find_by_id(&mut *tx, album_id).await?
                 && album.thumbnail_id.is_none()
             {
                 AlbumStore::update(

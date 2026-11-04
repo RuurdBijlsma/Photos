@@ -12,6 +12,7 @@ pub mod clean_db;
 pub mod clean_thumbnails;
 pub mod cluster_faces;
 pub mod cluster_photos;
+pub mod finalize_takeout_import;
 pub mod generate_daily_cards;
 pub mod handle_web_upload;
 pub mod import_album_item;
@@ -54,6 +55,7 @@ pub async fn handle_job(context: &WorkerContext, job: &Job) -> Result<JobResult>
         JobType::GenerateDailyCards => generate_daily_cards::handle(context, job).await,
         JobType::UpdateGlobalCentroid => update_global_centroid::handle(context, job).await,
         JobType::IngestTakeoutBatch => ingest_takeout_batch::handle(context, job).await,
+        JobType::FinalizeTakeoutImport => finalize_takeout_import::handle(context, job).await,
         JobType::PruneMissingIngestJobs => prune_missing_ingest_jobs::handle(context, job).await,
     };
 

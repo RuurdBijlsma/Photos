@@ -11,10 +11,12 @@ use common_services::api::upload::interfaces::TakeoutBatchPayload;
 use common_services::api::upload::service::repair_tus_upload;
 use common_services::database::album::album::AlbumRole;
 use common_services::database::album_store::AlbumStore;
-use common_services::database::jobs::Job;
+use common_services::database::jobs::{Job, JobType};
 use common_services::database::media_item_store::MediaItemStore;
 use common_services::database::user_store::UserStore;
-use common_services::job_queue::{IngestMetadataPayload, bulk_enqueue_full_ingest};
+use common_services::job_queue::{
+    FinalizeTakeoutImportPayload, IngestMetadataPayload, bulk_enqueue_full_ingest, enqueue_job,
+};
 use serde_json::from_value;
 use std::collections::{BTreeMap, HashMap};
 use std::path::Path;
@@ -252,6 +254,7 @@ pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
                         Some(IngestMetadataPayload {
                             album_ids: album_ids_by_filename.remove(&filename).unwrap_or_default(),
                             remote_user_identity: None,
+                            defer_album_thumbnail: true,
                             fallback_taken_at,
                         }),
                     ));
@@ -286,6 +289,25 @@ pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
     if !new_media.is_empty() {
         bulk_enqueue_full_ingest(&context.pool, &context.settings.ingest, &new_media, user_id)
             .await?;
+    }
+
+    let mut album_ids: Vec<String> = folder_to_album_id.into_values().collect();
+    album_ids.sort_unstable();
+    album_ids.dedup();
+    if !album_ids.is_empty() {
+        let finalize_payload = FinalizeTakeoutImportPayload {
+            album_ids,
+            batch_job_id: job.id,
+        };
+        enqueue_job(
+            &context.pool,
+            &context.settings.ingest,
+            JobType::FinalizeTakeoutImport,
+        )
+        .user_id(user_id)
+        .payload(&finalize_payload)
+        .call()
+        .await?;
     }
 
     info!(
