@@ -735,14 +735,13 @@ In `create_takeout_zips`, create it with `let zip3 = create_corrupt_zip(folder)?
 - After the job, assert the corrupt file never became media and left no part file:
 
 ```rust
-    let corrupt_rows: i64 = sqlx::query_scalar!(
-        "SELECT COUNT(*) FROM media_item WHERE filename = $1",
-        CORRUPT_PHOTO
+    let corrupt = MediaItemStore::find_existing_filenames_map(
+        &context.pool,
+        user_id,
+        &[CORRUPT_PHOTO.to_owned()],
     )
-    .fetch_one(&context.pool)
-    .await?
-    .expect("count");
-    assert_eq!(corrupt_rows, 0, "a corrupt entry must be skipped");
+    .await?;
+    assert!(corrupt.is_empty(), "a corrupt entry must be skipped");
 
     assert!(
         !context
@@ -756,7 +755,23 @@ In `create_takeout_zips`, create it with `let zip3 = create_corrupt_zip(folder)?
     );
 ```
 
-- Assert the good entry from the same ZIP still imported: `wait_for_media_item(context, user_id, GOOD_AFTER_CORRUPT).await?;` and that "Broken Album" exists as an album (the folder was still registered): a `SELECT COUNT(*) FROM album WHERE owner_id = $1 AND name = 'Broken Album'` equals 1.
+Use existing store calls rather than new `sqlx::query_scalar!` strings, so `server/.sqlx` gains no entry. Add the imports:
+
+```rust
+use common_services::database::album_store::AlbumStore;
+use common_services::database::media_item_store::MediaItemStore;
+```
+
+- Assert the good entry from the same ZIP still imported: `wait_for_media_item(context, user_id, GOOD_AFTER_CORRUPT).await?;` and that "Broken Album" exists (the folder was registered at index time even though one entry was unreadable):
+
+```rust
+    assert!(
+        AlbumStore::find_by_name(&context.pool, user_id, "Broken Album")
+            .await?
+            .is_some(),
+        "the album folder is still registered when one of its entries is unreadable"
+    );
+```
 
 - [ ] **Step 3: Run the integration suite**
 
