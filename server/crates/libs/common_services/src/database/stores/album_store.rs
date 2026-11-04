@@ -125,6 +125,62 @@ impl AlbumStore {
         .await?)
     }
 
+    /// Marks whether the current album thumbnail was explicitly selected by the user.
+    pub async fn set_thumbnail_user_selected(
+        executor: impl PgExecutor<'_>,
+        album_id: &str,
+        is_user_selected: bool,
+    ) -> Result<PgQueryResult, DbError> {
+        Ok(
+            sqlx::query("UPDATE album SET thumbnail_is_user_selected = $2 WHERE id = $1")
+                .bind(album_id)
+                .bind(is_user_selected)
+                .execute(executor)
+                .await?,
+        )
+    }
+
+    /// Updates an automatically selected thumbnail without replacing a user-selected one.
+    pub async fn update_thumbnail_if_not_user_selected(
+        executor: impl PgExecutor<'_>,
+        album_id: &str,
+        thumbnail_id: &str,
+    ) -> Result<PgQueryResult, DbError> {
+        Ok(sqlx::query(
+            r#"
+            UPDATE album
+            SET thumbnail_id = $2, updated_at = now()
+            WHERE id = $1
+              AND thumbnail_is_user_selected = false
+            "#,
+        )
+        .bind(album_id)
+        .bind(thumbnail_id)
+        .execute(executor)
+        .await?)
+    }
+
+    /// Replaces a thumbnail after the previous selection was removed from the album.
+    pub async fn update_thumbnail_as_automatic(
+        executor: impl PgExecutor<'_>,
+        album_id: &str,
+        thumbnail_id: &str,
+    ) -> Result<PgQueryResult, DbError> {
+        Ok(sqlx::query(
+            r#"
+            UPDATE album
+            SET thumbnail_id = $2,
+                thumbnail_is_user_selected = false,
+                updated_at = now()
+            WHERE id = $1
+            "#,
+        )
+        .bind(album_id)
+        .bind(thumbnail_id)
+        .execute(executor)
+        .await?)
+    }
+
     /// Retrieves a single album by its ID, including the count of media items.
     pub async fn find_by_id(
         executor: impl PgExecutor<'_>,

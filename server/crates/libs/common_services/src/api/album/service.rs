@@ -275,15 +275,8 @@ pub async fn remove_media_from_album(
                 .await?;
 
                 if let Some(thumbnail_id) = get_representative_thumbnail(&mut tx, &ids).await? {
-                    AlbumStore::update(
-                        &mut *tx,
-                        album_id,
-                        None,
-                        UpdateField::Ignore,
-                        UpdateField::Value(thumbnail_id),
-                        None,
-                    )
-                    .await?;
+                    AlbumStore::update_thumbnail_as_automatic(&mut *tx, album_id, &thumbnail_id)
+                        .await?;
                 }
                 break;
             }
@@ -412,8 +405,27 @@ pub async fn update_album(
         }
     }
 
-    let updated_album =
-        AlbumStore::update(pool, album_id, name, description, thumbnail_id, is_public).await?;
+    let thumbnail_is_user_selected = match &thumbnail_id {
+        UpdateField::Value(_) => Some(true),
+        UpdateField::SetNull => Some(false),
+        UpdateField::Ignore => None,
+    };
+
+    let mut tx = pool.begin().await?;
+    let updated_album = AlbumStore::update(
+        &mut *tx,
+        album_id,
+        name,
+        description,
+        thumbnail_id,
+        is_public,
+    )
+    .await?;
+    if let Some(is_user_selected) = thumbnail_is_user_selected {
+        AlbumStore::set_thumbnail_user_selected(&mut *tx, album_id, is_user_selected).await?;
+    }
+    tx.commit().await?;
+
     Ok(updated_album)
 }
 
