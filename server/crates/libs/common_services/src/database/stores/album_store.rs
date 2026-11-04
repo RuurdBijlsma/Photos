@@ -125,23 +125,21 @@ impl AlbumStore {
         .await?)
     }
 
-    /// Sets or clears a thumbnail explicitly chosen by the user.
-    pub async fn set_user_selected_thumbnail(
+    /// Marks whether the current thumbnail was explicitly selected by the user.
+    pub async fn set_thumbnail_user_selected(
         executor: impl PgExecutor<'_>,
         album_id: &str,
-        thumbnail_id: Option<&str>,
+        is_user_selected: bool,
     ) -> Result<PgQueryResult, DbError> {
         Ok(sqlx::query(
             r#"
                 UPDATE album
-                SET thumbnail_id = $2,
-                    thumbnail_is_user_selected = $2 IS NOT NULL,
-                    updated_at = now()
+                SET thumbnail_is_user_selected = $2
                 WHERE id = $1
                 "#,
         )
         .bind(album_id)
-        .bind(thumbnail_id)
+        .bind(is_user_selected)
         .execute(executor)
         .await?)
     }

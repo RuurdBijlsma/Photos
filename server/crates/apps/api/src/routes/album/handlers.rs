@@ -13,9 +13,12 @@ use common_services::api::album::interfaces::{
     CheckInviteRequest, CreateAlbumRequest, GetSortedAlbumItemsRequest, ListAlbumsParam,
     ReorderMediaRequest, SharedMediaItem, UpdateAlbumRequest,
 };
-use common_services::api::album::service::{accept_invite, add_collaborator, add_media_to_album, create_album, delete_album, generate_invite, get_album_media, get_album_media_item, get_sorted_album_media, remove_collaborator, remove_media_from_album, reorder_media_items, update_album, user_update_album};
+use common_services::api::album::service::{
+    accept_invite, add_collaborator, add_media_to_album, create_album, delete_album,
+    generate_invite, get_album_media, get_album_media_item, get_sorted_album_media,
+    remove_collaborator, remove_media_from_album, reorder_media_items, user_update_album,
+};
 use common_services::api::app_error::AppError;
-use common_services::database::UpdateField;
 use common_services::database::album::album::{Album, AlbumSummary};
 use common_services::database::album::album_collaborator::AlbumCollaborator;
 use common_services::database::album_store::AlbumStore;
