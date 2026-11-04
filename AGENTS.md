@@ -105,6 +105,10 @@ handler is in `server/crates/apps/worker/src/handlers/mod.rs`.
   priority numbers are selected first. Jobs in the same phase can run concurrently.
 - For phase limits, the worker considers running jobs and queued jobs whose `scheduled_at` is due. A queued job
   scheduled for a future retry does not hold the phase barrier.
+- Queue eligibility is implemented in two places: `server/crates/apps/worker/src/jobs/management.rs::claim_next_job`
+  claims a job, while `server/crates/apps/worker_scaler/src/demand.rs::get_demand` counts jobs the scaler considers
+  available. Both queries duplicate the active-job set and the global/path phase checks. Keep those predicates in sync
+  when changing queue eligibility.
 - `DependencyReschedule` puts a job back in `queued` with exponential backoff (capped at two hours). It is cancelled
   after 20 dependency attempts. Use it for prerequisites that can eventually finish, not as a permanent wait state.
 
@@ -113,17 +117,20 @@ Job type values are PostgreSQL enum values: add them to `JobType` and add a new 
 ### Per-item ingest meaning
 
 `enqueue_full_ingest` and `bulk_enqueue_full_ingest` enqueue metadata, thumbnail, and analysis jobs for each file.
-These jobs may all be present in the queue at once; phase and path rules enforce their order. They are not three
-separate import batches.
+These jobs may all be present in the queue at once; phase and path rules enforce their order. They form the stages
+of one file's ingest pipeline.
 
-| Job                | Phase | What completion means                                                                                                                                                                                                                                                                                                                                           |
-|--------------------|------:|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `IngestMetadata`   |    20 | The media row and extracted metadata are stord. Payload album IDs are linked here. A library with all ingest metadata jobs done, and 0 thumbs or analysis done is 90% functional in terms of browsing by the user. Timeline works, album works, /explore works, /map works, viewing/downloading/sharing works.                                                  |
-| `IngestThumbnails` |    30 | Pre-generated thumbnails and related thumbnail assets are ready, and thumbnail status is updated. When a media item has no thumbnails pregenerated yet, it uses on-demand thumbnails. Slower in UI but it works.                                                                                                                                                |
-| `IngestAnalysis`   |    40 | Visual analysis is stored, including embeddings and model-derived data used by search and clustering. When a media item has no analysis done, it can't be properly found by search, or when using "find similar item", or with clustering. Also no facial recognition, or object detection. Object detection is used for search suggestions and cluster naming. |
+- **`IngestMetadata` (phase 20)** stores the media row and extracted metadata, and links album IDs from the job
+  payload. Once metadata jobs finish across the library, users can browse the timeline and albums, Explore, Map, and
+  view, download, and share items. This supports roughly 90% of normal browsing use.
+- **`IngestThumbnails` (phase 30)** creates pre-generated thumbnails and related assets, then updates thumbnail
+  status. The UI can render a requested thumbnail on demand while its pre-generated version is being prepared.
+- **`IngestAnalysis` (phase 40)** stores embeddings and model-derived results. As analysis completes, embeddings
+  support semantic search, clustering, and Find Similar; face detections feed `ClusterFaces`; object tags support search
+  suggestions and cluster naming.
 
-Treat `IngestMetadata` completion as mostly done ingesting, the user sees it in the UI now. A batch's visible
-items can be ready for browsing while thumbnail generation and visual analysis continue.
+`IngestMetadata` completion registers the item and makes it available in the UI. Once metadata has completed for a
+batch, its items are ready for browsing while thumbnail generation and visual analysis continue in the background.
 
 Production deployment is not built here: the `compose-services` repo (`stacks/photos/compose.yml`) runs the published
 `ghcr.io/ruurdbijlsma/photos-server` and `photos-web` images and joins the external `proxy-net`. The root `compose.yml`
