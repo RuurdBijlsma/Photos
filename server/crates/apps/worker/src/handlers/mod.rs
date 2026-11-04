@@ -24,7 +24,6 @@ pub mod prepare_takeout_import;
 pub mod prune_missing_ingest_jobs;
 pub mod remove;
 pub mod scan;
-mod takeout_import;
 pub mod update_global_centroid;
 
 /// The outcome of a job handler's execution.

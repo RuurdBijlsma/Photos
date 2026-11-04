@@ -1,3 +1,6 @@
+ALTER TYPE job_type ADD VALUE 'finalize_takeout_import';
+ALTER TYPE job_type ADD VALUE 'prepare_takeout_import';
+
 ALTER TABLE album
     ADD COLUMN thumbnail_is_user_selected BOOLEAN NOT NULL DEFAULT false;
 

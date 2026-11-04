@@ -1,6 +1,6 @@
 use crate::context::WorkerContext;
 use crate::handlers::JobResult;
-use crate::handlers::takeout_import::{
+use crate::handlers::common::takeout_import::{
     IngestWaitStage, TakeoutAlbumImport, has_pending_ingest_jobs,
 };
 use crate::handlers::update_global_centroid::refresh_global_centroid;
