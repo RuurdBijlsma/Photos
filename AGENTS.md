@@ -75,7 +75,7 @@ overlap, so these are not measurements of isolated CPU time.
 | Job                | Scope                 | Observed duration |
 |--------------------|-----------------------|------------------:|
 | `IngestMetadata`   | One media item        |          42–44 ms |
-| `IngestThumbnails` | One media item        |          24–35 ms |
+| `IngestThumbnails` | One media item        |               5 s |
 | `IngestAnalysis`   | One media item        |         94–143 ms |
 | `ClusterFaces`     | One user's face data  |       34.6–35.5 s |
 | `ClusterPhotos`    | One user's photo data |       24.5–25.7 s |
@@ -87,10 +87,10 @@ current run, use its own job timestamps and dataset size.
 
 ## Job queue and ingest stages
 
-The queue's source of truth is `server/crates/libs/common_services/src/database/tables/jobs.rs` for `JobType`,
-`JobScope`, phase, and priority; `server/crates/apps/worker/src/jobs/management.rs` for claiming and lifecycle
-handling; and `server/crates/libs/common_services/src/job_queue.rs` for enqueue helpers. Dispatch from job type to
-handler is in `server/crates/apps/worker/src/handlers/mod.rs`.
+The queue's source of truth is `common_services/src/database/tables/jobs.rs` for `JobType`,
+`JobScope`, phase, and priority; `worker/src/jobs/management.rs` for claiming and lifecycle
+handling; and `job_queue.rs` for enqueue helpers. Dispatch from job type to
+handler is in `worker/src/handlers/mod.rs`.
 
 ### Reading queue order and status
 
@@ -105,8 +105,8 @@ handler is in `server/crates/apps/worker/src/handlers/mod.rs`.
   priority numbers are selected first. Jobs in the same phase can run concurrently.
 - For phase limits, the worker considers running jobs and queued jobs whose `scheduled_at` is due. A queued job
   scheduled for a future retry does not hold the phase barrier.
-- Queue eligibility is implemented in two places: `server/crates/apps/worker/src/jobs/management.rs::claim_next_job`
-  claims a job, while `server/crates/apps/worker_scaler/src/demand.rs::get_demand` counts jobs the scaler considers
+- Queue eligibility is implemented in two places: `worker/src/jobs/management.rs::claim_next_job`
+  claims a job, while `worker_scaler/src/demand.rs::get_demand` counts jobs the scaler considers
   available. Both queries duplicate the active-job set and the global/path phase checks. Keep those predicates in sync
   when changing queue eligibility.
 - `DependencyReschedule` puts a job back in `queued` with exponential backoff (capped at two hours). It is cancelled
@@ -386,3 +386,12 @@ npm run lint
   shows
   up as a modified binary after every suite run. Drop it from the diff (`git checkout -- <file>`) unless the model
   actually changed.
+
+# AGENT.md todo:
+
+* where caching is used, for example in ingest jobs
+* worker scaler logic and different profiles (profiles aren't that useful any more now that i have the model manager)
+
+# Keeping AGENTS.md in sync
+
+If you change anything described in the AGENTS.md file, then also update this file to keep it in sync. 
