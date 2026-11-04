@@ -15,7 +15,7 @@ use common_services::database::jobs::{Job, JobType};
 use common_services::database::media_item_store::MediaItemStore;
 use common_services::database::user_store::UserStore;
 use common_services::job_queue::{
-    FinalizeTakeoutImportPayload, IngestMetadataPayload, bulk_enqueue_full_ingest, enqueue_job,
+    IngestMetadataPayload, TakeoutAlbumImportPayload, bulk_enqueue_full_ingest, enqueue_job,
 };
 use serde_json::from_value;
 use std::collections::{BTreeMap, HashMap};
@@ -295,17 +295,26 @@ pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
     album_ids.sort_unstable();
     album_ids.dedup();
     if !album_ids.is_empty() {
-        let finalize_payload = FinalizeTakeoutImportPayload {
+        let import_payload = TakeoutAlbumImportPayload {
             album_ids,
             batch_job_id: job.id,
         };
         enqueue_job(
             &context.pool,
             &context.settings.ingest,
+            JobType::PrepareTakeoutImport,
+        )
+        .user_id(user_id)
+        .payload(&import_payload)
+        .call()
+        .await?;
+        enqueue_job(
+            &context.pool,
+            &context.settings.ingest,
             JobType::FinalizeTakeoutImport,
         )
         .user_id(user_id)
-        .payload(&finalize_payload)
+        .payload(&import_payload)
         .call()
         .await?;
     }

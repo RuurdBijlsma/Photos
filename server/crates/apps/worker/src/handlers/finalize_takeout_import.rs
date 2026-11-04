@@ -7,7 +7,7 @@ use common_services::api::album::service::get_representative_thumbnail;
 use common_services::database::UpdateField;
 use common_services::database::album_store::AlbumStore;
 use common_services::database::jobs::Job;
-use common_services::job_queue::FinalizeTakeoutImportPayload;
+use common_services::job_queue::TakeoutAlbumImportPayload;
 use serde_json::from_value;
 use sqlx::PgPool;
 
@@ -24,7 +24,7 @@ async fn has_pending_ingest_jobs(
             WHERE j.user_id = $1
               AND j.status IN ('queued', 'running')
               AND (
-                  j.job_type::text = 'ingest_takeout_batch'
+                  j.job_type::text IN ('ingest_takeout_batch', 'prepare_takeout_import')
                   OR
                   (
                       j.job_type::text = 'ingest_metadata'
@@ -57,7 +57,7 @@ pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
         .payload
         .as_ref()
         .ok_or_else(|| eyre!("FinalizeTakeoutImport missing payload"))?;
-    let payload: FinalizeTakeoutImportPayload = from_value(payload_value.clone())?;
+    let payload: TakeoutAlbumImportPayload = from_value(payload_value.clone())?;
     let mut album_ids = payload.album_ids;
     album_ids.sort_unstable();
     album_ids.dedup();

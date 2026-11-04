@@ -85,6 +85,93 @@ durations therefore are not directly comparable. Treat these values as observati
 hardware, cache state, and concurrent workload, not as normal limits or service-level expectations. When diagnosing a
 current run, use its own job timestamps and dataset size.
 
+## Job queue and ingest stages
+
+The queue's source of truth is `server/crates/libs/common_services/src/database/tables/jobs.rs` for `JobType`,
+`JobScope`, phase, and priority; `server/crates/apps/worker/src/jobs/management.rs` for claiming and lifecycle
+handling; and `server/crates/libs/common_services/src/job_queue.rs` for enqueue helpers. Dispatch from job type to
+handler is in `server/crates/apps/worker/src/handlers/mod.rs`.
+
+### Reading queue order and status
+
+- A **path-scoped** job has a `relative_path`. Metadata, thumbnail, analysis, and removal jobs are path-scoped.
+  Their phases are ordered for the same path, so metadata is eligible before thumbnails, and thumbnails before
+  analysis.
+- A **global** job has no `relative_path`. It is phase-gated against all active jobs. A global job at phase 45 waits
+  while a lower-phase active job exists, even if that job belongs to another user.
+- A path job is also gated by the minimum active global phase. A global job can therefore temporarily hold later
+  per-file stages while it runs.
+- `phase` is an eligibility barrier; lower numbers run first. `priority` breaks ties among eligible jobs; lower
+  priority numbers are selected first. Jobs in the same phase can run concurrently.
+- For phase limits, the worker considers running jobs and queued jobs whose `scheduled_at` is due. A queued job
+  scheduled for a future retry does not hold the phase barrier. If a handler must wait for such a dependency, it must
+  check queued/running dependency rows and return `JobResult::DependencyReschedule`; phase ordering alone is not enough.
+- `queued` means waiting for eligibility, its scheduled time, or a worker. `running` means a worker claimed it.
+  `done` means that handler completed; it does not mean that later jobs for the same item or import have completed.
+  `failed` means normal handler retries were exhausted. `cancelled` can mean the work was intentionally cancelled or a
+  dependency/file-not-found retry limit was reached.
+- `DependencyReschedule` puts a job back in `queued` with exponential backoff (capped at two hours). It is cancelled
+  after 20 dependency attempts. Use it for prerequisites that can eventually finish, not as a permanent wait state.
+
+The phase values in `JobType::phase()` are currently:
+
+| Phase | Jobs                                                                                     |
+|------:|------------------------------------------------------------------------------------------|
+|     5 | `Remove`, `PruneMissingIngestJobs`                                                       |
+|    10 | `HandleWebUpload`, `IngestTakeoutBatch`                                                  |
+|    20 | `IngestMetadata`                                                                         |
+|    25 | `PrepareTakeoutImport`                                                                   |
+|    30 | `IngestThumbnails`                                                                       |
+|    40 | `IngestAnalysis`                                                                         |
+|    45 | `FinalizeTakeoutImport`                                                                  |
+|    50 | `ClusterFaces`, `ClusterPhotos`, `Scan`, `CleanDb`, `ImportAlbumItem`, `CleanThumbnails` |
+|    60 | `UpdateGlobalCentroid`, `CalcSystemStats`                                                |
+|    80 | `GenerateDailyCards`                                                                     |
+
+Update this table whenever phase assignments change. Job type values are PostgreSQL enum values: add them to
+`JobType` and add a new migration under `server/migrations` with `ALTER TYPE job_type ADD VALUE ...`.
+
+### Per-item ingest meaning
+
+`enqueue_full_ingest` and `bulk_enqueue_full_ingest` enqueue metadata, thumbnail, and analysis jobs for each file.
+These jobs may all be present in the queue at once; phase and path rules enforce their order. They are not three
+separate import batches.
+
+| Job                | Phase | What completion means                                                                                                                                                                           |
+|--------------------|------:|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `IngestMetadata`   |    20 | The media row and extracted metadata are stored. Payload album IDs are linked here. Timeline and album membership can become visible at this point.                                             |
+| `IngestThumbnails` |    30 | Pre-generated thumbnails and related thumbnail assets are ready, and thumbnail status is updated. The UI can still request an on-demand thumbnail before this job finishes; that can be slower. |
+| `IngestAnalysis`   |    40 | Visual analysis is stored, including embeddings and model-derived data used by search and clustering. Album representative selection can improve after these jobs complete.                     |
+
+Treat `IngestMetadata` completion as “the item is registered,” not “the item is fully processed.” A batch's visible
+items can be ready for browsing while thumbnail generation and visual analysis continue. Job durations can overlap;
+do not multiply a per-item sample duration by item count and treat it as a wall-clock estimate.
+
+### Google Takeout import stages
+
+Takeout has separate batch and per-file work. Interpret its job statuses as follows:
+
+1. `IngestTakeoutBatch` (phase 10) indexes the ZIPs, creates or reuses albums, links files already in the collection,
+   copies new files, and enqueues their per-item ingest jobs. `done` means this batch setup finished; new media may
+   still be waiting on metadata, thumbnails, and analysis.
+2. `PrepareTakeoutImport` (phase 25) waits for the batch's album membership metadata, then assigns a provisional
+   chronological-middle item to each album. It does not wait for pre-generated thumbnails; the UI may render the
+   selected item's thumbnail on demand.
+3. `FinalizeTakeoutImport` (phase 45) waits for the related thumbnail and analysis work to settle, refreshes the
+   global embedding centroid, and replaces the provisional cover with a representative thumbnail chosen from all
+   current album members.
+
+Takeout metadata payloads defer per-item album thumbnail assignment so whichever metadata worker happens to finish
+first cannot choose the lasting cover. When changing this flow, keep the two completion points distinct: metadata
+completion makes albums structurally complete and browsable; analysis completion enables the later representative
+selection. The finalizer checks queued/running dependencies too, because delayed retry jobs are not part of the phase
+barrier.
+
+`get_representative_thumbnail` uses the embedding-based selection when more than half of the supplied media IDs have
+embeddings; otherwise it falls back to the chronological middle item. Pass all album member IDs when choosing an
+album cover, and refresh the global centroid before the embedding-based selection. Passing only newly imported IDs
+can omit a better existing album member.
+
 Production deployment is not built here: the `compose-services` repo (`stacks/photos/compose.yml`) runs the published
 `ghcr.io/ruurdbijlsma/photos-server` and `photos-web` images and joins the external `proxy-net`. The root `compose.yml`
 builds from source and is used to test Podman/Docker-specific behavior; typical development runs the backend and web
@@ -253,9 +340,9 @@ npm run lint
   a service function in `web/src/scripts/services/`, and a type in `web/src/scripts/types/api/`. If the endpoint is
   hot (timeline, search, albums, people, camera, explore, storage), consider the protobuf path (`Protobuf<T>` responses
   decoded with ts-proto in `web/src/scripts/services`).
-- **Job type**: add the variant to `JobType` in `common_services/src/database/jobs.rs`, add a handler module under
-  `apps/worker/src/handlers/`, and wire it in `handlers/mod.rs`. JobType is a postgres enum, so an SQL migration is
-  needed. SQL migration files are located at `server/migrations`.
+- **Job type**: add the variant to `common_services/src/database/tables/jobs.rs`, assign its scope, phase, and
+  priority, add a handler module under `apps/worker/src/handlers/`, and wire it in `handlers/mod.rs`. `JobType` is a
+  PostgreSQL enum, so add a new migration under `server/migrations` with `ALTER TYPE job_type ADD VALUE ...`.
 - **Setting**: add the field to `app_state` (`raw_settings.rs` + `settings.rs`) and to `config/settings.yaml`; expose it
   through the frontend settings/admin API if users should change it at runtime.
 - **Dashboard / Grafana panel / Alerting**: the dashboard model is in

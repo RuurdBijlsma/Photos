@@ -45,6 +45,7 @@ pub enum JobType {
     GenerateDailyCards,
     UpdateGlobalCentroid,
     IngestTakeoutBatch,
+    PrepareTakeoutImport,
     FinalizeTakeoutImport,
     PruneMissingIngestJobs,
 }
@@ -64,6 +65,7 @@ impl JobType {
             Self::PruneMissingIngestJobs | Self::Remove => 5,
             Self::HandleWebUpload | Self::IngestTakeoutBatch => 10,
             Self::IngestMetadata => 20,
+            Self::PrepareTakeoutImport => 25,
             Self::IngestThumbnails => 30,
             Self::IngestAnalysis => 40,
             Self::FinalizeTakeoutImport => 45,
@@ -88,6 +90,7 @@ impl JobType {
             Self::Scan
             | Self::HandleWebUpload
             | Self::IngestTakeoutBatch
+            | Self::PrepareTakeoutImport
             | Self::FinalizeTakeoutImport
             | Self::ImportAlbumItem
             | Self::CleanDb
@@ -131,6 +134,7 @@ impl JobType {
             Self::ImportAlbumItem => 25,
             Self::Scan => 70,
             Self::UpdateGlobalCentroid => 100,
+            Self::PrepareTakeoutImport => 102,
             Self::FinalizeTakeoutImport => 105,
             Self::CalcSystemStats => 110,
             Self::ClusterFaces => 120,

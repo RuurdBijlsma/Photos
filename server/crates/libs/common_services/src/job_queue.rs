@@ -21,9 +21,9 @@ pub struct IngestMetadataPayload {
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct FinalizeTakeoutImportPayload {
+pub struct TakeoutAlbumImportPayload {
     pub album_ids: Vec<String>,
-    /// Prevents separate imports of the same albums from sharing one active finalizer job.
+    /// Prevents separate imports of the same albums from sharing active completion jobs.
     pub batch_job_id: i64,
 }
 
