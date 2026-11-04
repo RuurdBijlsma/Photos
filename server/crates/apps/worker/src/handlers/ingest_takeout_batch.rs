@@ -1,3 +1,5 @@
+mod archive;
+
 use crate::context::WorkerContext;
 use crate::handlers::JobResult;
 use crate::handlers::common::utils::{get_unique_filename, require_media_mounted};
