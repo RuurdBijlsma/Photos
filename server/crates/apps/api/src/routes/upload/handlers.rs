@@ -8,14 +8,14 @@ use common_services::alert;
 use common_services::api::app_error::AppError;
 use common_services::api::auth::interfaces::AuthClaims;
 use common_services::api::upload::interfaces::{TakeoutBatchPayload, TakeoutStartResponse};
-use common_services::api::upload::service::{decode_upload_token, repair_tus_upload};
+use common_services::api::upload::service::decode_upload_token;
 use common_services::database::jobs::JobType;
 use common_services::job_queue::enqueue_job;
 use fileloft_core::info::UploadInfoChanges;
 use fileloft_core::{Metadata, TusError, UploadInfo};
 use jsonwebtoken::{EncodingKey, Header, encode};
 use std::collections::HashSet;
-use tracing::{error, warn};
+use tracing::{error, info, warn};
 
 pub async fn get_upload_jwt(
     State(settings): State<AppSettings>,
@@ -128,6 +128,8 @@ async fn pending_takeout_upload_ids(
         .flat_map(|payload| payload.tus_upload_ids)
         .collect();
 
+    let mut incomplete_count = 0usize;
+    let mut claimed_count = 0usize;
     let tus_dir = context
         .settings
         .ingest
@@ -158,25 +160,26 @@ async fn pending_takeout_upload_ids(
             .get("userId")
             .and_then(|opt| opt.as_ref())
             .and_then(|s| s.parse::<i32>().ok());
-        if !is_takeout || owner != Some(user_id) || info.size != Some(info.offset) {
+        if !is_takeout || owner != Some(user_id) {
+            continue;
+        }
+        if info.size != Some(info.offset) {
+            incomplete_count += 1;
             continue;
         }
         let id = info.id.to_string();
         if claimed.contains(&id) {
+            claimed_count += 1;
             continue;
         }
-        match repair_tus_upload(&tus_dir, &id).await {
-            Ok(_) => upload_ids.push(id),
-            Err(e) if e.kind() == std::io::ErrorKind::InvalidData => {
-                return Err(AppError::Conflict(format!(
-                    "Takeout upload {id} is incomplete: {e}. Wait for it to finish or reselect the ZIPs."
-                )));
-            }
-            Err(e) => return Err(AppError::Internal(e.into())),
-        }
+        upload_ids.push(id);
     }
     upload_ids.sort_unstable();
     upload_ids.dedup();
+    info!(
+        "Takeout import start for user {user_id}: {} ZIP(s) ready, {claimed_count} claimed by an active import, {incomplete_count} still uploading",
+        upload_ids.len()
+    );
     Ok(upload_ids)
 }
 
