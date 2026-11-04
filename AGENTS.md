@@ -104,32 +104,11 @@ handler is in `server/crates/apps/worker/src/handlers/mod.rs`.
 - `phase` is an eligibility barrier; lower numbers run first. `priority` breaks ties among eligible jobs; lower
   priority numbers are selected first. Jobs in the same phase can run concurrently.
 - For phase limits, the worker considers running jobs and queued jobs whose `scheduled_at` is due. A queued job
-  scheduled for a future retry does not hold the phase barrier. If a handler must wait for such a dependency, it must
-  check queued/running dependency rows and return `JobResult::DependencyReschedule`; phase ordering alone is not enough.
-- `queued` means waiting for eligibility, its scheduled time, or a worker. `running` means a worker claimed it.
-  `done` means that handler completed; it does not mean that later jobs for the same item or import have completed.
-  `failed` means normal handler retries were exhausted. `cancelled` can mean the work was intentionally cancelled or a
-  dependency/file-not-found retry limit was reached.
+  scheduled for a future retry does not hold the phase barrier.
 - `DependencyReschedule` puts a job back in `queued` with exponential backoff (capped at two hours). It is cancelled
   after 20 dependency attempts. Use it for prerequisites that can eventually finish, not as a permanent wait state.
 
-The phase values in `JobType::phase()` are currently:
-
-| Phase | Jobs                                                                                     |
-|------:|------------------------------------------------------------------------------------------|
-|     5 | `Remove`, `PruneMissingIngestJobs`                                                       |
-|    10 | `HandleWebUpload`, `IngestTakeoutBatch`                                                  |
-|    20 | `IngestMetadata`                                                                         |
-|    25 | `PrepareTakeoutImport`                                                                   |
-|    30 | `IngestThumbnails`                                                                       |
-|    40 | `IngestAnalysis`                                                                         |
-|    45 | `FinalizeTakeoutImport`                                                                  |
-|    50 | `ClusterFaces`, `ClusterPhotos`, `Scan`, `CleanDb`, `ImportAlbumItem`, `CleanThumbnails` |
-|    60 | `UpdateGlobalCentroid`, `CalcSystemStats`                                                |
-|    80 | `GenerateDailyCards`                                                                     |
-
-Update this table whenever phase assignments change. Job type values are PostgreSQL enum values: add them to
-`JobType` and add a new migration under `server/migrations` with `ALTER TYPE job_type ADD VALUE ...`.
+Job type values are PostgreSQL enum values: add them to `JobType` and add a new migration under `server/migrations`.
 
 ### Per-item ingest meaning
 
@@ -137,40 +116,14 @@ Update this table whenever phase assignments change. Job type values are Postgre
 These jobs may all be present in the queue at once; phase and path rules enforce their order. They are not three
 separate import batches.
 
-| Job                | Phase | What completion means                                                                                                                                                                           |
-|--------------------|------:|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `IngestMetadata`   |    20 | The media row and extracted metadata are stored. Payload album IDs are linked here. Timeline and album membership can become visible at this point.                                             |
-| `IngestThumbnails` |    30 | Pre-generated thumbnails and related thumbnail assets are ready, and thumbnail status is updated. The UI can still request an on-demand thumbnail before this job finishes; that can be slower. |
-| `IngestAnalysis`   |    40 | Visual analysis is stored, including embeddings and model-derived data used by search and clustering. Album representative selection can improve after these jobs complete.                     |
+| Job                | Phase | What completion means                                                                                                                                                                                                                                                                                                                                           |
+|--------------------|------:|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `IngestMetadata`   |    20 | The media row and extracted metadata are stord. Payload album IDs are linked here. A library with all ingest metadata jobs done, and 0 thumbs or analysis done is 90% functional in terms of browsing by the user. Timeline works, album works, /explore works, /map works, viewing/downloading/sharing works.                                                  |
+| `IngestThumbnails` |    30 | Pre-generated thumbnails and related thumbnail assets are ready, and thumbnail status is updated. When a media item has no thumbnails pregenerated yet, it uses on-demand thumbnails. Slower in UI but it works.                                                                                                                                                |
+| `IngestAnalysis`   |    40 | Visual analysis is stored, including embeddings and model-derived data used by search and clustering. When a media item has no analysis done, it can't be properly found by search, or when using "find similar item", or with clustering. Also no facial recognition, or object detection. Object detection is used for search suggestions and cluster naming. |
 
-Treat `IngestMetadata` completion as “the item is registered,” not “the item is fully processed.” A batch's visible
-items can be ready for browsing while thumbnail generation and visual analysis continue. Job durations can overlap;
-do not multiply a per-item sample duration by item count and treat it as a wall-clock estimate.
-
-### Google Takeout import stages
-
-Takeout has separate batch and per-file work. Interpret its job statuses as follows:
-
-1. `IngestTakeoutBatch` (phase 10) indexes the ZIPs, creates or reuses albums, links files already in the collection,
-   copies new files, and enqueues their per-item ingest jobs. `done` means this batch setup finished; new media may
-   still be waiting on metadata, thumbnails, and analysis.
-2. `PrepareTakeoutImport` (phase 25) waits for the batch's album membership metadata, then assigns a provisional
-   chronological-middle item to each album. It does not wait for pre-generated thumbnails; the UI may render the
-   selected item's thumbnail on demand.
-3. `FinalizeTakeoutImport` (phase 45) waits for the related thumbnail and analysis work to settle, refreshes the
-   global embedding centroid, and replaces the provisional cover with a representative thumbnail chosen from all
-   current album members.
-
-Takeout metadata payloads defer per-item album thumbnail assignment so whichever metadata worker happens to finish
-first cannot choose the lasting cover. When changing this flow, keep the two completion points distinct: metadata
-completion makes albums structurally complete and browsable; analysis completion enables the later representative
-selection. The finalizer checks queued/running dependencies too, because delayed retry jobs are not part of the phase
-barrier.
-
-`get_representative_thumbnail` uses the embedding-based selection when more than half of the supplied media IDs have
-embeddings; otherwise it falls back to the chronological middle item. Pass all album member IDs when choosing an
-album cover, and refresh the global centroid before the embedding-based selection. Passing only newly imported IDs
-can omit a better existing album member.
+Treat `IngestMetadata` completion as mostly done ingesting, the user sees it in the UI now. A batch's visible
+items can be ready for browsing while thumbnail generation and visual analysis continue.
 
 Production deployment is not built here: the `compose-services` repo (`stacks/photos/compose.yml`) runs the published
 `ghcr.io/ruurdbijlsma/photos-server` and `photos-web` images and joins the external `proxy-net`. The root `compose.yml`
