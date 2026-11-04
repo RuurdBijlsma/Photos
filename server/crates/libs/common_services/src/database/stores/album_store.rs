@@ -164,6 +164,27 @@ impl AlbumStore {
         .await?)
     }
 
+    /// Assigns the first ingested item as a cover when the album has no thumbnail yet.
+    pub async fn set_initial_thumbnail_if_missing(
+        executor: impl PgExecutor<'_>,
+        album_id: &str,
+        thumbnail_id: &str,
+    ) -> Result<PgQueryResult, DbError> {
+        Ok(sqlx::query(
+            r#"
+            UPDATE album
+            SET thumbnail_id = $2, updated_at = now()
+            WHERE id = $1
+              AND thumbnail_id IS NULL
+              AND thumbnail_is_user_selected = false
+            "#,
+        )
+        .bind(album_id)
+        .bind(thumbnail_id)
+        .execute(executor)
+        .await?)
+    }
+
     /// Replaces a thumbnail after the previous selection was removed from the album.
     pub async fn update_thumbnail_as_automatic(
         executor: impl PgExecutor<'_>,

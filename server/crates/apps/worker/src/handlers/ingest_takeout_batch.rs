@@ -254,7 +254,6 @@ pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
                         Some(IngestMetadataPayload {
                             album_ids: album_ids_by_filename.remove(&filename).unwrap_or_default(),
                             remote_user_identity: None,
-                            defer_album_thumbnail: true,
                             fallback_taken_at,
                         }),
                     ));

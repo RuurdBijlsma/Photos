@@ -12,9 +12,6 @@ use tracing::{debug, info};
 pub struct IngestMetadataPayload {
     pub album_ids: Vec<String>,
     pub remote_user_identity: Option<String>,
-    /// Takeout album thumbnails are selected after all imported media has been ingested.
-    #[serde(default)]
-    pub defer_album_thumbnail: bool,
     /// Takeout sidecar timestamp; applied only when ingest analysis is low-confidence.
     #[serde(default)]
     pub fallback_taken_at: Option<DateTime<Utc>>,
