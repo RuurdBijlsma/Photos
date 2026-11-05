@@ -18,7 +18,7 @@ groups:
             datasourceUid: loki
             model:
               editorMode: code
-              expr: sum(count_over_time({job="photos-backend"} |= "ALERT:" [1m]))
+              expr: sum by (alert_content) (count_over_time({job="photos-backend"} |= "ALERT:" | json | label_format alert_content=message [1m]))
               queryType: range
               refId: A
           - refId: B
@@ -50,7 +50,7 @@ groups:
         for: 0s
         annotations:
           summary: Photos backend ALERT! log fired
-          description: A log line with 'ALERT:' prefix was recorded in the backend log within the last minute.
+          description: '{{ $labels.alert_content }}'
         labels:
           severity: critical
 
@@ -68,7 +68,7 @@ groups:
               editorMode: code
               format: table
               rawQuery: true
-              rawSql: "SELECT count(*)::bigint AS failed_count FROM jobs WHERE status = 'failed' AND finished_at >= NOW() - INTERVAL '5 minutes'"
+              rawSql: "SELECT id::text AS job_id, job_type::text AS job_type, COALESCE(last_error, 'No error details recorded') AS error, 1::bigint AS failed FROM jobs WHERE status = 'failed' AND finished_at >= NOW() - INTERVAL '5 minutes'"
               refId: A
           - refId: B
             datasourceUid: __expr__
@@ -99,6 +99,6 @@ groups:
         for: 1m
         annotations:
           summary: Background job failures detected
-          description: One or more background jobs failed in the last 5 minutes.
+          description: 'Job {{ $labels.job_id }} ({{ $labels.job_type }}) failed: {{ $labels.error }}'
         labels:
           severity: warning
