@@ -323,6 +323,7 @@ export function mimeSupportsRotation(mimeType?: string): boolean {
 export function preloadImageForNextVisit(src: string): Promise<void> {
   return new Promise((resolve, reject) => {
     const img = new Image()
+    img.fetchPriority = 'low'
 
     img.onload = () => resolve()
     img.onerror = () => reject(new Error(`Failed to cache image: ${src}`))

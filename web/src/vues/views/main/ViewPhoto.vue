@@ -31,6 +31,7 @@ import {
   makeDateTimeString,
   makeLocationString,
   mimeSupportsRotation,
+  preloadImageForNextVisit,
 } from '@/scripts/utils.ts'
 import { useDialogStore } from '@/scripts/stores/dialogStore.ts'
 import { useAuthStore } from '@/scripts/stores/authStore.ts'
@@ -40,11 +41,12 @@ import { useBinStore } from '@/scripts/stores/binStore.ts'
 import { useMissingMediaStore } from '@/scripts/stores/missingMediaStore.ts'
 import { useProfileStore } from '@/scripts/stores/profileStore.ts'
 import storageService from '@/scripts/services/storageService.ts'
+import mediaItemService from '@/scripts/services/mediaItemService.ts'
 import AddToAlbumCard from '@/vues/components/timeline/timeline-components/AddToAlbumCard.vue'
 import { useUiHider } from '@/scripts/composables/useUiHider.ts'
 import { navigatorShare } from '@/scripts/sharing.ts'
 import PhotoGallery from '@/vues/components/viewer/components/PhotoGallery.vue'
-import { useEventListener, useStorage } from '@vueuse/core'
+import { useDebounceFn, useEventListener, useStorage } from '@vueuse/core'
 import { useDetailTitle } from '@/scripts/composables/usePageTitle.ts'
 import { useSnackbarsStore } from '@/scripts/stores/snackbarStore.ts'
 import { useResponsive } from '@/scripts/composables/useResponsive.ts'
@@ -277,12 +279,17 @@ async function changeMediaItem(mediaItemId: string) {
   await router.replace({ path: `${viewPhotoStore.viewLink}${mediaItemId}`, query: route.query })
 }
 
-function prefetchMediaItem(mediaItemId: string) {
+async function prefetchMediaItem(mediaItemId: string) {
   if (authStore.isAuthenticated) {
-    mediaItemStore.fetchMediaItem(mediaItemId)
+    await mediaItemStore.fetchMediaItem(mediaItemId)
   } else if (albumId.value) {
-    mediaItemStore.fetchSharedMediaItem(albumId.value, mediaItemId)
+    await mediaItemStore.fetchSharedMediaItem(albumId.value, mediaItemId)
   }
+  const item = mediaItemStore.anyMediaItems.get(mediaItemId)
+  if (!item?.has_thumbnails) return
+  preloadImageForNextVisit(mediaItemService.getPhotoThumbnail(mediaItemId, 1440, false)).catch(
+    () => {},
+  )
 }
 
 async function moveToBin() {
@@ -358,12 +365,13 @@ function goPrev() {
 }
 
 // Pre-fetch adjacent items
-watch(prevId, () => {
-  if (prevId.value) requestIdleCallback(() => prefetchMediaItem(prevId.value))
-})
-watch(nextId, () => {
-  if (nextId.value) requestIdleCallback(() => prefetchMediaItem(nextId.value))
-})
+const prefetchNeighbours = useDebounceFn(() => {
+  for (const adjacentId of [prevId.value, nextId.value]) {
+    if (adjacentId) prefetchMediaItem(adjacentId)
+  }
+}, 100)
+
+watch(id, prefetchNeighbours, { immediate: true })
 
 watch(
   id,
