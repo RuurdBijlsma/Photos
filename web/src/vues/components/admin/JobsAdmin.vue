@@ -29,7 +29,7 @@ const tableOptions = ref({
   sortBy: [] as { key: string; order: 'asc' | 'desc' }[],
 })
 
-const autoRefresh = useStorage('autoRefreshJobsTable', false)
+const autoRefresh = useStorage('autoRefreshJobsTable', true)
 
 // Filters State
 const selectedStatus = ref<JobStatus | null>('running')
@@ -246,7 +246,7 @@ watch(
           <v-btn
             :prepend-icon="MdiCached"
             variant="tonal"
-            color="warning"
+            color="tertiary"
             rounded
             :loading="isBulkRetryLoading"
             @click="handleBulkRetryCancelled"
