@@ -797,8 +797,13 @@ useEventListener(containerRef, 'wheel', handleWheel, { passive: false })
   user-select: none;
 }
 
+.thumbnail-img {
+  background-color: rgba(255, 0, 0, 0.2);
+}
+
 .full-res-img {
   z-index: 2;
+  background-color: rgba(0, 255, 255, 0.2);
 }
 
 .motion-video-tag {
