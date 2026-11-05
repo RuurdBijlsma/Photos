@@ -324,9 +324,11 @@ pub async fn is_job_cancelled(
     executor: impl Executor<'_, Database = Postgres>,
     job_id: i64,
 ) -> Result<bool> {
-    let status: Option<JobStatus> = sqlx::query_scalar("SELECT status FROM jobs WHERE id = $1")
-        .bind(job_id)
-        .fetch_optional(executor)
-        .await?;
+    let status: Option<JobStatus> = sqlx::query_scalar!(
+        r#"SELECT status AS "status: JobStatus" FROM jobs WHERE id = $1"#,
+        job_id
+    )
+    .fetch_optional(executor)
+    .await?;
     Ok(status.is_none_or(|s| s == JobStatus::Cancelled))
 }

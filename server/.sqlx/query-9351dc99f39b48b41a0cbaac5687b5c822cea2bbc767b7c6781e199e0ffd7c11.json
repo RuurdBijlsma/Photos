@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE album\n            SET thumbnail_id = $2, updated_at = now()\n            WHERE id = $1\n              AND thumbnail_is_user_selected = false\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Varchar"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "9351dc99f39b48b41a0cbaac5687b5c822cea2bbc767b7c6781e199e0ffd7c11"
+}

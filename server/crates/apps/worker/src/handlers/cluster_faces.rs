@@ -207,13 +207,15 @@ async fn upsert_and_link(
 
         let cluster_id = if let Some(existing_cluster_id) = cluster_map.get(&cluster_idx) {
             // Update existing cluster
-            query("UPDATE face_cluster SET centroid = $1, thumb_media_item_id = $2, updated_at = $3 WHERE id = $4")
-                .bind(new_centroid)
-                .bind(&representative_face.media_item_id)
-                .bind(snapshot_time)
-                .bind(existing_cluster_id)
-                .execute(&mut **tx)
-                .await?;
+            query!(
+                "UPDATE face_cluster SET centroid = $1, thumb_media_item_id = $2, updated_at = $3 WHERE id = $4",
+                new_centroid as _,
+                &representative_face.media_item_id,
+                snapshot_time,
+                existing_cluster_id
+            )
+            .execute(&mut **tx)
+            .await?;
             existing_cluster_id.clone()
         } else {
             // New discovery: Create Person AND Cluster
@@ -228,15 +230,17 @@ async fn upsert_and_link(
             .execute(&mut **tx)
             .await?;
 
-            query("INSERT INTO face_cluster (id, user_id, person_id, centroid, thumb_media_item_id, updated_at) VALUES ($1, $2, $3, $4, $5, $6)")
-                .bind(&new_cluster_id)
-                .bind(user_id)
-                .bind(&new_person_id)
-                .bind(new_centroid)
-                .bind(&representative_face.media_item_id)
-                .bind(snapshot_time)
-                .execute(&mut **tx)
-                .await?;
+            query!(
+                "INSERT INTO face_cluster (id, user_id, person_id, centroid, thumb_media_item_id, updated_at) VALUES ($1, $2, $3, $4, $5, $6)",
+                &new_cluster_id,
+                user_id,
+                &new_person_id,
+                new_centroid as _,
+                &representative_face.media_item_id,
+                snapshot_time
+            )
+            .execute(&mut **tx)
+            .await?;
 
             query!(
                 "UPDATE person SET face_thumb_id = $1 WHERE id = $2",

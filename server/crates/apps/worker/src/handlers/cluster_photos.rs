@@ -296,18 +296,27 @@ async fn upsert_and_link(
         };
 
         let photo_cluster_id = if let Some(existing_id) = cluster_map.get(&cluster_idx) {
-            query("UPDATE photo_cluster SET centroid = $1, thumbnail_media_item_id = $2, friendly_label = $3, updated_at = now() WHERE id = $4")
-                .bind(&new_centroid).bind(thumbnail_media_item_id).bind(user_friendly_label).bind(existing_id)
-                .execute(&mut **tx).await?;
+            query!(
+                "UPDATE photo_cluster SET centroid = $1, thumbnail_media_item_id = $2, friendly_label = $3, updated_at = now() WHERE id = $4",
+                &new_centroid as _,
+                thumbnail_media_item_id,
+                user_friendly_label,
+                existing_id
+            )
+            .execute(&mut **tx)
+            .await?;
             existing_id.to_owned()
         } else {
-            query_scalar("INSERT INTO photo_cluster (id, user_id, thumbnail_media_item_id, centroid, friendly_label) VALUES ($1, $2, $3, $4, $5) RETURNING id")
-                .bind(nice_id(10))
-                .bind(user_id)
-                .bind(thumbnail_media_item_id)
-                .bind(&new_centroid)
-                .bind(user_friendly_label)
-                .fetch_one(&mut **tx).await?
+            query_scalar!(
+                "INSERT INTO photo_cluster (id, user_id, thumbnail_media_item_id, centroid, friendly_label) VALUES ($1, $2, $3, $4, $5) RETURNING id",
+                nice_id(10),
+                user_id,
+                thumbnail_media_item_id,
+                &new_centroid as _,
+                user_friendly_label
+            )
+            .fetch_one(&mut **tx)
+            .await?
         };
 
         // Remove media items that were previously linked to this cluster but are no longer in it

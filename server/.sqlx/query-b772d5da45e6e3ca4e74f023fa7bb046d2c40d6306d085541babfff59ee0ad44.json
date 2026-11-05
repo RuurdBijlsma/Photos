@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        UPDATE jobs\n        SET status = 'queued'::job_status,\n            attempts = 0,\n            scheduled_at = NOW(),\n            finished_at = NULL,\n            started_at = NULL,\n            last_error = NULL,\n            owner = NULL\n        WHERE id = $1\n          AND user_id = $2\n          AND status IN ('failed'::job_status, 'done'::job_status, 'cancelled'::job_status)\n          AND job_type IN ('ingest_metadata', 'ingest_thumbnails', 'ingest_analysis', 'ingest_takeout_batch')\n        RETURNING job_type AS \"job_type: JobType\", relative_path\n        ",
+  "query": "\n        SELECT\n            job_type AS \"job_type: JobType\",\n            status AS \"status: JobStatus\",\n            COUNT(*)::bigint AS \"count!\"\n        FROM jobs\n        WHERE user_id = $1\n          -- The pipeline overview has three fixed stages; other job types are shown in the queue.\n          AND job_type IN ('ingest_metadata', 'ingest_thumbnails', 'ingest_analysis')\n        GROUP BY job_type, status\n        ",
   "describe": {
     "columns": [
       {
@@ -26,7 +26,9 @@
                 "calc_system_stats",
                 "handle_web_upload",
                 "ingest_takeout_batch",
-                "prune_missing_ingest_jobs"
+                "prune_missing_ingest_jobs",
+                "finalize_takeout_import",
+                "prepare_takeout_import"
               ]
             }
           }
@@ -40,26 +42,45 @@
       },
       {
         "ordinal": 1,
-        "name": "relative_path",
-        "type_info": "Text",
+        "name": "status: JobStatus",
+        "type_info": {
+          "Custom": {
+            "name": "job_status",
+            "kind": {
+              "Enum": [
+                "queued",
+                "running",
+                "failed",
+                "done",
+                "cancelled"
+              ]
+            }
+          }
+        },
         "origin": {
           "Table": {
             "table": "jobs",
-            "name": "relative_path"
+            "name": "status"
           }
         }
+      },
+      {
+        "ordinal": 2,
+        "name": "count!",
+        "type_info": "Int8",
+        "origin": "Expression"
       }
     ],
     "parameters": {
       "Left": [
-        "Int8",
         "Int4"
       ]
     },
     "nullable": [
       false,
-      true
+      false,
+      null
     ]
   },
-  "hash": "77a91cc576296d85d66687fbff07a32954f1c657a948f36763f7367b9321e915"
+  "hash": "b772d5da45e6e3ca4e74f023fa7bb046d2c40d6306d085541babfff59ee0ad44"
 }

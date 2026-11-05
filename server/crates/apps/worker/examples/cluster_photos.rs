@@ -35,16 +35,17 @@ async fn main() -> Result<()> {
 
     // Fetch all photo embeddings for the user.
     // We use DISTINCT ON to get only one embedding per media item, which is crucial for videos.
-    let photos = sqlx::query_as::<_, PhotoData>(
-        r"SELECT DISTINCT ON (media_item.id)
+    let photos = sqlx::query_as!(
+        PhotoData,
+        r#"SELECT DISTINCT ON (media_item.id)
                media_item.relative_path,
-               va.embedding
+               va.embedding as "embedding: Vector"
            FROM visual_analysis va
            JOIN media_item ON media_item.id = va.media_item_id
            WHERE media_item.user_id = $1 AND media_item.deleted = false
-           ORDER BY media_item.id, va.created_at",
+           ORDER BY media_item.id, va.created_at"#,
+        USER_ID_TO_TEST
     )
-    .bind(USER_ID_TO_TEST)
     .fetch_all(&pool)
     .await?;
 

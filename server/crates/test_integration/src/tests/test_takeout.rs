@@ -590,11 +590,12 @@ pub async fn test_takeout_import_flow(context: &TestContext) -> Result<()> {
             .expect("count");
     assert_eq!(job_count, 1, "the batch should only be enqueued once");
 
-    let (job_id, payload): (i64, Option<serde_json::Value>) = sqlx::query_as(
+    let row = sqlx::query!(
         "SELECT id, payload FROM jobs WHERE job_type = 'ingest_takeout_batch' ORDER BY id DESC LIMIT 1",
     )
     .fetch_one(&context.pool)
     .await?;
+    let (job_id, payload) = (row.id, row.payload);
     let mut expected_ids = vec![zip1_id.clone(), zip2_id.clone(), zip3_id.clone()];
     expected_ids.sort_unstable();
     let payload_ids: Vec<String> = payload

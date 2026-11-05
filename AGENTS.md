@@ -75,7 +75,7 @@ overlap, so these are not measurements of isolated CPU time.
 | Job                | Scope                 | Observed duration |
 |--------------------|-----------------------|------------------:|
 | `IngestMetadata`   | One media item        |          42–44 ms |
-| `IngestThumbnails` | One media item        |          24–35 ms |
+| `IngestThumbnails` | One media item        |               5 s |
 | `IngestAnalysis`   | One media item        |         94–143 ms |
 | `ClusterFaces`     | One user's face data  |       34.6–35.5 s |
 | `ClusterPhotos`    | One user's photo data |       24.5–25.7 s |
@@ -84,6 +84,53 @@ The ingest jobs process an individual item, while clustering jobs can process a 
 durations therefore are not directly comparable. Treat these values as observations from that specific dataset,
 hardware, cache state, and concurrent workload, not as normal limits or service-level expectations. When diagnosing a
 current run, use its own job timestamps and dataset size.
+
+## Job queue and ingest stages
+
+The queue's source of truth is `common_services/src/database/tables/jobs.rs` for `JobType`,
+`JobScope`, phase, and priority; `worker/src/jobs/management.rs` for claiming and lifecycle
+handling; and `job_queue.rs` for enqueue helpers. Dispatch from job type to
+handler is in `worker/src/handlers/mod.rs`.
+
+### Reading queue order and status
+
+- A **path-scoped** job has a `relative_path`. Metadata, thumbnail, analysis, and removal jobs are path-scoped.
+  Their phases are ordered for the same path, so metadata is eligible before thumbnails, and thumbnails before
+  analysis.
+- A **global** job has no `relative_path`. It is phase-gated against all active jobs. A global job at phase 45 waits
+  while a lower-phase active job exists, even if that job belongs to another user.
+- A path job is also gated by the minimum active global phase. A global job can therefore temporarily hold later
+  per-file stages while it runs.
+- `phase` is an eligibility barrier; lower numbers run first. `priority` breaks ties among eligible jobs; lower
+  priority numbers are selected first. Jobs in the same phase can run concurrently.
+- For phase limits, the worker considers running jobs and queued jobs whose `scheduled_at` is due. A queued job
+  scheduled for a future retry does not hold the phase barrier.
+- Queue eligibility is implemented in two places: `worker/src/jobs/management.rs::claim_next_job`
+  claims a job, while `worker_scaler/src/demand.rs::get_demand` counts jobs the scaler considers
+  available. Both queries duplicate the active-job set and the global/path phase checks. Keep those predicates in sync
+  when changing queue eligibility.
+- `DependencyReschedule` puts a job back in `queued` with exponential backoff (capped at two hours). It is cancelled
+  after 20 dependency attempts. Use it for prerequisites that can eventually finish, not as a permanent wait state.
+
+Job type values are PostgreSQL enum values: add them to `JobType` and add a new migration under `server/migrations`.
+
+### Per-item ingest meaning
+
+`enqueue_full_ingest` and `bulk_enqueue_full_ingest` enqueue metadata, thumbnail, and analysis jobs for each file.
+These jobs may all be present in the queue at once; phase and path rules enforce their order. They form the stages
+of one file's ingest pipeline.
+
+- **`IngestMetadata` (phase 20)** stores the media row and extracted metadata, and links album IDs from the job
+  payload. Once metadata jobs finish across the library, users can browse the timeline and albums, Explore, Map, and
+  view, download, and share items. This supports roughly 90% of normal browsing use.
+- **`IngestThumbnails` (phase 30)** creates pre-generated thumbnails and related assets, then updates thumbnail
+  status. The UI can render a requested thumbnail on demand while its pre-generated version is being prepared.
+- **`IngestAnalysis` (phase 40)** stores embeddings and model-derived results. As analysis completes, embeddings
+  support semantic search, clustering, and Find Similar; face detections feed `ClusterFaces`; object tags support search
+  suggestions and cluster naming.
+
+`IngestMetadata` completion registers the item and makes it available in the UI. Once metadata has completed for a
+batch, its items are ready for browsing while thumbnail generation and visual analysis continue in the background.
 
 Production deployment is not built here: the `compose-services` repo (`stacks/photos/compose.yml`) runs the published
 `ghcr.io/ruurdbijlsma/photos-server` and `photos-web` images and joins the external `proxy-net`. The root `compose.yml`
@@ -253,9 +300,9 @@ npm run lint
   a service function in `web/src/scripts/services/`, and a type in `web/src/scripts/types/api/`. If the endpoint is
   hot (timeline, search, albums, people, camera, explore, storage), consider the protobuf path (`Protobuf<T>` responses
   decoded with ts-proto in `web/src/scripts/services`).
-- **Job type**: add the variant to `JobType` in `common_services/src/database/jobs.rs`, add a handler module under
-  `apps/worker/src/handlers/`, and wire it in `handlers/mod.rs`. JobType is a postgres enum, so an SQL migration is
-  needed. SQL migration files are located at `server/migrations`.
+- **Job type**: add the variant to `common_services/src/database/tables/jobs.rs`, assign its scope, phase, and
+  priority, add a handler module under `apps/worker/src/handlers/`, and wire it in `handlers/mod.rs`. `JobType` is a
+  PostgreSQL enum, so add a new migration under `server/migrations` with `ALTER TYPE job_type ADD VALUE ...`.
 - **Setting**: add the field to `app_state` (`raw_settings.rs` + `settings.rs`) and to `config/settings.yaml`; expose it
   through the frontend settings/admin API if users should change it at runtime.
 - **Dashboard / Grafana panel / Alerting**: the dashboard model is in
@@ -339,3 +386,12 @@ npm run lint
   shows
   up as a modified binary after every suite run. Drop it from the diff (`git checkout -- <file>`) unless the model
   actually changed.
+
+# AGENT.md todo:
+
+* where caching is used, for example in ingest jobs
+* worker scaler logic and different profiles (profiles aren't that useful any more now that i have the model manager)
+
+# Keeping AGENTS.md in sync
+
+If you change anything described in the AGENTS.md file, then also update this file to keep it in sync. 

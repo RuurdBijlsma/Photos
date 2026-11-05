@@ -288,6 +288,8 @@ watch(
                   'ingest_thumbnails',
                   'ingest_analysis',
                   'ingest_takeout_batch',
+                  'prepare_takeout_import',
+                  'finalize_takeout_import',
                   'handle_web_upload',
                   'remove',
                   'scan',

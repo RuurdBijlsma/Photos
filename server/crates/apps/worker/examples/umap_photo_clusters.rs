@@ -56,23 +56,24 @@ async fn fetch_photo_clusters(
     user_id: i32,
     limit: usize,
 ) -> Result<Vec<ClusterRow>> {
-    let rows = sqlx::query_as::<_, ClusterRow>(
-        r"
+    let rows = sqlx::query_as!(
+        ClusterRow,
+        r#"
         SELECT
             pc.id,
             pc.friendly_label,
             mi.relative_path,
-            pc.centroid
+            pc.centroid as "centroid!: pgvector::Vector"
         FROM photo_cluster pc
         JOIN media_item mi ON mi.id = pc.thumbnail_media_item_id
         WHERE pc.user_id = $1
           AND pc.centroid IS NOT NULL
           AND mi.deleted = false
         LIMIT $2
-        ",
+        "#,
+        user_id,
+        limit as i64
     )
-    .bind(user_id)
-    .bind(limit as i64)
     .fetch_all(pool)
     .await?;
 

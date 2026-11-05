@@ -8,11 +8,14 @@ use sqlx::PgPool;
 use tracing::info;
 
 pub async fn handle(context: &WorkerContext, _job: &Job) -> Result<JobResult> {
+    refresh_global_centroid(&context.pool).await?;
+    Ok(JobResult::Done)
+}
+
+pub async fn refresh_global_centroid(pool: &PgPool) -> Result<()> {
     info!("🔄 Updating global centroid...");
 
-    let pool = &context.pool;
-
-    // 1. Calculate the average of 1000 random items
+    // 1. Calculate the average of 10000 random items
     let centroid = calculate_global_centroid(pool).await?;
 
     if let Some(vector) = centroid {
@@ -23,7 +26,7 @@ pub async fn handle(context: &WorkerContext, _job: &Job) -> Result<JobResult> {
         info!("⚠️ No embeddings found, skipping global centroid update.");
     }
 
-    Ok(JobResult::Done)
+    Ok(())
 }
 
 async fn calculate_global_centroid(pool: &PgPool) -> Result<Option<Vec<f32>>> {

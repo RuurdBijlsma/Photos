@@ -36,6 +36,7 @@
     * might as well also delete: `MakerNotes`
   * on a temp file to get the exif data
   * On a detected hang it should kill & restart the exiftool daemon
+* fix non-compile type sqlx queries overal
 
 # INFRASTRUCTURE:
 

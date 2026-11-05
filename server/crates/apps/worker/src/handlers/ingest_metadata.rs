@@ -9,7 +9,6 @@ use chrono::{DateTime, Utc};
 use color_eyre::eyre::Context;
 use color_eyre::{Result, eyre::eyre};
 use common_services::caching::hash_file;
-use common_services::database::UpdateField;
 use common_services::database::album_store::AlbumStore;
 use common_services::database::jobs::Job;
 use common_services::database::media_item::media_item::CreateFullMediaItem;
@@ -130,19 +129,7 @@ async fn store_media_item(
         for album_id in &album_ids {
             AlbumStore::add_media_items(&mut tx, album_id, std::slice::from_ref(&item_id), user_id)
                 .await?;
-            if let Some(album) = AlbumStore::find_by_id(&mut *tx, album_id).await?
-                && album.thumbnail_id.is_none()
-            {
-                AlbumStore::update(
-                    &mut *tx,
-                    album_id,
-                    None,
-                    UpdateField::Ignore,
-                    UpdateField::Value(item_id.clone()),
-                    None,
-                )
-                .await?;
-            }
+            AlbumStore::set_initial_thumbnail_if_missing(&mut *tx, album_id, &item_id).await?;
         }
     }
     tx.commit().await?;

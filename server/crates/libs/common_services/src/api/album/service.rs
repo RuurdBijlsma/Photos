@@ -275,15 +275,8 @@ pub async fn remove_media_from_album(
                 .await?;
 
                 if let Some(thumbnail_id) = get_representative_thumbnail(&mut tx, &ids).await? {
-                    AlbumStore::update(
-                        &mut *tx,
-                        album_id,
-                        None,
-                        UpdateField::Ignore,
-                        UpdateField::Value(thumbnail_id),
-                        None,
-                    )
-                    .await?;
+                    AlbumStore::update_thumbnail_as_automatic(&mut *tx, album_id, &thumbnail_id)
+                        .await?;
                 }
                 break;
             }
@@ -375,10 +368,9 @@ pub async fn delete_album(pool: &PgPool, album_id: &str, user_id: i32) -> Result
     Ok(())
 }
 
-/// Updates an album's name and/or description.
-/// The user must be the album owner.
+/// Applies a user-facing album update and records an explicit thumbnail choice.
 #[instrument(skip(pool))]
-pub async fn update_album(
+pub async fn user_update_album(
     pool: &PgPool,
     album_id: &str,
     user_id: i32,
@@ -387,8 +379,45 @@ pub async fn update_album(
     thumbnail_id: UpdateField<String>,
     is_public: Option<bool>,
 ) -> Result<Album, AppError> {
+    let thumbnail_is_user_selected = match &thumbnail_id {
+        UpdateField::Value(_) => Some(true),
+        UpdateField::SetNull => Some(false),
+        UpdateField::Ignore => None,
+    };
+
+    let mut tx = pool.begin().await?;
+    let result = update_album(
+        &mut tx,
+        album_id,
+        user_id,
+        name,
+        description,
+        thumbnail_id,
+        is_public,
+    )
+    .await?;
+    if let Some(is_user_selected) = thumbnail_is_user_selected {
+        AlbumStore::set_thumbnail_user_selected(&mut *tx, album_id, is_user_selected).await?;
+    }
+    tx.commit().await?;
+
+    Ok(result)
+}
+
+/// Updates album details.
+/// The user must be the album owner.
+#[instrument(skip(tx))]
+pub async fn update_album(
+    tx: &mut PgTransaction<'_>,
+    album_id: &str,
+    user_id: i32,
+    name: Option<String>,
+    description: UpdateField<String>,
+    thumbnail_id: UpdateField<String>,
+    is_public: Option<bool>,
+) -> Result<Album, AppError> {
     // Permission Check: Only the owner can update album details.
-    if !is_album_owner(pool, user_id, album_id).await? {
+    if !is_album_owner(&mut **tx, user_id, album_id).await? {
         return Err(AppError::NotFound(
             "Album not found or permission denied.".to_string(),
         ));
@@ -397,14 +426,14 @@ pub async fn update_album(
     // At least one field must be provided for the update.
     if name.is_none() && description.is_ignore() && thumbnail_id.is_ignore() && is_public.is_none()
     {
-        let album = AlbumStore::find_by_id(pool, album_id)
+        let album = AlbumStore::find_by_id(&mut **tx, album_id)
             .await?
             .ok_or_else(|| AppError::NotFound(album_id.to_owned()))?;
         return Ok(album);
     }
 
     if let UpdateField::Value(thumbnail_id) = &thumbnail_id {
-        let exists = AlbumStore::has_media_item(pool, album_id, thumbnail_id).await?;
+        let exists = AlbumStore::has_media_item(&mut **tx, album_id, thumbnail_id).await?;
         if !exists {
             return Err(AppError::BadRequest(
                 "thumbnail_id is not in the album".to_owned(),
@@ -412,8 +441,19 @@ pub async fn update_album(
         }
     }
 
-    let updated_album =
-        AlbumStore::update(pool, album_id, name, description, thumbnail_id, is_public).await?;
+    AlbumStore::update(
+        &mut **tx,
+        album_id,
+        name,
+        description,
+        thumbnail_id,
+        is_public,
+    )
+    .await?;
+    let updated_album = AlbumStore::find_by_id(&mut **tx, album_id)
+        .await?
+        .ok_or_else(|| AppError::NotFound(album_id.to_owned()))?;
+
     Ok(updated_album)
 }
 

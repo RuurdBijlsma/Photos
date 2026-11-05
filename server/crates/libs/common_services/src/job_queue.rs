@@ -17,6 +17,13 @@ pub struct IngestMetadataPayload {
     pub fallback_taken_at: Option<DateTime<Utc>>,
 }
 
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct TakeoutAlbumImportPayload {
+    pub album_ids: Vec<String>,
+    /// Prevents separate imports of the same albums from sharing active completion jobs.
+    pub batch_job_id: i64,
+}
+
 /// Enqueues a job for a specific file, such as ingestion or removal.
 ///
 /// # Errors
