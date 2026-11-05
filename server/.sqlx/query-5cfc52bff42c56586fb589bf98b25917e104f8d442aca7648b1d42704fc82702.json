@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT\n            job_type AS \"job_type: JobType\",\n            status AS \"status: JobStatus\",\n            COUNT(*)::bigint AS \"count!\"\n        FROM jobs\n        WHERE user_id = $1\n          AND job_type IN ('ingest_metadata', 'ingest_thumbnails', 'ingest_analysis')\n        GROUP BY job_type, status\n        ",
+  "query": "\n        UPDATE jobs\n        SET status = 'queued'::job_status,\n            attempts = 0,\n            scheduled_at = NOW(),\n            finished_at = NULL,\n            started_at = NULL,\n            last_error = NULL,\n            owner = NULL\n        WHERE id = $1\n          AND user_id = $2\n          AND status IN ('failed'::job_status, 'done'::job_status, 'cancelled'::job_status)\n        RETURNING job_type AS \"job_type: JobType\", relative_path\n        ",
   "describe": {
     "columns": [
       {
@@ -26,7 +26,9 @@
                 "calc_system_stats",
                 "handle_web_upload",
                 "ingest_takeout_batch",
-                "prune_missing_ingest_jobs"
+                "prune_missing_ingest_jobs",
+                "finalize_takeout_import",
+                "prepare_takeout_import"
               ]
             }
           }
@@ -40,45 +42,26 @@
       },
       {
         "ordinal": 1,
-        "name": "status: JobStatus",
-        "type_info": {
-          "Custom": {
-            "name": "job_status",
-            "kind": {
-              "Enum": [
-                "queued",
-                "running",
-                "failed",
-                "done",
-                "cancelled"
-              ]
-            }
-          }
-        },
+        "name": "relative_path",
+        "type_info": "Text",
         "origin": {
           "Table": {
             "table": "jobs",
-            "name": "status"
+            "name": "relative_path"
           }
         }
-      },
-      {
-        "ordinal": 2,
-        "name": "count!",
-        "type_info": "Int8",
-        "origin": "Expression"
       }
     ],
     "parameters": {
       "Left": [
+        "Int8",
         "Int4"
       ]
     },
     "nullable": [
       false,
-      false,
-      null
+      true
     ]
   },
-  "hash": "05e2f4e0cf33cd7a5739025ab70b3b79dc92c98c1ba4cb23998a84acdb13d872"
+  "hash": "5cfc52bff42c56586fb589bf98b25917e104f8d442aca7648b1d42704fc82702"
 }

@@ -41,7 +41,7 @@ pub async fn has_pending_ingest_jobs(
     wait_stage: IngestWaitStage,
 ) -> Result<bool> {
     let wait_for_all_stages = matches!(wait_stage, IngestWaitStage::All);
-    Ok(sqlx::query_scalar::<_, bool>(
+    Ok(sqlx::query_scalar!(
         r#"
         WITH album_paths AS (
             SELECT mi.relative_path
@@ -73,12 +73,12 @@ pub async fn has_pending_ingest_jobs(
                       AND j.relative_path IN (SELECT relative_path FROM album_paths)
                   )
               )
-        )
+        ) AS "has_pending!"
         "#,
+        user_id,
+        album_ids,
+        wait_for_all_stages
     )
-    .bind(user_id)
-    .bind(album_ids)
-    .bind(wait_for_all_stages)
     .fetch_one(pool)
     .await?)
 }

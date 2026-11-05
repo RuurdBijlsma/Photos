@@ -1,0 +1,25 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        WITH album_paths AS (\n            SELECT mi.relative_path\n            FROM album_media_item ami\n            JOIN media_item mi ON mi.id = ami.media_item_id\n            WHERE ami.album_id = ANY($2::text[])\n        )\n        SELECT EXISTS (\n            SELECT 1\n            FROM jobs j\n            WHERE j.user_id = $1\n              AND j.status IN ('queued', 'running')\n              AND (\n                  j.job_type::text = 'ingest_takeout_batch'\n                  OR (\n                      $3::boolean\n                      AND j.job_type::text = 'prepare_takeout_import'\n                  )\n                  OR (\n                      j.job_type::text = 'ingest_metadata'\n                      AND (\n                          j.payload -> 'album_ids' ?| $2::text[]\n                          OR j.relative_path IN (SELECT relative_path FROM album_paths)\n                      )\n                  )\n                  OR (\n                      $3::boolean\n                      AND j.job_type::text IN ('ingest_thumbnails', 'ingest_analysis')\n                      AND j.relative_path IN (SELECT relative_path FROM album_paths)\n                  )\n              )\n        ) AS \"has_pending!\"\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "has_pending!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4",
+        "TextArray",
+        "Bool"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "cdce604c9eab728bef615381edbf0141021cb01619b93d966fec58f5645df87f"
+}

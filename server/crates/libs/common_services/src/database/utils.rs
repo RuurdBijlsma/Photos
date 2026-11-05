@@ -54,7 +54,7 @@ pub async fn get_db_pool(database_url: &str, run_migrations: bool) -> Result<Poo
         .test_before_acquire(true)
         .after_connect(|conn, _meta| {
             Box::pin(async move {
-                sqlx::query("SET plan_cache_mode = force_custom_plan")
+                sqlx::query!("SET plan_cache_mode = force_custom_plan")
                     .execute(conn)
                     .await?;
                 Ok(())

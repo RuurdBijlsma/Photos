@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT payload AS \"payload!: serde_json::Value\" FROM jobs\n        WHERE user_id = $1\n          AND job_type = 'ingest_takeout_batch'::job_type\n          AND status IN ('queued'::job_status, 'running'::job_status)\n          AND payload IS NOT NULL\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "payload!: serde_json::Value",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "jobs",
+            "name": "payload"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4"
+      ]
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "0c88107adf4f7217c7abbf35ab450ec3bf89529ce3894c5466e412fda44631c7"
+}

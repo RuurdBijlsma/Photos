@@ -131,15 +131,15 @@ impl AlbumStore {
         album_id: &str,
         is_user_selected: bool,
     ) -> Result<PgQueryResult, DbError> {
-        Ok(sqlx::query(
+        Ok(sqlx::query!(
             r#"
                 UPDATE album
                 SET thumbnail_is_user_selected = $2
                 WHERE id = $1
                 "#,
+            album_id,
+            is_user_selected
         )
-        .bind(album_id)
-        .bind(is_user_selected)
         .execute(executor)
         .await?)
     }
@@ -150,16 +150,16 @@ impl AlbumStore {
         album_id: &str,
         thumbnail_id: &str,
     ) -> Result<PgQueryResult, DbError> {
-        Ok(sqlx::query(
+        Ok(sqlx::query!(
             r#"
             UPDATE album
             SET thumbnail_id = $2, updated_at = now()
             WHERE id = $1
               AND thumbnail_is_user_selected = false
             "#,
+            album_id,
+            thumbnail_id
         )
-        .bind(album_id)
-        .bind(thumbnail_id)
         .execute(executor)
         .await?)
     }
@@ -170,7 +170,7 @@ impl AlbumStore {
         album_id: &str,
         thumbnail_id: &str,
     ) -> Result<PgQueryResult, DbError> {
-        Ok(sqlx::query(
+        Ok(sqlx::query!(
             r#"
             UPDATE album
             SET thumbnail_id = $2, updated_at = now()
@@ -178,9 +178,9 @@ impl AlbumStore {
               AND thumbnail_id IS NULL
               AND thumbnail_is_user_selected = false
             "#,
+            album_id,
+            thumbnail_id
         )
-        .bind(album_id)
-        .bind(thumbnail_id)
         .execute(executor)
         .await?)
     }
@@ -191,7 +191,7 @@ impl AlbumStore {
         album_id: &str,
         thumbnail_id: &str,
     ) -> Result<PgQueryResult, DbError> {
-        Ok(sqlx::query(
+        Ok(sqlx::query!(
             r#"
             UPDATE album
             SET thumbnail_id = $2,
@@ -199,9 +199,9 @@ impl AlbumStore {
                 updated_at = now()
             WHERE id = $1
             "#,
+            album_id,
+            thumbnail_id
         )
-        .bind(album_id)
-        .bind(thumbnail_id)
         .execute(executor)
         .await?)
     }

@@ -110,16 +110,16 @@ async fn pending_takeout_upload_ids(
     context: &ApiContext,
     user_id: i32,
 ) -> Result<Vec<String>, AppError> {
-    let claimed_payloads: Vec<serde_json::Value> = sqlx::query_scalar(
-        r"
-        SELECT payload FROM jobs
+    let claimed_payloads = sqlx::query_scalar!(
+        r#"
+        SELECT payload AS "payload!: serde_json::Value" FROM jobs
         WHERE user_id = $1
           AND job_type = 'ingest_takeout_batch'::job_type
           AND status IN ('queued'::job_status, 'running'::job_status)
           AND payload IS NOT NULL
-        ",
+        "#,
+        user_id,
     )
-    .bind(user_id)
     .fetch_all(&context.pool)
     .await?;
     let claimed: HashSet<String> = claimed_payloads

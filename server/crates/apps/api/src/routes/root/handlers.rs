@@ -8,7 +8,10 @@ pub async fn root() -> &'static str {
 }
 
 pub async fn health_check(State(context): State<ApiContext>) -> Result<&'static str, StatusCode> {
-    match sqlx::query("SELECT 1").fetch_one(&context.pool).await {
+    match sqlx::query!("SELECT 1 AS one")
+        .fetch_one(&context.pool)
+        .await
+    {
         Ok(_) => Ok("OK"),
         Err(e) => {
             error!("Health check failed: database connection error: {}", e);

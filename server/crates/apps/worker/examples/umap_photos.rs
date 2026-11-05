@@ -26,17 +26,16 @@ struct PhotoEmbeddingRow {
 
 // Fetch embeddings without join logic
 async fn fetch_photo_embeddings(pool: &PgPool, user_id: i32) -> Result<Vec<PhotoEmbeddingRow>> {
-    let rows = sqlx::query_as::<_, PhotoEmbeddingRow>(
-        r"
+    let rows = sqlx::query_as!(
+        PhotoEmbeddingRow,
+        r#"
         SELECT
-            id,
-            media_item_id,
-            embedding
+            embedding as "embedding: pgvector::Vector"
         FROM visual_analysis
         WHERE user_id = $1 AND deleted = false
-        ",
+        "#,
+        user_id
     )
-    .bind(user_id)
     .fetch_all(pool)
     .await?;
 

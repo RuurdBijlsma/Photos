@@ -39,8 +39,9 @@ struct FaceDetails {
 async fn fetch_all_face_details(pool: &PgPool, user_id: i32) -> Result<Vec<FaceDetails>> {
     // This query assumes you have a `media_item` table with a `path` column.
     // Adjust the query if your schema is different.
-    let faces = sqlx::query_as::<_, FaceDetails>(
-        r"
+    let faces = sqlx::query_as!(
+        FaceDetails,
+        r#"
         SELECT
             f.id,
             va.media_item_id,
@@ -48,15 +49,15 @@ async fn fetch_all_face_details(pool: &PgPool, user_id: i32) -> Result<Vec<FaceD
             f.position_y,
             f.width,
             f.height,
-            f.embedding,
+            f.embedding as "embedding: pgvector::Vector",
             mi.relative_path
         FROM face f
         JOIN visual_analysis va ON f.visual_analysis_id = va.id
         JOIN media_item mi ON va.media_item_id = mi.id
         WHERE mi.user_id = $1
-        ",
+        "#,
+        user_id
     )
-    .bind(user_id)
     .fetch_all(pool)
     .await?;
     Ok(faces)

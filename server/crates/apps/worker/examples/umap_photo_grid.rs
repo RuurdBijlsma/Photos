@@ -51,8 +51,9 @@ async fn fetch_random_photo_embeddings(
     limit: usize,
 ) -> Result<Vec<SampledPhotoRow>> {
     // We use a CTE to ensure we isolate unique photos before sampling them randomly
-    let rows = sqlx::query_as::<_, SampledPhotoRow>(
-        r"
+    let rows = sqlx::query_as!(
+        SampledPhotoRow,
+        r#"
         WITH unique_items AS (
             SELECT DISTINCT ON (media_item.id)
                 media_item.relative_path,
@@ -62,16 +63,16 @@ async fn fetch_random_photo_embeddings(
             WHERE media_item.user_id = $1 AND media_item.deleted = false AND media_item.is_video = false
             ORDER BY media_item.id, va.created_at
         )
-        SELECT relative_path, embedding
+        SELECT relative_path, embedding as "embedding: pgvector::Vector"
         FROM unique_items
         ORDER BY RANDOM()
         LIMIT $2
-        ",
+        "#,
+        user_id,
+        limit as i64
     )
-        .bind(user_id)
-        .bind(limit as i64)
-        .fetch_all(pool)
-        .await?;
+    .fetch_all(pool)
+    .await?;
 
     Ok(rows)
 }
