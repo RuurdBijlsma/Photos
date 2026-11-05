@@ -279,14 +279,14 @@ async function changeMediaItem(mediaItemId: string) {
   await router.replace({ path: `${viewPhotoStore.viewLink}${mediaItemId}`, query: route.query })
 }
 
-async function prefetchMediaItem(mediaItemId: string) {
+function prefetchMediaItem(mediaItemId: string) {
   if (authStore.isAuthenticated) {
-    await mediaItemStore.fetchMediaItem(mediaItemId)
+    mediaItemStore.fetchMediaItem(mediaItemId)
   } else if (albumId.value) {
-    await mediaItemStore.fetchSharedMediaItem(albumId.value, mediaItemId)
+    mediaItemStore.fetchSharedMediaItem(albumId.value, mediaItemId)
   }
-  const item = mediaItemStore.anyMediaItems.get(mediaItemId)
-  if (!item?.has_thumbnails) return
+  // Don't try to preload next Avif image when it's known that next media item has no thumbnails.
+  if (viewPhotoStore.idsMetadata.get(mediaItemId)?.hasThumbnails === false) return
   preloadImageForNextVisit(mediaItemService.getPhotoThumbnail(mediaItemId, 1440, false)).catch(
     () => {},
   )
