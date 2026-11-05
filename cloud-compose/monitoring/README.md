@@ -19,6 +19,10 @@ Open <http://localhost:9476>. The login is `admin` and `GRAFANA_ADMIN_PASSWORD` 
 your `.env` (default `admin` — change it, the container can read your database
 password).
 
+If Grafana is behind a reverse proxy, set `GRAFANA_ROOT_URL` in `.env` to the URL
+people use to open Grafana. Grafana uses it when building alert links; without it,
+the default is `http://localhost:9476/` (or the port configured by `GRAFANA_PORT`).
+
 To stop only the monitoring containers:
 
 ```bash
@@ -27,11 +31,11 @@ docker compose stop photos_loki photos_alloy photos_grafana
 
 ## What runs
 
-| Service | Image | Purpose | Port |
-| --- | --- | --- | --- |
-| `loki` | `photos-loki` | Log store, filesystem + TSDB, retention | none published |
-| `alloy` | `photos-alloy` | Tails `<app_data>/logs` and pushes to Loki | none published |
-| `grafana` | `photos-grafana` | UI, provisioned datasources and dashboard | `${GRAFANA_PORT:-9476}` |
+| Service   | Image            | Purpose                                    | Port                    |
+|-----------|------------------|--------------------------------------------|-------------------------|
+| `loki`    | `photos-loki`    | Log store, filesystem + TSDB, retention    | none published          |
+| `alloy`   | `photos-alloy`   | Tails `<app_data>/logs` and pushes to Loki | none published          |
+| `grafana` | `photos-grafana` | UI, provisioned datasources and dashboard  | `${GRAFANA_PORT:-9476}` |
 
 Only Grafana publishes a port, because it is the only one with a login. Loki and
 Alloy have no authentication at all.
@@ -82,8 +86,10 @@ Grafana Unified Alerting is provisioned with a default contact point for Telegra
 3. Set `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` in your `.env`.
 
 Default provisioned alert rules:
-- **`ALERT:` Macro**: Fires immediately if any Rust backend component logs via the `alert!` macro.
-- **Background Job Failures**: Fires if background jobs fail within a 5-minute window.
+
+- **`ALERT:` Macro**: Fires immediately if any Rust backend component logs via the `alert!` macro; the Telegram message
+  includes the matching log line.
+- **Background Job Failures**: Fires for each background job that failed within the last 5 minutes and includes its ID, type, and error in Telegram.
 
 ## Caveats
 

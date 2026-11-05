@@ -797,6 +797,9 @@ useEventListener(containerRef, 'wheel', handleWheel, { passive: false })
   user-select: none;
 }
 
+.thumbnail-img {
+}
+
 .full-res-img {
   z-index: 2;
 }
