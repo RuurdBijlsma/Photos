@@ -109,6 +109,12 @@ async fn handle_file_create(
         return Ok(());
     }
 
+    sqlx::query!(
+        "DELETE FROM failed_ingest WHERE relative_path = $1",
+        relative_path
+    )
+    .execute(pool)
+    .await?;
     enqueue_full_ingest(pool, settings, &relative_path, user.id, None).await?;
     Ok(())
 }

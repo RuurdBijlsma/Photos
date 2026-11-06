@@ -127,8 +127,20 @@ pub async fn sync_user_files_to_db(
         return Ok(());
     }
 
-    // New files on disk -> Enqueue ingest
-    let to_ingest: Vec<_> = fs_paths.difference(&db_all_paths).cloned().collect();
+    // New files on disk -> Enqueue ingest, unless a previous metadata extraction failed for them.
+    let failed_paths: HashSet<String> = sqlx::query_scalar!(
+        "SELECT relative_path FROM failed_ingest WHERE user_id = $1",
+        user_id
+    )
+    .fetch_all(pool)
+    .await?
+    .into_iter()
+    .collect();
+    let to_ingest: Vec<_> = fs_paths
+        .difference(&db_all_paths)
+        .filter(|path| !failed_paths.contains(*path))
+        .cloned()
+        .collect();
 
     // WalkDir can skip permission errors, so verify every candidate path directly.
     let mut to_unmark_missing: Vec<_> = db_missing_paths.intersection(&fs_paths).cloned().collect();

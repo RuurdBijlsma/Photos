@@ -3,6 +3,7 @@ use app_state::IngestSettings;
 use sqlx::PgPool;
 use std::path::Path;
 
+// todo: refactor to use is_video_file etc.
 /// Returns true when the path has a configured photo or video extension.
 #[must_use]
 pub fn is_media_path(path: &str, settings: &IngestSettings) -> bool {
@@ -13,6 +14,7 @@ pub fn is_media_path(path: &str, settings: &IngestSettings) -> bool {
     )
 }
 
+// todo: refactor to use is_video_file etc.
 pub(crate) fn has_media_extension(
     path: &str,
     photo_exts: &[String],
@@ -97,6 +99,22 @@ pub async fn reconcile_removed_paths(
                   FROM unnest($2::text[]) AS p(prefix)
                   WHERE left(media_item.relative_path, length(p.prefix) + 1) = p.prefix || '/'
               )
+          )
+        "#,
+        &paths,
+        &dir_paths
+    )
+    .execute(&mut *tx)
+    .await?;
+
+    sqlx::query!(
+        r#"
+        DELETE FROM failed_ingest
+        WHERE relative_path = ANY($1)
+          OR EXISTS (
+              SELECT 1
+              FROM unnest($2::text[]) AS p(prefix)
+              WHERE left(failed_ingest.relative_path, length(p.prefix) + 1) = p.prefix || '/'
           )
         "#,
         &paths,

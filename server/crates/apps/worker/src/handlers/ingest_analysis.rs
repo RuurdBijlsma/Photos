@@ -10,7 +10,26 @@ use common_services::database::media_item_store::MediaItemStore;
 use common_services::database::visual_analysis_store::VisualAnalysisStore;
 use common_types::ml_analysis::MLFastAnalysis;
 use std::path::Path;
-use tracing::{debug, info};
+use tracing::{debug, info, warn};
+
+/// Whether an `ingest_metadata` job for this path can still complete (queued, including a future
+/// retry, or running).
+pub async fn metadata_stage_active(pool: &sqlx::PgPool, relative_path: &str) -> Result<bool> {
+    let active = sqlx::query_scalar!(
+        r#"
+        SELECT EXISTS (
+            SELECT 1 FROM jobs
+            WHERE relative_path = $1
+              AND job_type = 'ingest_metadata'
+              AND status IN ('queued', 'running')
+        ) AS "active!"
+        "#,
+        relative_path
+    )
+    .fetch_one(pool)
+    .await?;
+    Ok(active)
+}
 
 /// Handles the analysis of a given job.
 ///
@@ -33,6 +52,13 @@ pub async fn handle(context: &WorkerContext, job: &Job) -> Result<JobResult> {
         .file_is_ingested(&context.pool, &file_path)
         .await?
     {
+        if !metadata_stage_active(&context.pool, relative_path).await? {
+            warn!(
+                "Metadata ingest for {} did not complete; cancelling analysis.",
+                relative_path
+            );
+            return Ok(JobResult::Cancelled);
+        }
         info!(
             "File {} is not ingested yet, rescheduling analysis.",
             &relative_path

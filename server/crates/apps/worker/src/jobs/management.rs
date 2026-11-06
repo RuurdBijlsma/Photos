@@ -6,7 +6,7 @@ use chrono::{Duration, Utc};
 use color_eyre::{Report, Result};
 use common_services::alert;
 use common_services::database::jobs::{Job, JobScope, JobStatus, JobType};
-use sqlx::{Executor, PgPool, Postgres};
+use sqlx::{Executor, PgConnection, PgPool, Postgres};
 use tracing::{info, warn};
 
 /// Atomically claims the next available job from the queue based on phase and scope ordering.
@@ -154,7 +154,7 @@ pub async fn update_job_on_failure(pool: &PgPool, job: &Job, error: &Report) -> 
         let mut tx = pool.begin().await?;
         let updated = mark_job_failed(&mut *tx, job.id, error_string).await?;
         if updated == 1 {
-            mark_stage_failed(&mut *tx, job, error_string).await?;
+            mark_stage_failed(&mut tx, job, error_string).await?;
         }
         tx.commit().await?;
         Ok(())
@@ -204,15 +204,45 @@ async fn mark_job_failed(
 }
 
 /// Marks the failed ingest stage without overwriting a completed stage.
-async fn mark_stage_failed(
-    executor: impl Executor<'_, Database = Postgres>,
-    job: &Job,
-    last_error: &str,
-) -> Result<()> {
+///
+/// A terminal metadata failure also records the path in `failed_ingest` (so scans stop
+/// re-enqueueing it) and cancels the later stages of the same file.
+async fn mark_stage_failed(conn: &mut PgConnection, job: &Job, last_error: &str) -> Result<()> {
     let Some(relative_path) = job.relative_path.as_deref() else {
         return Ok(());
     };
     match job.job_type {
+        JobType::IngestMetadata => {
+            if let Some(user_id) = job.user_id {
+                sqlx::query!(
+                    r#"
+                    INSERT INTO failed_ingest (relative_path, user_id, error)
+                    VALUES ($1, $2, $3)
+                    ON CONFLICT (relative_path) DO UPDATE
+                    SET user_id = excluded.user_id,
+                        error = excluded.error,
+                        failed_at = now()
+                    "#,
+                    relative_path,
+                    user_id,
+                    last_error
+                )
+                .execute(&mut *conn)
+                .await?;
+            }
+            sqlx::query!(
+                r#"
+                UPDATE jobs
+                SET status = 'cancelled'
+                WHERE relative_path = $1
+                  AND status IN ('queued', 'running')
+                  AND job_type IN ('ingest_thumbnails', 'ingest_analysis')
+                "#,
+                relative_path
+            )
+            .execute(&mut *conn)
+            .await?;
+        }
         JobType::IngestThumbnails => {
             sqlx::query!(
                 r#"
@@ -226,7 +256,7 @@ async fn mark_stage_failed(
                 relative_path,
                 last_error
             )
-            .execute(executor)
+            .execute(&mut *conn)
             .await?;
         }
         JobType::IngestAnalysis => {
@@ -242,7 +272,7 @@ async fn mark_stage_failed(
                 relative_path,
                 last_error
             )
-            .execute(executor)
+            .execute(&mut *conn)
             .await?;
         }
         _ => {}

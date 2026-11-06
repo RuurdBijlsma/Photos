@@ -132,6 +132,12 @@ async fn store_media_item(
             AlbumStore::set_initial_thumbnail_if_missing(&mut *tx, album_id, &item_id).await?;
         }
     }
+    sqlx::query!(
+        "DELETE FROM failed_ingest WHERE relative_path = $1",
+        relative_path
+    )
+    .execute(&mut *tx)
+    .await?;
     tx.commit().await?;
     Ok(())
 }
