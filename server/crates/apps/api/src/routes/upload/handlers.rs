@@ -29,7 +29,6 @@ pub async fn get_upload_jwt(
         exp,
         aud: "upload".to_string(),
     };
-    // todo: its probably not safe to store the jwt secret in the config YAML
     let access_token = encode(
         &Header::default(),
         &claims,
