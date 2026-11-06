@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM failed_ingest WHERE relative_path = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "d87fd54cea8d85de4ef4e7dd03f2b5089139b052ee96c7abb6280d20d9345229"
+}
