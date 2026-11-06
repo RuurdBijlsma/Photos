@@ -132,6 +132,10 @@ of one file's ingest pipeline.
 `IngestMetadata` completion registers the item and makes it available in the UI. Once metadata has completed for a
 batch, its items are ready for browsing while thumbnail generation and visual analysis continue in the background.
 
+A terminal `IngestMetadata` failure (a corrupt file) records the path in `failed_ingest` and cancels that file's
+thumbnail and analysis jobs; scans skip those paths, and `IngestAnalysis` returns `Cancelled` when no metadata job is
+queued or running. A later successful ingest, watcher create event, or removal deletes the row.
+
 Production deployment is not built here: the `compose-services` repo (`stacks/photos/compose.yml`) runs the published
 `ghcr.io/ruurdbijlsma/photos-server` and `photos-web` images and joins the external `proxy-net`. The root `compose.yml`
 builds from source and is used to test Podman/Docker-specific behavior; typical development runs the backend and web

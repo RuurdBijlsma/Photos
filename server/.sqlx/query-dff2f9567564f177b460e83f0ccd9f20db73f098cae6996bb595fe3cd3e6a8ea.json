@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT EXISTS (\n            SELECT 1 FROM jobs\n            WHERE relative_path = $1\n              AND job_type = 'ingest_metadata'\n              AND status IN ('queued', 'running')\n        ) AS \"active!\"\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "active!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "dff2f9567564f177b460e83f0ccd9f20db73f098cae6996bb595fe3cd3e6a8ea"
+}

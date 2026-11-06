@@ -819,6 +819,183 @@ pub async fn test_prune_missing_ingest_jobs(context: &TestContext) -> Result<()>
     Ok(())
 }
 
+pub async fn test_metadata_failure_records_failed_ingest(context: &TestContext) -> Result<()> {
+    let source = sqlx::query!("SELECT user_id FROM media_item WHERE deleted = false LIMIT 1")
+        .fetch_one(&context.pool)
+        .await?;
+    let path = "failed-ingest-test/broken.jpg";
+    let metadata_job = insert_job(
+        &context.pool,
+        source.user_id,
+        path,
+        JobType::IngestMetadata,
+        "running",
+        4,
+        5,
+    )
+    .await?;
+    let sibling_jobs = vec![
+        insert_job(
+            &context.pool,
+            source.user_id,
+            path,
+            JobType::IngestThumbnails,
+            "queued",
+            0,
+            5,
+        )
+        .await?,
+        insert_job(
+            &context.pool,
+            source.user_id,
+            path,
+            JobType::IngestAnalysis,
+            "queued",
+            0,
+            5,
+        )
+        .await?,
+    ];
+
+    let job = retry_failure_job(metadata_job, path, source.user_id, JobType::IngestMetadata);
+    worker::jobs::management::update_job_on_failure(
+        &context.pool,
+        &job,
+        &eyre!("Essential metadata extraction failed: File format error"),
+    )
+    .await?;
+
+    let status: String = sqlx::query_scalar!(
+        r#"SELECT status::text AS "status!" FROM jobs WHERE id = $1"#,
+        metadata_job
+    )
+    .fetch_one(&context.pool)
+    .await?;
+    assert_eq!(status, "failed");
+
+    let failed = sqlx::query!(
+        "SELECT user_id, error FROM failed_ingest WHERE relative_path = $1",
+        path
+    )
+    .fetch_one(&context.pool)
+    .await?;
+    assert_eq!(failed.user_id, source.user_id);
+    assert!(failed.error.contains("File format error"));
+
+    let siblings = sqlx::query!(
+        r#"SELECT id, status::text AS "status!" FROM jobs WHERE id = ANY($1) ORDER BY id"#,
+        &sibling_jobs
+    )
+    .fetch_all(&context.pool)
+    .await?;
+    assert_eq!(siblings.len(), 2);
+    for sibling in siblings {
+        assert_eq!(sibling.status, "cancelled", "job {}", sibling.id);
+    }
+
+    sqlx::query!("DELETE FROM jobs WHERE relative_path = $1", path)
+        .execute(&context.pool)
+        .await?;
+    sqlx::query!("DELETE FROM failed_ingest WHERE relative_path = $1", path)
+        .execute(&context.pool)
+        .await?;
+    Ok(())
+}
+
+pub async fn test_metadata_stage_active(context: &TestContext) -> Result<()> {
+    let source = sqlx::query!("SELECT user_id FROM media_item WHERE deleted = false LIMIT 1")
+        .fetch_one(&context.pool)
+        .await?;
+    let path = "failed-ingest-test/in-flight.jpg";
+
+    assert!(
+        !worker::handlers::ingest_analysis::metadata_stage_active(&context.pool, path).await?,
+        "no metadata job means analysis must not wait"
+    );
+
+    let job_id = insert_job(
+        &context.pool,
+        source.user_id,
+        path,
+        JobType::IngestMetadata,
+        "queued",
+        0,
+        5,
+    )
+    .await?;
+    assert!(
+        worker::handlers::ingest_analysis::metadata_stage_active(&context.pool, path).await?,
+        "a queued retry is still an active metadata stage"
+    );
+
+    sqlx::query!("UPDATE jobs SET status = 'failed' WHERE id = $1", job_id)
+        .execute(&context.pool)
+        .await?;
+    assert!(
+        !worker::handlers::ingest_analysis::metadata_stage_active(&context.pool, path).await?,
+        "a failed metadata job means analysis must stop waiting"
+    );
+
+    sqlx::query!("DELETE FROM jobs WHERE id = $1", job_id)
+        .execute(&context.pool)
+        .await?;
+    Ok(())
+}
+
+pub async fn test_scan_skips_failed_ingest(context: &TestContext) -> Result<()> {
+    let user = sqlx::query!(
+        r#"SELECT id, media_folder FROM app_user WHERE media_folder IS NOT NULL ORDER BY id LIMIT 1"#
+    )
+    .fetch_one(&context.pool)
+    .await?;
+    let folder = user.media_folder.unwrap_or_default();
+    let relative_path = if folder.is_empty() {
+        "failed-scan-test.jpg".to_owned()
+    } else {
+        format!("{folder}/failed-scan-test.jpg")
+    };
+    let path = context.settings.ingest.media_root.join(&relative_path);
+    if let Some(parent) = path.parent() {
+        tokio::fs::create_dir_all(parent).await?;
+    }
+    tokio::fs::write(&path, b"not a real jpeg").await?;
+    sqlx::query!(
+        "INSERT INTO failed_ingest (relative_path, user_id, error) VALUES ($1, $2, 'boom')",
+        &relative_path,
+        user.id
+    )
+    .execute(&context.pool)
+    .await?;
+
+    worker::handlers::scan::sync_user_files_to_db(
+        &context.pool,
+        &context.settings.ingest,
+        &context.settings.ingest.media_root.join(&folder),
+        user.id,
+    )
+    .await?;
+
+    let jobs: i64 = sqlx::query_scalar!(
+        r#"SELECT COUNT(*) AS "count!" FROM jobs WHERE relative_path = $1"#,
+        &relative_path
+    )
+    .fetch_one(&context.pool)
+    .await?;
+    assert_eq!(
+        jobs, 0,
+        "scan must not enqueue a path recorded in failed_ingest"
+    );
+
+    sqlx::query!(
+        "DELETE FROM failed_ingest WHERE relative_path = $1",
+        &relative_path
+    )
+    .execute(&context.pool)
+    .await?;
+    tokio::fs::remove_file(&path).await?;
+    Ok(())
+}
+
 pub async fn test_watcher_delete(context: &TestContext) -> Result<()> {
     let (photos, _) = media_dir_contents(context)?;
     let source = photos
