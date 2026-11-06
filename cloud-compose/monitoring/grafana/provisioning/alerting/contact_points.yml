@@ -11,9 +11,8 @@ contactPoints:
           bottoken: $__env{TELEGRAM_BOT_TOKEN}
           chatid: $__env{TELEGRAM_CHAT_ID}
           message: |-
-            <b>Ruurd Photos Alert</b>
-
+            <b>Ruurd Photos</b>
             {{ range .Alerts -}}
-            {{ html .Annotations.description }}
+            {{ if .Labels.alert_content }}{{ html .Labels.alert_content }}{{ else if .Labels.job_id }}Job {{ .Labels.job_id }} ({{ .Labels.job_type }}) failed: {{ html .Labels.error }}{{ else if (index .Annotations "description") }}{{ html (index .Annotations "description") }}{{ else }}{{ html .Labels.alertname }}{{ end }}
             {{ end }}
           parse_mode: HTML

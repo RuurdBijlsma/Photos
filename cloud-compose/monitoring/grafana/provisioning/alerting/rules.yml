@@ -8,49 +8,25 @@ groups:
     rules:
       - uid: photos_alert_macro
         title: Photos backend ALERT! log fired
-        condition: B
+        condition: A
         data:
           - refId: A
-            queryType: range
+            queryType: instant
             relativeTimeRange:
               from: 60
               to: 0
             datasourceUid: loki
             model:
               editorMode: code
-              expr: sum by (alert_content) (count_over_time({job="photos-backend"} |= "ALERT:" | json | label_format alert_content=message [1m]))
-              queryType: range
+              expr: sum by (alert_content) (count_over_time({job="photos-backend"} |= "ALERT:" | json | label_format alert_content=message [1m])) > 0
+              queryType: instant
               refId: A
-          - refId: B
-            datasourceUid: __expr__
-            model:
-              conditions:
-                - evaluator:
-                    params:
-                      - 0
-                    type: gt
-                  operator:
-                    type: and
-                  query:
-                    params:
-                      - A
-                  reducer:
-                    params: []
-                    type: last
-                  type: query
-              datasource:
-                type: __expr__
-                uid: __expr__
-              expression: A
-              reducer: last
-              refId: B
-              type: threshold
         noDataState: OK
         execErrState: Error
         for: 0s
         annotations:
           summary: Photos backend ALERT! log fired
-          description: '{{ $labels.alert_content }}'
+          description: A backend alert log entry was recorded.
         labels:
           severity: critical
 
@@ -99,6 +75,6 @@ groups:
         for: 1m
         annotations:
           summary: Background job failures detected
-          description: 'Job {{ $labels.job_id }} ({{ $labels.job_type }}) failed: {{ $labels.error }}'
+          description: A background job failed within the last 5 minutes.
         labels:
           severity: warning
