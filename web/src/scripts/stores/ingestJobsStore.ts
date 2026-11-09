@@ -28,6 +28,7 @@ export const useIngestJobsStore = defineStore('ingestJobs', () => {
   const isOverviewLoading: Ref<boolean> = ref(false)
   const isRunningLoading: Ref<boolean> = ref(false)
   const isJobsLoading = ref(false)
+  const isCancelling = ref(false)
 
   // Paginated Jobs Table State
   const totalJobsCount = ref(0)
@@ -224,21 +225,18 @@ export const useIngestJobsStore = defineStore('ingestJobs', () => {
   }
 
   async function cancelPendingJobs() {
-    const queued =
-      (overview.value?.metadata.queued ?? 0) +
-      (overview.value?.thumbnails.queued ?? 0) +
-      (overview.value?.analysis.queued ?? 0)
-
     const confirmed = await dialogStore.confirm({
-      title: 'Cancel pending jobs and rescan?',
+      title: 'Cancel queued jobs and rescan?',
       color: 'error',
       icon: MdiAlert,
-      description: `This cancels <strong>${queued.toLocaleString()} queued job${queued === 1 ? '' : 's'}</strong> and rescans your library folder. Running jobs finish normally. Files that are no longer on disk are marked as missing, and items left half-ingested are picked up again by the scan.`,
+      description:
+        'Cancels all queued metadata, thumbnail and analysis jobs, then rescans your folder. Running jobs finish normally and files missing from disk are marked as missing.',
       confirmText: 'Cancel jobs & rescan',
     })
 
     if (!confirmed) return
 
+    isCancelling.value = true
     try {
       const response = await ingestJobsService.cancelPending()
       snackbarStore.success(
@@ -249,6 +247,8 @@ export const useIngestJobsStore = defineStore('ingestJobs', () => {
     } catch (error) {
       snackbarStore.error('Failed to cancel pending jobs', error)
       throw error
+    } finally {
+      isCancelling.value = false
     }
   }
 
@@ -322,6 +322,7 @@ export const useIngestJobsStore = defineStore('ingestJobs', () => {
     userJobs,
     totalJobsCount,
     isJobsLoading,
+    isCancelling,
     page,
     itemsPerPage,
     searchQuery,

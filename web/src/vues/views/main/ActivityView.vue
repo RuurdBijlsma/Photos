@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 import MainLayoutContainer from '@/vues/components/MainLayoutContainer.vue'
 import IngestDashboard from '@/vues/components/activity/IngestDashboard.vue'
 import { useUploadStore } from '@/scripts/stores/uploadStore.ts'
@@ -16,16 +16,11 @@ const queuedCount = computed(() => {
   return overview.metadata.queued + overview.thumbnails.queued + overview.analysis.queued
 })
 
-const isCancelling = ref(false)
-
 async function handleCancelPending() {
-  isCancelling.value = true
   try {
     await ingestStore.cancelPendingJobs()
   } catch {
     // Managed in store
-  } finally {
-    isCancelling.value = false
   }
 }
 
@@ -49,18 +44,22 @@ useEventListener('beforeunload', handleBeforeUnload)
             Monitor your server's metadata extraction, image processing, and analysis pipelines.
           </p>
         </div>
-        <v-btn
-          v-if="queuedCount > 0"
-          class="cancel-pending-button"
-          color="error"
-          variant="tonal"
-          rounded="xl"
-          :loading="isCancelling"
-          :prepend-icon="MdiBackupRestore"
-          @click="handleCancelPending"
-        >
-          Cancel {{ queuedCount.toLocaleString() }} queued jobs
-        </v-btn>
+        <v-tooltip v-if="queuedCount > 0" text="Cancel queued jobs and rescan" location="bottom">
+          <template #activator="{ props }">
+            <v-btn
+              v-bind="props"
+              :prepend-icon="MdiBackupRestore"
+              aria-label="Cancel queued jobs and rescan"
+              color="error"
+              variant="plain"
+              rounded="xl"
+              :loading="ingestStore.isCancelling"
+              @click="handleCancelPending"
+            >
+              Cancel queued jobs
+            </v-btn>
+          </template>
+        </v-tooltip>
       </header>
 
       <ingest-dashboard />
