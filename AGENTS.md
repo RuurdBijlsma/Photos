@@ -337,6 +337,14 @@ npm run lint
   `refactor:`, `docs:`, `perf:`) - follow that. Keep committed artifacts in sync (`.sqlx/`, generated proto, perf
   result) in the same PR as the change that caused them.
 
+## Frontend
+
+When adding an alert, confirm, prompt style UI feature, use the `dialogStore`. For snackbars, use the `snackbarStore`.
+If something requires a refresh of whatever data is visible on screen, use the `refreshStore`, for example, trashing a
+media item. This requires whatever UI the user is viewing to update incase the media item is there. So you do
+refreshStore.counter++. When implementing a browseable UI element that would benefit from the refresh function, make
+sure to use the `useRefreshFunction.ts`.
+
 ## Gotchas
 
 - **Tokio runtime responsiveness**: `photos_app` runs the API, worker scaler, watcher, and worker tasks together.
