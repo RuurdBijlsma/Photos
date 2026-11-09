@@ -8532,6 +8532,7 @@ dependencies = [
  "colored",
  "common_services",
  "common_types",
+ "exiftool",
  "futures-util",
  "material-color-utils",
  "media_analyzer",
