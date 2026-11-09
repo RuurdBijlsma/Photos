@@ -689,6 +689,112 @@ pub async fn test_clean_thumbnail_orphans(context: &TestContext) -> Result<()> {
 }
 
 #[allow(clippy::too_many_lines)]
+pub async fn test_cancel_pending_ingest_jobs(context: &TestContext) -> Result<()> {
+    let user_id: i32 = sqlx::query_scalar!(
+        "SELECT id FROM app_user WHERE media_folder IS NOT NULL ORDER BY id LIMIT 1"
+    )
+    .fetch_one(&context.pool)
+    .await?;
+
+    let queued_metadata = insert_job(
+        &context.pool,
+        user_id,
+        "cancel-pending-test/a.jpg",
+        JobType::IngestMetadata,
+        "queued",
+        0,
+        3,
+    )
+    .await?;
+    let queued_thumbnails = insert_job(
+        &context.pool,
+        user_id,
+        "cancel-pending-test/b.jpg",
+        JobType::IngestThumbnails,
+        "queued",
+        0,
+        3,
+    )
+    .await?;
+    let running_analysis = insert_job(
+        &context.pool,
+        user_id,
+        "cancel-pending-test/c.jpg",
+        JobType::IngestAnalysis,
+        "running",
+        0,
+        3,
+    )
+    .await?;
+    let queued_remove = insert_job(
+        &context.pool,
+        user_id,
+        "cancel-pending-test/d.jpg",
+        JobType::Remove,
+        "queued",
+        0,
+        3,
+    )
+    .await?;
+
+    let response = common_services::api::jobs::user_level::cancel_pending_ingest_jobs(
+        &context.pool,
+        &context.settings.ingest,
+        user_id,
+    )
+    .await?;
+    assert!(
+        response.cancelled >= 2,
+        "expected at least the two queued ingest jobs to be cancelled"
+    );
+
+    for (id, expected) in [
+        (queued_metadata, "cancelled"),
+        (queued_thumbnails, "cancelled"),
+        (running_analysis, "running"),
+        (queued_remove, "queued"),
+    ] {
+        let status: String = sqlx::query_scalar!(
+            r#"SELECT status::text AS "status!" FROM jobs WHERE id = $1"#,
+            id
+        )
+        .fetch_one(&context.pool)
+        .await?;
+        assert_eq!(status, expected, "unexpected status for job {id}");
+    }
+
+    let active_scans: i64 = sqlx::query_scalar!(
+        r#"
+        SELECT COUNT(*) AS "count!" FROM jobs
+        WHERE job_type = 'scan'::job_type
+          AND user_id = $1
+          AND status IN ('queued'::job_status, 'running'::job_status)
+        "#,
+        user_id
+    )
+    .fetch_one(&context.pool)
+    .await?;
+    assert!(active_scans >= 1, "the reset must enqueue a scan");
+
+    // Stop the scan again so it cannot interleave with the rest of the suite.
+    sqlx::query!(
+        r#"
+        UPDATE jobs SET status = 'cancelled'::job_status
+        WHERE job_type = 'scan'::job_type
+          AND user_id = $1
+          AND status = 'queued'::job_status
+        "#,
+        user_id
+    )
+    .execute(&context.pool)
+    .await?;
+    sqlx::query!("DELETE FROM jobs WHERE relative_path LIKE 'cancel-pending-test/%'")
+        .execute(&context.pool)
+        .await?;
+    Ok(())
+}
+
+#[allow(clippy::too_many_lines)]
 pub async fn test_prune_missing_ingest_jobs(context: &TestContext) -> Result<()> {
     let source = sqlx::query!("SELECT id, user_id FROM media_item WHERE deleted = false LIMIT 1")
         .fetch_one(&context.pool)

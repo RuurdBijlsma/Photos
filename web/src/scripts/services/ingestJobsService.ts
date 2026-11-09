@@ -1,6 +1,9 @@
 import type { AxiosResponse } from 'axios'
 import apiClient from './api.ts'
-import type { IngestOverviewResponse } from '@/scripts/types/api/ingestJobs.ts'
+import type {
+  CancelPendingJobsResponse,
+  IngestOverviewResponse,
+} from '@/scripts/types/api/ingestJobs.ts'
 import type { JobInfo, PaginatedJobsResponse } from '@/scripts/types/api/admin.ts'
 
 const ingestJobsService = {
@@ -35,6 +38,13 @@ const ingestJobsService = {
    */
   scan(): Promise<AxiosResponse<void>> {
     return apiClient.post<void>('/jobs/ingest/scan')
+  },
+
+  /**
+   * Cancel the user's queued ingest jobs and rescan the library folder.
+   */
+  cancelPending(): Promise<AxiosResponse<CancelPendingJobsResponse>> {
+    return apiClient.post<CancelPendingJobsResponse>('/jobs/ingest/cancel-pending')
   },
 
   /**

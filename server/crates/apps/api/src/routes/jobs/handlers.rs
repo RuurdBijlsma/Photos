@@ -5,15 +5,15 @@ use axum::{Extension, Json};
 use axum_extra::extract::Query;
 use common_services::api::app_error::AppError;
 use common_services::api::jobs::interfaces::{
-    BulkRetryResponse, IngestOverviewResponse, JobInfo, JobsQuery, PaginatedJobsResponse,
-    RetryJobPayload, UserJobsQuery,
+    BulkRetryResponse, CancelPendingJobsResponse, IngestOverviewResponse, JobInfo, JobsQuery,
+    PaginatedJobsResponse, RetryJobPayload, UserJobsQuery,
 };
 use common_services::api::jobs::service::{
     cancel_job, get_job_overview, retry_cancelled_jobs, retry_job,
 };
 use common_services::api::jobs::user_level::{
-    get_failed_ingest_jobs, get_running_ingest_jobs, get_user_ingest_jobs,
-    get_user_ingest_overview, retry_user_job,
+    cancel_pending_ingest_jobs, get_failed_ingest_jobs, get_running_ingest_jobs,
+    get_user_ingest_jobs, get_user_ingest_overview, retry_user_job,
 };
 use common_services::database::jobs::JobType;
 use common_services::job_queue::enqueue_job;
@@ -96,6 +96,16 @@ pub async fn scan_user_media_handler(
         .call()
         .await?;
     Ok(Json(()))
+}
+
+#[instrument(skip(context, user), err(Debug))]
+pub async fn cancel_pending_ingest_jobs_handler(
+    State(context): State<ApiContext>,
+    Extension(user): Extension<ApiUser>,
+) -> Result<Json<CancelPendingJobsResponse>, AppError> {
+    let response =
+        cancel_pending_ingest_jobs(&context.pool, &context.settings.ingest, user.id).await?;
+    Ok(Json(response))
 }
 
 #[instrument(skip(pool, user), err(Debug))]

@@ -219,6 +219,7 @@ cargo clippy --all-features
 cargo test -p test_integration -- --nocapture
 
 # Local full run (release profile + dynamically loaded ONNX Runtime; CI runs no tests at all)
+# Takes about 1 minute to complete (runtime). ML models are cached so no re-download required.
 just test    # = cargo test --profile release --features load-dynamic -- --nocapture
 
 # Benchmarks (need a populated local DB; from server/)

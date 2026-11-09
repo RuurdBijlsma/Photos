@@ -3,7 +3,10 @@ import { defineStore } from 'pinia'
 import type { IngestOverviewResponse } from '@/scripts/types/api/ingestJobs.ts'
 import type { JobInfo } from '@/scripts/types/api/admin.ts'
 import { useSnackbarsStore } from '@/scripts/stores/snackbarStore.ts'
+import { useDialogStore } from '@/scripts/stores/dialogStore.ts'
+import { useRefreshStore } from '@/scripts/stores/refreshStore.ts'
 import ingestJobsService from '@/scripts/services/ingestJobsService.ts'
+import MdiAlert from '~icons/mdi/alert'
 
 interface DisplayJob extends JobInfo {
   _displayFinishedTime?: number
@@ -11,6 +14,8 @@ interface DisplayJob extends JobInfo {
 
 export const useIngestJobsStore = defineStore('ingestJobs', () => {
   const snackbarStore = useSnackbarsStore()
+  const dialogStore = useDialogStore()
+  const refreshStore = useRefreshStore()
 
   // --- CONFIGURATION ---
   const MAX_DISPLAY_ITEMS = 100
@@ -218,6 +223,35 @@ export const useIngestJobsStore = defineStore('ingestJobs', () => {
     }
   }
 
+  async function cancelPendingJobs() {
+    const queued =
+      (overview.value?.metadata.queued ?? 0) +
+      (overview.value?.thumbnails.queued ?? 0) +
+      (overview.value?.analysis.queued ?? 0)
+
+    const confirmed = await dialogStore.confirm({
+      title: 'Cancel pending jobs and rescan?',
+      color: 'error',
+      icon: MdiAlert,
+      description: `This cancels <strong>${queued.toLocaleString()} queued job${queued === 1 ? '' : 's'}</strong> and rescans your library folder. Running jobs finish normally. Files that are no longer on disk are marked as missing, and items left half-ingested are picked up again by the scan.`,
+      confirmText: 'Cancel jobs & rescan',
+    })
+
+    if (!confirmed) return
+
+    try {
+      const response = await ingestJobsService.cancelPending()
+      snackbarStore.success(
+        `Cancelled ${response.data.cancelled.toLocaleString()} job${response.data.cancelled === 1 ? '' : 's'} and started a library scan`,
+      )
+      refreshStore.counter++
+      await fetchOverview()
+    } catch (error) {
+      snackbarStore.error('Failed to cancel pending jobs', error)
+      throw error
+    }
+  }
+
   async function retryJob(jobId: number) {
     try {
       await ingestJobsService.retry(jobId)
@@ -294,6 +328,7 @@ export const useIngestJobsStore = defineStore('ingestJobs', () => {
     selectedTab,
     fetchUserJobs,
     triggerScan,
+    cancelPendingJobs,
     retryJob,
     pollTick,
     startPolling,
