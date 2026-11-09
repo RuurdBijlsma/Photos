@@ -48,9 +48,12 @@ const uploadToGoText = computed(() => {
 
 function computeIngestProgress(category: 'metadata' | 'thumbnails' | 'analysis') {
   const counts = ingestStore.overview?.[category]
-  if (!counts || counts.total === 0) return 100
-  const done = counts.total - counts.queued - counts.running
-  return Math.round((done / counts.total) * 100)
+  if (!counts) return 100
+  // Cancelled jobs are abandoned, not completed: counting them as progress made a
+  // re-enqueued pipeline sit at 50% (cancelled rows + fresh queued rows, doubled total).
+  const settled = counts.done + counts.failed
+  const active = settled + counts.queued + counts.running
+  return active === 0 ? 100 : Math.round((settled / active) * 100)
 }
 
 function computeIngestRemaining(category: 'metadata' | 'thumbnails' | 'analysis') {

@@ -1,6 +1,5 @@
-// src/scripts/composables/useResponsive.ts
 import { useDisplay } from 'vuetify/framework'
-import { computed, watch } from 'vue'
+import { computed } from 'vue'
 
 /**
  * 'sm' threshold ends at 959.99px (under 'md').
@@ -25,22 +24,6 @@ export function useResponsive() {
   // True on devices where touch is the primary input (phones, tablets)
   // False on laptops with touchscreens (primary input is mouse/trackpad)
   const useTouchControls = computed(() => hasTouchSupport && isPrimaryInputCoarse)
-
-  watch(
-    isMobile,
-    () => {
-      console.log('IS MOBILE', isMobile.value)
-    },
-    { immediate: true },
-  )
-
-  watch(
-    useTouchControls,
-    () => {
-      console.log('USE TOUCH', useTouchControls.value)
-    },
-    { immediate: true },
-  )
 
   return {
     isMobile,
