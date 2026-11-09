@@ -1,5 +1,5 @@
 use crate::api::app_error::AppError;
-use crate::api::photos::interfaces::{UpdateMediaItemRequest, UpdateMediaItemResponse};
+use crate::api::photos::interfaces::{GpsEdit, UpdateMediaItemRequest, UpdateMediaItemResponse};
 use crate::database::app_user::UserRole;
 use crate::database::cached_store::cached_store;
 use crate::database::jobs::JobType;
@@ -489,6 +489,107 @@ pub async fn reprocess_media_item(
     Ok(())
 }
 
+async fn apply_orientation_update(
+    pool: &PgPool,
+    settings: &IngestSettings,
+    media_item_id: &str,
+    user_id: i32,
+    new_orientation: i32,
+) -> Result<String, AppError> {
+    let relative_path = MediaItemStore::find_relative_path_by_id(pool, media_item_id)
+        .await?
+        .ok_or_else(|| AppError::NotFound(media_item_id.to_owned()))?;
+
+    let file_path = settings.media_root.join(&relative_path);
+    if !file_path.exists() {
+        return Err(AppError::BadRequest(
+            "Cannot modify orientation because the media file is missing from disk.".to_string(),
+        ));
+    }
+
+    write_exif_orientation(&file_path, new_orientation)?;
+
+    reprocess_media_item(
+        pool,
+        settings,
+        media_item_id,
+        user_id,
+        &relative_path,
+        ReprocessScope::Full,
+    )
+    .await?;
+
+    let thumb_dir = settings.thumbnails_root.join(media_item_id);
+    if thumb_dir.exists() {
+        let _ = tokio::fs::remove_dir_all(&thumb_dir).await;
+    }
+
+    let new_id = nice_id(constants().database.media_item_id_length);
+    let mut tx = pool.begin().await?;
+    MediaItemStore::change_media_item_id(&mut tx, media_item_id, &new_id).await?;
+    tx.commit().await?;
+
+    Ok(new_id)
+}
+
+fn apply_gps_write(file_path: &Path, gps: &UpdateField<GpsEdit>) -> Result<(), AppError> {
+    if let UpdateField::Value(gps_edit) = gps {
+        if !(-90.0..=90.0).contains(&gps_edit.latitude)
+            || !(-180.0..=180.0).contains(&gps_edit.longitude)
+        {
+            return Err(AppError::BadRequest(format!(
+                "Invalid coordinates: {}, {}",
+                gps_edit.latitude, gps_edit.longitude
+            )));
+        }
+        write_media_gps(file_path, gps_edit.latitude, gps_edit.longitude)?;
+    } else if matches!(gps, UpdateField::SetNull) {
+        remove_media_gps(file_path)?;
+    }
+    Ok(())
+}
+
+async fn apply_datetime_write(
+    pool: &PgPool,
+    media_item_id: &str,
+    file_path: &Path,
+    taken_at_local: Option<&str>,
+    timezone_offset_seconds: &UpdateField<i32>,
+) -> Result<(), AppError> {
+    let current = sqlx::query!(
+        "SELECT taken_at_local, timezone_offset_seconds, is_video FROM media_item WHERE id = $1",
+        media_item_id
+    )
+    .fetch_one(pool)
+    .await?;
+
+    let dt_to_format = if let Some(dt_str) = taken_at_local {
+        NaiveDateTime::parse_from_str(dt_str, "%Y-%m-%dT%H:%M:%S")
+            .map_err(|e| AppError::BadRequest(format!("Invalid date format: {e}")))?
+    } else {
+        current.taken_at_local
+    };
+
+    let formatted_dt = dt_to_format.format("%Y:%m:%d %H:%M:%S").to_string();
+
+    let target_offset = match timezone_offset_seconds {
+        UpdateField::Value(v) => Some(*v),
+        UpdateField::SetNull => None,
+        UpdateField::Ignore => current.timezone_offset_seconds,
+    };
+
+    let target_file_path = file_path.to_path_buf();
+    let is_video = current.is_video;
+    task::spawn_blocking(move || {
+        write_media_datetime(&target_file_path, &formatted_dt, target_offset, is_video)
+    })
+    .await
+    .map_err(|e| AppError::Internal(eyre!("Failed to spawn blocking task: {e}")))?
+    .map_err(|e| AppError::Internal(eyre!("Failed to write datetime tags: {e}")))?;
+
+    Ok(())
+}
+
 pub async fn update_media_item(
     pool: &PgPool,
     settings: &IngestSettings,
@@ -527,41 +628,9 @@ pub async fn update_media_item(
 
     // 1. Process EXIF Orientation update if provided
     if let Some(new_orientation) = orientation {
-        let relative_path = MediaItemStore::find_relative_path_by_id(pool, media_item_id)
-            .await?
-            .ok_or_else(|| AppError::NotFound(media_item_id.to_owned()))?;
-
-        let file_path = settings.media_root.join(&relative_path);
-        if !file_path.exists() {
-            return Err(AppError::BadRequest(
-                "Cannot modify orientation because the media file is missing from disk."
-                    .to_string(),
-            ));
-        }
-
-        write_exif_orientation(&file_path, *new_orientation)?;
-
-        reprocess_media_item(
-            pool,
-            settings,
-            media_item_id,
-            user_id,
-            &relative_path,
-            ReprocessScope::Full,
-        )
-        .await?;
-
-        let thumb_dir = settings.thumbnails_root.join(media_item_id);
-        if thumb_dir.exists() {
-            let _ = tokio::fs::remove_dir_all(&thumb_dir).await;
-        }
-
-        let new_id = nice_id(constants().database.media_item_id_length);
-        let mut tx = pool.begin().await?;
-        MediaItemStore::change_media_item_id(&mut tx, media_item_id, &new_id).await?;
-        tx.commit().await?;
-
-        current_id = new_id;
+        current_id =
+            apply_orientation_update(pool, settings, &current_id, user_id, *new_orientation)
+                .await?;
     }
 
     // 2. Process GPS and/or Datetime updates (writes directly to file EXIF)
@@ -581,53 +650,19 @@ pub async fn update_media_item(
             ));
         }
 
-        // Write GPS tags
-        if let UpdateField::Value(gps_edit) = gps {
-            if !(-90.0..=90.0).contains(&gps_edit.latitude)
-                || !(-180.0..=180.0).contains(&gps_edit.longitude)
-            {
-                return Err(AppError::BadRequest(format!(
-                    "Invalid coordinates: {}, {}",
-                    gps_edit.latitude, gps_edit.longitude
-                )));
-            }
-            write_media_gps(&file_path, gps_edit.latitude, gps_edit.longitude)?;
-        } else if matches!(gps, UpdateField::SetNull) {
-            remove_media_gps(&file_path)?;
+        if is_editing_gps {
+            apply_gps_write(&file_path, gps)?;
         }
 
-        // Write Datetime tags
         if is_editing_datetime {
-            let current = sqlx::query!(
-                "SELECT taken_at_local, timezone_offset_seconds, is_video FROM media_item WHERE id = $1",
-                &current_id
+            apply_datetime_write(
+                pool,
+                &current_id,
+                &file_path,
+                taken_at_local.as_deref(),
+                timezone_offset_seconds,
             )
-            .fetch_one(pool)
             .await?;
-
-            let dt_to_format = if let Some(dt_str) = taken_at_local {
-                NaiveDateTime::parse_from_str(dt_str, "%Y-%m-%dT%H:%M:%S")
-                    .map_err(|e| AppError::BadRequest(format!("Invalid date format: {e}")))?
-            } else {
-                current.taken_at_local
-            };
-
-            let formatted_dt = dt_to_format.format("%Y:%m:%d %H:%M:%S").to_string();
-
-            let target_offset = match timezone_offset_seconds {
-                UpdateField::Value(v) => Some(*v),
-                UpdateField::SetNull => None,
-                UpdateField::Ignore => current.timezone_offset_seconds,
-            };
-
-            let target_file_path = file_path.clone();
-            let is_video = current.is_video;
-            task::spawn_blocking(move || {
-                write_media_datetime(&target_file_path, &formatted_dt, target_offset, is_video)
-            })
-            .await
-            .map_err(|e| AppError::Internal(eyre!("Failed to spawn blocking task: {e}")))?
-            .map_err(|e| AppError::Internal(eyre!("Failed to write datetime tags: {e}")))?;
         }
 
         // Re-analyze metadata once without wiping thumbnails or running visual neural analysis

@@ -313,7 +313,10 @@ pub async fn test_update_datetime_edits_exif(context: &TestContext) -> Result<()
         return Ok(());
     };
 
-    let update_url = format!("{}/api/photos/{}", context.settings.api.public_url, item.id);
+    let update_url = format!(
+        "{}/api/photos/{}/item",
+        context.settings.api.public_url, item.id
+    );
     let target_datetime = "2024-06-15T10:30:00";
     let payload = serde_json::json!({
         "takenAtLocal": target_datetime,
