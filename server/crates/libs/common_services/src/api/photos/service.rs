@@ -1,18 +1,20 @@
 use crate::api::app_error::AppError;
-use crate::api::photos::interfaces::{GpsEdit, UpdateMediaItemRequest, UpdateMediaItemResponse};
+use crate::api::photos::interfaces::{UpdateMediaItemRequest, UpdateMediaItemResponse};
 use crate::database::app_user::UserRole;
 use crate::database::cached_store::cached_store;
 use crate::database::jobs::JobType;
 use crate::database::media_item::media_item::CreateFullMediaItem;
 use crate::database::media_item_store::MediaItemStore;
 pub use crate::database::media_item_store::ReprocessScope;
-use crate::database::{UpdateField, UpdateMediaItemPayload, with_fallback_timezone};
+use crate::database::{UpdateField, UpdateMediaItemPayload};
 use crate::job_queue::enqueue_job;
-use crate::utils::{nice_id, remove_media_gps, write_exif_orientation, write_media_gps};
+use crate::utils::{
+    nice_id, remove_media_gps, write_exif_orientation, write_media_datetime, write_media_gps,
+};
 use app_state::{IngestSettings, MakeRelativePath, constants};
 use axum::body::Body;
 use axum_extra::headers::Range;
-use chrono::{DateTime, FixedOffset, NaiveDateTime, TimeZone, Utc};
+use chrono::{FixedOffset, NaiveDateTime};
 use color_eyre::Report;
 use color_eyre::eyre::eyre;
 use exif::{In, Tag, Value};
@@ -20,7 +22,7 @@ use fast_image_resize as fr;
 use http::{Response, StatusCode, header};
 use image::ImageDecoder;
 use image::ImageReader;
-use sqlx::{Executor, PgPool, Postgres};
+use sqlx::PgPool;
 use std::io::Cursor;
 use std::ops::Bound;
 use std::path::Path;
@@ -436,49 +438,6 @@ pub async fn stream_video_file(
         .map_err(|e| eyre!("Can't create video stream response {e}"))?)
 }
 
-async fn compute_updated_timestamps(
-    executor: impl Executor<'_, Database = Postgres>,
-    media_item_id: &str,
-    new_local: Option<NaiveDateTime>,
-    new_offset: &UpdateField<i32>,
-) -> Result<(UpdateField<DateTime<Utc>>, Option<DateTime<Utc>>), AppError> {
-    let is_updating_local = new_local.is_some();
-    let is_updating_offset = !matches!(new_offset, UpdateField::Ignore);
-    // If neither is changing, we don't need to update these derived fields
-    if !is_updating_local && !is_updating_offset {
-        return Ok((UpdateField::Ignore, None));
-    }
-
-    let current = sqlx::query!(
-        "SELECT taken_at_local, timezone_offset_seconds FROM media_item WHERE id = $1",
-        media_item_id
-    )
-    .fetch_one(executor)
-    .await?;
-
-    // Determine the values for this calculation
-    let local_dt = new_local.unwrap_or(current.taken_at_local);
-    let offset_secs = match new_offset {
-        UpdateField::Value(v) => Some(*v),
-        UpdateField::SetNull => None,
-        UpdateField::Ignore => current.timezone_offset_seconds,
-    };
-
-    let taken_at_utc = offset_secs
-        .and_then(FixedOffset::east_opt)
-        .and_then(|offset| {
-            offset
-                .from_local_datetime(&local_dt)
-                .earliest()
-                .map(|dt| dt.with_timezone(&Utc))
-        });
-
-    let sort_timestamp = Some(with_fallback_timezone(taken_at_utc, &local_dt));
-    let utc_field = taken_at_utc.map_or(UpdateField::SetNull, UpdateField::Value);
-
-    Ok((utc_field, sort_timestamp))
-}
-
 pub async fn reprocess_media_item(
     pool: &PgPool,
     settings: &IngestSettings,
@@ -528,53 +487,6 @@ pub async fn reprocess_media_item(
     }
 
     Ok(())
-}
-
-async fn apply_gps_edit(
-    pool: &PgPool,
-    settings: &IngestSettings,
-    media_item_id: &str,
-    user_id: i32,
-    gps: &UpdateField<GpsEdit>,
-) -> Result<(), AppError> {
-    if gps.is_ignore() {
-        return Ok(());
-    }
-    if let UpdateField::Value(gps) = gps
-        && (!(-90.0..=90.0).contains(&gps.latitude) || !(-180.0..=180.0).contains(&gps.longitude))
-    {
-        return Err(AppError::BadRequest(format!(
-            "Invalid coordinates: {}, {}",
-            gps.latitude, gps.longitude
-        )));
-    }
-
-    let relative_path = MediaItemStore::find_relative_path_by_id(pool, media_item_id)
-        .await?
-        .ok_or_else(|| AppError::NotFound(media_item_id.to_owned()))?;
-
-    let file_path = settings.media_root.join(&relative_path);
-    if !file_path.exists() {
-        return Err(AppError::BadRequest(
-            "Cannot modify location because the media file is missing from disk.".to_string(),
-        ));
-    }
-
-    match gps {
-        UpdateField::Value(gps) => write_media_gps(&file_path, gps.latitude, gps.longitude)?,
-        _ => remove_media_gps(&file_path)?,
-    }
-
-    // Re-analyze metadata only without wiping thumbnails or running visual neural analysis
-    reprocess_media_item(
-        pool,
-        settings,
-        media_item_id,
-        user_id,
-        &relative_path,
-        ReprocessScope::MetadataOnly,
-    )
-    .await
 }
 
 pub async fn update_media_item(
@@ -652,42 +564,100 @@ pub async fn update_media_item(
         current_id = new_id;
     }
 
-    // 2. Process GPS update if provided (metadata-only)
-    if gps.not_ignore() {
-        apply_gps_edit(pool, settings, &current_id, user_id, gps).await?;
-    }
+    // 2. Process GPS and/or Datetime updates (writes directly to file EXIF)
+    let is_editing_gps = gps.not_ignore();
+    let is_editing_datetime =
+        taken_at_local.is_some() || !matches!(timezone_offset_seconds, UpdateField::Ignore);
 
-    // 3. Process caption / timestamp / panorama updates if provided
-    let has_metadata_updates = taken_at_local.is_some()
-        || !matches!(user_caption, UpdateField::Ignore)
-        || use_panorama_viewer.is_some()
-        || !matches!(timezone_offset_seconds, UpdateField::Ignore);
+    if is_editing_gps || is_editing_datetime {
+        let relative_path = MediaItemStore::find_relative_path_by_id(pool, &current_id)
+            .await?
+            .ok_or_else(|| AppError::NotFound(current_id.clone()))?;
 
-    if has_metadata_updates {
-        let mut tx = pool.begin().await?;
+        let file_path = settings.media_root.join(&relative_path);
+        if !file_path.exists() {
+            return Err(AppError::BadRequest(
+                "Cannot modify media item because the media file is missing from disk.".to_string(),
+            ));
+        }
 
-        let taken_at_local_input = taken_at_local
-            .as_ref()
-            .map(|m| NaiveDateTime::parse_from_str(m, "%Y-%m-%dT%H:%M:%S"))
-            .transpose()?;
+        // Write GPS tags
+        if let UpdateField::Value(gps_edit) = gps {
+            if !(-90.0..=90.0).contains(&gps_edit.latitude)
+                || !(-180.0..=180.0).contains(&gps_edit.longitude)
+            {
+                return Err(AppError::BadRequest(format!(
+                    "Invalid coordinates: {}, {}",
+                    gps_edit.latitude, gps_edit.longitude
+                )));
+            }
+            write_media_gps(&file_path, gps_edit.latitude, gps_edit.longitude)?;
+        } else if matches!(gps, UpdateField::SetNull) {
+            remove_media_gps(&file_path)?;
+        }
 
-        let (taken_at_utc, sort_timestamp) = compute_updated_timestamps(
-            &mut *tx,
+        // Write Datetime tags
+        if is_editing_datetime {
+            let current = sqlx::query!(
+                "SELECT taken_at_local, timezone_offset_seconds, is_video FROM media_item WHERE id = $1",
+                &current_id
+            )
+            .fetch_one(pool)
+            .await?;
+
+            let dt_to_format = if let Some(dt_str) = taken_at_local {
+                NaiveDateTime::parse_from_str(dt_str, "%Y-%m-%dT%H:%M:%S")
+                    .map_err(|e| AppError::BadRequest(format!("Invalid date format: {e}")))?
+            } else {
+                current.taken_at_local
+            };
+
+            let formatted_dt = dt_to_format.format("%Y:%m:%d %H:%M:%S").to_string();
+
+            let target_offset = match timezone_offset_seconds {
+                UpdateField::Value(v) => Some(*v),
+                UpdateField::SetNull => None,
+                UpdateField::Ignore => current.timezone_offset_seconds,
+            };
+
+            let target_file_path = file_path.clone();
+            let is_video = current.is_video;
+            task::spawn_blocking(move || {
+                write_media_datetime(&target_file_path, &formatted_dt, target_offset, is_video)
+            })
+            .await
+            .map_err(|e| AppError::Internal(eyre!("Failed to spawn blocking task: {e}")))?
+            .map_err(|e| AppError::Internal(eyre!("Failed to write datetime tags: {e}")))?;
+        }
+
+        // Re-analyze metadata once without wiping thumbnails or running visual neural analysis
+        reprocess_media_item(
+            pool,
+            settings,
             &current_id,
-            taken_at_local_input,
-            timezone_offset_seconds,
+            user_id,
+            &relative_path,
+            ReprocessScope::MetadataOnly,
         )
         .await?;
+    }
+
+    // 3. Process caption / panorama updates if provided
+    let has_other_updates =
+        !matches!(user_caption, UpdateField::Ignore) || use_panorama_viewer.is_some();
+
+    if has_other_updates {
+        let mut tx = pool.begin().await?;
 
         MediaItemStore::update(
             &mut *tx,
             &current_id,
             UpdateMediaItemPayload {
                 user_caption: user_caption.clone(),
-                taken_at_local: taken_at_local_input,
-                taken_at_utc,
-                sort_timestamp,
-                timezone_offset_seconds: timezone_offset_seconds.clone(),
+                taken_at_local: None,
+                taken_at_utc: UpdateField::Ignore,
+                sort_timestamp: None,
+                timezone_offset_seconds: UpdateField::Ignore,
                 use_panorama_viewer: *use_panorama_viewer,
             },
         )

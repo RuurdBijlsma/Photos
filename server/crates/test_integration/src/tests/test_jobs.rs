@@ -21,14 +21,14 @@ pub(crate) async fn insert_media_item_copy(
         INSERT INTO media_item (
             id, user_id, remote_user_id, hash, relative_path, filename,
             width, height, is_video, duration_ms, orientation,
-            taken_at_local, og_taken_at_local, taken_at_utc, sort_timestamp,
-            timezone_name, timezone_offset_seconds, og_timezone_offset_seconds,
+            taken_at_local, taken_at_utc, sort_timestamp,
+            timezone_name, timezone_offset_seconds,
             use_panorama_viewer, deleted, missing_since
         )
         SELECT $2, user_id, remote_user_id, hash, $3, regexp_replace($3, '^.*/', ''),
                width, height, is_video, duration_ms, orientation,
-               taken_at_local, og_taken_at_local, taken_at_utc, sort_timestamp,
-               timezone_name, timezone_offset_seconds, og_timezone_offset_seconds,
+               taken_at_local, taken_at_utc, sort_timestamp,
+               timezone_name, timezone_offset_seconds,
                use_panorama_viewer, false, NULL
         FROM media_item WHERE id = $1
         "#,

@@ -633,8 +633,8 @@ pub async fn test_takeout_import_flow(context: &TestContext) -> Result<()> {
 
     let broken_time = sqlx::query!(
         r#"
-        SELECT mi.taken_at_utc, mi.og_taken_at_local,
-               mi.timezone_name, mi.timezone_offset_seconds, mi.og_timezone_offset_seconds,
+        SELECT mi.taken_at_utc,
+               mi.timezone_name, mi.timezone_offset_seconds,
                t.source_details, t.source_confidence
         FROM media_item mi
         JOIN "time" t ON t.media_item_id = mi.id
@@ -649,10 +649,8 @@ pub async fn test_takeout_import_flow(context: &TestContext) -> Result<()> {
         broken_time.taken_at_utc,
         Some(DateTime::<Utc>::from_timestamp(BROKEN_SIDECAR_TIMESTAMP, 0).unwrap())
     );
-    assert_eq!(broken_time.og_taken_at_local, broken_taken_at_local);
     assert_eq!(broken_time.timezone_name.as_deref(), Some("UTC"));
     assert_eq!(broken_time.timezone_offset_seconds, Some(0));
-    assert_eq!(broken_time.og_timezone_offset_seconds, Some(0));
     assert_eq!(broken_time.source_details, "Google Takeout sidecar");
     assert_eq!(broken_time.source_confidence, "Medium");
 

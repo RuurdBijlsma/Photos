@@ -11,12 +11,10 @@ use tracing::warn;
 pub fn apply_to_media_item(media_item: &mut CreateFullMediaItem, taken_at: DateTime<Utc>) {
     media_item.taken_at_local = taken_at.naive_utc();
     media_item.taken_at_utc = Some(taken_at);
-    media_item.og_taken_at_local = media_item.taken_at_local;
 
     // TODO: sidecar timestamps are UTC; derive the real photo timezone and local time.
     media_item.timezone_name = Some("UTC".to_string());
     media_item.timezone_offset_seconds = Some(0);
-    media_item.og_timezone_offset_seconds = Some(0);
     media_item.time.timezone_source = Some("Google Takeout sidecar (UTC)".to_string());
     media_item.time.source_details = "Google Takeout sidecar".to_string();
     media_item.time.source_confidence = "Medium".to_string();
@@ -39,7 +37,7 @@ pub async fn resolve_override(
     let target_path = file_path.to_path_buf();
     let is_video = media_info.features.is_video;
     let write_result = tokio::task::spawn_blocking(move || {
-        write_media_datetime(&target_path, &formatted, is_video)
+        write_media_datetime(&target_path, &formatted, Some(0), is_video)
     })
     .await?;
 

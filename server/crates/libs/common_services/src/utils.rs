@@ -33,11 +33,20 @@ pub fn write_exif_orientation(file_path: &Path, orientation: i32) -> color_eyre:
     Ok(())
 }
 
+fn format_tz_offset(offset_seconds: i32) -> String {
+    let sign = if offset_seconds >= 0 { '+' } else { '-' };
+    let abs_seconds = offset_seconds.abs();
+    let hours = abs_seconds / 3600;
+    let minutes = (abs_seconds % 3600) / 60;
+    format!("{sign}{hours:02}:{minutes:02}")
+}
+
 /// Write/update datetime tags on a media file (photo or video) using exiftool.
 /// `formatted_datetime` is expected in "YYYY:MM:DD HH:MM:SS" format.
 pub fn write_media_datetime(
     file_path: &Path,
     formatted_datetime: &str,
+    timezone_offset_seconds: Option<i32>,
     is_video: bool,
 ) -> color_eyre::Result<()> {
     let et = exiftool::ExifTool::new()?;
@@ -45,22 +54,49 @@ pub fn write_media_datetime(
         et.write_tag(
             file_path,
             "QuickTime:CreateDate",
-            &formatted_datetime,
+            formatted_datetime,
             &["-P", "-overwrite_original"],
         )?;
         et.write_tag(
             file_path,
             "QuickTime:ModifyDate",
-            &formatted_datetime,
+            formatted_datetime,
             &["-P", "-overwrite_original"],
         )?;
+        if let Some(offset_secs) = timezone_offset_seconds {
+            let offset_str = format_tz_offset(offset_secs);
+            let dt_with_offset = format!("{formatted_datetime}{offset_str}");
+            let _ = et.write_tag(
+                file_path,
+                "QuickTime:CreationDate",
+                &dt_with_offset,
+                &["-P", "-overwrite_original"],
+            );
+            let _ = et.write_tag(
+                file_path,
+                "Keys:CreationDate",
+                &dt_with_offset,
+                &["-P", "-overwrite_original"],
+            );
+        }
     } else {
         et.write_tag(
             file_path,
             "AllDates",
-            &formatted_datetime,
+            formatted_datetime,
             &["-P", "-overwrite_original"],
         )?;
+        if let Some(offset_secs) = timezone_offset_seconds {
+            let offset_str = format_tz_offset(offset_secs);
+            for tag in ["OffsetTimeOriginal", "OffsetTime", "OffsetTimeDigitized"] {
+                et.write_tag(
+                    file_path,
+                    &format!("all:{tag}"),
+                    &offset_str,
+                    &["-P", "-overwrite_original"],
+                )?;
+            }
+        }
     }
     Ok(())
 }

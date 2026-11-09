@@ -37,7 +37,7 @@ mod test_runner {
     use crate::tests::test_onboarding::{test_onboarding, test_start_processing};
     use crate::tests::test_photos::{
         test_get_color_theme, test_get_full_item, test_get_full_item_albums, test_get_random_photo,
-        test_photo_download,
+        test_photo_download, test_update_datetime_edits_exif,
     };
     use crate::tests::test_root::test_health_endpoint;
     use crate::tests::test_search::test_search_filters;
@@ -83,6 +83,7 @@ mod test_runner {
                 // -- Photos --
                 test_photo_download,
                 test_get_full_item,
+                test_update_datetime_edits_exif,
                 test_get_full_item_albums,
                 test_get_color_theme,
                 test_get_random_photo,

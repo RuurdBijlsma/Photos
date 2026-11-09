@@ -175,10 +175,8 @@ impl MediaItemStore {
             mi.duration_ms,
             mi.taken_at_local,
             mi.taken_at_utc,
-            mi.og_taken_at_local,
             mi.timezone_name,
             mi.timezone_offset_seconds,
-            mi.og_timezone_offset_seconds,
             mi.use_panorama_viewer,
             mi.has_thumbnails AS "has_thumbnails!",
             mi.user_caption,
@@ -239,10 +237,9 @@ impl MediaItemStore {
             INSERT INTO media_item (
                 id, relative_path, filename, user_id, remote_user_id, hash, width, height,
                 is_video, duration_ms, taken_at_local, taken_at_utc,
-                og_taken_at_local, sort_timestamp, orientation,
-                use_panorama_viewer, timezone_name, timezone_offset_seconds, og_timezone_offset_seconds
+                sort_timestamp, orientation, use_panorama_viewer, timezone_name, timezone_offset_seconds
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
             "#,
             id,
             relative_path,
@@ -256,13 +253,11 @@ impl MediaItemStore {
             media_item.duration_ms,
             media_item.taken_at_local,
             media_item.taken_at_utc,
-            media_item.og_taken_at_local,
             sort_timestamp,
             media_item.orientation,
             media_item.use_panorama_viewer,
             media_item.timezone_name,
             media_item.timezone_offset_seconds,
-            media_item.og_timezone_offset_seconds,
         )
             .execute(&mut **tx)
             .await?;
@@ -334,7 +329,7 @@ impl MediaItemStore {
                 .await?;
         }
 
-        // 3. Update media_item with a single evaluation of the user edit flag
+        // 3. Update media_item with fresh metadata from re-analysis
         let reset_pipeline = scope == ReprocessScope::Full;
         let fresh_sort_timestamp =
             with_fallback_timezone(media_item.taken_at_utc, &media_item.taken_at_local);
@@ -353,23 +348,13 @@ impl MediaItemStore {
                 is_video          = $6,
                 duration_ms       = $7,
                 orientation       = $8,
-                taken_at_local             = CASE WHEN flags.is_time_edited THEN media_item.taken_at_local ELSE $9 END,
-                taken_at_utc               = CASE WHEN flags.is_time_edited THEN media_item.taken_at_utc ELSE $10 END,
-                og_taken_at_local          = CASE WHEN flags.is_time_edited THEN media_item.og_taken_at_local ELSE $11 END,
-                sort_timestamp             = CASE WHEN flags.is_time_edited THEN media_item.sort_timestamp ELSE $12 END,
-                timezone_name              = CASE WHEN flags.is_time_edited THEN media_item.timezone_name ELSE $13 END,
-                timezone_offset_seconds    = CASE WHEN flags.is_time_edited THEN media_item.timezone_offset_seconds ELSE $14 END,
-                og_timezone_offset_seconds = CASE WHEN flags.is_time_edited THEN media_item.og_timezone_offset_seconds ELSE $15 END,
+                taken_at_local    = $9,
+                taken_at_utc      = $10,
+                sort_timestamp    = $11,
+                timezone_name     = $12,
+                timezone_offset_seconds = $13,
                 updated_at        = now()
-            FROM (
-                SELECT
-                    id,
-                    (taken_at_local IS DISTINCT FROM og_taken_at_local
-                     OR timezone_offset_seconds IS DISTINCT FROM og_timezone_offset_seconds) AS is_time_edited
-                FROM media_item
-                WHERE id = $1
-            ) AS flags
-            WHERE media_item.id = flags.id
+            WHERE id = $1
             "#,
             id,
             reset_pipeline,
@@ -381,11 +366,9 @@ impl MediaItemStore {
             media_item.orientation,
             media_item.taken_at_local,
             media_item.taken_at_utc,
-            media_item.og_taken_at_local,
             fresh_sort_timestamp,
             media_item.timezone_name,
             media_item.timezone_offset_seconds,
-            media_item.og_timezone_offset_seconds,
         )
             .execute(&mut **tx)
             .await?;
@@ -776,8 +759,8 @@ impl MediaItemStore {
                     hash, deleted, is_video, thumbnails_status, analysis_status,
                     thumbnails_error, analysis_error,
                     width, height, duration_ms,
-                    taken_at_local, taken_at_utc, og_taken_at_local, sort_timestamp,
-                    timezone_name, timezone_offset_seconds, og_timezone_offset_seconds,
+                    taken_at_local, taken_at_utc, sort_timestamp,
+                    timezone_name, timezone_offset_seconds,
                     use_panorama_viewer, orientation, user_caption, search_vector,
                     created_at, updated_at
                 )
@@ -786,8 +769,8 @@ impl MediaItemStore {
                     hash, deleted, is_video, thumbnails_status, analysis_status,
                     thumbnails_error, analysis_error,
                     width, height, duration_ms,
-                    taken_at_local, taken_at_utc, og_taken_at_local, sort_timestamp,
-                    timezone_name, timezone_offset_seconds, og_timezone_offset_seconds,
+                    taken_at_local, taken_at_utc, sort_timestamp,
+                    timezone_name, timezone_offset_seconds,
                     use_panorama_viewer, orientation, user_caption, search_vector,
                     created_at, updated_at
                 FROM media_item

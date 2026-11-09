@@ -297,3 +297,53 @@ pub async fn test_get_random_photo(context: &TestContext) -> Result<()> {
 
     Ok(())
 }
+
+pub async fn test_update_datetime_edits_exif(context: &TestContext) -> Result<()> {
+    login(context).await?;
+    let client = &context.http_client;
+
+    let media_item = sqlx::query!(
+        "SELECT id, relative_path, hash FROM media_item WHERE is_video = false LIMIT 1"
+    )
+    .fetch_optional(&context.pool)
+    .await?;
+
+    let Some(item) = media_item else {
+        println!("Skipping test_update_datetime_edits_exif (no photo media items in DB)");
+        return Ok(());
+    };
+
+    let update_url = format!("{}/api/photos/{}", context.settings.api.public_url, item.id);
+    let target_datetime = "2024-06-15T10:30:00";
+    let payload = serde_json::json!({
+        "takenAtLocal": target_datetime,
+        "timezoneOffsetSeconds": 7200
+    });
+
+    let response = client.put(&update_url).json(&payload).send().await?;
+    assert_eq!(response.status(), StatusCode::OK);
+
+    // Verify DB updated
+    let after = sqlx::query!(
+        "SELECT taken_at_local, timezone_offset_seconds, hash FROM media_item WHERE id = $1",
+        item.id
+    )
+    .fetch_one(&context.pool)
+    .await?;
+
+    assert_eq!(
+        after.taken_at_local.format("%Y-%m-%dT%H:%M:%S").to_string(),
+        target_datetime
+    );
+    assert_eq!(after.timezone_offset_seconds, Some(7200));
+
+    // Verify EXIF on disk updated
+    let file_path = context.settings.ingest.media_root.join(&item.relative_path);
+    let et = exiftool::ExifTool::new()?;
+    let read_dt: String = et.read_tag(&file_path, "DateTimeOriginal", &[])?;
+    assert_eq!(read_dt, "2024:06:15 10:30:00");
+    let read_offset: String = et.read_tag(&file_path, "OffsetTimeOriginal", &[])?;
+    assert_eq!(read_offset, "+02:00");
+
+    Ok(())
+}
