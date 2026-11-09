@@ -62,7 +62,7 @@ async function handleDownload(relativePath: string | null | undefined, jobId?: n
     downloadingJobIds.value.add(jobId)
   }
   try {
-    const response = await mediaItemService.downloadMediaFile(relativePath)
+    const response = await mediaItemService.downloadMediaFile(relativePath, true)
     const fallbackFilename = relativePath.split(/[/\\]/).pop() || 'download'
     const filename = filenameFromHeaders(response.headers) ?? fallbackFilename
     downloadBlob(response.data, filename)

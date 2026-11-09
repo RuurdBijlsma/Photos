@@ -62,15 +62,22 @@ const mediaItemService = {
     return apiClient.get<MediaItemWithAlbums>(`/photos/${id}/item`)
   },
 
-  downloadMediaFile(relative_path: string): Promise<AxiosResponse<Blob>> {
+  downloadMediaFile(relative_path: string, bustCache = false): Promise<AxiosResponse<Blob>> {
     return apiClient.get<Blob>('/photos/download', {
-      params: { path: relative_path },
+      params: bustCache ? { path: relative_path, v: Date.now() } : { path: relative_path },
       responseType: 'blob',
     })
   },
 
-  downloadMediaFileById(id: string, signal?: AbortSignal): Promise<AxiosResponse<Blob>> {
+  // `bustCache` is for the manual download action: edits rewrite the file in place, so a cached
+  // copy would be stale. Browsing keeps using the cached response.
+  downloadMediaFileById(
+    id: string,
+    signal?: AbortSignal,
+    bustCache = false,
+  ): Promise<AxiosResponse<Blob>> {
     return apiClient.get<Blob>(`/photos/${id}/download`, {
+      params: bustCache ? { v: Date.now() } : undefined,
       responseType: 'blob',
       signal,
     })

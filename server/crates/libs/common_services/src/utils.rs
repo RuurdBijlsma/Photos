@@ -20,19 +20,6 @@ macro_rules! alert {
     };
 }
 
-/// Write/update the EXIF Orientation tag on a media file on disk.
-pub fn write_exif_orientation(file_path: &Path, orientation: i32) -> color_eyre::Result<()> {
-    // `-P` keeps the file mtime: a file without any EXIF date falls back to it for its datetime.
-    let et = exiftool::ExifTool::new()?;
-    et.write_tag(
-        file_path,
-        "all:Orientation",
-        &orientation.to_string(),
-        &["-P", "-n", "-overwrite_original"],
-    )?;
-    Ok(())
-}
-
 fn format_tz_offset(offset_seconds: i32) -> String {
     let sign = if offset_seconds >= 0 { '+' } else { '-' };
     let abs_seconds = offset_seconds.abs();
@@ -98,6 +85,19 @@ pub fn write_media_datetime(
             }
         }
     }
+    Ok(())
+}
+
+/// Write/update the EXIF Orientation tag on a media file on disk.
+pub fn write_exif_orientation(file_path: &Path, orientation: i32) -> color_eyre::Result<()> {
+    // `-P` keeps the file mtime: a file without any EXIF date falls back to it for its datetime.
+    let et = exiftool::ExifTool::new()?;
+    et.write_tag(
+        file_path,
+        "all:Orientation",
+        &orientation.to_string(),
+        &["-P", "-n", "-overwrite_original"],
+    )?;
     Ok(())
 }
 
