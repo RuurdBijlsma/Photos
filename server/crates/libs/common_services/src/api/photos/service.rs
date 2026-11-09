@@ -553,35 +553,31 @@ async fn apply_datetime_write(
     pool: &PgPool,
     media_item_id: &str,
     file_path: &Path,
-    taken_at_local: Option<&str>,
+    taken_at_local: Option<NaiveDateTime>,
     timezone_offset_seconds: &UpdateField<i32>,
 ) -> Result<(), AppError> {
     let current = sqlx::query!(
-        "SELECT taken_at_local, timezone_offset_seconds, is_video FROM media_item WHERE id = $1",
+        "SELECT taken_at_local, is_video FROM media_item WHERE id = $1",
         media_item_id
     )
     .fetch_one(pool)
     .await?;
 
-    let dt_to_format = if let Some(dt_str) = taken_at_local {
-        NaiveDateTime::parse_from_str(dt_str, "%Y-%m-%dT%H:%M:%S")
-            .map_err(|e| AppError::BadRequest(format!("Invalid date format: {e}")))?
-    } else {
-        current.taken_at_local
-    };
-
-    let formatted_dt = dt_to_format.format("%Y:%m:%d %H:%M:%S").to_string();
-
-    let target_offset = match timezone_offset_seconds {
-        UpdateField::Value(v) => Some(*v),
-        UpdateField::SetNull => None,
-        UpdateField::Ignore => current.timezone_offset_seconds,
-    };
+    let formatted_dt = taken_at_local
+        .unwrap_or(current.taken_at_local)
+        .format("%Y:%m:%d %H:%M:%S")
+        .to_string();
 
     let target_file_path = file_path.to_path_buf();
     let is_video = current.is_video;
+    let timezone_offset_seconds = timezone_offset_seconds.clone();
     task::spawn_blocking(move || {
-        write_media_datetime(&target_file_path, &formatted_dt, target_offset, is_video)
+        write_media_datetime(
+            &target_file_path,
+            &formatted_dt,
+            &timezone_offset_seconds,
+            is_video,
+        )
     })
     .await
     .map_err(|e| AppError::Internal(eyre!("Failed to spawn blocking task: {e}")))?
@@ -626,6 +622,13 @@ pub async fn update_media_item(
         )));
     }
 
+    // Parse the datetime up front: nothing below may modify the file or the item for a bad value
+    let taken_at_local = taken_at_local
+        .as_deref()
+        .map(|dt| NaiveDateTime::parse_from_str(dt, "%Y-%m-%dT%H:%M:%S"))
+        .transpose()
+        .map_err(|e| AppError::BadRequest(format!("Invalid date format: {e}")))?;
+
     // 1. Process EXIF Orientation update if provided
     if let Some(new_orientation) = orientation {
         current_id =
@@ -659,7 +662,7 @@ pub async fn update_media_item(
                 pool,
                 &current_id,
                 &file_path,
-                taken_at_local.as_deref(),
+                taken_at_local,
                 timezone_offset_seconds,
             )
             .await?;

@@ -297,8 +297,6 @@ impl MediaItemStore {
     ///
     /// If `scope == ReprocessScope::Full`, visual analyses are wiped and pipeline statuses reset to `'pending'`.
     /// If `scope == ReprocessScope::MetadataOnly`, visual analyses and pipeline statuses remain untouched.
-    ///
-    /// Preserves user-customized datetime and timezone offsets if the user has modified either.
     pub async fn update_full(
         tx: &mut PgTransaction<'_>,
         id: &str,

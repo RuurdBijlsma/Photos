@@ -1,3 +1,4 @@
+use crate::database::UpdateField;
 use std::path::Path;
 
 /// Generate a URL-safe random ID of a given length.
@@ -30,62 +31,60 @@ fn format_tz_offset(offset_seconds: i32) -> String {
 
 /// Write/update datetime tags on a media file (photo or video) using exiftool.
 /// `formatted_datetime` is expected in "YYYY:MM:DD HH:MM:SS" format.
+/// `timezone_offset_seconds` writes the offset tags, `SetNull` clears them and `Ignore` leaves
+/// them untouched.
 pub fn write_media_datetime(
     file_path: &Path,
     formatted_datetime: &str,
-    timezone_offset_seconds: Option<i32>,
+    timezone_offset_seconds: &UpdateField<i32>,
     is_video: bool,
 ) -> color_eyre::Result<()> {
     let et = exiftool::ExifTool::new()?;
+    let path = file_path.to_string_lossy();
+    // One exiftool call per tag set: every call rewrites the whole file.
+    let run = |tags: &[String]| -> color_eyre::Result<()> {
+        let mut args: Vec<&str> = vec!["-P", "-overwrite_original"];
+        args.extend(tags.iter().map(String::as_str));
+        args.push(path.as_ref());
+        et.execute_raw(&args)?;
+        Ok(())
+    };
+
     if is_video {
-        et.write_tag(
-            file_path,
-            "QuickTime:CreateDate",
-            formatted_datetime,
-            &["-P", "-overwrite_original"],
-        )?;
-        et.write_tag(
-            file_path,
-            "QuickTime:ModifyDate",
-            formatted_datetime,
-            &["-P", "-overwrite_original"],
-        )?;
-        if let Some(offset_secs) = timezone_offset_seconds {
-            let offset_str = format_tz_offset(offset_secs);
-            let dt_with_offset = format!("{formatted_datetime}{offset_str}");
-            let _ = et.write_tag(
-                file_path,
-                "QuickTime:CreationDate",
-                &dt_with_offset,
-                &["-P", "-overwrite_original"],
-            );
-            let _ = et.write_tag(
-                file_path,
-                "Keys:CreationDate",
-                &dt_with_offset,
-                &["-P", "-overwrite_original"],
-            );
-        }
-    } else {
-        et.write_tag(
-            file_path,
-            "AllDates",
-            formatted_datetime,
-            &["-P", "-overwrite_original"],
-        )?;
-        if let Some(offset_secs) = timezone_offset_seconds {
-            let offset_str = format_tz_offset(offset_secs);
+        run(&[
+            format!("-QuickTime:CreateDate={formatted_datetime}"),
+            format!("-QuickTime:ModifyDate={formatted_datetime}"),
+        ])?;
+
+        // TODO: investigate whether these errors can be surfaced. They are ignored so a file
+        // that cannot store the tag does not fail the whole edit.
+        let _ = match timezone_offset_seconds {
+            UpdateField::Value(offset) => run(&[format!(
+                "-Keys:CreationDate={formatted_datetime}{}",
+                format_tz_offset(*offset)
+            )]),
+            UpdateField::SetNull => run(&["-Keys:CreationDate=".to_string()]),
+            UpdateField::Ignore => Ok(()),
+        };
+        return Ok(());
+    }
+
+    let mut tags = vec![format!("-AllDates={formatted_datetime}")];
+    match timezone_offset_seconds {
+        UpdateField::Value(offset) => {
+            let offset = format_tz_offset(*offset);
             for tag in ["OffsetTimeOriginal", "OffsetTime", "OffsetTimeDigitized"] {
-                et.write_tag(
-                    file_path,
-                    &format!("all:{tag}"),
-                    &offset_str,
-                    &["-P", "-overwrite_original"],
-                )?;
+                tags.push(format!("-all:{tag}={offset}"));
             }
         }
+        UpdateField::SetNull => {
+            for tag in ["OffsetTimeOriginal", "OffsetTime", "OffsetTimeDigitized"] {
+                tags.push(format!("-all:{tag}="));
+            }
+        }
+        UpdateField::Ignore => {}
     }
-    Ok(())
+    run(&tags)
 }
 
 /// Write/update the EXIF Orientation tag on a media file on disk.

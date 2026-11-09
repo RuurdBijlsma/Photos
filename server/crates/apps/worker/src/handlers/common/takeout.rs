@@ -1,6 +1,7 @@
 use chrono::{DateTime, Utc};
 use color_eyre::Result;
 use common_services::caching::hash_file;
+use common_services::database::UpdateField;
 use common_services::database::media_item::media_item::CreateFullMediaItem;
 use common_services::utils::write_media_datetime;
 use media_analyzer::MediaMetadata;
@@ -37,7 +38,12 @@ pub async fn resolve_override(
     let target_path = file_path.to_path_buf();
     let is_video = media_info.features.is_video;
     let write_result = tokio::task::spawn_blocking(move || {
-        write_media_datetime(&target_path, &formatted, Some(0), is_video)
+        write_media_datetime(
+            &target_path,
+            &formatted,
+            &UpdateField::Value(0),
+            is_video,
+        )
     })
     .await?;
 
