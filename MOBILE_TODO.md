@@ -1,0 +1,64 @@
+~~# MOBILE APP:
+
+Support for Android 17 and up.
+
+## CORE FEATURES
+
+* auto upload when a new photo/video is taken
+* view timeline (including offline photos, in case no internet connection)
+    * includes local vs cloud deduplication
+    * show badge on timeline for cloud / local / uploading
+    * scrub through timeline with scrubber on the right edge with floating date pill (similar to web frontend)
+* view photo, pinch/double tap to zoom, share, add to album. generally native gallery gestures & interactions
+* smooth UI feel, quick app start
+* browse/view albums
+* manually upload (TUS resumable upload, backend is already there)
+* folder selection for what to backup. Default to DCIM/Camera, optionally let user add more folders
+* cache timeline / other responses so opening app can be instant
+* view timeline items offline
+    * this means caching all cloud thumbnails? Investigate how to best handle this. Maybe that would be too much
+      storage/downloading required. bounded LRU disk cache for thumbs?
+    * For photos physically on the phone, load directly from Android’s local thumbs instead of querying the server.
+* delete action, consider how to best do this, there's delete from device, delete from server, and soft delete (db sets
+  deleted=true)
+
+## LATER ON
+
+* "Free up space" on phone button, deletes locally from phone from media items where it's detected it's already on
+  server
+* semantic search (backend is already there), wouldnt need offline items to be searchable
+* map view
+* daily cards on front page (similar to cards in google photos), with notifications. Things like "On this day (1 year
+  ago)", or "Cuddles and purrs" (cat pics).
+* people page, where clustered faces are shown and can be labeled, and face clusters can be joined together.
+* bin/trash, place where deleted items are, where they can be permanently deleted or restored to library.
+* settings page - mostly app settings. on frontend this is theme settings, UI settings, concurrent uploads limit, album
+  backup management, and missing media list (items that exist on DB but not on disk, can be (mass) deleted from db
+  there). This is not all required for mobile. Mobile is more user focused rather that server management focused.
+  Settings can include only sync on wifi, only while charging, not when roaming.
+* User-friendly upload status UI
+* set as wallpaper/lock screen option
+* share photo to Ruurd Photos app to upload it (receive share intent)
+* timeline
+    * drag to select in timeline
+        * long press to enter selection mode, the drag to select many items quickly.
+    * pinch to change grid density
+* connectivity indicator, on mobile bad internet is much more common. dont error on no internet, show indicators like (
+  Connecting..., offline, etc.)
+
+## BONUS, NOT REQUIRED
+
+* motion photo viewer
+* search offline items as well (may need design considerations early on, depens on added complexity / drawbacks)
+* 3d panorama viewer
+* explore page (backend endpoints are there already, just about showing the data. Some tables, histograms in nice UI,
+  top visited places), includes location page where all photos/videos taken in that location are shown.\
+* biometric lock for app? optionally of course
+
+## ADMIN STUFF
+
+even lower prio, dont want this in the app
+
+* activity view, where user can see how the backend is progressing during ingest
+* admin page - see background job queue, manage user accounts on server
+* manage storage - see how full the server disk is, and get possibility to clear up storage by deleting large items~~
