@@ -38,12 +38,7 @@ pub async fn resolve_override(
     let target_path = file_path.to_path_buf();
     let is_video = media_info.features.is_video;
     let write_result = tokio::task::spawn_blocking(move || {
-        write_media_datetime(
-            &target_path,
-            &formatted,
-            &UpdateField::Value(0),
-            is_video,
-        )
+        write_media_datetime(&target_path, &formatted, &UpdateField::Value(0), is_video)
     })
     .await?;
 

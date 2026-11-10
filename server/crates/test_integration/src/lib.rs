@@ -85,6 +85,7 @@ mod test_runner {
                 test_photo_download,
                 test_get_full_item,
                 test_update_datetime_edits_exif,
+                test_update_video_datetime_edits_exif,
                 test_get_full_item_albums,
                 test_get_color_theme,
                 test_get_random_photo,

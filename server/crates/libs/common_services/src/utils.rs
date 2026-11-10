@@ -29,7 +29,8 @@ fn format_tz_offset(offset_seconds: i32) -> String {
     format!("{sign}{hours:02}:{minutes:02}")
 }
 
-/// Write/update datetime tags on a media file (photo or video) using exiftool.
+/// Write/update datetime tags on a media file using exiftool.
+///
 /// `formatted_datetime` is expected in "YYYY:MM:DD HH:MM:SS" format.
 /// `timezone_offset_seconds` writes the offset tags, `SetNull` clears them and `Ignore` leaves
 /// them untouched.

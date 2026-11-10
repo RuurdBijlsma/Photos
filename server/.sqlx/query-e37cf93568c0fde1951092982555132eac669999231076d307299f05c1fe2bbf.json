@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT taken_at_local, timezone_offset_seconds, is_video FROM media_item WHERE id = $1",
+  "query": "SELECT taken_at_local, is_video FROM media_item WHERE id = $1",
   "describe": {
     "columns": [
       {
@@ -16,17 +16,6 @@
       },
       {
         "ordinal": 1,
-        "name": "timezone_offset_seconds",
-        "type_info": "Int4",
-        "origin": {
-          "Table": {
-            "table": "media_item",
-            "name": "timezone_offset_seconds"
-          }
-        }
-      },
-      {
-        "ordinal": 2,
         "name": "is_video",
         "type_info": "Bool",
         "origin": {
@@ -44,9 +33,8 @@
     },
     "nullable": [
       false,
-      true,
       false
     ]
   },
-  "hash": "e6c02021d030f0e4e9b60231fb3e772511b7146f14bbbe1c8400e6486c6deb1d"
+  "hash": "e37cf93568c0fde1951092982555132eac669999231076d307299f05c1fe2bbf"
 }

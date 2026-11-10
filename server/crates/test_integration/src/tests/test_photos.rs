@@ -389,7 +389,7 @@ pub async fn test_update_video_datetime_edits_exif(context: &TestContext) -> Res
     assert_eq!(response.status(), StatusCode::OK);
 
     let after = sqlx::query!(
-        "SELECT taken_at_local FROM media_item WHERE id = $1",
+        "SELECT taken_at_local, taken_at_utc, timezone_offset_seconds FROM media_item WHERE id = $1",
         item.id
     )
     .fetch_one(&context.pool)
@@ -406,7 +406,14 @@ pub async fn test_update_video_datetime_edits_exif(context: &TestContext) -> Res
     let read_creation_date: String = et.read_tag(&file_path, "CreationDate", &[])?;
     assert_eq!(read_creation_date, "2024:06:15 10:30:00+02:00");
 
-    // TODO: also assert timezone_offset_seconds == Some(7200) once media_analyzer reads the video
-    // offset out of Keys:CreationDate; until then the DB offset comes back NULL.
+    // The analyzer reads the offset back out of Keys:CreationDate
+    assert_eq!(after.timezone_offset_seconds, Some(7200));
+    assert_eq!(
+        after
+            .taken_at_utc
+            .map(|dt| dt.format("%Y-%m-%dT%H:%M:%SZ").to_string()),
+        Some("2024-06-15T08:30:00Z".to_string())
+    );
+
     Ok(())
 }
