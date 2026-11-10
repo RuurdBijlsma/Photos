@@ -84,35 +84,35 @@ even lower prio, dont want this in the app
 * admin page - see background job queue, manage user accounts on server
 * manage storage - see how full the server disk is, and get possibility to clear up storage by deleting large items
 
-
 ---
 
-Phased implementation of CORE features
+# Phased Implementation of CORE Features
 
-#### Phase 1: Foundation & Read-Only Timeline
-* Set up Ktor/Retrofit with JWT storage in Android `EncryptedSharedPreferences` or `DataStore`.
-* Compile `timeline.proto` to generate Kotlin/Java Protobuf models.
+## Phase 1: Foundation & Read-Only Timeline
+* Set up Retrofit + OkHttp configured with a persistent `CookieJar` to handle and persist cookie-based session auth across app launches.
+* Compile `timeline.proto` via the Protobuf Gradle plugin to generate Kotlin/Java models.
 * Implement repository sync: fetch `GET /api/timeline/ratios` and `GET /api/timeline/by-month`, storing entries into Room.
-* Query local `MediaStore` and merge them into the same Room table.
-* Build the Compose timeline using `LazyVerticalGrid` with month headers and the draggable right-edge scrubber.
+* Query local `MediaStore` and merge them into the same Room table to support unified offline browsing.
+* Build the Compose timeline using `LazyVerticalGrid` with month headers and the draggable right-edge scrubber with a floating date pill.
 
-#### Phase 2: Media Viewer & Gestures
+## Phase 2: Media Viewer & Gestures
 * Implement fullscreen viewer with swipe-between-items via `HorizontalPager`.
-* Integrate `telephoto` / `zoomable` for double-tap and pinch-to-zoom.
-* Media3 (ExoPlayer) integration for streaming videos or playing local video files directly from device storage.
-* Add bottom action bar: Share (using native Android `Intent.ACTION_SEND`), Info panel (EXIF metadata), and Delete.
+* Integrate `telephoto` / `zoomable` for double-tap and pinch-to-zoom gestures.
+* Add native gallery vertical gestures: swipe down to dismiss back to the timeline, and swipe up to expand the info/GPS/date details sheet.
+* Integrate Media3 (ExoPlayer) for streaming remote videos and playing local files directly from device storage.
+* Add bottom action bar: Share (`Intent.ACTION_SEND`), Info panel toggle, and Delete actions.
 
-#### Phase 3: Backup Engine & Manual Upload
-* UI screen for backup settings: enable backup, select folders (DCIM, WhatsApp, etc.), Wi-Fi only toggle.
-* Room `upload_queue` table to track progress.
-* `UploadWorker` implementation with TUS upload chunks.
-* Timeline badge overlays: syncing spinner, local-only icon, or cloud checkmark.
+## Phase 3: Backup Engine & Manual Upload
+* UI screen for backup settings: toggle auto-backup, select source folders (DCIM, WhatsApp, etc.), and set Wi-Fi / charging constraints.
+* Room `upload_queue` table to track progress, errors, and resumable state.
+* `UploadWorker` implementation leveraging OkHttp for TUS chunked resumable uploads.
+* Timeline badge overlays showing item status: syncing spinner, local-only icon, or cloud checkmark.
 
-#### Phase 4: Albums, Management & Deletion
-* Album browsing and creating new albums.
-* Drag-to-select and long-press multi-selection on the timeline.
-* Deletion dialog: "Delete from Device", "Delete from Server", "Delete Everywhere".
-* "Free up space" feature: find all items where `syncStatus == SYNCED`, count their total local file size, and prompt `createDeleteRequest` to purge them from the phone.
+## Phase 4: Albums, Management & Deletion
+* Album browsing, viewing album items, and creating new albums.
+* Drag-to-select and long-press multi-selection on the timeline grid.
+* Unified deletion dialog: "Delete from Device", "Delete from Server" (soft delete / trash), and "Delete Everywhere".
+* "Free up space" feature: query items where `syncStatus == SYNCED`, compute local savings, and trigger `MediaStore.createDeleteRequest` to purge local files.
 
 ---
 
