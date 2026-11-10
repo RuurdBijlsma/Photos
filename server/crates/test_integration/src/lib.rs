@@ -25,19 +25,20 @@ mod test_runner {
         test_login, test_logout, test_refresh, test_register, test_second_register_attempt,
     };
     use crate::tests::test_jobs::{
-        test_bulk_enqueue_sorts_paths, test_cancelled_job_not_overwritten,
-        test_clean_thumbnail_orphans, test_generated_thumbnails_status,
-        test_media_reconcile_removal, test_metadata_failure_records_failed_ingest,
-        test_metadata_stage_active, test_prune_missing_ingest_jobs,
-        test_scan_repairs_incomplete_items, test_scan_skips_failed_ingest,
-        test_stage_failure_and_retry, test_thumbnail_drift_reset,
+        test_bulk_enqueue_sorts_paths, test_cancel_pending_ingest_jobs,
+        test_cancelled_job_not_overwritten, test_clean_thumbnail_orphans,
+        test_generated_thumbnails_status, test_media_reconcile_removal,
+        test_metadata_failure_records_failed_ingest, test_metadata_stage_active,
+        test_prune_missing_ingest_jobs, test_scan_repairs_incomplete_items,
+        test_scan_skips_failed_ingest, test_stage_failure_and_retry, test_thumbnail_drift_reset,
         test_update_full_resets_ingest_stages, test_visual_analysis_unique_percentage,
         test_watcher_delete,
     };
     use crate::tests::test_onboarding::{test_onboarding, test_start_processing};
     use crate::tests::test_photos::{
         test_get_color_theme, test_get_full_item, test_get_full_item_albums, test_get_random_photo,
-        test_photo_download,
+        test_photo_download, test_update_datetime_edits_exif,
+        test_update_video_datetime_edits_exif,
     };
     use crate::tests::test_root::test_health_endpoint;
     use crate::tests::test_search::test_search_filters;
@@ -83,6 +84,8 @@ mod test_runner {
                 // -- Photos --
                 test_photo_download,
                 test_get_full_item,
+                test_update_datetime_edits_exif,
+                test_update_video_datetime_edits_exif,
                 test_get_full_item_albums,
                 test_get_color_theme,
                 test_get_random_photo,
@@ -102,6 +105,7 @@ mod test_runner {
                 test_thumbnail_drift_reset,
                 test_clean_thumbnail_orphans,
                 test_prune_missing_ingest_jobs,
+                test_cancel_pending_ingest_jobs,
                 test_metadata_failure_records_failed_ingest,
                 test_metadata_stage_active,
                 test_scan_skips_failed_ingest,

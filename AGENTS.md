@@ -219,6 +219,7 @@ cargo clippy --all-features
 cargo test -p test_integration -- --nocapture
 
 # Local full run (release profile + dynamically loaded ONNX Runtime; CI runs no tests at all)
+# Takes about 1 minute to complete (runtime). ML models are cached so no re-download required.
 just test    # = cargo test --profile release --features load-dynamic -- --nocapture
 
 # Benchmarks (need a populated local DB; from server/)
@@ -336,6 +337,14 @@ npm run lint
 - Branch from `develop`; PRs target `main`. History uses conventional prefixes (`feat:`, `fix:`, `chore:`,
   `refactor:`, `docs:`, `perf:`) - follow that. Keep committed artifacts in sync (`.sqlx/`, generated proto, perf
   result) in the same PR as the change that caused them.
+
+## Frontend
+
+When adding an alert, confirm, prompt style UI feature, use the `dialogStore`. For snackbars, use the `snackbarStore`.
+If something requires a refresh of whatever data is visible on screen, use the `refreshStore`, for example, trashing a
+media item. This requires whatever UI the user is viewing to update incase the media item is there. So you do
+refreshStore.counter++. When implementing a browseable UI element that would benefit from the refresh function, make
+sure to use the `useRefreshFunction.ts`.
 
 ## Gotchas
 

@@ -513,9 +513,9 @@ pub async fn test_manual_album_concurrent_add(context: &TestContext) -> Result<(
             r#"
             INSERT INTO media_item (
                 id, user_id, hash, relative_path, filename, width, height, is_video,
-                taken_at_local, og_taken_at_local, sort_timestamp, use_panorama_viewer
+                taken_at_local, sort_timestamp, use_panorama_viewer
             )
-            VALUES ($1, $2, $3, $4, $5, 1, 1, false, now()::timestamp, now()::timestamp, now(), false)
+            VALUES ($1, $2, $3, $4, $5, 1, 1, false, now()::timestamp, now(), false)
             "#,
             media_id,
             user_id,

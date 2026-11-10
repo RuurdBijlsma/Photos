@@ -19,7 +19,7 @@ export const useDownloadStore = defineStore('download', () => {
     if (downloadingIds.value.has(id)) return
     downloadingIds.value.add(id)
     try {
-      const response = await mediaItemService.downloadMediaFileById(id)
+      const response = await mediaItemService.downloadMediaFileById(id, undefined, true)
       const filename = filenameFromHeaders(response.headers) ?? fullItem?.filename
       downloadBlob(response.data, filename)
     } catch (e) {

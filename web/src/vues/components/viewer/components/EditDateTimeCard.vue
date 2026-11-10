@@ -20,27 +20,13 @@ const snackbars = useSnackbarsStore()
 const timelineStore = useTimelineStore()
 
 const adjustedDate = ref(new Date(props.mediaItem.taken_at_local))
-const originalDate = new Date(props.mediaItem.og_taken_at_local)
 
 const timezoneDisplay = computed(() => {
-  const is_tz_edited =
-    props.mediaItem.og_timezone_offset_seconds !== props.mediaItem.timezone_offset_seconds
-  const tz = is_tz_edited
-    ? makeTzOffsetString(props.mediaItem.timezone_offset_seconds)
-    : props.mediaItem.timezone_name
-  if (!tz) return 'the local timezone'
-  return /^[+-]\d{2}:\d{2}$/.test(tz) ? `UTC${tz}` : tz
-})
-const ogTimezoneDisplay = computed(() => {
   const tz =
-    props.mediaItem.timezone_name ?? makeTzOffsetString(props.mediaItem.og_timezone_offset_seconds)
+    props.mediaItem.timezone_name ?? makeTzOffsetString(props.mediaItem.timezone_offset_seconds)
   if (!tz) return 'the local timezone'
   return /^[+-]\d{2}:\d{2}$/.test(tz) ? `UTC${tz}` : tz
 })
-
-function revert() {
-  adjustedDate.value = new Date(props.mediaItem.og_taken_at_local)
-}
 
 function makeTzOffsetString(tzOffsetSeconds: number | undefined | null) {
   if (tzOffsetSeconds == null) {
@@ -70,7 +56,6 @@ function parseTzOffsetString(value: string): number | null {
 
 async function editTimezoneOffset() {
   const tzOffsetString = makeTzOffsetString(props.mediaItem.timezone_offset_seconds)
-  const ogTzOffsetString = makeTzOffsetString(props.mediaItem.og_timezone_offset_seconds)
 
   const newTimezoneOffset = await dialogs.prompt({
     title: 'Timezone Offset',
@@ -83,11 +68,6 @@ This should be the fixed timezone offset that applied when the photo was taken.
 
 Current offset:
 <code>${tzOffsetString ?? 'unknown'}</code>
-
-<br>
-
-Original offset:
-<code>${ogTzOffsetString ?? 'unknown'}</code>
 
 <br><br>
 
@@ -141,28 +121,13 @@ async function save() {
         <thumbnail-img cover :media-item-id="mediaItem?.id" />
       </v-avatar>
 
-      <div class="tz-offset" @click="editTimezoneOffset()" v-ripple>
-        <template v-if="mediaItem.timezone_offset_seconds !== mediaItem.og_timezone_offset_seconds">
-          <!-- Edited timezone -->
-          <p>Original time is {{ ogTimezoneDisplay }}</p>
-          <p>Adjusted time is {{ timezoneDisplay }}</p>
-        </template>
-        <p v-else>All times are listed in {{ ogTimezoneDisplay }}</p>
+      <div class="tz-offset mb-4" @click="editTimezoneOffset()" v-ripple>
+        <p>Listed in {{ timezoneDisplay }}</p>
       </div>
 
-      <div class="time-row mb-3 mt-2">
-        <span class="dt-label text-on-surface-variant">Original:</span>
-        <date-time-picker disabled v-model="originalDate" />
-      </div>
-
-      <div class="time-row mb-2">
-        <span class="dt-label text-on-surface-variant">Adjusted:</span>
+      <div class="time-row mb-3">
         <date-time-picker v-model="adjustedDate" />
       </div>
-
-      <v-btn variant="plain" color="primary" rounded="pill" @click="revert">
-        Revert to Original
-      </v-btn>
     </div>
 
     <v-card-actions class="mt-7">
@@ -182,6 +147,7 @@ async function save() {
 .time-row {
   display: flex;
   align-items: center;
+  justify-content: center;
   width: 100%;
   max-width: 380px;
 }
@@ -194,12 +160,5 @@ async function save() {
   padding: 3px 10px;
   border-radius: 20px;
   text-align: center;
-}
-
-.dt-label {
-  font-weight: 500;
-  font-size: 14px;
-  margin-right: 10px;
-  width: 75px;
 }
 </style>

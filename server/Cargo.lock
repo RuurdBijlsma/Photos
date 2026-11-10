@@ -4388,9 +4388,9 @@ dependencies = [
 
 [[package]]
 name = "media_analyzer"
-version = "0.10.6"
+version = "0.10.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "984eb2e9e81395789d476d2395f74b2c2a5bbf04d3bd4189c0bd6c6d7692509a"
+checksum = "bb2e75a1f618ca41ffcb5e681580f52197cfbf40ab04900d91ea7adaf728c86b"
 dependencies = [
  "blake3",
  "bon",
@@ -8532,6 +8532,7 @@ dependencies = [
  "colored",
  "common_services",
  "common_types",
+ "exiftool",
  "futures-util",
  "material-color-utils",
  "media_analyzer",

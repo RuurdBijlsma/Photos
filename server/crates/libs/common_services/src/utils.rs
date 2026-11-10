@@ -1,3 +1,4 @@
+use crate::database::UpdateField;
 use std::path::Path;
 
 /// Generate a URL-safe random ID of a given length.
@@ -20,6 +21,73 @@ macro_rules! alert {
     };
 }
 
+fn format_tz_offset(offset_seconds: i32) -> String {
+    let sign = if offset_seconds >= 0 { '+' } else { '-' };
+    let abs_seconds = offset_seconds.abs();
+    let hours = abs_seconds / 3600;
+    let minutes = (abs_seconds % 3600) / 60;
+    format!("{sign}{hours:02}:{minutes:02}")
+}
+
+/// Write/update datetime tags on a media file using exiftool.
+///
+/// `formatted_datetime` is expected in "YYYY:MM:DD HH:MM:SS" format.
+/// `timezone_offset_seconds` writes the offset tags, `SetNull` clears them and `Ignore` leaves
+/// them untouched.
+pub fn write_media_datetime(
+    file_path: &Path,
+    formatted_datetime: &str,
+    timezone_offset_seconds: &UpdateField<i32>,
+    is_video: bool,
+) -> color_eyre::Result<()> {
+    let et = exiftool::ExifTool::new()?;
+    let path = file_path.to_string_lossy();
+    // One exiftool call per tag set: every call rewrites the whole file.
+    let run = |tags: &[String]| -> color_eyre::Result<()> {
+        let mut args: Vec<&str> = vec!["-P", "-overwrite_original"];
+        args.extend(tags.iter().map(String::as_str));
+        args.push(path.as_ref());
+        et.execute_raw(&args)?;
+        Ok(())
+    };
+
+    if is_video {
+        run(&[
+            format!("-QuickTime:CreateDate={formatted_datetime}"),
+            format!("-QuickTime:ModifyDate={formatted_datetime}"),
+        ])?;
+
+        // TODO: investigate whether these errors can be surfaced. They are ignored so a file
+        // that cannot store the tag does not fail the whole edit.
+        let _ = match timezone_offset_seconds {
+            UpdateField::Value(offset) => run(&[format!(
+                "-Keys:CreationDate={formatted_datetime}{}",
+                format_tz_offset(*offset)
+            )]),
+            UpdateField::SetNull => run(&["-Keys:CreationDate=".to_string()]),
+            UpdateField::Ignore => Ok(()),
+        };
+        return Ok(());
+    }
+
+    let mut tags = vec![format!("-AllDates={formatted_datetime}")];
+    match timezone_offset_seconds {
+        UpdateField::Value(offset) => {
+            let offset = format_tz_offset(*offset);
+            for tag in ["OffsetTimeOriginal", "OffsetTime", "OffsetTimeDigitized"] {
+                tags.push(format!("-all:{tag}={offset}"));
+            }
+        }
+        UpdateField::SetNull => {
+            for tag in ["OffsetTimeOriginal", "OffsetTime", "OffsetTimeDigitized"] {
+                tags.push(format!("-all:{tag}="));
+            }
+        }
+        UpdateField::Ignore => {}
+    }
+    run(&tags)
+}
+
 /// Write/update the EXIF Orientation tag on a media file on disk.
 pub fn write_exif_orientation(file_path: &Path, orientation: i32) -> color_eyre::Result<()> {
     // `-P` keeps the file mtime: a file without any EXIF date falls back to it for its datetime.
@@ -30,38 +98,6 @@ pub fn write_exif_orientation(file_path: &Path, orientation: i32) -> color_eyre:
         &orientation.to_string(),
         &["-P", "-n", "-overwrite_original"],
     )?;
-    Ok(())
-}
-
-/// Write/update datetime tags on a media file (photo or video) using exiftool.
-/// `formatted_datetime` is expected in "YYYY:MM:DD HH:MM:SS" format.
-pub fn write_media_datetime(
-    file_path: &Path,
-    formatted_datetime: &str,
-    is_video: bool,
-) -> color_eyre::Result<()> {
-    let et = exiftool::ExifTool::new()?;
-    if is_video {
-        et.write_tag(
-            file_path,
-            "QuickTime:CreateDate",
-            &formatted_datetime,
-            &["-P", "-overwrite_original"],
-        )?;
-        et.write_tag(
-            file_path,
-            "QuickTime:ModifyDate",
-            &formatted_datetime,
-            &["-P", "-overwrite_original"],
-        )?;
-    } else {
-        et.write_tag(
-            file_path,
-            "AllDates",
-            &formatted_datetime,
-            &["-P", "-overwrite_original"],
-        )?;
-    }
     Ok(())
 }
 

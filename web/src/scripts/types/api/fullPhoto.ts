@@ -131,10 +131,8 @@ export interface FullMediaItem {
   duration_ms?: number
   taken_at_local: string
   taken_at_utc?: string
-  og_taken_at_local: string
   timezone_name?: string
   timezone_offset_seconds?: number
-  og_timezone_offset_seconds?: number
   use_panorama_viewer: boolean
   panorama_config: PannellumConfig
   has_thumbnails: boolean

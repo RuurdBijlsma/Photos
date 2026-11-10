@@ -297,3 +297,123 @@ pub async fn test_get_random_photo(context: &TestContext) -> Result<()> {
 
     Ok(())
 }
+
+pub async fn test_update_datetime_edits_exif(context: &TestContext) -> Result<()> {
+    login(context).await?;
+    let client = &context.http_client;
+
+    // Pinned on purpose: this photo's GPS timezone is UTC+2 in June, so the offset assertion holds
+    // both now and once media_analyzer lets an explicit offset win over the GPS-derived timezone.
+    let media_item = sqlx::query!(
+        "SELECT id, relative_path FROM media_item WHERE relative_path = $1",
+        "PXL_20250916_155329360.jpg"
+    )
+    .fetch_optional(&context.pool)
+    .await?;
+
+    let Some(item) = media_item else {
+        println!("Skipping test_update_datetime_edits_exif (fixture photo not ingested)");
+        return Ok(());
+    };
+
+    let update_url = format!(
+        "{}/api/photos/{}/item",
+        context.settings.api.public_url, item.id
+    );
+    let target_datetime = "2024-06-15T10:30:00";
+    let payload = serde_json::json!({
+        "takenAtLocal": target_datetime,
+        "timezoneOffsetSeconds": 7200
+    });
+
+    let response = client.put(&update_url).json(&payload).send().await?;
+    assert_eq!(response.status(), StatusCode::OK);
+
+    // The DB is rebuilt from the file, so these values only survive if the write reached the tags
+    let after = sqlx::query!(
+        "SELECT taken_at_local, taken_at_utc, timezone_offset_seconds FROM media_item WHERE id = $1",
+        item.id
+    )
+    .fetch_one(&context.pool)
+    .await?;
+
+    assert_eq!(
+        after.taken_at_local.format("%Y-%m-%dT%H:%M:%S").to_string(),
+        target_datetime
+    );
+    assert_eq!(after.timezone_offset_seconds, Some(7200));
+    assert_eq!(
+        after
+            .taken_at_utc
+            .map(|dt| dt.format("%Y-%m-%dT%H:%M:%SZ").to_string()),
+        Some("2024-06-15T08:30:00Z".to_string())
+    );
+
+    // Verify EXIF on disk updated
+    let file_path = context.settings.ingest.media_root.join(&item.relative_path);
+    let et = exiftool::ExifTool::new()?;
+    let read_dt: String = et.read_tag(&file_path, "DateTimeOriginal", &[])?;
+    assert_eq!(read_dt, "2024:06:15 10:30:00");
+    let read_offset: String = et.read_tag(&file_path, "OffsetTimeOriginal", &[])?;
+    assert_eq!(read_offset, "+02:00");
+
+    Ok(())
+}
+
+pub async fn test_update_video_datetime_edits_exif(context: &TestContext) -> Result<()> {
+    login(context).await?;
+    let client = &context.http_client;
+
+    let media_item = sqlx::query!(
+        "SELECT id, relative_path FROM media_item WHERE relative_path = $1",
+        "VID_20190223_155900.mp4"
+    )
+    .fetch_optional(&context.pool)
+    .await?;
+
+    let Some(item) = media_item else {
+        println!("Skipping test_update_video_datetime_edits_exif (fixture video not ingested)");
+        return Ok(());
+    };
+
+    let update_url = format!(
+        "{}/api/photos/{}/item",
+        context.settings.api.public_url, item.id
+    );
+    let payload = serde_json::json!({
+        "takenAtLocal": "2024-06-15T10:30:00",
+        "timezoneOffsetSeconds": 7200
+    });
+
+    let response = client.put(&update_url).json(&payload).send().await?;
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let after = sqlx::query!(
+        "SELECT taken_at_local, taken_at_utc, timezone_offset_seconds FROM media_item WHERE id = $1",
+        item.id
+    )
+    .fetch_one(&context.pool)
+    .await?;
+    assert_eq!(
+        after.taken_at_local.format("%Y-%m-%dT%H:%M:%S").to_string(),
+        "2024-06-15T10:30:00"
+    );
+
+    let file_path = context.settings.ingest.media_root.join(&item.relative_path);
+    let et = exiftool::ExifTool::new()?;
+    let read_dt: String = et.read_tag(&file_path, "CreateDate", &[])?;
+    assert_eq!(read_dt, "2024:06:15 10:30:00");
+    let read_creation_date: String = et.read_tag(&file_path, "CreationDate", &[])?;
+    assert_eq!(read_creation_date, "2024:06:15 10:30:00+02:00");
+
+    // The analyzer reads the offset back out of Keys:CreationDate
+    assert_eq!(after.timezone_offset_seconds, Some(7200));
+    assert_eq!(
+        after
+            .taken_at_utc
+            .map(|dt| dt.format("%Y-%m-%dT%H:%M:%SZ").to_string()),
+        Some("2024-06-15T08:30:00Z".to_string())
+    );
+
+    Ok(())
+}

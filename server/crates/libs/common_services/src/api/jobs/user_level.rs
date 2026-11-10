@@ -1,10 +1,13 @@
 use crate::api::app_error::AppError;
 use crate::api::jobs::interfaces::{
-    IngestOverviewResponse, JobInfo, PaginatedJobsResponse, UserJobsQuery,
+    CancelPendingJobsResponse, IngestOverviewResponse, JobInfo, PaginatedJobsResponse,
+    UserJobsQuery,
 };
 use crate::database::jobs::{JobStatus, JobType};
+use crate::job_queue::enqueue_job;
 use crate::media_mount::MediaFolderStatus;
 use crate::media_mount::media_mount_status;
+use app_state::IngestSettings;
 use sqlx::{PgPool, Postgres, QueryBuilder};
 use std::path::Path;
 
@@ -207,6 +210,40 @@ pub async fn retry_user_job(pool: &PgPool, job_id: i64, user_id: i32) -> Result<
 
     tx.commit().await?;
     Ok(())
+}
+
+/// Cancels the user's queued ingest jobs, then enqueues a scan.
+///
+/// The scan repairs the items those jobs left half-ingested and marks files that are no longer on
+/// disk as missing, so this is safe to use after fixing a wrong media folder.
+pub async fn cancel_pending_ingest_jobs(
+    pool: &PgPool,
+    settings: &IngestSettings,
+    user_id: i32,
+) -> Result<CancelPendingJobsResponse, AppError> {
+    let cancelled = sqlx::query!(
+        r#"
+        UPDATE jobs
+        SET status = 'cancelled'::job_status,
+            finished_at = NOW()
+        WHERE user_id = $1
+          AND status = 'queued'::job_status
+          AND job_type IN ('ingest_metadata', 'ingest_thumbnails', 'ingest_analysis')
+        "#,
+        user_id
+    )
+    .execute(pool)
+    .await?
+    .rows_affected();
+
+    enqueue_job::<()>(pool, settings, JobType::Scan)
+        .user_id(user_id)
+        .call()
+        .await?;
+
+    Ok(CancelPendingJobsResponse {
+        cancelled: cancelled as i64,
+    })
 }
 
 /// Retrieves a paginated list of user jobs matching filter/search parameters.

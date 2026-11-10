@@ -62,8 +62,11 @@ const filteredCategoryProgress = computed(() => {
 
   const progress = categories.map((cat) => {
     const counts = ingestStore.overview![cat.id]
-    const total = counts?.total || 0
-    const done = counts?.done || 0
+    // Cancelled jobs are abandoned work; leaving them in the totals makes a re-enqueued
+    // pipeline read as half finished.
+    const cancelled = counts?.cancelled || 0
+    const total = (counts?.total || 0) - cancelled
+    const done = (counts?.done || 0) + (counts?.failed || 0)
     const running = counts?.running || 0
     const queued = counts?.queued || 0
     const toGo = queued + running
@@ -74,7 +77,7 @@ const filteredCategoryProgress = computed(() => {
       total,
       toGo,
       percentage,
-      counts,
+      counts: counts ? { ...counts, total, cancelled: 0 } : undefined,
     }
   })
 
