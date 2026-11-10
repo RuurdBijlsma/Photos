@@ -16,7 +16,7 @@ Initial thoughts on libraries. not set in stone. Change if something better is a
     * with the official Java/Kotlin Protobuf lite runtime (compiled from your existing timeline.proto).
 * Background Tasks: WorkManager (with CoroutineWorker) for auto-uploading and background synchronization.
 * Video Playback: Jetpack Media3 (ExoPlayer).
-* not sure yet
+* not sure yet what zoom/pan gesture library to use
 
 ## CORE FEATURES
 
