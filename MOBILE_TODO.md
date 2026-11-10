@@ -88,12 +88,23 @@ even lower prio, dont want this in the app
 
 # Phased Implementation of CORE Features
 
+## phase 0: INVESTIGATE
+* look at [investigate] fields in the file and decide.
+  * masonry vs square grid
+  * image caching for offline viewing (which cloud-only images to cache?)
+
 ## Phase 1: Foundation & Read-Only Timeline
 * Set up Retrofit + OkHttp configured with a persistent `CookieJar` to handle and persist cookie-based session auth across app launches.
+* make sure to handle expiring tokens and such
 * Compile `timeline.proto` via the Protobuf Gradle plugin to generate Kotlin/Java models.
 * Implement repository sync: fetch `GET /api/timeline/ratios` and `GET /api/timeline/by-month`, storing entries into Room.
 * Query local `MediaStore` and merge them into the same Room table to support unified offline browsing.
 * Build the Compose timeline using `LazyVerticalGrid` with month headers and the draggable right-edge scrubber with a floating date pill.
+  * [investigate] look into how much complexity a justified masonry grid (like frontend has) adds. keep in mind:
+    * scrubbar to date is affected by this (insta scrub has to know where to scrub to, masonry layout has variable height rows)
+    * is performance cost acceptable?
+    * all aspect ratios (offline & online) have to be known to build a proper grid (on the fly on mobile)
+    * even with masonry grid the app should start quickly and load into the timeline grid "instantly"
 
 ## Phase 2: Media Viewer & Gestures
 * Implement fullscreen viewer with swipe-between-items via `HorizontalPager`.
