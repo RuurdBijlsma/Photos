@@ -12,7 +12,7 @@ Initial thoughts on libraries. not set in stone. Change if something better is a
       content:// MediaStore URIs, and HTTP/AVIF URLs).
 * Local Database: Room
     * (with SQLite WAL mode for fast parallel reads/writes).
-* Networking & Protobuf: Ktor Client (or Retrofit + OkHttp)
+* Networking & Protobuf: Retrofit + OkHttp
     * with the official Java/Kotlin Protobuf lite runtime (compiled from your existing timeline.proto).
 * Background Tasks: WorkManager (with CoroutineWorker) for auto-uploading and background synchronization.
 * Video Playback: Jetpack Media3 (ExoPlayer).
@@ -82,4 +82,43 @@ even lower prio, dont want this in the app
 
 * activity view, where user can see how the backend is progressing during ingest
 * admin page - see background job queue, manage user accounts on server
-* manage storage - see how full the server disk is, and get possibility to clear up storage by deleting large items~~
+* manage storage - see how full the server disk is, and get possibility to clear up storage by deleting large items
+
+
+---
+
+Phased implementation of CORE features
+
+#### Phase 1: Foundation & Read-Only Timeline
+* Set up Ktor/Retrofit with JWT storage in Android `EncryptedSharedPreferences` or `DataStore`.
+* Compile `timeline.proto` to generate Kotlin/Java Protobuf models.
+* Implement repository sync: fetch `GET /api/timeline/ratios` and `GET /api/timeline/by-month`, storing entries into Room.
+* Query local `MediaStore` and merge them into the same Room table.
+* Build the Compose timeline using `LazyVerticalGrid` with month headers and the draggable right-edge scrubber.
+
+#### Phase 2: Media Viewer & Gestures
+* Implement fullscreen viewer with swipe-between-items via `HorizontalPager`.
+* Integrate `telephoto` / `zoomable` for double-tap and pinch-to-zoom.
+* Media3 (ExoPlayer) integration for streaming videos or playing local video files directly from device storage.
+* Add bottom action bar: Share (using native Android `Intent.ACTION_SEND`), Info panel (EXIF metadata), and Delete.
+
+#### Phase 3: Backup Engine & Manual Upload
+* UI screen for backup settings: enable backup, select folders (DCIM, WhatsApp, etc.), Wi-Fi only toggle.
+* Room `upload_queue` table to track progress.
+* `UploadWorker` implementation with TUS upload chunks.
+* Timeline badge overlays: syncing spinner, local-only icon, or cloud checkmark.
+
+#### Phase 4: Albums, Management & Deletion
+* Album browsing and creating new albums.
+* Drag-to-select and long-press multi-selection on the timeline.
+* Deletion dialog: "Delete from Device", "Delete from Server", "Delete Everywhere".
+* "Free up space" feature: find all items where `syncStatus == SYNCED`, count their total local file size, and prompt `createDeleteRequest` to purge them from the phone.
+
+---
+
+implement notes
+
+* Compose LazyGrid Performance:
+  * Timeline scrolling will stutter if items perform heavy formatting on the main thread. Ensure dates, timestamps, and URLs
+  are pre-computed in Room or mapped once in the ViewModel, never inside the Compose @Composable item body. Pass stable
+  Lambdas/IDs to LazyVerticalGrid.
