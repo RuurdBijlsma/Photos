@@ -1,9 +1,26 @@
-~~# MOBILE APP:
+# MOBILE APP:
 
 Support for Android 17 and up.
 
+### Mobile stack:
+
+Initial thoughts on libraries. not set in stone. Change if something better is available.
+
+* UI: Jetpack Compose + Compose Material 3.
+* Image Loading: Coil 3
+    * (Supports Compose natively, coroutines-first, customizable disk caches, and handles both android.resource://,
+      content:// MediaStore URIs, and HTTP/AVIF URLs).
+* Local Database: Room
+    * (with SQLite WAL mode for fast parallel reads/writes).
+* Networking & Protobuf: Ktor Client (or Retrofit + OkHttp)
+    * with the official Java/Kotlin Protobuf lite runtime (compiled from your existing timeline.proto).
+* Background Tasks: WorkManager (with CoroutineWorker) for auto-uploading and background synchronization.
+* Video Playback: Jetpack Media3 (ExoPlayer).
+* not sure yet
+
 ## CORE FEATURES
 
+* auth (login, stay logged in)
 * auto upload when a new photo/video is taken
 * view timeline (including offline photos, in case no internet connection)
     * includes local vs cloud deduplication
@@ -21,11 +38,15 @@ Support for Android 17 and up.
     * For photos physically on the phone, load directly from Android’s local thumbs instead of querying the server.
 * delete action, consider how to best do this, there's delete from device, delete from server, and soft delete (db sets
   deleted=true)
+* in media-viewer
+    * swipe up for info/gps/date pane
+    * swipe down to return back to timeline
 
 ## LATER ON
 
 * "Free up space" on phone button, deletes locally from phone from media items where it's detected it's already on
   server
+* "cast" button
 * semantic search (backend is already there), wouldnt need offline items to be searchable
 * map view
 * daily cards on front page (similar to cards in google photos), with notifications. Things like "On this day (1 year
