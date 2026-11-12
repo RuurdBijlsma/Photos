@@ -295,7 +295,6 @@ app/src/main/java/com/ruurd/photos/
 
 ### Part 5: Recommended Third-Party Libraries
 
-* **Target SDK:** Min SDK **31** (Android 12), Target SDK **35+** (Android 15).
 * **Image Loading:** `io.coil-kt.coil3:coil-compose:3.1.0` (Native Compose integration, supports coroutines, handles
   `content://`, `http://`, and AVIF decoding via `ImageDecoder`).
 * **Zoom Gestures in Viewer:** `me.saket.telephoto:zoomable-image-coil:0.14.0` (Compose zoomable image with fling,
