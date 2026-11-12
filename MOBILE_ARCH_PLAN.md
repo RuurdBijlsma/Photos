@@ -134,13 +134,14 @@ into two distinct tiers (mirroring the web app's architecture):
 
 ##### Tier 2: Item Hydration via Lazy Loading
 
-* When a row enters the viewport:
+* When a row enters (or comes close to) the viewport:
     * For local photos: Room already holds full metadata from the MediaStore scan.
     * For cloud photos: The ViewModel checks if the month's items are in Room. If missing, it dispatches
       `GET /api/timeline/by-month?months=YYYY-MM-01` for the visible month plus 1–2 overscan months (exact equivalent of
       `preLoadAllMonths` in `timelineStore.ts`).
     * Once metadata arrives, `Placeholder` entries in that month transition to `Loaded` items, binding thumbnail URLs
       without shifting row geometry.
+    * See web implementation for how it's done there.
 
 ---
 
@@ -164,20 +165,6 @@ class TimelineLayoutIndex(
     fun findIndexForDate(yearMonth: String): Int = monthOffsets[yearMonth] ?: 0
 }
 ```
-
-##### Throttling During Fast Scrubbing (`isScrollingFast`)
-
-When dragging the scrubber across years of photos, composing thousands of incoming images would flood Coil's request
-queues and cause GC stutters.
-
-* Adopt the web app's `isScrollingFast` pattern:
-    * While the user is actively dragging the scrubber thumb, set `isScrollingFast = true`.
-    * While `isScrollingFast == true`, row items render only the background shape box, completely bypassing image
-      loading.
-    * Once the scrubber stops or touch lifts (150ms debounce), set `isScrollingFast = false` to begin loading thumbnails
-      for the landed viewport.
-
----
 
 ### Part 2: Android App Architecture
 
@@ -226,7 +213,8 @@ Adopt **Clean Architecture + MVI/MVVM** with **Unidirectional Data Flow (UDF)**.
           hardware-accelerated `MessageDigest.getInstance("SHA-256")`. If it matches a cloud item, mark it `SYNCED` and
           link `cloudId` without uploading.
 3. **Coil 3 Thumbnail Strategy:**
-    * **Target SDK:** Android 12+ (API 31+) provides native hardware-accelerated AVIF decoding via `ImageDecoder`.
+    * **Target SDK:** (Android 17 and up (API level 37)) provides native hardware-accelerated AVIF decoding via
+      `ImageDecoder`.
     * If `syncStatus == LOCAL_ONLY`: Image source is `localContentUri` (instant system thumbnail).
     * If `syncStatus == CLOUD_ONLY`:
         * If `hasThumbnails == true`: Image source is `"${BASE_URL}/thumbnails/${cloudId}/${targetHeight}p.avif"` cached
@@ -295,13 +283,13 @@ app/src/main/java/com/ruurd/photos/
 
 ### Part 4: Screens & Views Breakdown
 
-| Screen                                   | Core UI Components                                                                                                                                                                         | Key Gestures & Interactions                                                                                                                                                            |
-|:-----------------------------------------|:-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|:---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **`TimelineScreen`**                     | • `LazyColumn` of justified rows<br>• Right-edge `TimelineScrubber`<br>• Floating `DateOverlay`<br>• Contextual multi-selection top bar                                                    | • Fast vertical dragging on scrubber to jump dates (with `isScrollingFast` blanking)<br>• Long-press + drag down to multi-select items<br>• Tap item $\to$ navigate into `MediaViewer` |
-| **`MediaViewerScreen`**                  | • `HorizontalPager` for smooth swiping<br>• `Telephoto` zoomable photo viewport<br>• Reused single `ExoPlayer` instance for video items<br>• Bottom action bar (Share, Edit, Delete, Info) | • Double-tap to zoom, pinch-to-zoom<br>• Swipe down to dismiss back to timeline<br>• Swipe up to expand metadata / EXIF / weather sheet                                                |
-| **`AlbumsScreen` & `AlbumDetailScreen`** | • `LazyVerticalGrid` (square cards) for album list<br>• Justified row grid for album contents                                                                                              | • Tap album card $\to$ open album timeline<br>• Add photos to album via selection flow                                                                                                 |
-| **`BackupSettingsScreen`**               | • Device folder checklist (DCIM, WhatsApp, Downloads)<br>• Constraint switches (Wi-Fi only, while charging)<br>• Live upload queue progress bar                                            | • Toggle auto-backup<br>• "Sync Now" manual trigger                                                                                                                                    |
-| **`AuthScreen`**                         | • Server URL input (defaults to self-hosted domain)<br>• Email & password inputs                                                                                                           | • Validates connection via `GET /api/health`<br>• Stores access/refresh tokens in encrypted DataStore                                                                                  |
+| Screen                                   | Core UI Components                                                                                                                                                                         | Key Gestures & Interactions                                                                                                                                                              |
+|:-----------------------------------------|:-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|:-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **`TimelineScreen`**                     | • `LazyColumn` of justified rows<br>• Right-edge `TimelineScrubber`<br>• Floating `DateOverlay`<br>• Contextual multi-selection top bar                                                    | • Fast vertical dragging on scrubber to jump dates (with `isScrollingFast` blanking)<br>• Long-press + drag down to multi-select items<br>• Tap item $\to$ navigate into `MediaViewer`   |
+| **`MediaViewerScreen`**                  | • `HorizontalPager` for smooth swiping<br>• `Telephoto` zoomable photo viewport<br>• Reused single `ExoPlayer` instance for video items<br>• Bottom action bar (Share, Edit, Delete, Info) | • Double-tap to zoom, pinch-to-zoom<br>• Swipe down to dismiss back to timeline<br>• Swipe up to expand metadata / EXIF / weather sheet (same info as media info panel in web viewphoto) |
+| **`AlbumsScreen` & `AlbumDetailScreen`** | • `LazyVerticalGrid` (square cards) for album list<br>• Justified row grid for album contents                                                                                              | • Tap album card $\to$ open album timeline<br>• Add photos to album via selection flow                                                                                                   |
+| **`BackupSettingsScreen`**               | • Device folder checklist (DCIM, WhatsApp, Downloads)<br>• Constraint switches (Wi-Fi only, while charging)<br>• Live upload queue progress bar                                            | • Toggle auto-backup<br>• "Sync Now" manual trigger                                                                                                                                      |
+| **`AuthScreen`**                         | • Server URL input (defaults to self-hosted domain)<br>• Email & password inputs                                                                                                           | • Validates connection via `GET /api/health`<br>• Stores access/refresh tokens in encrypted DataStore                                                                                    |
 
 ---
 
@@ -312,8 +300,7 @@ app/src/main/java/com/ruurd/photos/
   `content://`, `http://`, and AVIF decoding via `ImageDecoder`).
 * **Zoom Gestures in Viewer:** `me.saket.telephoto:zoomable-image-coil:0.14.0` (Compose zoomable image with fling,
   inertia, and nested scrolling cooperation with `HorizontalPager`).
-* **Video Playback:** `androidx.media3:media3-exoplayer:1.5.1` & `androidx.media3:media3-ui:1.5.1` (Shared player pool
-  across pager items).
+* **Video Playback:** `androidx.media3:media3-exoplayer:1.5.1` & `androidx.media3:media3-ui:1.5.1`
 * **Protobuf Compilation:** `com.google.protobuf:protobuf-kotlin-lite:4.30.0` with the Gradle Protobuf plugin to compile
   `timeline.proto`.
 * **Navigation:** `androidx.navigation:navigation-compose:2.8.8` (Type-safe Compose navigation routes via
