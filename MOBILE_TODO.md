@@ -23,7 +23,7 @@ Initial thoughts on libraries. not set in stone. Change if something better is a
 * auth (login, stay logged in)
 * auto upload when a new photo/video is taken
 * view timeline (including offline photos, in case no internet connection)
-    * includes local vs cloud deduplication
+    * includes local vs cloud deduplicationa
     * show badge on timeline for cloud / local / uploading
     * scrub through timeline with scrubber on the right edge with floating date pill (similar to web frontend)
 * view photo, pinch/double tap to zoom, share, add to album. generally native gallery gestures & interactions
@@ -33,8 +33,7 @@ Initial thoughts on libraries. not set in stone. Change if something better is a
 * folder selection for what to backup. Default to DCIM/Camera, optionally let user add more folders
 * cache timeline / other responses so opening app can be instant
 * view timeline items offline
-    * this means caching all cloud thumbnails? Investigate how to best handle this. Maybe that would be too much
-      storage/downloading required. bounded LRU disk cache for thumbs?
+    * bounded LRU disk cache for cloud thumbs?
     * For photos physically on the phone, load directly from Android’s local thumbs instead of querying the server.
 * delete action, consider how to best do this, there's delete from device, delete from server, and soft delete (db sets
   deleted=true)
@@ -88,10 +87,27 @@ even lower prio, dont want this in the app
 
 # Phased Implementation of CORE Features
 
+decisions:
+
+* For cloud-only photos, load the WebP/AVIF thumbnail from GET /thumbnails/{id}/{size}p.avif and let Coil’s bounded disk cache (e.g. 500 MB LRU disk cache) cache what the user actually scrolls past.
+* grid: justified horizontal row layout / masonry
+
+investigation:
+
+* how to handle justified horizontal row layout grid:
+  * insta scrub
+  * no lag / perf impact
+  * offline & cloud mix
+  * how does it affect
+
+implement notes
+
+* Compose LazyGrid Performance:
+  * Timeline scrolling will stutter if items perform heavy formatting on the main thread. Ensure dates, timestamps, and URLs
+    are pre-computed in Room or mapped once in the ViewModel, never inside the Compose @Composable item body. Pass stable
+    Lambdas/IDs to LazyVerticalGrid.
+
 ## phase 0: INVESTIGATE
-* look at [investigate] fields in the file and decide.
-  * masonry vs square grid
-  * image caching for offline viewing (which cloud-only images to cache?)
 
 ## Phase 1: Foundation & Read-Only Timeline
 * Set up Retrofit + OkHttp configured with a persistent `CookieJar` to handle and persist cookie-based session auth across app launches.
@@ -100,7 +116,7 @@ even lower prio, dont want this in the app
 * Implement repository sync: fetch `GET /api/timeline/ratios` and `GET /api/timeline/by-month`, storing entries into Room.
 * Query local `MediaStore` and merge them into the same Room table to support unified offline browsing.
 * Build the Compose timeline using `LazyVerticalGrid` with month headers and the draggable right-edge scrubber with a floating date pill.
-  * [investigate] look into how much complexity a justified masonry grid (like frontend has) adds. keep in mind:
+  * [investigate] look into how much complexity a justified horizontal row layout grid (like frontend / google photos) adds. keep in mind:
     * scrubbar to date is affected by this (insta scrub has to know where to scrub to, masonry layout has variable height rows)
     * is performance cost acceptable?
     * all aspect ratios (offline & online) have to be known to build a proper grid (on the fly on mobile)
@@ -119,17 +135,19 @@ even lower prio, dont want this in the app
 * `UploadWorker` implementation leveraging OkHttp for TUS chunked resumable uploads.
 * Timeline badge overlays showing item status: syncing spinner, local-only icon, or cloud checkmark.
 
+```
+The Problem: Standard Android CoroutineWorker instances have a strict 10-minute maximum execution window. If a user uploads a 4K 60fps video or a large batch on a typical home upload speed, Android's OS will kill the worker mid-stream.
+
+Fix:
+    Call setForeground(createForegroundInfo()) inside UploadWorker to promote it to a Foreground Service with an ongoing notification showing progress.
+    Use TUS chunking (e.g., 5 MB chunks) and persist the TUS upload URL and offset in Room's upload_queue table after every chunk. If killed, the next run resumes seamlessly without re-uploading uploaded bytes.
+```
+
 ## Phase 4: Albums, Management & Deletion
 * Album browsing, viewing album items, and creating new albums.
 * Drag-to-select and long-press multi-selection on the timeline grid.
 * Unified deletion dialog: "Delete from Device", "Delete from Server" (soft delete / trash), and "Delete Everywhere".
+  * On Android 11+ (API 30+), deleting media from MediaStore that belongs to other apps or was created before the app was installed requires user consent via the OS dialog.
 * "Free up space" feature: query items where `syncStatus == SYNCED`, compute local savings, and trigger `MediaStore.createDeleteRequest` to purge local files.
 
 ---
-
-implement notes
-
-* Compose LazyGrid Performance:
-  * Timeline scrolling will stutter if items perform heavy formatting on the main thread. Ensure dates, timestamps, and URLs
-  are pre-computed in Room or mapped once in the ViewModel, never inside the Compose @Composable item body. Pass stable
-  Lambdas/IDs to LazyVerticalGrid.
