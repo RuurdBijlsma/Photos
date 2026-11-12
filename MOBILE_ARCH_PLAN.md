@@ -188,18 +188,26 @@ Adopt **Clean Architecture + MVI/MVVM** with **Unidirectional Data Flow (UDF)**.
 │                       Data Layer                           │
 │  Repositories (MediaRepository, BackupRepository)          │
 │  Local: Room DB, MediaStore DataSource, Layout Cache       │
-│  Remote: OkHttp + Retrofit (Protobuf Lite), TUS Client     │
+│  Remote: OkHttp + Persistent CookieJar, Retrofit, TUS      │
 │  Background: WorkManager (UploadWorker, LocalScanWorker)   │
 └────────────────────────────────────────────────────────────┘
 ```
 
 #### Key Architecture Principles for this App:
 
-1. **Two-Tier Layout vs Item Storage:**
+1. **Cookie-Based Session Authentication & Persistent CookieJar:**
+    * Matches the web client (`web/src/scripts/services/api.ts`) by relying exclusively on HTTP cookies (`access_token`,
+      `refresh_token`) set by the backend on `POST /api/auth/login`.
+    * OkHttp is configured with a persistent `CookieJar` (backed by encrypted SharedPreferences or DataStore).
+    * Every network call—including Retrofit API requests, Coil thumbnail image fetches, and TUS file uploads—shares this
+      exact OkHttp client instance and automatically includes the session cookies.
+    * Transparent session refresh: An OkHttp `Interceptor` or 401 response handler triggers `POST /api/auth/refresh`
+      when an access cookie expires, updating the cookie store seamlessly without re-prompting the user.
+2. **Two-Tier Layout vs Item Storage:**
     * **Structure Cache:** Stores `month_id -> List<Float>` ratios to construct the visual grid partition immediately.
     * **Room Database:** Stores complete `MediaEntity` rows (local items and synced cloud items). The UI combines both
       tiers into `TimelineRowUiItem` models.
-2. **Local vs Cloud Identity (Deduplication via SHA-256):**
+3. **Local vs Cloud Identity (Deduplication via SHA-256):**
     * Backend adds a `sha256` column to `media_item`, indexed for fast lookups.
     * Media items in Room contain:
         * `localContentUri`: `content://media/external/images/media/1234` (nullable)
@@ -212,19 +220,18 @@ Adopt **Clean Architecture + MVI/MVVM** with **Unidirectional Data Flow (UDF)**.
         * *Crypto Verification:* For candidate matches or when staging an upload, compute SHA-256 via
           hardware-accelerated `MessageDigest.getInstance("SHA-256")`. If it matches a cloud item, mark it `SYNCED` and
           link `cloudId` without uploading.
-3. **Coil 3 Thumbnail Strategy:**
-    * **Target SDK:** (Android 17 and up (API level 37)) provides native hardware-accelerated AVIF decoding via
-      `ImageDecoder`.
+4. **Coil 3 Thumbnail Strategy:**
+    * **Target SDK:** (Android 17 and up (API level 37)) provides native hardware-accelerated AVIF decoding via `ImageDecoder`.
     * If `syncStatus == LOCAL_ONLY`: Image source is `localContentUri` (instant system thumbnail).
     * If `syncStatus == CLOUD_ONLY`:
         * If `hasThumbnails == true`: Image source is `"${BASE_URL}/thumbnails/${cloudId}/${targetHeight}p.avif"` cached
           in Coil's disk LRU cache.
         * If `hasThumbnails == false` (ingest in progress): Image source is
-          `"${BASE_URL}/api/photos/${cloudId}/thumbnail?size=${targetHeight}"`.
+          `"${BASE_URL}/api/photos/${cloudId}/thumbnail?size=${targetHeight}"`
     * If `syncStatus == SYNCED`: Prefer `localContentUri` while on device storage; fall back to cloud thumbnail URL if
       deleted locally.
-4. **Resumable Uploads via Foreground WorkManager:**
-    * `UploadWorker` executes TUS resumable uploads in 5 MB chunks.
+5. **Resumable Uploads via Foreground WorkManager:**
+    * `UploadWorker` executes TUS resumable uploads in 5 MB chunks (tus uploads work with JWT ticket).
     * To prevent the OS from killing transfers after 10 minutes, the worker calls
       `setForeground(createForegroundInfo())` to run as an Android Foreground Service with an ongoing notification.
     * The upload offset is persisted in Room after each chunk, ensuring seamless resume on network drops.
@@ -240,8 +247,9 @@ app/src/main/java/com/ruurd/photos/
 │   ├── database/           # Room Database, TypeConverters
 │   │   ├── dao/            # MediaDao, AlbumDao, UploadQueueDao
 │   │   └── entity/         # MediaEntity, AlbumEntity, UploadQueueEntity
-│   ├── network/            # OkHttp, Retrofit, AuthInterceptor, TokenAuthenticator
+│   ├── network/            # OkHttp, Retrofit, PersistentCookieJar, SessionManager
 │   │   ├── api/            # PhotosApiService (Retrofit Protobuf Lite)
+│   │   ├── cookie/         # PersistentCookieJar implementation (DataStore-backed)
 │   │   └── tus/            # Resumable TUS upload client
 │   └── ui/                 # Shared UI components, Theme (M3 Dynamic Color), Dimens
 │       └── components/     # ThumbnailImage, FastScroller, DateOverlay
@@ -283,13 +291,13 @@ app/src/main/java/com/ruurd/photos/
 
 ### Part 4: Screens & Views Breakdown
 
-| Screen                                   | Core UI Components                                                                                                                                                                         | Key Gestures & Interactions                                                                                                                                                              |
-|:-----------------------------------------|:-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|:-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **`TimelineScreen`**                     | • `LazyColumn` of justified rows<br>• Right-edge `TimelineScrubber`<br>• Floating `DateOverlay`<br>• Contextual multi-selection top bar                                                    | • Fast vertical dragging on scrubber to jump dates (with `isScrollingFast` blanking)<br>• Long-press + drag down to multi-select items<br>• Tap item $\to$ navigate into `MediaViewer`   |
-| **`MediaViewerScreen`**                  | • `HorizontalPager` for smooth swiping<br>• `Telephoto` zoomable photo viewport<br>• Reused single `ExoPlayer` instance for video items<br>• Bottom action bar (Share, Edit, Delete, Info) | • Double-tap to zoom, pinch-to-zoom<br>• Swipe down to dismiss back to timeline<br>• Swipe up to expand metadata / EXIF / weather sheet (same info as media info panel in web viewphoto) |
-| **`AlbumsScreen` & `AlbumDetailScreen`** | • `LazyVerticalGrid` (square cards) for album list<br>• Justified row grid for album contents                                                                                              | • Tap album card $\to$ open album timeline<br>• Add photos to album via selection flow                                                                                                   |
-| **`BackupSettingsScreen`**               | • Device folder checklist (DCIM, WhatsApp, Downloads)<br>• Constraint switches (Wi-Fi only, while charging)<br>• Live upload queue progress bar                                            | • Toggle auto-backup<br>• "Sync Now" manual trigger                                                                                                                                      |
-| **`AuthScreen`**                         | • Server URL input (defaults to self-hosted domain)<br>• Email & password inputs                                                                                                           | • Validates connection via `GET /api/health`<br>• Stores access/refresh tokens in encrypted DataStore                                                                                    |
+| Screen                                   | Core UI Components                                                                                                                                                                         | Key Gestures & Interactions                                                                                                                                                            |
+|:-----------------------------------------|:-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|:---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **`TimelineScreen`**                     | • `LazyColumn` of justified rows<br>• Right-edge `TimelineScrubber`<br>• Floating `DateOverlay`<br>• Contextual multi-selection top bar                                                    | • Fast vertical dragging on scrubber to jump dates (with `isScrollingFast` blanking)<br>• Long-press + drag down to multi-select items<br>• Tap item $\to$ navigate into `MediaViewer` |
+| **`MediaViewerScreen`**                  | • `HorizontalPager` for smooth swiping<br>• `Telephoto` zoomable photo viewport<br>• Reused single `ExoPlayer` instance for video items<br>• Bottom action bar (Share, Edit, Delete, Info) | • Double-tap to zoom, pinch-to-zoom<br>• Swipe down to dismiss back to timeline<br>• Swipe up to expand metadata / EXIF / weather sheet                                                |
+| **`AlbumsScreen` & `AlbumDetailScreen`** | • `LazyVerticalGrid` (square cards) for album list<br>• Justified row grid for album contents                                                                                              | • Tap album card $\to$ open album timeline<br>• Add photos to album via selection flow                                                                                                 |
+| **`BackupSettingsScreen`**               | • Device folder checklist (DCIM, WhatsApp, Downloads)<br>• Constraint switches (Wi-Fi only, while charging)<br>• Live upload queue progress bar                                            | • Toggle auto-backup<br>• "Sync Now" manual trigger                                                                                                                                    |
+| **`AuthScreen`**                         | • Server URL input (defaults to self-hosted domain)<br>• Email & password inputs                                                                                                           | • Validates connection via `GET /api/health`<br>• Stores session cookies in persistent `CookieJar` across app launches                                                                 |
 
 ---
 
