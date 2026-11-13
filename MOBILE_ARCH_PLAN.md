@@ -115,6 +115,14 @@ to purge removed items from Room without re-fetching the entire library.
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
 
+If an IngestMetadata transaction starts at T = 100 (setting updated_at = now() = 100 in Postgres) and commits at T =
+105, while a mobile sync runs at T = 102 and saves sync_timestamp = 102, the next delta sync (updated_at > 102) will
+permanently miss that item.
+
+Fix: On the client (or server), subtract a small safety overlap from since (e.g., since - 60_000L, 60 seconds). Since
+upserted and deleted_ids are idempotent in Room, overlapping by a minute costs almost nothing and eliminates missed
+concurrent ingests.
+
 ##### Sync Protocol & Data Transfer
 
 1. **Compact Timeline Protobuf (`timeline.proto`):**
@@ -171,7 +179,7 @@ to purge removed items from Room without re-fetching the entire library.
 3. **Delta Syncing (`since` parameter):**
     * **Initial Launch:** Query `GET /api/mobile/timeline/sync` without `since`. Backend streams all non-deleted items.
       Room bulk-inserts them in a single transaction and stores `latestSyncTimestamp`.
-    * **Subsequent Launches:** Query `GET /api/mobile/timeline/sync?since={latestSyncTimestamp}`. Only items created,
+    * **Subsequent Launches:** Query `GET /api/mobile/timeline/sync={latestSyncTimestamp}`. Only items created,
       updated, or soft-deleted since the last sync are returned (typically a few KB).
     * To handle possible out-of-sync situations, do a full sync (without `?since`) periodically (e.g., weekly) and on
       pull-to-refresh.
@@ -217,10 +225,53 @@ To prevent cold-start battery drain and disk thrashing, **the mobile app never h
 2. **Pass 2: On-Demand Crypto Verification (Deferred to Backup/Upload):**
     * For local items that did *not* match in Pass 1 (including rare cases where `size_bytes` + `ratio` matched a
       `CLOUD_ONLY` item whose timestamp differed by >24h due to a web date edit or missing `DATE_TAKEN`), the file hash
-      is calculated **only when staged for backup** (or lazily for those rare size-collision candidates) using the same
-      hash algorithm stored by the backend (`media_item.hash`).
+      is calculated **only when staged for backup** (or lazily for those rare size-collision candidates) using the
+      sha256 stored by the backend (backend currently uses BLAKE3, sha256 hash to be implemented and added to media_item
+      table).
     * Before streaming bytes, a pre-upload check (`POST /api/upload/check-hashes`) queries the backend with the hash. If
       the backend already possesses it, the upload is skipped and the item is marked `SYNCED`.
+
+##### TIPS
+
+DATE_TAKEN can be NULL or 0: Screenshots, WhatsApp media, and downloaded images often lack DATE_TAKEN in MediaStore.
+Fall back to DATE_MODIFIED * 1000L (note: DATE_ADDED and DATE_MODIFIED are in seconds, whereas DATE_TAKEN is in
+milliseconds!).
+
+##### How MediaEntity handles primary keys and state transitions between LOCAL_ONLY, CLOUD_ONLY, and SYNCED.
+
+If `MediaEntity` uses `cloudId` for cloud items and a generated/local ID for `LOCAL_ONLY` items, or vice versa, consider
+all four transitions carefully inside `@Transaction`:
+
+1. **Local item gets backed up → Cloud sync arrives:**
+   `LOCAL_ONLY` (`local_1234`) is uploaded via TUS. `IngestMetadata` runs asynchronously on the worker and creates a new
+   `cloudId` (`a1B2c3D4e5`). When `SyncTimelineUseCase` receives `a1B2c3D4e5`, it **must also run deduplication
+   against `LOCAL_ONLY` / `SYNCING` rows** (not just `ScanLocalMediaUseCase` running against `CLOUD_ONLY` rows!),
+   otherwise you'll momentarily show duplicate photos in the grid.
+2. **Cloud item deleted (`deleted_ids` contains `a1B2c3D4e5`) while `SYNCED`:**
+   Do **not** blindly `DELETE FROM media_item WHERE cloud_id IN (:deletedIds)`! If `localContentUri != null` (the photo
+   still exists on the phone), flip `syncStatus = LOCAL_ONLY` and `cloudId = null` (otherwise it vanishes from the
+   gallery and reappears on the next `MediaStore` scan). Only delete the Room row if `localContentUri == null`.
+3. **Local file deleted from device while `SYNCED`:**
+   When `ScanLocalMediaUseCase` sees `localContentUri` is gone, flip `syncStatus = CLOUD_ONLY` and
+   `localContentUri = null`. Only delete the Room row if `cloudId == null`.
+4. **Recommendation:** Make `localId` (or a deterministic surrogate key, e.g., `UUID` or `cloudId` with a helper merge)
+   clean by indexing `cloudId` (`UNIQUE`) and `localContentUri` (`UNIQUE`) separately, or explicitly performing an
+   atomic delete-old + insert/update in one Room `@Transaction` when merging `LOCAL_ONLY` + `CLOUD_ONLY` into `SYNCED`.
+
+##### Auth tip
+
+Concurrent 401 refresh lock (Critical):
+server/config/settings.yaml sets access_token_expiry_minutes: 30 and 20251004204735_init.sql stores hashed refresh_token
+selectors/verifiers (token rotation). If 4 parallel requests (e.g., timeline sync + 3 on-demand Coil thumbnail fetches)
+hit 401 when the 30-minute cookie expires, an unsynchronized OkHttp Authenticator will send 4 concurrent
+/api/auth/refresh calls. The first rotates the token and the other 3 fail and log the user out.
+
+Fix: Guard /api/auth/refresh in your OkHttp Authenticator with a Mutex / synchronized block and double-check whether the
+access_token cookie already changed before firing a refresh request. Also cap retries (responseCount(response) >= 2 ->
+give up) to avoid infinite 401 loops.
+
+Also keep api.rate_limiting (req_per_second: 6, burst_size: 10) in mind for auth_public_router—don't spam
+/api/auth/login or /api/auth/refresh.
 
 ##### App Launch Flow:
 
@@ -313,7 +364,8 @@ Adopt **Clean Architecture + MVI/MVVM** with **Unidirectional Data Flow (UDF)**.
           or 15-minute timezone-aligned timestamp (`±2s` within `±24h`). Matched items flip to `SYNCED` with zero disk
           hashing.
         * *Lazy Crypto Verification:* For unmatched local items staged for upload (and rare `size_bytes` collisions
-          with >24h timestamp drift), compute the file hash lazily and verify against the backend prior to streaming bytes.
+          with >24h timestamp drift), compute the file hash lazily and verify against the backend prior to streaming
+          bytes.
 4. **Coil 3 Thumbnail Strategy:**
     * **Target SDK:** (Android 17 and up (API level 37)) provides native hardware-accelerated AVIF decoding via
       `ImageDecoder`.
@@ -393,6 +445,16 @@ app/src/main/java/com/ruurd/photos/
 | **`AlbumsScreen` & `AlbumDetailScreen`** | • `LazyVerticalGrid` (square cards) for album list<br>• Justified row grid for album contents                                                                                              | • Tap album card → open album timeline<br>• Add photos to album via selection flow                                                                                                 |
 | **`BackupSettingsScreen`**               | • Device folder checklist (DCIM, WhatsApp, Downloads)<br>• Constraint switches (Wi-Fi only, while charging)<br>• Live upload queue progress bar                                            | • Toggle auto-backup<br>• "Sync Now" manual trigger                                                                                                                                |
 | **`AuthScreen`**                         | • Server URL input (defaults to self-hosted domain)<br>• Email & password inputs                                                                                                           | • Validates connection via `GET /api/health`<br>• Stores session cookies in persistent `CookieJar` across app launches                                                             |
+
+#### TIP
+
+- TIMELINE will only show photos from regular camera folder on phone
+
+Dynamic Server URL:
+Since AuthScreen lets the user input a server URL, don't hardcode Retrofit's baseUrl at DI graph creation time. Either
+swap/recreate the Retrofit instance on URL change or rewrite request.url in an OkHttp interceptor from the persisted
+server URL. Also add a network_security_config.xml (or debug manifest override) if you plan to test
+against http://10.0.2.2:5272 or LAN HTTP
 
 ---
 
