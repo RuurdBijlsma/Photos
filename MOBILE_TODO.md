@@ -7,16 +7,16 @@ Support for Android 17 and up (API level 37).
 Initial thoughts on libraries. not set in stone. Change if something better is available.
 
 * UI: Jetpack Compose + Compose Material 3.
-* Image Loading: Coil 3
-    * (Supports Compose natively, coroutines-first, customizable disk caches, and handles both android.resource://,
-      content:// MediaStore URIs, and HTTP/AVIF URLs).
+* Image Loading: Coil 3 (`coil-compose` + `coil-network-okhttp`)
+    * (Supports Compose natively, coroutines-first, customizable disk caches, and handles both `android.resource://`,
+      `content://` MediaStore URIs, and HTTP/AVIF URLs).
 * Local Database: Room
     * (with SQLite WAL mode for fast parallel reads/writes).
 * Networking & Protobuf: Retrofit + OkHttp
     * with the official Java/Kotlin Protobuf lite runtime (compiled from proto schemas).
 * Background Tasks: WorkManager (with CoroutineWorker) for auto-uploading and background synchronization.
 * Video Playback: Jetpack Media3 (ExoPlayer) + `media3-datasource-okhttp`.
-* Zoom/pan gestures: Telephoto (`zoomable-image-coil`).
+* Zoom/pan gestures: Telephoto (`zoomable-image-coil3`).
 
 ## CORE FEATURES
 
@@ -107,6 +107,9 @@ implement notes
 * Set up Retrofit + OkHttp configured with a persistent `CookieJar` to handle and persist cookie-based session auth
   across app launches.
 * Handle expiring tokens safely via a mutex-guarded OkHttp `Authenticator` (no concurrent `/api/auth/refresh` races).
+* Build `AuthScreen` (custom server URL input validated via `GET /api/health`, email/password login).
+* Configure Coil 3 (`coil-network-okhttp` sharing `OkHttpClient`, 500 MB LRU disk cache, and custom
+  `MediaStoreThumbnailFetcher` calling `ContentResolver.loadThumbnail` with coroutine `CancellationSignal`).
 * Add `NetworkMonitor` (`ConnectivityManager.NetworkCallback`) and subtle Offline / Syncing status indicator so missing
   internet degrades gracefully without errors.
 * Add dedicated compact timeline sync endpoint on backend (`GET /api/mobile/timeline/sync?since=...`) returning
@@ -117,21 +120,24 @@ implement notes
 * Implement repository sync: initial full sync and delta sync (using `since` timestamp with overlap window) directly
   into Room as the Single Source of Truth (non-unique `cloudId`, unique `localContentUri`, immutable surrogate `id`, and
   canonical `is_visible_in_timeline` invariant so duplicate local copies never crash or duplicate in the grid).
-* Query local `MediaStore` (handling `READ_MEDIA_IMAGES`, `READ_MEDIA_VIDEO`, and `READ_MEDIA_VISUAL_USER_SELECTED`) and
-  merge into Room using two-pass deduplication:
+* Query local `MediaStore` (`IS_PENDING = 0 AND IS_TRASHED = 0 AND SIZE > 0`, handling `READ_MEDIA_IMAGES`,
+  `READ_MEDIA_VIDEO`, and `READ_MEDIA_VISUAL_USER_SELECTED`) and merge into Room using two-pass deduplication:
     * Fast pass: match `(size_bytes, ratio, timezone-aligned timestamp)` against `CLOUD_ONLY` Room records for instant,
       zero-hash `SYNCED` reconciliation without disk I/O.
     * Lazy crypto pass: defer SHA-256 hashing to when unmatched items are staged for upload/backup.
 * Build the Compose timeline (`LazyColumn` of precomputed justified rows + `MonthHeaderUiItem`s) and the draggable
-  right-edge scrubber with a floating date pill (`isScrubbing` image-load gating, instant `scrollToItem`).
+  right-edge scrubber with a floating date pill (`isScrubbing` image-load gating, instant `scrollToItem`, and thumb
+  position derived from `estimatedOffsetTopDp / totalHeightDp`).
 
 ## Phase 2: Media Viewer & Gestures
 
 * Implement fullscreen viewer with swipe-between-items via `HorizontalPager`.
-* Integrate `telephoto` / `zoomable` for double-tap and pinch-to-zoom gestures.
+* Integrate `telephoto` (`zoomable-image-coil3`) for double-tap and pinch-to-zoom gestures.
 * Add native gallery vertical gestures: swipe down to dismiss back to the timeline (syncing timeline scroll position if
-  the viewed item is out of viewport), and swipe up to expand the info/GPS/date details sheet.
-* Integrate Media3 (`ExoPlayer` + `OkHttpDataSource.Factory`):
+  the viewed item is out of viewport), and swipe up to expand the info/GPS/date details sheet (fetching full details via
+  `GET /api/photos/{id}/item` when online and falling back to Room metadata offline).
+* Integrate Media3 (`ExoPlayer` + `OkHttpDataSource.Factory`), attaching the single shared `ExoPlayer` surface only to
+  the settled `HorizontalPager` page (`settledPage`) with thumbnail placeholder until the first frame renders:
     * Play `localContentUri` directly when `LOCAL_ONLY` or `SYNCED`.
     * For `CLOUD_ONLY`: if `hasThumbnails == false`, stream `/api/photos/{id}/video` (original quality, Range-enabled,
       requires auth). If `hasThumbnails == true`, check phone codec playability: let the user pick quality from
@@ -145,26 +151,35 @@ implement notes
   deduplication (returning all non-deleted matching `cloud_ids` per hash; Room prefers merging into an unlinked
   `CLOUD_ONLY` row if one matches, or otherwise links to the first returned `cloud_id` as `SYNCED` with
   `is_visible_in_timeline = 0` when an active timeline row for that `cloud_id` already exists).
-* UI screen for backup settings / Device Folders: toggle auto-backup, select source folders (default `DCIM/*` excluding
-  Screenshots, opt-in for WhatsApp, Downloads, etc.), and set Wi-Fi / charging constraints.
+* UI screen for backup settings / `DeviceFoldersScreen`: browse non-timeline device folders, toggle auto-backup, select
+  source folders (default `DCIM/*` excluding Screenshots), set Wi-Fi / charging constraints, and allow manual upload
+  (per-item action / picker).
 * Room `upload_queue` table to track progress, errors, `UPLOADED_PENDING_SYNC` state, and resumable state (keeping
   upload ticks out of `media_item` so timeline layout isn't recomputed during uploads).
-* `UploadWorker` implementation leveraging OkHttp for TUS chunked resumable uploads.
+* `UploadWorker` implementation leveraging a derived `OkHttpClient` (with `120s+` read/write timeouts and `404`/`410`
+  stale URL recovery) for TUS chunked resumable uploads.
 * Timeline badge overlays showing item status: syncing spinner, local-only icon, or cloud checkmark.
 
 ```
-The Problem: Standard Android CoroutineWorker instances have a strict 10-minute maximum execution window. If a user uploads a 4K 60fps video or a large batch on a typical home upload speed, Android's OS will kill the worker mid-stream.
+The Problem: Standard Android CoroutineWorker instances have a ~10-minute execution window, while Android 15–17 also
+enforces a 6-hour/24h cap on `dataSync` Foreground Services and blocks starting them from the background.
 
 Fix:
-Call setForeground(createForegroundInfo()) inside UploadWorker to promote it to a Foreground Service with an ongoing notification showing progress.
-Use TUS chunking (e.g., 5 MB chunks) and persist the TUS upload URL/UUID and offset in Room's upload_queue table after every chunk. If killed, the next run resumes seamlessly without re-uploading uploaded bytes.
+- Use TUS chunking (e.g., 5 MB chunks) and persist the TUS upload URL/UUID and offset in Room's `upload_queue` table
+  after every chunk so interrupted runs resume seamlessly without re-uploading bytes.
+- Run routine background auto-backups as normal constrained `WorkManager` batches (no `setForeground` needed).
+- Reserve `setForeground(createForegroundInfo())` (guarded against `ForegroundServiceStartNotAllowedException`) or
+  User-Initiated Data Transfer (UIDT) for explicit user-triggered "Back up now" / manual upload sessions started in
+  the foreground.
 ```
 
 ## Phase 4: Albums, Management & Deletion
 
-* Album browsing, viewing album items, and creating new albums.
+* Album browsing, viewing album items, creating new albums, and adding/removing items to/from albums.
 * Drag-to-select and long-press multi-selection on the timeline grid.
 * Unified deletion dialog: "Delete from Device", "Delete from Server" (soft delete / trash), and "Delete Everywhere".
+    * Deleting a `SYNCED` item from the server sets `auto_backup_suppressed = true` when reverting the local row to
+      `LOCAL_ONLY`, preventing auto-backup from immediately re-uploading it.
     * Deleting a local file with sibling local copies sharing the same `cloud_id` removes only that row (promoting a
       sibling to `is_visible_in_timeline = 1` if needed), rather than reverting the cloud item to `CLOUD_ONLY` while
       another local copy still exists.
