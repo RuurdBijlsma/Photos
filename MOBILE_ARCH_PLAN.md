@@ -1,18 +1,3 @@
-PROBLEMS:
-
-* UTC timestamp of DB might not fit with UTC timestamp that android delivers for a photo. not a huge deal. We can ignore
-  or make the fast-pass dedup looser and allow exact full hour differences up to and including 12 hour or something.
-* with current payload from server (utc timestamp), how do we group by month? Since the cutoff should be in local
-  timezone.
-    * I guess we'll have to add a timezone offset minutes (sint32) or local timestamp. We'd have to calc the timezone
-      offset minutes by the difference of sort_timestamp and local_timestamp
-* make room query for timeline something that doesnt cause "room invalidation storms".
-    * Group by month or something.
-    * Small debounce if there's multiple updates per second. Dont implement this yet, wait until we actually encounter a
-      problem here.
-
----
-
 PURPOSE OF THE DOC
 
 Purpose is to show a general idea of the breadth of the application. It's not a hard "in stone" written fact that the
@@ -55,14 +40,15 @@ LazyColumn
 
 Just like the web app's `calculateLayout` in `TimelineContainer.vue`, the math runs strictly off the UI thread (
 `Dispatchers.Default`) when the window width, orientation, or density changes. Because Room acts as the Single Source of
-Truth, the layout calculator receives fully resolved entities directly.
+Truth, the layout calculator receives fully resolved entities directly—with `yearMonth` precomputed on write so month
+boundary detection is a simple integer comparison with zero date parsing during layout.
 
 ```kotlin
 data class TimelineRowUiItem(
-    val id: String, // Stable key, e.g. "row_${monthId}_${items.firstOrNull()?.id ?: index}"
+    val id: String, // Stable key, e.g. "row_${yearMonth}_${items.firstOrNull()?.id ?: index}"
     val heightDp: Float,
     val items: List<TimelineGridItemUiModel>,
-    val monthId: String,
+    val yearMonth: Int, // Precomputed e.g. 202610
     val isFirstOfMonth: Boolean,
     val isLastOfMonth: Boolean,
     val estimatedOffsetTopDp: Float,
@@ -76,7 +62,9 @@ data class TimelineGridItemUiModel(
     val isVideo: Boolean,
     val durationMs: Int,
     val hasThumbnails: Boolean,
-    val timestamp: Long,
+    val sortTimestamp: Long,          // UTC epoch millis for ordering within month
+    val timezoneOffsetMinutes: Int,   // Local capture offset from UTC
+    val yearMonth: Int,               // Precomputed local month (e.g. 202610)
     val ratio: Float,
     val syncStatus: SyncStatus
 )
@@ -91,8 +79,8 @@ data class TimelineGridItemUiModel(
    $$\text{scaleFactor} = \frac{\text{containerWidth} - \text{totalGaps}}{\sum (\text{aspectRatio}_i \times \text{desiredHeight})}$$
    $$\text{actualRowHeight} = \text{clamp}(\text{desiredHeight} \times \text{scaleFactor}, \; \text{minHeight}, \; \text{desiredHeight} \times 1.5)$$
 4. Finalize the row, compute its cumulative vertical offset (`offsetTop`), and advance.
-5. If the month boundary ends on an incomplete row, cap its scale factor to `1.0` so the last 1 or 2 items don't stretch
-   into giant blocks.
+5. If the `yearMonth` boundary ends on an incomplete row, cap its scale factor to `1.0` so the last 1 or 2 items don't
+   stretch into giant blocks.
 
 ---
 
@@ -104,88 +92,143 @@ guarantees full offline capability and instant local-to-cloud reconciliation wit
 
 **Tombstone Deletion Tracking:** Permanent deletions are recorded in a lightweight `deleted_media_item` (tombstone,
 populated by db trigger, to be implemented) table with the purged IDs and their deletion timestamp. The delta sync
-endpoint checks
-`deleted_at > since` alongside`updated_at > since` to return `deleted_ids`, allowing the mobile client to purge removed
-items from Room without re-fetching the entire library.
+endpoint checks `deleted_at > since` alongside `updated_at > since` to return `deleted_ids`, allowing the mobile client
+to purge removed items from Room without re-fetching the entire library.
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                 Dedicated Compact Sync (Initial & Delta)                    │
-│  • Remote: GET /api/mobile/timeline/sync?since=... (Compact Protobuf)       │
-│    Payload: [id, sort_timestamp, ratio, is_video, has_thumbnails, size_bytes]│
-│    Size: ~24 bytes/photo (~380 KB gzipped for 50,000 photos)                │
-│  • Writes directly to Room `media_item` table                               │
-└──────────────────────────────────────┬──────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                 Dedicated Compact Sync (Initial & Delta)                     │
+│  • Remote: GET /api/mobile/timeline/sync?since=... (Compact Protobuf)        │
+│    Payload: [id, sort_timestamp, tz_offset_min, ratio, is_video,             │
+│              has_thumbnails, size_bytes]                                     │
+│    Size: ~26–27 bytes/photo (~400 KB gzipped for 50,000 photos)              │
+│  • Computes `year_month` and writes directly to Room `media_item` table      │
+└──────────────────────────────────────┬───────────────────────────────────────┘
                                        │
                                        ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                 Room Database: Single Source of Truth (SSOT)                │
-│  • Houses local-only, cloud-only, and merged/synced items                   │
-│  • Deduplication via zero-hash fast pass: (size_bytes, timestamp)           │
-│  • Feeds CalculateTimelineLayoutUseCase directly on Dispatchers.Default     │
-│  • 100% offline-ready: entire timeline renders instantly from SQLite       │
-└─────────────────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                 Room Database: Single Source of Truth (SSOT)                 │
+│  • Houses local-only, cloud-only, and merged/synced items                    │
+│  • Deduplication via zero-hash fast pass: size_bytes + ratio + tz-aligned ts │
+│  • Feeds CalculateTimelineLayoutUseCase directly on Dispatchers.Default      │
+│  • 100% offline-ready: entire timeline renders instantly from SQLite        │
+└──────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ##### Sync Protocol & Data Transfer
 
 1. **Compact Timeline Protobuf (`timeline.proto`):**
    ```protobuf
-    message TimelineSyncResponse {
-    // New or modified media items to be upserted into Room
-    repeated CompactTimelineItem upserted = 1;
-    // IDs of items moved to Bin/Trash or permanently purged via tombstones
-    repeated string deleted_ids = 2;
-    // Server timestamp (epoch ms) to persist and pass as `since` in the next sync request
-    int64 sync_timestamp = 3;
-    }
-    
-    message CompactTimelineItem {
-    string id = 1;                  // 10-char alphanumeric ID
-    int64 sort_timestamp = 2;       // Epoch millis for deterministic chronological sorting
-    float ratio = 3;                // width / height aspect ratio
-    bool is_video = 4;
-    bool has_thumbnails = 5;        // True if server pre-generated AVIF thumbnails are ready
-    int64 size_bytes = 6;           // Used for instant, zero-hash MediaStore deduplication
-    optional int32 duration_ms = 7; // Video duration in milliseconds (if video)
-    }
+   message TimelineSyncResponse {
+     // New or modified media items to be upserted into Room
+     repeated CompactTimelineItem upserted = 1;
+     // IDs of items moved to Bin/Trash or permanently purged via tombstones
+     repeated string deleted_ids = 2;
+     // Server timestamp (epoch ms) to persist and pass as `since` in the next sync request
+     int64 sync_timestamp = 3;
+   }
+
+   message CompactTimelineItem {
+     string id = 1;                      // 10-char alphanumeric ID
+     int64 sort_timestamp = 2;           // Epoch millis (UTC) for deterministic chronological sorting
+     float ratio = 3;                    // width / height aspect ratio
+     bool is_video = 4;
+     bool has_thumbnails = 5;            // True if server pre-generated AVIF thumbnails are ready
+     int64 size_bytes = 6;               // Used for instant, zero-hash MediaStore deduplication
+     optional int32 duration_ms = 7;     // Video duration in milliseconds (if video)
+     sint32 timezone_offset_minutes = 8; // Offset of taken_at_local vs sort_timestamp in minutes
+   }
    ```
-2. **Delta Syncing (`since` parameter):**
+2. **Local Timezone Month Grouping (`year_month`):**
+    * The web backend groups months by `month_id = date_trunc('month', taken_at_local)` (the wall-clock time where the
+      photo was taken, not the viewer's current timezone) and sorts items inside each month by
+      `sort_timestamp DESC, id DESC`.
+    * On the server, `timezone_offset_minutes` is derived from the two `NOT NULL` columns in `media_item` so it always
+      has
+      a value even when `timezone_offset_seconds` is `NULL`:
+      ```sql
+      ROUND(
+          EXTRACT(EPOCH FROM (taken_at_local - (sort_timestamp AT TIME ZONE 'UTC'))) / 60.0
+      )::INT AS timezone_offset_minutes
+      ```
+      *(Sending `sint32 timezone_offset_minutes` adds only 2–3 bytes uncompressed and compresses to near zero under gzip
+      since most photos in a library share 1–2 offsets; it also lets the viewer info sheet display true local capture
+      time offline.)*
+    * When writing to Room, precompute `year_month` (e.g., `202610` as an `Int`) and store it on `MediaEntity`:
+        * **Cloud items (`CLOUD_ONLY` / `SYNCED`):** Derive `year_month` from
+          `Instant.ofEpochMilli(sort_timestamp + timezone_offset_minutes * 60_000L)` in UTC.
+        * **Local-only items (`LOCAL_ONLY`):** Derive `year_month` from `MediaStore.DATE_TAKEN` using
+          `ZoneId.systemDefault()`. Once backed up and synced, the server's authoritative `year_month` and
+          `timezone_offset_minutes` take over.
+    * **Timeline Room query ordering:**
+      ```sql
+      SELECT * FROM media_item
+      ORDER BY year_month DESC, sort_timestamp DESC, id DESC
+      ```
+      Sorting by `year_month DESC` before `sort_timestamp DESC` guarantees contiguous month groups matching the
+      backend—so cross-timezone travel around midnight on the 1st of a month never splits a month header into two
+      sections.
+3. **Delta Syncing (`since` parameter):**
     * **Initial Launch:** Query `GET /api/mobile/timeline/sync` without `since`. Backend streams all non-deleted items.
       Room bulk-inserts them in a single transaction and stores `latestSyncTimestamp`.
     * **Subsequent Launches:** Query `GET /api/mobile/timeline/sync?since={latestSyncTimestamp}`. Only items created,
       updated, or soft-deleted since the last sync are returned (typically a few KB).
-    * To handle possible out of sync situations, do a full sync (without ?size) periodically (weekly?), and on pull to
-      refresh
+    * To handle possible out-of-sync situations, do a full sync (without `?since`) periodically (e.g., weekly) and on
+      pull-to-refresh.
+4. **Room Invalidation Note (Deferred):**
+    * Always wrap sync and `MediaStore` batch updates in a single Room `@Transaction` (`withTransaction { ... }`) so
+      Room emits one `Flow` invalidation per batch rather than per row.
+    * If rapid concurrent updates ever cause "Room invalidation storms" (multiple layout recalculations per second), add
+      a small `.debounce(150)` on the timeline `Flow` (or split queries by month). Don't implement extra complexity
+      unless actually encountered.
 
 ##### Two-Pass Local/Cloud Deduplication Strategy
 
 To prevent cold-start battery drain and disk thrashing, **the mobile app never hashes local photos on startup**:
 
-1. **Pass 1: Instant Fast-Pass (Zero Hashing):**
-    * Query `MediaStore` for `_ID`, `WIDTH`, `HEIGHT`, `ORIENTATION`, `SIZE`, and `DATE_TAKEN`.
-    * Cross-reference against Room using:
+1. **Pass 1: Instant Fast-Pass (Zero Hashing, Timezone-Safe):**
+    * Android `MediaStore.DATE_TAKEN` often differs from the server's `sort_timestamp` by exact timezone offsets (e.g.,
+      naive EXIF `DateTimeOriginal` interpreted in the phone's current timezone vs. server GPS/fallback timezone, OEM
+      QuickTime `creation_time` written in local time, or DST shifts).
+    * Query `MediaStore` for `_ID`, `WIDTH`, `HEIGHT`, `ORIENTATION`, `SIZE`, and `DATE_TAKEN` (compute `localRatio`
+      from oriented dimensions).
+    * Index `size_bytes` in Room (`@Index(value = ["sizeBytes"])`) and query `CLOUD_ONLY` candidates by exact byte size:
       ```sql
-      SELECT * FROM media_item 
-      WHERE size_bytes = :localFileSize 
-        AND ABS(sort_timestamp - :localDateTaken) < 2000
-      LIMIT 1;
+      SELECT * FROM media_item
+      WHERE size_bytes = :localFileSize
+        AND sync_status = 'CLOUD_ONLY'
       ```
-    * A match instantly links `localContentUri` to `cloudId` and marks `syncStatus = SYNCED`. This resolves >99.9% of
-      items with zero disk I/O.
+    * Match in Kotlin if **aspect ratio** matches (`abs(cloud.ratio - localRatio) < 0.02f`) AND **timestamp** satisfies
+      either:
+        * **Exact UTC match:** `diff < 2_000L` (covers sub-second truncation/rounding), OR
+        * **Timezone-aligned match:** `diff <= 24 * 3_600_000L` and `diff` falls within `±2_000L` of a 15-minute
+          (`900_000L`) boundary (covers all full-hour offsets plus `:30` / `:45` timezones):
+          ```kotlin
+          val diff = abs(cloud.sortTimestamp - localDateTakenMs)
+          val stepMs = 900_000L
+          val remainder = diff % stepMs
+          val timestampMatches = diff < 2_000L || (
+              diff <= 24 * 3_600_000L &&
+                  (remainder < 2_000L || stepMs - remainder < 2_000L)
+          )
+          ```
+    * Filtering on `sync_status = 'CLOUD_ONLY'` prevents two identical local copies from claiming the same `cloudId`. A
+      match immediately links `localContentUri` to `cloudId` and marks `syncStatus = SYNCED` with zero disk I/O.
 2. **Pass 2: On-Demand Crypto Verification (Deferred to Backup/Upload):**
-    * For local items that did *not* match in Pass 1 (new or modified local files), SHA-256 is calculated **only when
-      the item is staged for backup** by `UploadWorker` using ARMv8 hardware acceleration.
-    * Before streaming bytes, a quick pre-upload check (`POST /api/upload/check-hashes`) queries the backend with the
-      hash. If the backend already possesses it, the upload is skipped and the item is marked `SYNCED`.
+    * For local items that did *not* match in Pass 1 (including rare cases where `size_bytes` + `ratio` matched a
+      `CLOUD_ONLY` item whose timestamp differed by >24h due to a web date edit or missing `DATE_TAKEN`), the file hash
+      is calculated **only when staged for backup** (or lazily for those rare size-collision candidates) using the same
+      hash algorithm stored by the backend (`media_item.hash`).
+    * Before streaming bytes, a pre-upload check (`POST /api/upload/check-hashes`) queries the backend with the hash. If
+      the backend already possesses it, the upload is skipped and the item is marked `SYNCED`.
 
 ##### App Launch Flow:
 
-* **T = 0ms:** Read existing records from Room. Compute justified layout on `Dispatchers.Default`. The timeline renders
-  immediately with full metadata, even in airplane mode.
+* **T = 0ms:** Read existing records from Room (`ORDER BY year_month DESC, sort_timestamp DESC, id DESC`). Compute
+  justified layout on `Dispatchers.Default`. The timeline renders immediately with full metadata, even in airplane mode.
 * **T + 50ms:** `MediaStore` scan reconciles new or deleted local photos via the zero-hash fast pass.
 * **T + 150ms:** Background delta sync calls `GET /api/mobile/timeline/sync?since=...`. Any cloud changes are committed
-  to Room, triggering an incremental UI layout update.
+  to Room in a single transaction, triggering an incremental UI layout update.
 
 ---
 
@@ -197,7 +240,7 @@ Because each row has a slightly different height, native scroll thumbs can jitte
 class TimelineLayoutIndex(
     val rows: List<TimelineRowUiItem>,
     val totalHeightDp: Float,
-    val monthOffsets: Map<String, Int> // monthId -> LazyColumn row index
+    val monthOffsets: Map<Int, Int> // yearMonth (e.g. 202610) -> LazyColumn row index
 ) {
     fun findRowIndexAtPercentage(fraction: Float): Int {
         val targetOffset = fraction * totalHeightDp
@@ -206,7 +249,7 @@ class TimelineLayoutIndex(
         return if (idx < 0) (-idx - 1).coerceIn(0, rows.lastIndex) else idx
     }
 
-    fun findIndexForDate(yearMonth: String): Int = monthOffsets[yearMonth] ?: 0
+    fun findIndexForDate(yearMonth: Int): Int = monthOffsets[yearMonth] ?: 0
 }
 ```
 
@@ -215,26 +258,26 @@ class TimelineLayoutIndex(
 Adopt **Clean Architecture + MVI/MVVM** with **Unidirectional Data Flow (UDF)**.
 
 ```
-┌────────────────────────────────────────────────────────────┐
-│                        UI Layer                            │
-│   Compose Screens (Timeline, Viewer, Albums, Settings)     │
-│   ViewModels (StateFlow<UiState>, UiEvent channels)        │
-└──────────────────────────────┬─────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│                        UI Layer                             │
+│   Compose Screens (Timeline, Viewer, Albums, Settings)      │
+│   ViewModels (StateFlow<UiState>, UiEvent channels)         │
+└──────────────────────────────┬──────────────────────────────┘
                                │
-┌──────────────────────────────▼─────────────────────────────┐
-│                      Domain Layer                          │
-│   UseCases (CalculateLayout, SyncTimelineUseCase,          │
-│   DeduplicateMediaUseCase, EnqueueUploadUseCase)           │
-│   Domain Models (MediaItem, SyncStatus, TimelineRow)       │
-└──────────────────────────────┬─────────────────────────────┘
+┌──────────────────────────────▼──────────────────────────────┐
+│                      Domain Layer                           │
+│   UseCases (CalculateLayout, SyncTimelineUseCase,           │
+│   DeduplicateMediaUseCase, EnqueueUploadUseCase)            │
+│   Domain Models (MediaItem, SyncStatus, TimelineRow)        │
+└──────────────────────────────┬──────────────────────────────┘
                                │
-┌──────────────────────────────▼─────────────────────────────┐
-│                       Data Layer                           │
-│  Repositories (MediaRepository, BackupRepository)          │
-│  Local: Room DB, MediaStore DataSource, Layout Index       │
-│  Remote: OkHttp + Persistent CookieJar, Compact Sync API   │
-│  Background: WorkManager (UploadWorker, LocalScanWorker)   │
-└────────────────────────────────────────────────────────────┘
+┌──────────────────────────────▼──────────────────────────────┐
+│                       Data Layer                            │
+│  Repositories (MediaRepository, BackupRepository)           │
+│  Local: Room DB, MediaStore DataSource, Layout Index        │
+│  Remote: OkHttp + Persistent CookieJar, Compact Sync API    │
+│  Background: WorkManager (UploadWorker, LocalScanWorker)    │
+└─────────────────────────────────────────────────────────────┘
 ```
 
 #### Key Architecture Principles for this App:
@@ -248,23 +291,29 @@ Adopt **Clean Architecture + MVI/MVVM** with **Unidirectional Data Flow (UDF)**.
     * Transparent session refresh: An OkHttp `Interceptor` or 401 response handler triggers `POST /api/auth/refresh`
       when an access cookie expires, updating the cookie store seamlessly without re-prompting the user.
 2. **Room Database as Single Source of Truth (SSOT):**
-    * Room stores complete `MediaEntity` rows (local-only items, synced items, and cloud-only items).
+    * Room stores complete `MediaEntity` rows (local-only items, synced items, and cloud-only items), including
+      precomputed `yearMonth` and `timezoneOffsetMinutes`.
     * The dedicated compact sync endpoint populates cloud metadata, while `MediaStore` queries populate local metadata
       into the same table.
-    * Layout calculations run directly over Room data, enabling a 100% offline-first architecture with zero UI
-      placeholder jumping.
+    * Layout calculations run directly over Room data (`ORDER BY year_month DESC, sort_timestamp DESC, id DESC`),
+      enabling a 100% offline-first architecture with zero UI placeholder jumping.
 3. **Local vs Cloud Identity & Two-Pass Deduplication:**
     * Media items in Room contain:
         * `localContentUri`: `content://media/external/images/media/1234` (nullable)
         * `cloudId`: Backend 10-char alphanumeric string `a1B2c3D4e5` (nullable)
-        * `sizeBytes`: File size in bytes (from `CompactTimelineItem` or `MediaStore`)
-        * `sha256`: SHA-256 file hash (nullable, computed lazily)
+        * `sizeBytes`: File size in bytes (indexed, from `CompactTimelineItem` or `MediaStore`)
+        * `ratio`: Aspect ratio `width / height`
+        * `sortTimestamp`: UTC epoch millis
+        * `timezoneOffsetMinutes`: Offset of local capture time from `sortTimestamp`
+        * `yearMonth`: Precomputed `YYYYMM` integer for contiguous local-month grouping
+        * `fileHash`: File hash matching backend `media_item.hash` (nullable, computed lazily)
         * `syncStatus`: `LOCAL_ONLY`, `SYNCING`, `SYNCED`, `CLOUD_ONLY`
     * **Matching Pipeline:**
-        * *Fast Pass:* On startup/scan, instantly match local items against Room cloud records using
-          `(date_taken, size_bytes)`. Matched items flip to `SYNCED` with zero disk hashing.
-        * *Lazy Crypto Verification:* For unmatched local items queued for upload, calculate SHA-256 via
-          hardware-accelerated `MessageDigest` and verify against the backend prior to streaming bytes.
+        * *Fast Pass:* On startup/scan, query `CLOUD_ONLY` rows by `size_bytes` and match in Kotlin on `ratio` + exact
+          or 15-minute timezone-aligned timestamp (`±2s` within `±24h`). Matched items flip to `SYNCED` with zero disk
+          hashing.
+        * *Lazy Crypto Verification:* For unmatched local items staged for upload (and rare `size_bytes` collisions
+          with >24h timestamp drift), compute the file hash lazily and verify against the backend prior to streaming bytes.
 4. **Coil 3 Thumbnail Strategy:**
     * **Target SDK:** (Android 17 and up (API level 37)) provides native hardware-accelerated AVIF decoding via
       `ImageDecoder`.
@@ -337,13 +386,13 @@ app/src/main/java/com/ruurd/photos/
 
 ### Part 4: Screens & Views Breakdown
 
-| Screen                                   | Core UI Components                                                                                                                                                                         | Key Gestures & Interactions                                                                                                                                                            |
-|:-----------------------------------------|:-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|:---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **`TimelineScreen`**                     | • `LazyColumn` of justified rows<br>• Right-edge `TimelineScrubber`<br>• Floating `DateOverlay`<br>• Contextual multi-selection top bar                                                    | • Fast vertical dragging on scrubber to jump dates (with `isScrollingFast` blanking)<br>• Long-press + drag down to multi-select items<br>• Tap item $\to$ navigate into `MediaViewer` |
-| **`MediaViewerScreen`**                  | • `HorizontalPager` for smooth swiping<br>• `Telephoto` zoomable photo viewport<br>• Reused single `ExoPlayer` instance for video items<br>• Bottom action bar (Share, Edit, Delete, Info) | • Double-tap to zoom, pinch-to-zoom<br>• Swipe down to dismiss back to timeline<br>• Swipe up to expand metadata / EXIF / weather sheet                                                |
-| **`AlbumsScreen` & `AlbumDetailScreen`** | • `LazyVerticalGrid` (square cards) for album list<br>• Justified row grid for album contents                                                                                              | • Tap album card $\to$ open album timeline<br>• Add photos to album via selection flow                                                                                                 |
-| **`BackupSettingsScreen`**               | • Device folder checklist (DCIM, WhatsApp, Downloads)<br>• Constraint switches (Wi-Fi only, while charging)<br>• Live upload queue progress bar                                            | • Toggle auto-backup<br>• "Sync Now" manual trigger                                                                                                                                    |
-| **`AuthScreen`**                         | • Server URL input (defaults to self-hosted domain)<br>• Email & password inputs                                                                                                           | • Validates connection via `GET /api/health`<br>• Stores session cookies in persistent `CookieJar` across app launches                                                                 |
+| Screen                                   | Core UI Components                                                                                                                                                                         | Key Gestures & Interactions                                                                                                                                                        |
+|:-----------------------------------------|:-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|:-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **`TimelineScreen`**                     | • `LazyColumn` of justified rows<br>• Right-edge `TimelineScrubber`<br>• Floating `DateOverlay`<br>• Contextual multi-selection top bar                                                    | • Fast vertical dragging on scrubber to jump dates (with `isScrollingFast` blanking)<br>• Long-press + drag down to multi-select items<br>• Tap item → navigate into `MediaViewer` |
+| **`MediaViewerScreen`**                  | • `HorizontalPager` for smooth swiping<br>• `Telephoto` zoomable photo viewport<br>• Reused single `ExoPlayer` instance for video items<br>• Bottom action bar (Share, Edit, Delete, Info) | • Double-tap to zoom, pinch-to-zoom<br>• Swipe down to dismiss back to timeline<br>• Swipe up to expand metadata / EXIF / weather sheet                                            |
+| **`AlbumsScreen` & `AlbumDetailScreen`** | • `LazyVerticalGrid` (square cards) for album list<br>• Justified row grid for album contents                                                                                              | • Tap album card → open album timeline<br>• Add photos to album via selection flow                                                                                                 |
+| **`BackupSettingsScreen`**               | • Device folder checklist (DCIM, WhatsApp, Downloads)<br>• Constraint switches (Wi-Fi only, while charging)<br>• Live upload queue progress bar                                            | • Toggle auto-backup<br>• "Sync Now" manual trigger                                                                                                                                |
+| **`AuthScreen`**                         | • Server URL input (defaults to self-hosted domain)<br>• Email & password inputs                                                                                                           | • Validates connection via `GET /api/health`<br>• Stores session cookies in persistent `CookieJar` across app launches                                                             |
 
 ---
 
