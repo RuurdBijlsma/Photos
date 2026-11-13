@@ -142,8 +142,8 @@ implement notes
 ## Phase 3: Backup Engine & Manual Upload
 
 * Implement `sha256` column on backend `media_item` and `POST /api/upload/check-hashes` endpoint for Pass 2
-  deduplication (returning a single canonical matching `cloud_id` per hash; duplicate local files resolve to `SYNCED`
-  with
+  deduplication (returning all non-deleted matching `cloud_ids` per hash; Room prefers merging into an unlinked
+  `CLOUD_ONLY` row if one matches, or otherwise links to the first returned `cloud_id` as `SYNCED` with
   `is_visible_in_timeline = 0` when an active timeline row for that `cloud_id` already exists).
 * UI screen for backup settings / Device Folders: toggle auto-backup, select source folders (default `DCIM/*` excluding
   Screenshots, opt-in for WhatsApp, Downloads, etc.), and set Wi-Fi / charging constraints.

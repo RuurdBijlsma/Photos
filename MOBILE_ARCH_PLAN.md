@@ -137,8 +137,9 @@ guarantees full offline capability and instant local-to-cloud reconciliation wit
   remain fast at 50k+ rows.
 * Note that `size_bytes` lives on `media_features` (`JOIN media_features mf ON mf.media_item_id = m.id`), and the
   `sha256` column on `media_item` + `POST /api/upload/check-hashes` still need to be implemented on the backend
-  (currently `media_item` only stores a `hash` column; note `media_item.hash` is not `UNIQUE` on the server, so
-  `check-hashes` should return a single canonical matching `cloud_id` per hash).
+  (currently `media_item` only stores a `hash` column; because `media_item.hash` is not `UNIQUE` on the server,
+  `check-hashes` should return all non-deleted matching `cloud_id`s per hash:
+  `SELECT sha256, array_agg(id ORDER BY created_at ASC) AS cloud_ids FROM media_item WHERE user_id = $1 AND deleted = false AND sha256 = ANY($2) GROUP BY sha256`).
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────────┐
@@ -331,8 +332,10 @@ To prevent cold-start battery drain and disk thrashing, **the mobile app never h
       date edit or missing `DATE_TAKEN`), the SHA-256 hash is calculated **only when staged for backup** (or lazily for
       those rare size-collision candidates), matching the `sha256` column to be added to `media_item`.
     * Before streaming bytes, a pre-upload check (`POST /api/upload/check-hashes`, to be implemented on the backend)
-      queries the backend with the SHA-256 hash. If the backend already possesses it, the upload is skipped and the item
-      is marked `SYNCED` (linking `cloudId` and respecting the canonical visibility rule below).
+      queries the backend with the SHA-256 hash and receives all non-deleted matching `cloud_id`s (`cloud_ids`). If
+      non-empty, the upload is skipped, and Room prefers merging into an unlinked `CLOUD_ONLY` row matching one of the
+      returned `cloud_ids` or otherwise links the local row to the first `cloud_id` as `SYNCED` (respecting the
+      canonical visibility rule below).
 
 ##### TIPS
 
@@ -365,11 +368,18 @@ Handle all state transitions inside Room `@Transaction`s:
    if none exist, runs Pass 1 deduplication against `LOCAL_ONLY` / `UPLOADED_PENDING_SYNC` rows (not just
    `ScanLocalMediaUseCase` running against `CLOUD_ONLY` rows!) so you don't momentarily show duplicate photos in the
    grid.
-2. **Duplicate local copy links to an already-synced `cloudId` (Pass 2 `check-hashes`):**
-   Check `SELECT EXISTS(SELECT 1 FROM media_item WHERE cloud_id = :cloudId AND is_visible_in_timeline = 1)`:
-    * If `true`, link `cloudId` and set `syncStatus = SYNCED` with `is_visible_in_timeline = 0` (secondary duplicate
-      hidden from main timeline, still visible in its `DeviceFolder` and eligible for `"Free up space"`).
-    * If `false`, link `cloudId`, set `syncStatus = SYNCED`, and set `is_visible_in_timeline = 1`.
+2. **Pass 2 `check-hashes` returns matching `cloud_ids` (`[c1, c2, ...]`):**
+    * **First, check for an unlinked `CLOUD_ONLY` row:** Query
+      `SELECT * FROM media_item WHERE cloud_id IN (:cloudIds) AND sync_status = 'CLOUD_ONLY' LIMIT 1`. If found, merge
+      the `LOCAL_ONLY` row into that `CLOUD_ONLY` row (copy `localContentUri`, `bucketId`, `bucketName`, `relativePath`,
+      `sha256Hash` onto it, flip `syncStatus = SYNCED`, and `DELETE` the old `LOCAL_ONLY` row) so an unlinked cloud copy
+      is never left stranded in the timeline.
+    * **Otherwise (all matching `cloudIds` are already `SYNCED`, or not yet synced into Room):** Pick
+      `cloudId = cloudIds.first()`
+      and check `SELECT EXISTS(SELECT 1 FROM media_item WHERE cloud_id = :cloudId AND is_visible_in_timeline = 1)`:
+        * If `true`, link `cloudId` and set `syncStatus = SYNCED` with `is_visible_in_timeline = 0` (secondary duplicate
+          hidden from main timeline, still visible in its `DeviceFolder` and eligible for `"Free up space"`).
+        * If `false`, link `cloudId`, set `syncStatus = SYNCED`, and set `is_visible_in_timeline = 1`.
 3. **Server updates a cloud item (`SyncTimelineUseCase`):**
    `UPDATE media_item SET has_thumbnails = ..., sort_timestamp = ..., timezone_offset_minutes = ..., year_month = ... WHERE cloud_id = :cloudId`
    (updates the canonical row and any linked secondary copies).
@@ -379,7 +389,8 @@ Handle all state transitions inside Room `@Transaction`s:
     * If `local_content_uri == null` → `DELETE` the row.
     * If `local_content_uri != null` → flip `syncStatus = LOCAL_ONLY`, `cloudId = null`, and recompute
       `is_visible_in_timeline` from `device_folder.show_in_timeline` (otherwise it vanishes from the gallery and
-      reappears on the next `MediaStore` scan).
+      reappears on the next `MediaStore` scan; if another active server copy still exists for that hash, the next backup
+      check-hashes pass will re-link it cleanly without re-uploading bytes).
 5. **Local file deleted from device (`ScanLocalMediaUseCase` or "Free up space"):**
    For the removed local row:
     * If `cloud_id == null` → `DELETE` the row.
