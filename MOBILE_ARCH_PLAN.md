@@ -1,3 +1,18 @@
+PROBLEMS:
+
+* UTC timestamp of DB might not fit with UTC timestamp that android delivers for a photo. not a huge deal. We can ignore
+  or make the fast-pass dedup looser and allow exact full hour differences up to and including 12 hour or something.
+* with current payload from server (utc timestamp), how do we group by month? Since the cutoff should be in local
+  timezone.
+    * I guess we'll have to add a timezone offset minutes (sint32) or local timestamp. We'd have to calc the timezone
+      offset minutes by the difference of sort_timestamp and local_timestamp
+* make room query for timeline something that doesnt cause "room invalidation storms".
+    * Group by month or something.
+    * Small debounce if there's multiple updates per second. Dont implement this yet, wait until we actually encounter a
+      problem here.
+
+---
+
 PURPOSE OF THE DOC
 
 Purpose is to show a general idea of the breadth of the application. It's not a hard "in stone" written fact that the
@@ -88,7 +103,8 @@ Compact Protobuf Sync Endpoint** (to be implemented) paired with **Room as the S
 guarantees full offline capability and instant local-to-cloud reconciliation without UI placeholders.
 
 **Tombstone Deletion Tracking:** Permanent deletions are recorded in a lightweight `deleted_media_item` (tombstone,
-populated by db trigger) table with the purged IDs and their deletion timestamp. The delta sync endpoint checks
+populated by db trigger, to be implemented) table with the purged IDs and their deletion timestamp. The delta sync
+endpoint checks
 `deleted_at > since` alongside`updated_at > since` to return `deleted_ids`, allowing the mobile client to purge removed
 items from Room without re-fetching the entire library.
 
@@ -250,7 +266,8 @@ Adopt **Clean Architecture + MVI/MVVM** with **Unidirectional Data Flow (UDF)**.
         * *Lazy Crypto Verification:* For unmatched local items queued for upload, calculate SHA-256 via
           hardware-accelerated `MessageDigest` and verify against the backend prior to streaming bytes.
 4. **Coil 3 Thumbnail Strategy:**
-    * **Target SDK:** (Android 17 and up (API level 37)) provides native hardware-accelerated AVIF decoding via `ImageDecoder`.
+    * **Target SDK:** (Android 17 and up (API level 37)) provides native hardware-accelerated AVIF decoding via
+      `ImageDecoder`.
     * If `syncStatus == LOCAL_ONLY`: Image source is `localContentUri` (instant system thumbnail).
     * If `syncStatus == CLOUD_ONLY`:
         * If `hasThumbnails == true`: Image source is `"${BASE_URL}/thumbnails/${cloudId}/${targetHeight}p.avif"` cached
