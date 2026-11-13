@@ -112,15 +112,15 @@ implement notes
 * Add dedicated compact timeline sync endpoint on backend (`GET /api/mobile/timeline/sync?since=...`) returning
   `CompactTimelineItem` protobufs (including `id`, `sort_timestamp`, `ratio`, `is_video`, `has_thumbnails`,
   `size_bytes`, `duration_ms`, `timezone_offset_minutes`), plus `deleted_media_item` tombstone trigger (without
-  cascading
-  FK to `app_user`) and `(user_id, updated_at)` index.
+  cascading FK to `app_user`) and `(user_id, updated_at)` index.
 * Compile proto schemas (`common.proto` / `mobile.proto`) via the Protobuf Gradle plugin to generate Kotlin/Java models.
 * Implement repository sync: initial full sync and delta sync (using `since` timestamp with overlap window) directly
-  into Room as the Single Source of Truth.
+  into Room as the Single Source of Truth (non-unique `cloudId`, unique `localContentUri`, immutable surrogate `id`, and
+  canonical `is_visible_in_timeline` invariant so duplicate local copies never crash or duplicate in the grid).
 * Query local `MediaStore` (handling `READ_MEDIA_IMAGES`, `READ_MEDIA_VIDEO`, and `READ_MEDIA_VISUAL_USER_SELECTED`) and
   merge into Room using two-pass deduplication:
-    * Fast pass: match `(size_bytes, ratio, timezone-aligned timestamp)` against Room records for instant, zero-hash
-      `SYNCED` reconciliation without disk I/O.
+    * Fast pass: match `(size_bytes, ratio, timezone-aligned timestamp)` against `CLOUD_ONLY` Room records for instant,
+      zero-hash `SYNCED` reconciliation without disk I/O.
     * Lazy crypto pass: defer SHA-256 hashing to when unmatched items are staged for upload/backup.
 * Build the Compose timeline (`LazyColumn` of precomputed justified rows + `MonthHeaderUiItem`s) and the draggable
   right-edge scrubber with a floating date pill (`isScrubbing` image-load gating, instant `scrollToItem`).
@@ -134,14 +134,17 @@ implement notes
 * Integrate Media3 (`ExoPlayer` + `OkHttpDataSource.Factory`):
     * Play `localContentUri` directly when `LOCAL_ONLY` or `SYNCED`.
     * For `CLOUD_ONLY`: if `hasThumbnails == false`, stream `/api/photos/{id}/video` (original quality, Range-enabled,
-      requires auth). If `hasThumbnails == true`, check phone codec playability: use `/api/photos/{id}/video` when
-      playable, or fall back to `/thumbnails/{id}/480p.webm` (no auth) when not natively playable.
+      requires auth). If `hasThumbnails == true`, check phone codec playability: let the user pick quality from
+      available WebM qualities + original (`/api/photos/{id}/video`) when playable, or fall back to transcoded WebM
+      qualities (`/thumbnails/{id}/480p.webm`, etc., no auth) when not natively playable.
 * Add bottom action bar: Share (`Intent.ACTION_SEND`), Info panel toggle, and Delete actions.
 
 ## Phase 3: Backup Engine & Manual Upload
 
 * Implement `sha256` column on backend `media_item` and `POST /api/upload/check-hashes` endpoint for Pass 2
-  deduplication.
+  deduplication (returning a single canonical matching `cloud_id` per hash; duplicate local files resolve to `SYNCED`
+  with
+  `is_visible_in_timeline = 0` when an active timeline row for that `cloud_id` already exists).
 * UI screen for backup settings / Device Folders: toggle auto-backup, select source folders (default `DCIM/*` excluding
   Screenshots, opt-in for WhatsApp, Downloads, etc.), and set Wi-Fi / charging constraints.
 * Room `upload_queue` table to track progress, errors, `UPLOADED_PENDING_SYNC` state, and resumable state (keeping
@@ -153,8 +156,8 @@ implement notes
 The Problem: Standard Android CoroutineWorker instances have a strict 10-minute maximum execution window. If a user uploads a 4K 60fps video or a large batch on a typical home upload speed, Android's OS will kill the worker mid-stream.
 
 Fix:
-    Call setForeground(createForegroundInfo()) inside UploadWorker to promote it to a Foreground Service with an ongoing notification showing progress.
-    Use TUS chunking (e.g., 5 MB chunks) and persist the TUS upload URL/UUID and offset in Room's upload_queue table after every chunk. If killed, the next run resumes seamlessly without re-uploading uploaded bytes.
+Call setForeground(createForegroundInfo()) inside UploadWorker to promote it to a Foreground Service with an ongoing notification showing progress.
+Use TUS chunking (e.g., 5 MB chunks) and persist the TUS upload URL/UUID and offset in Room's upload_queue table after every chunk. If killed, the next run resumes seamlessly without re-uploading uploaded bytes.
 ```
 
 ## Phase 4: Albums, Management & Deletion
@@ -162,7 +165,10 @@ Fix:
 * Album browsing, viewing album items, and creating new albums.
 * Drag-to-select and long-press multi-selection on the timeline grid.
 * Unified deletion dialog: "Delete from Device", "Delete from Server" (soft delete / trash), and "Delete Everywhere".
+    * Deleting a local file with sibling local copies sharing the same `cloud_id` removes only that row (promoting a
+      sibling to `is_visible_in_timeline = 1` if needed), rather than reverting the cloud item to `CLOUD_ONLY` while
+      another local copy still exists.
     * On Android 11+ (API 30+), deleting media from MediaStore that belongs to other apps or was created before the app
       was installed requires user consent via the OS dialog (`MediaStore.createDeleteRequest`).
-* "Free up space" feature: query items where `syncStatus == SYNCED`, compute local savings, and trigger
-  `MediaStore.createDeleteRequest` to purge local files.
+* "Free up space" feature: query items where `syncStatus == SYNCED` (across both canonical and secondary duplicate local
+  rows), compute local savings, and trigger `MediaStore.createDeleteRequest` to purge local files.

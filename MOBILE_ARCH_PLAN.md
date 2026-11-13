@@ -137,7 +137,8 @@ guarantees full offline capability and instant local-to-cloud reconciliation wit
   remain fast at 50k+ rows.
 * Note that `size_bytes` lives on `media_features` (`JOIN media_features mf ON mf.media_item_id = m.id`), and the
   `sha256` column on `media_item` + `POST /api/upload/check-hashes` still need to be implemented on the backend
-  (currently `media_item` only stores a `hash` column).
+  (currently `media_item` only stores a `hash` column; note `media_item.hash` is not `UNIQUE` on the server, so
+  `check-hashes` should return a single canonical matching `cloud_id` per hash).
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────────┐
@@ -146,9 +147,9 @@ guarantees full offline capability and instant local-to-cloud reconciliation wit
 │    Payload: [id, sort_timestamp, tz_offset_min, ratio, is_video,             │
 │              has_thumbnails, size_bytes]                                     │
 │  • Computes `year_month` and writes in chunked batch inside one @Transaction │
-└──────────────────────────────────────┬───────────────────────────────────────┘
-                                       │
-                                       ▼
+└─────────────────────────────────────┬────────────────────────────────────────┘
+                                      │
+                                      ▼
 ┌──────────────────────────────────────────────────────────────────────────────┐
 │                 Room Database: Single Source of Truth (SSOT)                 │
 │  • Houses local-only, cloud-only, and merged/synced items                    │
@@ -169,7 +170,7 @@ ingests.
 
 ##### Sync Protocol & Data Transfer
 
-We'll have to refactor the timeline.proto into common.proto, web.proto, and mobile.proto.
+We'll have to refactor the `timeline.proto` into `common.proto`, `web.proto`, and `mobile.proto`.
 
 1. **Compact Timeline Protobuf (`mobile.proto` / `common.proto`):**
    ```protobuf
@@ -218,9 +219,10 @@ We'll have to refactor the timeline.proto into common.proto, web.proto, and mobi
       a full-table scan and a temporary B-tree sort (`USE TEMP B-TREE FOR ORDER BY`), and `SELECT m.*` pulls unused
       strings (`relative_path`, `bucket_name`, `file_hash`, etc.) across the `CursorWindow`.
     * **Fix:**
-        1. Store `is_visible_in_timeline: Boolean` (0/1) directly on `media_item` (`1` for all `CLOUD_ONLY`/`SYNCED`
-           items; copied from `device_folder.show_in_timeline` for `LOCAL_ONLY` items and updated in a single SQL
-           `UPDATE` when a folder toggle changes).
+        1. Store `is_visible_in_timeline: Boolean` (0/1) directly on `media_item`: `1` for all `CLOUD_ONLY` items and
+           the **canonical** `SYNCED` row per `cloudId` (`0` for secondary local duplicates of the same `cloudId`);
+           copied from `device_folder.show_in_timeline` for `LOCAL_ONLY` items and updated in a single SQL `UPDATE` when
+           a folder toggle changes.
         2. Create a composite index on `media_item`:
            `(is_visible_in_timeline, year_month DESC, sort_timestamp DESC, id DESC)` so SQLite reads in exact timeline
            order with zero temp B-tree sort step (note: SQLite does not support PostgreSQL's `INCLUDE (...)` syntax;
@@ -268,9 +270,9 @@ We'll have to refactor the timeline.proto into common.proto, web.proto, and mobi
       downloads never clutter the web timeline.
     * **Device Folders ("On this device") & Deduplication:** All discovered folders remain browsable in a Device Folders
       view / Backup Settings (`GROUP BY bucket_id`), where users can toggle **Back up** (which automatically enables
-      `showInTimeline` and flips `is_visible_in_timeline = 1` for that bucket) or **Show in timeline** per folder.
-      Crucially, **deduplication still runs across all scanned folders**, so if a user manually uploads a single
-      screenshot via Share or Device Folders, it links cleanly as `SYNCED` instead of duplicating.
+      `showInTimeline` and flips `is_visible_in_timeline = 1` for `LOCAL_ONLY` items in that bucket) or **Show in
+      timeline** per folder. Crucially, **deduplication still runs across all scanned folders**, so if a user manually
+      uploads a single screenshot via Share or Device Folders, it links cleanly as `SYNCED` instead of duplicating.
 5. **Delta Syncing (`since` parameter):**
     * **Initial Launch:** Query `GET /api/mobile/timeline/sync` without `since`. Backend streams all non-deleted items
       (`deleted = false`, no tombstones). Room inserts them in chunked batches (to stay below SQLite's bind-parameter
@@ -319,16 +321,18 @@ To prevent cold-start battery drain and disk thrashing, **the mobile app never h
                   (remainder < 2_000L || stepMs - remainder < 2_000L)
           )
           ```
-    * Filtering on `sync_status = 'CLOUD_ONLY'` prevents two identical local copies from claiming the same `cloudId`. A
-      match immediately links `localContentUri` to `cloudId` and marks `syncStatus = SYNCED` with zero disk I/O.
+    * Filtering on `sync_status = 'CLOUD_ONLY'` prevents two identical local copies from matching the same `cloudId`
+      without a hash check. A match immediately links `localContentUri` to `cloudId` and marks `syncStatus = SYNCED`
+      with
+      zero disk I/O.
 2. **Pass 2: On-Demand Crypto Verification (Deferred to Backup/Upload):**
-    * For local items that did *not* match in Pass 1 (including rare cases where `size_bytes` + `ratio` matched a
-      `CLOUD_ONLY` item whose timestamp differed by >24h due to a web date edit or missing `DATE_TAKEN`), the SHA-256
-      hash is calculated **only when staged for backup** (or lazily for those rare size-collision candidates), matching
-      the `sha256` column to be added to `media_item`.
+    * For local items that did *not* match in Pass 1 (including duplicate local copies of an already-`SYNCED` file, or
+      rare cases where `size_bytes` + `ratio` matched a `CLOUD_ONLY` item whose timestamp differed by >24h due to a web
+      date edit or missing `DATE_TAKEN`), the SHA-256 hash is calculated **only when staged for backup** (or lazily for
+      those rare size-collision candidates), matching the `sha256` column to be added to `media_item`.
     * Before streaming bytes, a pre-upload check (`POST /api/upload/check-hashes`, to be implemented on the backend)
       queries the backend with the SHA-256 hash. If the backend already possesses it, the upload is skipped and the item
-      is marked `SYNCED`.
+      is marked `SYNCED` (linking `cloudId` and respecting the canonical visibility rule below).
 
 ##### TIPS
 
@@ -336,31 +340,54 @@ To prevent cold-start battery drain and disk thrashing, **the mobile app never h
 `MediaStore`. Fall back to `DATE_MODIFIED * 1000L` (note: `DATE_ADDED` and `DATE_MODIFIED` are in **seconds**, whereas
 `DATE_TAKEN` is in **milliseconds**!).
 
-##### How `MediaEntity` handles primary keys and state transitions between `LOCAL_ONLY`, `CLOUD_ONLY`, and `SYNCED`
+##### How `MediaEntity` handles primary keys, duplicate local copies, and state transitions
 
-Consider all four transitions carefully inside `@Transaction`:
+Keep a **single `media_item` table** (preserving the fast composite-index query with zero joins/unions) with:
 
-1. **Local item gets backed up → Cloud sync arrives:**
-   `LOCAL_ONLY` (`local_1234`) is uploaded via TUS. `IngestMetadata` runs asynchronously on the worker and creates a new
-   `cloudId` (`a1B2c3D4e5`). When `SyncTimelineUseCase` receives `a1B2c3D4e5`, it **must also run deduplication
-   against `LOCAL_ONLY` / pending-sync rows** (not just `ScanLocalMediaUseCase` running against `CLOUD_ONLY` rows!),
-   otherwise you'll momentarily show duplicate photos in the grid.
-2. **Cloud item deleted (`deleted_ids` contains `a1B2c3D4e5`) while `SYNCED`:**
-   Do **not** blindly `DELETE FROM media_item WHERE cloud_id IN (:deletedIds)`! If `localContentUri != null` (the photo
-   still exists on the phone), flip `syncStatus = LOCAL_ONLY`, `cloudId = null`, and recompute `is_visible_in_timeline`
-   from `device_folder` (otherwise it vanishes from the gallery and reappears on the next `MediaStore` scan). Only
-   delete the Room row if `localContentUri == null`.
-3. **Local file deleted from device while `SYNCED`:**
-   When `ScanLocalMediaUseCase` sees `localContentUri` is gone, flip `syncStatus = CLOUD_ONLY`,
-   `localContentUri = null`, and `is_visible_in_timeline = 1`. Only delete the Room row if `cloudId == null`.
-4. **Recommendation & Open Question (Duplicate Local Copies):**
-   Index `localContentUri` (`UNIQUE`) and `cloudId` on a surrogate primary key (or perform an atomic delete-old +
-   insert/update in one Room `@Transaction` when merging `LOCAL_ONLY` + `CLOUD_ONLY` into `SYNCED`), and sort
-   tie-breakers via `id` / `cloudId`.
-    * *TODO (tabled for later):* Decide how to handle two identical local files on the device (e.g., `DCIM/Camera` and
-      `Pictures/Restored`) that both resolve via Pass 2 `check-hashes` to the same `cloudId`. Do **not** blindly put a
-      strict `UNIQUE` constraint on `cloudId` without deciding whether to merge/hide the duplicate local row or allow
-      many-to-one `localContentUri → cloudId`, otherwise the second match would throw a `SQLiteConstraintException`.
+* An immutable surrogate primary key `id` (e.g., `"local_<mediaStoreId>"` for local rows, `"cloud_<cloudId>"` for
+  `CLOUD_ONLY` rows) so Compose keys and `ORDER BY year_month DESC, sort_timestamp DESC, id DESC` tie-breakers never
+  jump during status transitions.
+* `@Index(value = ["localContentUri"], unique = true)` — one row per local file URI.
+* `@Index(value = ["cloudId"], unique = false)` — **non-unique** so secondary local copies (e.g., the same photo in
+  `DCIM/Camera/` and `Download/`) resolved via Pass 2 `check-hashes` can also store `cloudId` and `syncStatus = SYNCED`
+  without throwing `SQLiteConstraintException`, preventing infinite re-hash/re-upload loops while letting
+  `DeviceFoldersScreen` and `"Free up space"` recognize all local copies as backed up.
+
+> **Canonical Timeline Visibility Invariant:** For any `cloudId != null`, **at most one row** in `media_item` has
+> `is_visible_in_timeline = 1`.
+
+Handle all state transitions inside Room `@Transaction`s:
+
+1. **Local item gets backed up → Cloud sync arrives (`SyncTimelineUseCase`):**
+   `LOCAL_ONLY` (`local_1234`) is uploaded via TUS. `IngestMetadata` runs asynchronously on the worker and creates
+   `cloudId` (`a1B2c3D4e5`). When `SyncTimelineUseCase` receives `a1B2c3D4e5`, it checks existing rows for `cloudId`,
+   and
+   if none exist, runs Pass 1 deduplication against `LOCAL_ONLY` / `UPLOADED_PENDING_SYNC` rows (not just
+   `ScanLocalMediaUseCase` running against `CLOUD_ONLY` rows!) so you don't momentarily show duplicate photos in the
+   grid.
+2. **Duplicate local copy links to an already-synced `cloudId` (Pass 2 `check-hashes`):**
+   Check `SELECT EXISTS(SELECT 1 FROM media_item WHERE cloud_id = :cloudId AND is_visible_in_timeline = 1)`:
+    * If `true`, link `cloudId` and set `syncStatus = SYNCED` with `is_visible_in_timeline = 0` (secondary duplicate
+      hidden from main timeline, still visible in its `DeviceFolder` and eligible for `"Free up space"`).
+    * If `false`, link `cloudId`, set `syncStatus = SYNCED`, and set `is_visible_in_timeline = 1`.
+3. **Server updates a cloud item (`SyncTimelineUseCase`):**
+   `UPDATE media_item SET has_thumbnails = ..., sort_timestamp = ..., timezone_offset_minutes = ..., year_month = ... WHERE cloud_id = :cloudId`
+   (updates the canonical row and any linked secondary copies).
+4. **Cloud item deleted (`deleted_ids` contains `a1B2c3D4e5`):**
+   Do **not** blindly `DELETE FROM media_item WHERE cloud_id IN (:deletedIds)`! For every row
+   `WHERE cloud_id = :cloudId`:
+    * If `local_content_uri == null` → `DELETE` the row.
+    * If `local_content_uri != null` → flip `syncStatus = LOCAL_ONLY`, `cloudId = null`, and recompute
+      `is_visible_in_timeline` from `device_folder.show_in_timeline` (otherwise it vanishes from the gallery and
+      reappears on the next `MediaStore` scan).
+5. **Local file deleted from device (`ScanLocalMediaUseCase` or "Free up space"):**
+   For the removed local row:
+    * If `cloud_id == null` → `DELETE` the row.
+    * If `cloud_id != null` and **another row** with the same `cloud_id` exists → `DELETE` this row; if it was the
+      canonical visible row (`is_visible_in_timeline == 1`), promote one remaining sibling row to
+      `is_visible_in_timeline = 1`.
+    * If `cloud_id != null` and **no other row** with the same `cloud_id` exists → flip to `syncStatus = CLOUD_ONLY`,
+      `localContentUri = null`, and `is_visible_in_timeline = 1`.
 
 ##### Auth, Network & Connectivity Tips
 
@@ -459,26 +486,26 @@ class TimelineLayoutIndex(
 Adopt **Clean Architecture + MVI/MVVM** with **Unidirectional Data Flow (UDF)**.
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                        UI Layer                             │
-│   Compose Screens (Timeline, Viewer, Albums, Settings)      │
-│   ViewModels (StateFlow<UiState>, UiEvent channels)         │
-└──────────────────────────────┬──────────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│                        UI Layer                              │
+│   Compose Screens (Timeline, Viewer, Albums, Settings)       │
+│   ViewModels (StateFlow<UiState>, UiEvent channels)          │
+└──────────────────────────────┬───────────────────────────────┘
                                │
-┌──────────────────────────────▼──────────────────────────────┐
-│                      Domain Layer                           │
-│   UseCases (CalculateLayout, SyncTimelineUseCase,           │
-│   DeduplicateMediaUseCase, EnqueueUploadUseCase)            │
-│   Domain Models (MediaItem, DeviceFolder, SyncStatus, Row)  │
-└──────────────────────────────┬──────────────────────────────┘
+┌──────────────────────────────▼───────────────────────────────┐
+│                      Domain Layer                            │
+│   UseCases (CalculateLayout, SyncTimelineUseCase,            │
+│   DeduplicateMediaUseCase, EnqueueUploadUseCase)             │
+│   Domain Models (MediaItem, DeviceFolder, SyncStatus, Row)   │
+└──────────────────────────────┬───────────────────────────────┘
                                │
-┌──────────────────────────────▼──────────────────────────────┐
-│                       Data Layer                            │
-│  Repositories (MediaRepository, BackupRepository)           │
-│  Local: Room DB, MediaStore DataSource, Layout Index        │
-│  Remote: OkHttp + Persistent CookieJar, Compact Sync API    │
-│  Background: WorkManager (UploadWorker, LocalScanWorker)    │
-└─────────────────────────────────────────────────────────────┘
+┌──────────────────────────────▼───────────────────────────────┐
+│                       Data Layer                             │
+│  Repositories (MediaRepository, BackupRepository)            │
+│  Local: Room DB, MediaStore DataSource, Layout Index         │
+│  Remote: OkHttp + Persistent CookieJar, Compact Sync API     │
+│  Background: WorkManager (UploadWorker, LocalScanWorker)     │
+└──────────────────────────────────────────────────────────────┘
 ```
 
 #### Key Architecture Principles for this App:
@@ -502,13 +529,14 @@ Adopt **Clean Architecture + MVI/MVVM** with **Unidirectional Data Flow (UDF)**.
       enabling a 100% offline-first architecture with zero UI placeholder jumping.
 3. **Local vs Cloud Identity, Permissions & Two-Pass Deduplication:**
     * Media items in Room contain:
-        * `localContentUri`: `content://media/external/images/media/1234` (nullable)
-        * `cloudId`: Backend 10-char alphanumeric string `a1B2c3D4e5` (nullable)
+        * `localContentUri`: `content://media/external/images/media/1234` (nullable, `UNIQUE`)
+        * `cloudId`: Backend 10-char alphanumeric string `a1B2c3D4e5` (nullable, non-unique index)
         * `bucketId`: `MediaStore` bucket ID for local items (nullable, indexed)
         * `bucketName`: Display folder name, e.g., `"Camera"`, `"Screenshots"` (nullable)
         * `relativePath`: Relative storage path, e.g., `"DCIM/Camera/"`, `"Pictures/Screenshots/"` (nullable)
-        * `isVisibleInTimeline`: Denormalized boolean/int (`1` for cloud/synced, synced from
-          `device_folder.show_in_timeline` for local-only)
+        * `isVisibleInTimeline`: Denormalized boolean/int (`1` for `CLOUD_ONLY` and the canonical `SYNCED` row per
+          `cloudId`; `0` for secondary duplicate local copies sharing an already-visible `cloudId`; synced from
+          `device_folder.show_in_timeline` for `LOCAL_ONLY`)
         * `sizeBytes`: File size in bytes (indexed, from `CompactTimelineItem` or `MediaStore`)
         * `ratio`: Orientation-corrected aspect ratio `width / height`
         * `sortTimestamp`: UTC epoch millis
@@ -524,8 +552,9 @@ Adopt **Clean Architecture + MVI/MVVM** with **Unidirectional Data Flow (UDF)**.
         * *Fast Pass:* On startup/scan, query `CLOUD_ONLY` rows by `size_bytes` and match in Kotlin on `ratio` + exact
           or 15-minute timezone-aligned timestamp (`±2s` within `±24h`). Matched items flip to `SYNCED` with zero disk
           hashing.
-        * *Lazy Crypto Verification:* For unmatched local items staged for upload (and rare `size_bytes` collisions
-          with >24h timestamp drift), compute SHA-256 lazily and verify against the backend prior to streaming bytes.
+        * *Lazy Crypto Verification:* For unmatched local items staged for upload (including duplicate local copies and
+          rare `size_bytes` collisions with >24h timestamp drift), compute SHA-256 lazily and verify against the backend
+          prior to streaming bytes.
 4. **Coil 3 Thumbnail Strategy (LCP & FPS Tuned):**
     * **Target & Min SDK:** Targeting Android 17 and up (API level 37, Pixel devices) provides native
       hardware-accelerated AVIF decoding via `ImageDecoder` and modern adaptive windowing (note API 37 ignores fixed
@@ -561,13 +590,13 @@ Adopt **Clean Architecture + MVI/MVVM** with **Unidirectional Data Flow (UDF)**.
               on-demand original-quality endpoint (`/api/photos/{id}/video`) can be used.
             * **`hasThumbnails == true`:** Check whether the original video format/codec is playable on the phone (e.g.,
               via codec capabilities / `MediaCodecList` or fallback on `PlaybackException`):
-                * If **playable**: let user pick quality from [possible webm qualities + original quality]. to stream
-                  the original-quality (`4K` / `1080p`) video from
-                  `"${BASE_URL}/api/photos/${cloudId}/video"`. This endpoint supports HTTP `Range` requests for seeking
-                  and **requires authentication** (handled via `OkHttpDataSource`).
+                * If **playable**: let user pick quality from [possible webm qualities + original quality] to stream
+                  the original-quality (`4K` / `1080p`) video from `"${BASE_URL}/api/photos/${cloudId}/video"`. This
+                  endpoint supports HTTP `Range` requests for seeking and **requires authentication** (handled via
+                  `OkHttpDataSource`).
                 * If **not playable** natively on the phone (e.g., unsupported container/codec): fall back to the
-                  transcoded WebM preview at `"${BASE_URL}/thumbnails/${cloudId}/480p.webm"`. Note that
-                  `/thumbnails/...` does **not** require authentication. let user pick quality from transcoded qualities
+                  transcoded WebM preview at `"${BASE_URL}/thumbnails/${cloudId}/480p.webm"` and let the user pick
+                  quality from transcoded qualities. Note that `/thumbnails/...` does **not** require authentication.
 6. **Resumable Uploads via Foreground WorkManager:**
     * `UploadWorker` executes TUS resumable uploads in 5 MB chunks. The JWT upload ticket is only verified at upload
       creation, after which TUS uses a persistent upload UUID for `HEAD`/`PATCH` chunks. Only `LOCAL_ONLY` items whose
