@@ -38,6 +38,8 @@
     * on a temp file to get the exif data
     * On a detected hang it should kill & restart the exiftool daemon
 * fix non-compile type sqlx queries overal
+* delete cache endpoints (full clear, metadata only, analysis only, thumbnails only).
+  * needs frontend UI (dialog to confirm because takes a long time to produce thumbs)
 
 # INFRASTRUCTURE:
 
