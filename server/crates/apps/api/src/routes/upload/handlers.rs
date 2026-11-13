@@ -22,7 +22,7 @@ pub async fn get_upload_jwt(
     Extension(user): Extension<ApiUser>,
 ) -> Result<Json<String>, AppError> {
     let exp =
-        (Utc::now() + Duration::minutes(constants().auth.access_token_expiry_minutes)).timestamp();
+        (Utc::now() + Duration::minutes(constants().auth.upload_token_expiry_minutes)).timestamp();
     let claims = AuthClaims {
         sub: user.id,
         role: user.role,
