@@ -23,7 +23,7 @@ Initial thoughts on libraries. not set in stone. Change if something better is a
 * auth (login, stay logged in)
 * auto upload when a new photo/video is taken
 * view timeline (including offline photos, in case no internet connection)
-    * includes local vs cloud deduplicationa
+    * includes local vs cloud deduplication
     * show badge on timeline for cloud / local / uploading
     * scrub through timeline with scrubber on the right edge with floating date pill (similar to web frontend)
 * view photo, pinch/double tap to zoom, share, add to album. generally native gallery gestures & interactions
@@ -89,48 +89,65 @@ even lower prio, dont want this in the app
 
 decisions:
 
-* For cloud-only photos, load the WebP/AVIF thumbnail from GET /thumbnails/{id}/{size}p.avif and let Coil’s bounded disk cache (e.g. 500 MB LRU disk cache) cache what the user actually scrolls past.
+* For cloud-only photos, load the WebP/AVIF thumbnail from GET /thumbnails/{id}/{size}p.avif and let Coil’s bounded disk
+  cache (e.g. 500 MB LRU disk cache) cache what the user actually scrolls past.
 * grid: justified horizontal row layout / masonry
 
 investigation:
 
 * how to handle justified horizontal row layout grid:
-  * insta scrub
-  * no lag / perf impact
-  * offline & cloud mix
-  * how does it affect
+    * insta scrub
+    * no lag / perf impact
+    * offline & cloud mix
+    * how does it affect
 
 implement notes
 
 * Compose LazyGrid Performance:
-  * Timeline scrolling will stutter if items perform heavy formatting on the main thread. Ensure dates, timestamps, and URLs
-    are pre-computed in Room or mapped once in the ViewModel, never inside the Compose @Composable item body. Pass stable
-    Lambdas/IDs to LazyVerticalGrid.
+    * Timeline scrolling will stutter if items perform heavy formatting on the main thread. Ensure dates, timestamps,
+      and URLs are pre-computed in Room or mapped once in the ViewModel, never inside the Compose @Composable item body.
+      Pass stable Lambdas/IDs.
 
 ## phase 0: INVESTIGATE
 
 ## Phase 1: Foundation & Read-Only Timeline
-* Set up Retrofit + OkHttp configured with a persistent `CookieJar` to handle and persist cookie-based session auth across app launches.
+
+* Set up Retrofit + OkHttp configured with a persistent `CookieJar` to handle and persist cookie-based session auth
+  across app launches.
 * make sure to handle expiring tokens and such
-* Compile `timeline.proto` via the Protobuf Gradle plugin to generate Kotlin/Java models.
-* Implement repository sync: fetch `GET /api/timeline/ratios` and `GET /api/timeline/by-month`, storing entries into Room.
-* Query local `MediaStore` and merge them into the same Room table to support unified offline browsing.
-* Build the Compose timeline using `LazyVerticalGrid` with month headers and the draggable right-edge scrubber with a floating date pill.
-  * [investigate] look into how much complexity a justified horizontal row layout grid (like frontend / google photos) adds. keep in mind:
-    * scrubbar to date is affected by this (insta scrub has to know where to scrub to, masonry layout has variable height rows)
-    * is performance cost acceptable?
-    * all aspect ratios (offline & online) have to be known to build a proper grid (on the fly on mobile)
-    * even with masonry grid the app should start quickly and load into the timeline grid "instantly"
+* Add dedicated compact timeline sync endpoint on backend (`GET /api/mobile/timeline/sync?since=...`) returning
+  `CompactTimelineItem` protobufs (including `id`, `sort_timestamp`, `ratio`, `is_video`, `has_thumbnails`,
+  `size_bytes`, `duration_ms`).
+* Compile updated `timeline.proto` via the Protobuf Gradle plugin to generate Kotlin/Java models.
+* Implement repository sync: initial full sync and delta sync (using `since` timestamp) directly into Room as the Single
+  Source of Truth.
+* Query local `MediaStore` (dimensions, orientation, date_taken, size_bytes) and merge into Room using two-pass
+  deduplication:
+    * Fast pass: match `(size_bytes, timestamp)` against Room records for instant, zero-hash `SYNCED` reconciliation
+      without disk I/O.
+    * Lazy crypto pass: defer SHA-256 hashing to when unmatched items are staged for upload/backup.
+* Build the Compose timeline with month headers and the draggable right-edge scrubber with a
+  floating date pill.
+    * justified horizontal row layout grid (like frontend / google photos). keep in mind:
+        * scrubbar to date is affected by this (insta scrub has to know where to scrub to, masonry layout has variable
+          height rows)
+        * all aspect ratios (offline & online) have to be known to build a proper grid (on the fly on mobile)
+        * offline & online have to be interleaved before being able to calculate grid
+        * even with masonry grid the app should start quickly and load into the timeline grid "instantly"
 
 ## Phase 2: Media Viewer & Gestures
+
 * Implement fullscreen viewer with swipe-between-items via `HorizontalPager`.
 * Integrate `telephoto` / `zoomable` for double-tap and pinch-to-zoom gestures.
-* Add native gallery vertical gestures: swipe down to dismiss back to the timeline, and swipe up to expand the info/GPS/date details sheet.
+* Add native gallery vertical gestures: swipe down to dismiss back to the timeline, and swipe up to expand the
+  info/GPS/date details sheet.
 * Integrate Media3 (ExoPlayer) for streaming remote videos and playing local files directly from device storage.
 * Add bottom action bar: Share (`Intent.ACTION_SEND`), Info panel toggle, and Delete actions.
 
 ## Phase 3: Backup Engine & Manual Upload
-* UI screen for backup settings: toggle auto-backup, select source folders (DCIM, WhatsApp, etc.), and set Wi-Fi / charging constraints.
+
+* UI screen for backup settings: toggle auto-backup, select source folders (DCIM, WhatsApp, etc.), and set Wi-Fi /
+  charging constraints.
 * Room `upload_queue` table to track progress, errors, and resumable state.
 * `UploadWorker` implementation leveraging OkHttp for TUS chunked resumable uploads.
 * Timeline badge overlays showing item status: syncing spinner, local-only icon, or cloud checkmark.
@@ -144,10 +161,11 @@ Fix:
 ```
 
 ## Phase 4: Albums, Management & Deletion
+
 * Album browsing, viewing album items, and creating new albums.
 * Drag-to-select and long-press multi-selection on the timeline grid.
 * Unified deletion dialog: "Delete from Device", "Delete from Server" (soft delete / trash), and "Delete Everywhere".
-  * On Android 11+ (API 30+), deleting media from MediaStore that belongs to other apps or was created before the app was installed requires user consent via the OS dialog.
-* "Free up space" feature: query items where `syncStatus == SYNCED`, compute local savings, and trigger `MediaStore.createDeleteRequest` to purge local files.
-
----
+    * On Android 11+ (API 30+), deleting media from MediaStore that belongs to other apps or was created before the app
+      was installed requires user consent via the OS dialog.
+* "Free up space" feature: query items where `syncStatus == SYNCED`, compute local savings, and trigger
+  `MediaStore.createDeleteRequest` to purge local files.
