@@ -111,7 +111,8 @@ implement notes
   internet degrades gracefully without errors.
 * Add dedicated compact timeline sync endpoint on backend (`GET /api/mobile/timeline/sync?since=...`) returning
   `CompactTimelineItem` protobufs (including `id`, `sort_timestamp`, `ratio`, `is_video`, `has_thumbnails`,
-  `size_bytes`, `duration_ms`, `timezone_offset_minutes`), plus `deleted_media_item` tombstone trigger (without cascading
+  `size_bytes`, `duration_ms`, `timezone_offset_minutes`), plus `deleted_media_item` tombstone trigger (without
+  cascading
   FK to `app_user`) and `(user_id, updated_at)` index.
 * Compile proto schemas (`common.proto` / `mobile.proto`) via the Protobuf Gradle plugin to generate Kotlin/Java models.
 * Implement repository sync: initial full sync and delta sync (using `since` timestamp with overlap window) directly
