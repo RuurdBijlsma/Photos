@@ -27,8 +27,7 @@ Instead, the cleanest and most performant pattern in Jetpack Compose is **a `Laz
   and `.height(row.heightDp)`** (never `Modifier.weight(aspectRatio)`, which forces extra intrinsic/weighted measure
   passes).
 * Measure the timeline container width **once** at the screen level (`onSizeChanged` / outer `BoxWithConstraints`),
-  never
-  inside `LazyColumn` items.
+  never inside `LazyColumn` items.
 * **Why this is fast:** Compose treats each row as a single virtualized element with uniform slot structure. Measurement
   overhead is virtually zero during scroll because row heights, item widths, and pixel target sizes are precomputed on
   background threads.
@@ -56,13 +55,15 @@ back row item lists with `ImmutableList`:
 ```kotlin
 sealed interface TimelineListItem {
     val id: String
+    val estimatedOffsetTopDp: Float
 }
 
 @Immutable
 data class MonthHeaderUiItem(
     override val id: String, // e.g. "header_202610"
     val yearMonth: Int,
-    val title: String        // Pre-formatted off main thread, e.g. "October 2026"
+    val title: String,       // Pre-formatted off main thread, e.g. "October 2026"
+    override val estimatedOffsetTopDp: Float
 ) : TimelineListItem
 
 @Immutable
@@ -73,7 +74,7 @@ data class TimelineRowUiItem(
     val yearMonth: Int,      // Precomputed e.g. 202610
     val isFirstOfMonth: Boolean,
     val isLastOfMonth: Boolean,
-    val estimatedOffsetTopDp: Float,
+    override val estimatedOffsetTopDp: Float,
     val thumbnailTargetHeightPx: Int // Ladder height selected in px (e.g. 240, 360, 480, 720)
 ) : TimelineListItem
 
@@ -91,9 +92,9 @@ data class TimelineGridItemUiModel(
 )
 ```
 
-*Keep active upload progress (from `UploadQueueEntity`) in a separate Flow/map observed only by visible cells—never
-mutate `media_item` per upload chunk, so upload ticks never re-trigger `CalculateTimelineLayoutUseCase` across 50k
-items.*
+*Keep active upload progress and transient `SYNCING` / `UPLOADED_PENDING_SYNC` states (from `UploadQueueEntity`) in a
+separate Flow/map observed only by visible cells—never mutate `media_item` per upload tick or start, so upload activity
+never re-triggers `CalculateTimelineLayoutUseCase` across 50k items.*
 
 **Row Partitioning Algorithm:**
 
@@ -109,7 +110,8 @@ items.*
    rendered pixels (`rowHeightDp * density`)**, not `dp` (on `3x–4x` phones a `180.dp` row is `540–720 px`; picking by
    `dp` yields blurry `240p` thumbnails). Cap grid thumbnails at `720` (or `480` on low-RAM devices) to keep AVIF
    decoding fast.
-6. Finalize the row, compute its cumulative vertical offset (`estimatedOffsetTopDp`), and advance.
+6. Finalize the row, compute its cumulative vertical offset (`estimatedOffsetTopDp`, as well as on each
+   `MonthHeaderUiItem`), and advance.
 7. If the `yearMonth` boundary ends on an incomplete row, cap its scale factor to `1.0` so the last 1 or 2 items don't
    stretch into giant blocks.
 
@@ -123,15 +125,19 @@ guarantees full offline capability and instant local-to-cloud reconciliation wit
 
 **Tombstone Deletion Tracking & Backend Indexing:**
 
-* Permanent deletions are recorded in a lightweight `deleted_media_item` (tombstone, populated by db trigger, to be
-  implemented) table with the purged IDs and their deletion timestamp (`ON DELETE CASCADE` on `user_id`).
-* Every backend write/update to `media_item` explicitly sets `updated_at = now()`, so no `UPDATE` trigger is needed.
+* Permanent deletions are recorded in a lightweight `deleted_media_item` (tombstone, populated by an `AFTER DELETE` db
+  trigger, to be implemented) table with the purged IDs, `user_id`, and deletion timestamp. **Do not** add a foreign key
+  with `ON DELETE CASCADE` on `deleted_media_item.user_id` referencing `app_user(id)`, because deleting a user cascades
+  into `media_item` deletes whose `AFTER DELETE` trigger would try to insert rows for the deleted user (failing FK
+  checks or causing unnecessary churn). Periodically prune old tombstones (e.g., >30–90 days) and fall back to a full
+  sync if `since` is older than retention.
+* Every backend write/update to `media_item` (including metadata re-ingest and bin/restore operations) explicitly sets
+  `updated_at = now()`, so no `UPDATE` trigger is needed.
 * Add a composite index on `media_item (user_id, updated_at)` on Postgres so delta sync queries (`updated_at > since`)
   remain fast at 50k+ rows.
-* Note that `size_bytes` lives on `media_features` (`JOIN media_features mf ON mf.media_item_id = m.id`), and remember
-  to
-  keep `server/crates/libs/common_types/proto/timeline.proto` and `web/src/proto/timeline.proto` in sync (
-  `npm run proto:gen`).
+* Note that `size_bytes` lives on `media_features` (`JOIN media_features mf ON mf.media_item_id = m.id`), and the
+  `sha256` column on `media_item` + `POST /api/upload/check-hashes` still need to be implemented on the backend
+  (currently `media_item` only stores a `hash` column).
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────────┐
@@ -146,7 +152,7 @@ guarantees full offline capability and instant local-to-cloud reconciliation wit
 ┌──────────────────────────────────────────────────────────────────────────────┐
 │                 Room Database: Single Source of Truth (SSOT)                 │
 │  • Houses local-only, cloud-only, and merged/synced items                    │
-│  • Denormalized `is_visible_in_timeline` + covering index (zero B-tree sort) │
+│  • Denormalized `is_visible_in_timeline` + composite index (zero temp sort)  │
 │  • Stage 1 launch query: top 2 months (~20ms to LCP); Stage 2: full library  │
 │  • Deduplication via zero-hash fast pass: size_bytes + ratio + tz-aligned ts │
 │  • 100% offline-ready: entire timeline renders instantly from SQLite        │
@@ -163,7 +169,9 @@ ingests.
 
 ##### Sync Protocol & Data Transfer
 
-1. **Compact Timeline Protobuf (`timeline.proto`):**
+We'll have to refactor the timeline.proto into common.proto, web.proto, and mobile.proto.
+
+1. **Compact Timeline Protobuf (`mobile.proto` / `common.proto`):**
    ```protobuf
    message TimelineSyncResponse {
      // New or modified media items to be upserted into Room
@@ -205,23 +213,20 @@ ingests.
         * **Local-only items (`LOCAL_ONLY`):** Derive `year_month` from `MediaStore.DATE_TAKEN` using
           `ZoneId.systemDefault()`. Once backed up and synced, the server's authoritative `year_month` and
           `timezone_offset_minutes` take over.
-3. **Fast Timeline Room Query (Denormalized Visibility + Slim Projection + Covering Index):**
+3. **Fast Timeline Room Query (Denormalized Visibility + Slim Projection + Composite Index):**
     * Avoid `OR` across `media_item LEFT JOIN device_folder` in the hot timeline query—at 50k rows, SQLite falls back to
       a full-table scan and a temporary B-tree sort (`USE TEMP B-TREE FOR ORDER BY`), and `SELECT m.*` pulls unused
-      strings
-      (`relative_path`, `bucket_name`, `file_hash`, etc.) across the `CursorWindow`.
+      strings (`relative_path`, `bucket_name`, `file_hash`, etc.) across the `CursorWindow`.
     * **Fix:**
         1. Store `is_visible_in_timeline: Boolean` (0/1) directly on `media_item` (`1` for all `CLOUD_ONLY`/`SYNCED`
-           items;
-           copied from `device_folder.show_in_timeline` for `LOCAL_ONLY` items and updated in a single SQL `UPDATE` when
-           a
-           folder toggle changes).
-        2. Create a covering index on `media_item`:
-           `(is_visible_in_timeline, year_month DESC, sort_timestamp DESC, id DESC)` (or including the slim projection
-           columns) so SQLite reads in exact timeline order with zero sort step.
+           items; copied from `device_folder.show_in_timeline` for `LOCAL_ONLY` items and updated in a single SQL
+           `UPDATE` when a folder toggle changes).
+        2. Create a composite index on `media_item`:
+           `(is_visible_in_timeline, year_month DESC, sort_timestamp DESC, id DESC)` so SQLite reads in exact timeline
+           order with zero temp B-tree sort step (note: SQLite does not support PostgreSQL's `INCLUDE (...)` syntax;
+           avoid bloating the index key with wide string columns like `local_content_uri`).
         3. Query a slim `TimelineGridProjection` (`id`, `cloud_id`, `local_content_uri`, `year_month`, `ratio`,
-           `is_video`,
-           `duration_ms`, `has_thumbnails`, `sync_status`):
+           `is_video`, `duration_ms`, `has_thumbnails`, `sync_status`):
            ```sql
            -- Stage 1 (Viewport fast path on cold start: top 2 months)
            SELECT id, cloud_id, local_content_uri, year_month, ratio, is_video, duration_ms, has_thumbnails, sync_status
@@ -257,9 +262,8 @@ ingests.
           and 3rd-party cameras under `DCIM/` (e.g. `DCIM/OpenCamera/`) while avoiding the Samsung/Xiaomi bug where
           `DCIM/Screenshots/` pollutes the camera roll.
         * **Other device folders (`showInTimeline = false`, `backupEnabled = false`):** Everything else (
-          `Pictures/Screenshots/`,
-          `DCIM/Screenshots/`, `Download/`, `Pictures/WhatsApp/`, or 3rd-party cameras saving outside `DCIM/`). These
-          stay out of the main timeline and are never uploaded unless the user opts in.
+          `Pictures/Screenshots/`, `DCIM/Screenshots/`, `Download/`, `Pictures/WhatsApp/`, or 3rd-party cameras saving
+          outside `DCIM/`). These stay out of the main timeline and are never uploaded unless the user opts in.
     * **Web vs. Mobile parity:** Only backed-up/uploaded items ever reach the server, so non-backed-up screenshots and
       downloads never clutter the web timeline.
     * **Device Folders ("On this device") & Deduplication:** All discovered folders remain browsable in a Device Folders
@@ -270,8 +274,7 @@ ingests.
 5. **Delta Syncing (`since` parameter):**
     * **Initial Launch:** Query `GET /api/mobile/timeline/sync` without `since`. Backend streams all non-deleted items
       (`deleted = false`, no tombstones). Room inserts them in chunked batches (to stay below SQLite's bind-parameter
-      limit)
-      inside a single `@Transaction` and stores `latestSyncTimestamp`.
+      limit) inside a single `@Transaction` and stores `latestSyncTimestamp`.
     * **Subsequent Launches:** Query `GET /api/mobile/timeline/sync?since={latestSyncTimestamp - 60_000}`. Backend
       returns `upserted` (`deleted = false AND updated_at > since`) and `deleted_ids` unioning soft-deletes
       (`media_item WHERE deleted = true AND updated_at > since`) and hard-deletes (
@@ -282,8 +285,7 @@ ingests.
     * Always wrap sync and `MediaStore` batch updates in a single Room `@Transaction` (`withTransaction { ... }`) so
       Room emits one `Flow` invalidation per batch rather than per row.
     * Apply `.debounce(150)` on background Room timeline `Flow` emissions (after the initial Stage 1/Stage 2 emission)
-      so
-      overlapping `MediaStore` scans and sync batches coalesce into a single `CalculateTimelineLayoutUseCase` pass.
+      so overlapping `MediaStore` scans and sync batches coalesce into a single `CalculateTimelineLayoutUseCase` pass.
 
 ##### Two-Pass Local/Cloud Deduplication Strategy
 
@@ -294,12 +296,9 @@ To prevent cold-start battery drain and disk thrashing, **the mobile app never h
       naive EXIF `DateTimeOriginal` interpreted in the phone's current timezone vs. server GPS/fallback timezone, OEM
       QuickTime `creation_time` written in local time, or DST shifts).
     * Query `MediaStore` (filtering `IS_PENDING = 0` and `SIZE > 0`) for `_ID`, `WIDTH`, `HEIGHT`, `ORIENTATION`,
-      `SIZE`,
-      `DATE_TAKEN`, `DATE_MODIFIED`, `BUCKET_ID`, `BUCKET_DISPLAY_NAME`, and `RELATIVE_PATH`. **Swap `WIDTH`
-      and `HEIGHT`
-      when `ORIENTATION` is `90` or `270`** (backend `media_item` dimensions are already orientation-adjusted;
-      `MediaStore`
-      often reports raw sensor dimensions), and guard against `0`/`NULL` dimensions.
+      `SIZE`, `DATE_TAKEN`, `DATE_MODIFIED`, `BUCKET_ID`, `BUCKET_DISPLAY_NAME`, and `RELATIVE_PATH`. **Swap `WIDTH`
+      and `HEIGHT` when `ORIENTATION` is `90` or `270`** (backend `media_item` dimensions are already
+      orientation-adjusted; `MediaStore` often reports raw sensor dimensions), and guard against `0`/`NULL` dimensions.
     * Index `size_bytes` in Room (`@Index(value = ["sizeBytes"])`) and query `CLOUD_ONLY` candidates by exact byte size:
       ```sql
       SELECT * FROM media_item
@@ -326,9 +325,10 @@ To prevent cold-start battery drain and disk thrashing, **the mobile app never h
     * For local items that did *not* match in Pass 1 (including rare cases where `size_bytes` + `ratio` matched a
       `CLOUD_ONLY` item whose timestamp differed by >24h due to a web date edit or missing `DATE_TAKEN`), the SHA-256
       hash is calculated **only when staged for backup** (or lazily for those rare size-collision candidates), matching
-      the `sha256` column added to `media_item`.
-    * Before streaming bytes, a pre-upload check (`POST /api/upload/check-hashes`) queries the backend with the SHA-256
-      hash. If the backend already possesses it, the upload is skipped and the item is marked `SYNCED`.
+      the `sha256` column to be added to `media_item`.
+    * Before streaming bytes, a pre-upload check (`POST /api/upload/check-hashes`, to be implemented on the backend)
+      queries the backend with the SHA-256 hash. If the backend already possesses it, the upload is skipped and the item
+      is marked `SYNCED`.
 
 ##### TIPS
 
@@ -343,22 +343,26 @@ Consider all four transitions carefully inside `@Transaction`:
 1. **Local item gets backed up → Cloud sync arrives:**
    `LOCAL_ONLY` (`local_1234`) is uploaded via TUS. `IngestMetadata` runs asynchronously on the worker and creates a new
    `cloudId` (`a1B2c3D4e5`). When `SyncTimelineUseCase` receives `a1B2c3D4e5`, it **must also run deduplication
-   against `LOCAL_ONLY` / `SYNCING` rows** (not just `ScanLocalMediaUseCase` running against `CLOUD_ONLY` rows!),
+   against `LOCAL_ONLY` / pending-sync rows** (not just `ScanLocalMediaUseCase` running against `CLOUD_ONLY` rows!),
    otherwise you'll momentarily show duplicate photos in the grid.
 2. **Cloud item deleted (`deleted_ids` contains `a1B2c3D4e5`) while `SYNCED`:**
    Do **not** blindly `DELETE FROM media_item WHERE cloud_id IN (:deletedIds)`! If `localContentUri != null` (the photo
    still exists on the phone), flip `syncStatus = LOCAL_ONLY`, `cloudId = null`, and recompute `is_visible_in_timeline`
    from `device_folder` (otherwise it vanishes from the gallery and reappears on the next `MediaStore` scan). Only
-   delete
-   the Room row if `localContentUri == null`.
+   delete the Room row if `localContentUri == null`.
 3. **Local file deleted from device while `SYNCED`:**
    When `ScanLocalMediaUseCase` sees `localContentUri` is gone, flip `syncStatus = CLOUD_ONLY`,
    `localContentUri = null`, and `is_visible_in_timeline = 1`. Only delete the Room row if `cloudId == null`.
-4. **Recommendation:** Index `cloudId` (`UNIQUE`) and `localContentUri` (`UNIQUE`) separately on a surrogate primary key
-   (or perform an atomic delete-old + insert/update in one Room `@Transaction` when merging `LOCAL_ONLY` + `CLOUD_ONLY`
-   into `SYNCED`), and sort tie-breakers via `id` / `cloudId`.
+4. **Recommendation & Open Question (Duplicate Local Copies):**
+   Index `localContentUri` (`UNIQUE`) and `cloudId` on a surrogate primary key (or perform an atomic delete-old +
+   insert/update in one Room `@Transaction` when merging `LOCAL_ONLY` + `CLOUD_ONLY` into `SYNCED`), and sort
+   tie-breakers via `id` / `cloudId`.
+    * *TODO (tabled for later):* Decide how to handle two identical local files on the device (e.g., `DCIM/Camera` and
+      `Pictures/Restored`) that both resolve via Pass 2 `check-hashes` to the same `cloudId`. Do **not** blindly put a
+      strict `UNIQUE` constraint on `cloudId` without deciding whether to merge/hide the duplicate local row or allow
+      many-to-one `localContentUri → cloudId`, otherwise the second match would throw a `SQLiteConstraintException`.
 
-##### Auth & Network Tips
+##### Auth, Network & Connectivity Tips
 
 * **Concurrent 401 refresh lock:**
   `server/config/settings.yaml` sets `access_token_expiry_minutes: 30` and `20251004204735_init.sql` stores hashed
@@ -371,37 +375,43 @@ Consider all four transitions carefully inside `@Transaction`:
            currently in `CookieJar`; if it already changed, skip calling refresh and retry the request with the updated
            cookie.
         3. Return `null` immediately if the failing path is `/api/auth/refresh` or `/api/auth/login` (and cap retries
-           via
-           `responseCount(response) >= 2`) to prevent infinite 401 loops.
+           via `responseCount(response) >= 2`) to prevent infinite 401 loops.
     * Keep `api.rate_limiting` (`req_per_second: 6, burst_size: 10`) in mind for `auth_public_router`—never spam
       `/api/auth/login` or `/api/auth/refresh`.
+* **Cookie `Secure` flag & custom URLs:**
+  `server/config/settings.yaml` uses `cookie_secure: false` in local dev and `true` behind production HTTPS. Ensure
+  `PersistentCookieJar` respects `Secure`, `Domain`, and `Path` attributes properly when the user configures a custom
+  server URL (including ports).
 * **Thumbnail concurrency:**
   Raise OkHttp's `dispatcher.maxRequestsPerHost` from the default `5` to `12–16` so visible cloud thumbnails load in
   parallel rather than queuing in batches of 5 (`/thumbnails` is static and not rate-limited by `auth_public_router`).
-* **Dynamic Server URL:**
+* **Dynamic Server URL & API 37 Cleartext Policy:**
   Since `AuthScreen` lets the user input a server URL, don't hardcode Retrofit's `baseUrl` at DI graph creation time.
   Either swap/recreate the Retrofit instance on URL change or rewrite `request.url` in an OkHttp interceptor from the
-  persisted server URL. Also add a `network_security_config.xml` (or debug manifest override) if you plan to test
-  against `http://10.0.2.2:5272` or LAN HTTP.
+  persisted server URL. Because Android 17 (API 37) deprecates `android:usesCleartextTraffic`, add an explicit
+  `network_security_config.xml` (or debug-only config) if testing against `http://10.0.2.2:5272` or LAN HTTP.
+* **Connectivity & Sync Status Indicator (`NetworkMonitor`):**
+  Observe connectivity via `ConnectivityManager.NetworkCallback` alongside a `SyncState` (`Idle`, `Syncing`, `Offline`,
+  `ServerUnreachable`). Do not surface transient network errors as fatal errors when offline; display a subtle status
+  indicator in the UI instead, since local Room + `MediaStore` items remain fully browsable offline.
 
 ##### Non-Initial App Launch Flow (Optimized for LCP):
 
-* **T = 0ms (Stage 1 — Fast Viewport LCP):** Query only the top 2 `year_month`s from Room using the covering index
+* **T = 0ms (Stage 1 — Fast Viewport LCP):** Query only the top 2 `year_month`s from Room using the composite index
   (`is_visible_in_timeline = 1`), compute their rows on `Dispatchers.Default`, and emit immediately (~15–30ms).
   `LazyColumn` renders the first screenful and Coil starts decoding visible thumbnails right away—never block launch on
   `/api/auth/me` or network sync.
 * **T + ~20ms (Stage 2 — Full Timeline):** Read the slim projection for the full library from Room, partition all rows +
   build `TimelineLayoutIndex` on `Dispatchers.Default`, and emit. Because Stage 1 ended on a clean `year_month`
-  boundary,
-  the visible rows remain identical with zero layout jump.
+  boundary, the visible rows remain identical with zero layout jump.
 * **T + 50ms:** `MediaStore` scan reconciles new or deleted local photos across all folders via the zero-hash fast pass
   and registers any newly seen `bucketId`s in `device_folder` with default visibility/backup flags.
-* **T + 150ms:** Background delta sync calls `GET /api/mobile/timeline/sync?since=...`. Any cloud changes are committed
-  to Room in a single transaction, triggering a debounced layout update.
+* **T + 150ms:** Background delta sync calls `GET /api/mobile/timeline/sync?since=...` (if online). Any cloud changes
+  are committed to Room in a single transaction, triggering a debounced layout update.
 
 ---
 
-#### 4. Instant Fast-Scrubbing with Variable Row Heights
+#### 4. Instant Fast-Scrubbing with Variable Row Heights & Viewer Scroll Sync
 
 Because each row has a slightly different height, native scroll thumbs can jitter. Solve this with a **Layout Index**:
 
@@ -409,25 +419,23 @@ Because each row has a slightly different height, native scroll thumbs can jitte
 class TimelineLayoutIndex(
     val rows: List<TimelineListItem>,
     val totalHeightDp: Float,
-    val monthOffsets: Map<Int, Int> // yearMonth (e.g. 202610) -> LazyColumn item index
+    val monthOffsets: Map<Int, Int>, // yearMonth (e.g. 202610) -> LazyColumn item index
+    val itemOffsets: Map<String, Int> // mediaId -> LazyColumn item index
 ) {
     fun findRowIndexAtPercentage(fraction: Float): Int {
         val targetOffset = fraction * totalHeightDp
-        // Binary search rows by estimatedOffsetTopDp: O(log N)
-        val idx = rows.binarySearchBy(targetOffset) {
-            when (it) {
-                is TimelineRowUiItem -> it.estimatedOffsetTopDp
-                is MonthHeaderUiItem -> /* header offset */
-            }
-        }
+        // Binary search rows and headers by estimatedOffsetTopDp: O(log N)
+        val idx = rows.binarySearchBy(targetOffset) { it.estimatedOffsetTopDp }
         return if (idx < 0) (-idx - 1).coerceIn(0, rows.lastIndex) else idx
     }
 
     fun findIndexForDate(yearMonth: Int): Int = monthOffsets[yearMonth] ?: 0
+
+    fun findRowIndexForMedia(mediaId: String): Int? = itemOffsets[mediaId]
 }
 ```
 
-**Fast-Scrubbing FPS & Gesture Rules:**
+**Fast-Scrubbing FPS, Viewer Sync & Gesture Rules:**
 
 * **Instant jumps:** Always use `lazyListState.scrollToItem(index)` while dragging the `TimelineScrubber`—never
   `animateScrollToItem`.
@@ -436,6 +444,10 @@ class TimelineLayoutIndex(
   (or restrict Coil to `memoryCache`/`diskCache` reads only) and resume full loading once scrubbing pauses (~60ms) or
   lifts. This prevents transient rows from flooding OkHttp and `ImageDecoder` with dozens of cancelled requests per
   second.
+* **Viewer-to-Timeline Scroll Sync:** Mirroring `TimelineContainer.vue`, if the user opens `MediaViewerScreen`, swipes
+  across many photos in `HorizontalPager`, and dismisses back to `TimelineScreen`, check whether the final `mediaId` is
+  outside the visible `LazyColumn` viewport and jump/scroll to `layoutIndex.findRowIndexForMedia(mediaId)` so the user
+  lands on the item they were just viewing.
 * **Edge-to-edge & gesture navigation safety (API 37):** Apply `Modifier.systemGestureExclusion()` on the right-edge
   scrubber handle so vertical scrubbing doesn't trigger Android's predictive back gesture, and pass
   `WindowInsets.statusBars` / `navigationBars` into `LazyColumn` `contentPadding` and scrubber vertical bounds.
@@ -457,7 +469,7 @@ Adopt **Clean Architecture + MVI/MVVM** with **Unidirectional Data Flow (UDF)**.
 │                      Domain Layer                           │
 │   UseCases (CalculateLayout, SyncTimelineUseCase,           │
 │   DeduplicateMediaUseCase, EnqueueUploadUseCase)            │
-│   Domain Models (MediaItem, SyncStatus, TimelineRow)        │
+│   Domain Models (MediaItem, DeviceFolder, SyncStatus, Row)  │
 └──────────────────────────────┬──────────────────────────────┘
                                │
 ┌──────────────────────────────▼──────────────────────────────┐
@@ -475,8 +487,8 @@ Adopt **Clean Architecture + MVI/MVVM** with **Unidirectional Data Flow (UDF)**.
     * Matches the web client (`web/src/scripts/services/api.ts`) by relying exclusively on HTTP cookies (`access_token`,
       `refresh_token`) set by the backend on `POST /api/auth/login`.
     * OkHttp is configured with a persistent `CookieJar` (backed by encrypted SharedPreferences or DataStore).
-    * Every network call—including Retrofit API requests, Coil thumbnail image fetches, and TUS file uploads—shares this
-      exact OkHttp client instance and automatically includes the session cookies.
+    * Every network call—including Retrofit API requests, Coil thumbnail image fetches, Media3 video streaming, and TUS
+      upload initiation—shares this exact `OkHttpClient` instance and automatically includes the session cookies.
     * Transparent session refresh: A mutex-guarded OkHttp `Authenticator` triggers `POST /api/auth/refresh` when an
       access cookie expires, updating the cookie store seamlessly without re-prompting the user.
 2. **Room Database as Single Source of Truth (SSOT):**
@@ -488,7 +500,7 @@ Adopt **Clean Architecture + MVI/MVVM** with **Unidirectional Data Flow (UDF)**.
     * Layout calculations run directly over slim Room projections (
       `ORDER BY year_month DESC, sort_timestamp DESC, id DESC`),
       enabling a 100% offline-first architecture with zero UI placeholder jumping.
-3. **Local vs Cloud Identity & Two-Pass Deduplication:**
+3. **Local vs Cloud Identity, Permissions & Two-Pass Deduplication:**
     * Media items in Room contain:
         * `localContentUri`: `content://media/external/images/media/1234` (nullable)
         * `cloudId`: Backend 10-char alphanumeric string `a1B2c3D4e5` (nullable)
@@ -503,7 +515,11 @@ Adopt **Clean Architecture + MVI/MVVM** with **Unidirectional Data Flow (UDF)**.
         * `timezoneOffsetMinutes`: Offset of local capture time from `sortTimestamp`
         * `yearMonth`: Precomputed `YYYYMM` integer for contiguous local-month grouping
         * `sha256Hash`: File SHA-256 hash matching backend `media_item.sha256` (nullable, computed lazily)
-        * `syncStatus`: `LOCAL_ONLY`, `SYNCING`, `SYNCED`, `CLOUD_ONLY`
+        * `syncStatus`: `LOCAL_ONLY`, `SYNCED`, `CLOUD_ONLY` (transient `SYNCING` / `UPLOADED_PENDING_SYNC` lives in
+          `upload_queue`)
+    * **Permissions:** Request `READ_MEDIA_IMAGES` and `READ_MEDIA_VIDEO`, and handle Android 14+ partial access
+      (`READ_MEDIA_VISUAL_USER_SELECTED`) cleanly so granting partial access does not break or loop permission prompts.
+      *(If local-network Cast discovery is added later, API 37 requires `ACCESS_LOCAL_NETWORK`.)*
     * **Matching Pipeline:**
         * *Fast Pass:* On startup/scan, query `CLOUD_ONLY` rows by `size_bytes` and match in Kotlin on `ratio` + exact
           or 15-minute timezone-aligned timestamp (`±2s` within `±24h`). Matched items flip to `SYNCED` with zero disk
@@ -511,30 +527,58 @@ Adopt **Clean Architecture + MVI/MVVM** with **Unidirectional Data Flow (UDF)**.
         * *Lazy Crypto Verification:* For unmatched local items staged for upload (and rare `size_bytes` collisions
           with >24h timestamp drift), compute SHA-256 lazily and verify against the backend prior to streaming bytes.
 4. **Coil 3 Thumbnail Strategy (LCP & FPS Tuned):**
-    * **Target SDK:** Android 17 and up (API level 37) provides native hardware-accelerated AVIF decoding via
-      `ImageDecoder`.
+    * **Target & Min SDK:** Targeting Android 17 and up (API level 37, Pixel devices) provides native
+      hardware-accelerated AVIF decoding via `ImageDecoder` and modern adaptive windowing (note API 37 ignores fixed
+      orientation / non-resizable restrictions on large screens).
     * **Custom `MediaStoreThumbnailFetcher`:** For `LOCAL_ONLY` and `SYNCED` items (`localContentUri`), register a
-      custom
-      Coil `Fetcher` that calls `ContentResolver.loadThumbnail(uri, Size(widthPx, heightPx), signal)` (falling back to
-      subsampled `ImageDecoder` only on failure) instead of Coil's default stream opener, avoiding full 12–50 MP file
-      decodes and slow video frame extraction in the timeline grid.
+      custom Coil `Fetcher` that calls `ContentResolver.loadThumbnail(uri, Size(widthPx, heightPx), signal)` instead of
+      Coil's default stream opener, avoiding full 12–50 MP file decodes and slow video frame extraction in the timeline
+      grid:
+        * Wire `CancellationSignal` to the coroutine's `Job` (`invokeOnCompletion { signal.cancel() }`) so fast
+          scrolling immediately aborts pending IPC thumbnail loads.
+        * On `loadThumbnail` failure, fall back to subsampled `ImageDecoder` for **images** and
+          `MediaMetadataRetriever` / Coil's `VideoFrameDecoder` for **videos** (`ImageDecoder` cannot decode video
+          URIs).
     * **If `syncStatus == CLOUD_ONLY` (or `SYNCED` after local file deletion):**
-        * If `hasThumbnails == true`: `"${BASE_URL}/thumbnails/${cloudId}/${targetHeightPx}p.avif"`
-        * If `hasThumbnails == false`: `"${BASE_URL}/api/photos/${cloudId}/thumbnail?size=${targetHeightPx}"`
+        * If `hasThumbnails == true`: `"${BASE_URL}/thumbnails/${cloudId}/${targetHeightPx}p.avif"` (no auth required)
+        * If `hasThumbnails == false`: `"${BASE_URL}/api/photos/${cloudId}/thumbnail?size=${targetHeightPx}"` (requires
+          auth)
     * **Grid ImageLoader tuning:**
         * Always pass exact pixel `.size(widthPx, heightPx)` on `ImageRequest`.
         * Keep hardware bitmaps enabled (`allowHardware(true)`).
         * **Disable `crossfade` in the timeline grid** to avoid simultaneous alpha-layer overdraw across 15+ cells.
         * Configure `MemoryCache` (~25% of heap), `DiskCache` (500 MB LRU), and share the `OkHttpClient` with
           `maxRequestsPerHost = 12–16`.
-5. **Resumable Uploads via Foreground WorkManager:**
-    * `UploadWorker` executes TUS resumable uploads in 5 MB chunks (TUS uploads work with JWT ticket). Only `LOCAL_ONLY`
-      items whose folder has `backup_enabled = 1` in `device_folder` are auto-enqueued.
+5. **Video Playback Strategy (`Media3` / `ExoPlayer`):**
+    * **Shared `OkHttpClient` DataSource:** Media3's `DefaultHttpDataSource` does **not** use OkHttp or your
+      `CookieJar`. Configure `ExoPlayer` with `media3-datasource-okhttp` (`OkHttpDataSource.Factory(okHttpClient)`) so
+      authenticated remote video streams automatically carry session cookies and trigger transparent 401 token refresh.
+    * **Source selection in `MediaViewerScreen`:**
+        * **Local / Synced (`localContentUri != null`):** Play directly from `localContentUri` (instant, zero
+          bandwidth, full quality).
+        * **Cloud-only (`CLOUD_ONLY`):**
+            * **`hasThumbnails == false`:** Thumbnails and WebM transcodes have not been generated yet, so **only** the
+              on-demand original-quality endpoint (`/api/photos/{id}/video`) can be used.
+            * **`hasThumbnails == true`:** Check whether the original video format/codec is playable on the phone (e.g.,
+              via codec capabilities / `MediaCodecList` or fallback on `PlaybackException`):
+                * If **playable**: let user pick quality from [possible webm qualities + original quality]. to stream
+                  the original-quality (`4K` / `1080p`) video from
+                  `"${BASE_URL}/api/photos/${cloudId}/video"`. This endpoint supports HTTP `Range` requests for seeking
+                  and **requires authentication** (handled via `OkHttpDataSource`).
+                * If **not playable** natively on the phone (e.g., unsupported container/codec): fall back to the
+                  transcoded WebM preview at `"${BASE_URL}/thumbnails/${cloudId}/480p.webm"`. Note that
+                  `/thumbnails/...` does **not** require authentication. let user pick quality from transcoded qualities
+6. **Resumable Uploads via Foreground WorkManager:**
+    * `UploadWorker` executes TUS resumable uploads in 5 MB chunks. The JWT upload ticket is only verified at upload
+      creation, after which TUS uses a persistent upload UUID for `HEAD`/`PATCH` chunks. Only `LOCAL_ONLY` items whose
+      folder has `backup_enabled = 1` in `device_folder` are auto-enqueued.
     * To prevent the OS from killing transfers after 10 minutes, the worker calls
       `setForeground(createForegroundInfo())` to run as an Android Foreground Service with an ongoing notification.
-    * The upload offset is persisted in Room (`upload_queue`) after each chunk, ensuring seamless resume on network
-      drops
-      without disturbing the timeline layout query.
+    * The upload URL/UUID and byte offset are persisted in Room (`upload_queue`) after each chunk, ensuring seamless
+      resume on network drops without disturbing the timeline layout query.
+    * Because `IngestMetadata` runs asynchronously on the server worker after upload completion, mark the item in
+      `upload_queue` as `UPLOADED_PENDING_SYNC` until the next `SyncTimelineUseCase` links its `cloudId`—preventing
+      `EnqueueBackupUseCase` from re-uploading already transferred files.
 
 ---
 
@@ -547,13 +591,13 @@ app/src/main/java/com/ruurd/photos/
 │   ├── database/           # Room Database, TypeConverters
 │   │   ├── dao/            # MediaDao, DeviceFolderDao, AlbumDao, UploadQueueDao
 │   │   └── entity/         # MediaEntity, DeviceFolderEntity, AlbumEntity, UploadQueueEntity
-│   ├── network/            # OkHttp, Retrofit, PersistentCookieJar, SessionManager
+│   ├── network/            # OkHttp, Retrofit, PersistentCookieJar, SessionManager, NetworkMonitor
 │   │   ├── api/            # PhotosApiService (Retrofit Protobuf Lite)
 │   │   ├── cookie/         # PersistentCookieJar implementation (DataStore-backed)
 │   │   └── tus/            # Resumable TUS upload client
 │   ├── image/              # Coil ImageLoader setup, MediaStoreThumbnailFetcher
 │   └── ui/                 # Shared UI components, Theme (M3 Dynamic Color), Dimens
-│       └── components/     # ThumbnailImage, FastScroller, DateOverlay
+│       └── components/     # ThumbnailImage, FastScroller, DateOverlay, SyncStatusIndicator
 │
 ├── data/                   # Repositories & Data Sources
 │   ├── repository/
@@ -592,14 +636,14 @@ app/src/main/java/com/ruurd/photos/
 
 ### Part 4: Screens & Views Breakdown
 
-| Screen                                   | Core UI Components                                                                                                                                                                                                             | Key Gestures & Interactions                                                                                                                                                                  |
-|:-----------------------------------------|:-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|:---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **`TimelineScreen`**                     | • `LazyColumn` of typed headers + justified rows (cloud items + visible camera folders)<br>• Right-edge `TimelineScrubber` (with `systemGestureExclusion`)<br>• Floating `DateOverlay`<br>• Contextual multi-selection top bar | • Fast vertical dragging on scrubber via `scrollToItem` (with `isScrubbing` image-load gating)<br>• Long-press + drag down to multi-select items<br>• Tap item → navigate into `MediaViewer` |
-| **`MediaViewerScreen`**                  | • `HorizontalPager` for smooth swiping<br>• `Telephoto` zoomable photo viewport<br>• Reused single `ExoPlayer` instance for video items<br>• Bottom action bar (Share, Edit, Delete, Info)                                     | • Double-tap to zoom, pinch-to-zoom<br>• Swipe down to dismiss back to timeline<br>• Swipe up to expand metadata / EXIF / weather sheet                                                      |
-| **`AlbumsScreen` & `AlbumDetailScreen`** | • `LazyVerticalGrid` (square cards) for album list<br>• Justified row grid for album contents                                                                                                                                  | • Tap album card → open album timeline<br>• Add photos to album via selection flow                                                                                                           |
-| **`DeviceFoldersScreen`**                | • "On this device" folder grid (`Screenshots`, `Download`, 3rd-party cameras, etc.)<br>• Per-folder **Back up** & **Show in timeline** toggles<br>• Justified row grid for folder contents                                     | • Browse non-camera folders without cluttering main timeline<br>• Toggle backup on for a folder (auto-enables timeline visibility) or manually upload individual items                       |
-| **`BackupSettingsScreen`**               | • Discovered device folder checklist (defaults to `DCIM/*` excluding Screenshots)<br>• Constraint switches (Wi-Fi only, while charging)<br>• Live upload queue progress bar                                                    | • Toggle auto-backup globally or per folder<br>• "Sync Now" manual trigger                                                                                                                   |
-| **`AuthScreen`**                         | • Server URL input (defaults to self-hosted domain)<br>• Email & password inputs                                                                                                                                               | • Validates connection via `GET /api/health`<br>• Stores session cookies in persistent `CookieJar` across app launches                                                                       |
+| Screen                                   | Core UI Components                                                                                                                                                                                                                                                     | Key Gestures & Interactions                                                                                                                                                                                                                                  |
+|:-----------------------------------------|:-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|:-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **`TimelineScreen`**                     | • `LazyColumn` of typed headers + justified rows (cloud items + visible camera folders)<br>• Right-edge `TimelineScrubber` (with `systemGestureExclusion`)<br>• Floating `DateOverlay`<br>• Subtle connectivity/sync indicator<br>• Contextual multi-selection top bar | • Fast vertical dragging on scrubber via `scrollToItem` (with `isScrubbing` image-load gating)<br>• Long-press + drag down to multi-select items<br>• Tap item → navigate into `MediaViewer`<br>• Sync scroll position back to active item on viewer dismiss |
+| **`MediaViewerScreen`**                  | • `HorizontalPager` for smooth swiping<br>• `Telephoto` zoomable photo viewport<br>• Reused single `ExoPlayer` instance (`OkHttpDataSource`) for video items<br>• Bottom action bar (Share, Edit, Delete, Info)                                                        | • Double-tap to zoom, pinch-to-zoom<br>• Swipe down to dismiss back to timeline<br>• Swipe up to expand metadata / EXIF / weather sheet                                                                                                                      |
+| **`AlbumsScreen` & `AlbumDetailScreen`** | • `LazyVerticalGrid` (square cards) for album list<br>• Justified row grid for album contents                                                                                                                                                                          | • Tap album card → open album timeline<br>• Add photos to album via selection flow                                                                                                                                                                           |
+| **`DeviceFoldersScreen`**                | • "On this device" folder grid (`Screenshots`, `Download`, 3rd-party cameras, etc.)<br>• Per-folder **Back up** & **Show in timeline** toggles<br>• Justified row grid for folder contents                                                                             | • Browse non-camera folders without cluttering main timeline<br>• Toggle backup on for a folder (auto-enables timeline visibility) or manually upload individual items                                                                                       |
+| **`BackupSettingsScreen`**               | • Discovered device folder checklist (defaults to `DCIM/*` excluding Screenshots)<br>• Constraint switches (Wi-Fi only, while charging)<br>• Live upload queue progress bar                                                                                            | • Toggle auto-backup globally or per folder<br>• "Sync Now" manual trigger                                                                                                                                                                                   |
+| **`AuthScreen`**                         | • Server URL input (defaults to self-hosted domain)<br>• Email & password inputs                                                                                                                                                                                       | • Validates connection via `GET /api/health`<br>• Stores session cookies in persistent `CookieJar` across app launches                                                                                                                                       |
 
 ---
 
@@ -611,9 +655,11 @@ app/src/main/java/com/ruurd/photos/
   Compose row skipping).
 * **Zoom Gestures in Viewer:** `me.saket.telephoto:zoomable-image-coil:0.14.0` (Compose zoomable image with fling,
   inertia, and nested scrolling cooperation with `HorizontalPager`).
-* **Video Playback:** `androidx.media3:media3-exoplayer:1.5.1` & `androidx.media3:media3-ui:1.5.1`
+* **Video Playback:** `androidx.media3:media3-exoplayer:1.5.1`, `androidx.media3:media3-ui:1.5.1`, &
+  `androidx.media3:media3-datasource-okhttp:1.5.1` (Required so `ExoPlayer` shares `OkHttpClient` cookies and 401
+  refresh).
 * **Protobuf Compilation:** `com.google.protobuf:protobuf-kotlin-lite:4.30.0` with the Gradle Protobuf plugin to compile
-  `timeline.proto`.
+  the `.proto` schemas.
 * **Navigation:** `androidx.navigation:navigation-compose:2.8.8` (Type-safe Compose navigation routes via
   `@Serializable` classes).
 * **Local DB:** `androidx.room:room-ktx:2.7.0` (Configured with SQLite WAL mode for non-blocking concurrent

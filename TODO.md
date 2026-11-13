@@ -40,6 +40,7 @@
 * fix non-compile type sqlx queries overal
 * delete cache endpoints (full clear, metadata only, analysis only, thumbnails only).
   * needs frontend UI (dialog to confirm because takes a long time to produce thumbs)
+* set production cookie_secure to true
 
 # INFRASTRUCTURE:
 
