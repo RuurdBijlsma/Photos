@@ -117,8 +117,8 @@ implement notes
 * **Scheduled tombstone pruning (`CleanDB job handler`):**
     * Periodically prune `deleted_media_item` rows older than retention (e.g. 30–90 days).
 * **Refactor protobuf schemas:**
-    * Split `timeline.proto` into `common.proto`, `web.proto`, and `mobile.proto` (updating `common_types/build.rs` and
-      `web/package.json` `proto:gen`).
+    * [✅ Done] Split `timeline.proto` into `common.proto`, `web.proto`, and `mobile.proto` (updating `common_types/build.rs` and
+      `web/package.json` `proto:gen`). 
     * Define `TimelineSyncResponse` and `CompactTimelineItem` (`id`, `sort_timestamp`, `ratio`, `is_video`,
       `has_thumbnails`, `size_bytes`, `duration_ms`, `timezone_offset_minutes`).
 * **Compact sync endpoint (`GET /api/mobile/timeline/sync?since=...`):**
@@ -129,11 +129,12 @@ implement notes
     * Verify `CompressionLayer` in `server.rs` gzip-compresses the protobuf response when `Accept-Encoding: gzip` is
       sent.
 * **SHA-256 ingest & hash check endpoint:**
-    * Compute and store `sha256` during `ingest_metadata` (and optionally backfill existing `media_item` rows).
+    * Compute and store `sha256` during `ingest_metadata` (_dont_ backfill existing `media_item` rows).
     * Implement `POST /api/upload/check-hashes` returning all non-deleted matching `cloud_ids` per hash.
+    * Increase INGEST_CACHE_VERSION of metadata (ingest_cache.rs) so it doesnt use old cache files 
 * **Verification:**
     * Add `test_integration` tests for full snapshot, delta upserts, soft-delete/restore, hard-delete tombstones,
-      retention fallback, and `check-hashes`; regenerate `server/.sqlx/` offline cache before merging.
+      retention fallback, and `check-hashes`;
 
 ---
 

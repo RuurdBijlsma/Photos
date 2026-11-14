@@ -61,25 +61,26 @@ CREATE TABLE media_item
 (
     -- Ids
     id                         VARCHAR(10) PRIMARY KEY,
-    user_id                    INT         NOT NULL REFERENCES app_user (id) ON DELETE CASCADE,
-    remote_user_id             INT         REFERENCES remote_user (id) ON DELETE SET NULL,
-    hash                       TEXT        NOT NULL,
+    user_id                    INT                 NOT NULL REFERENCES app_user (id) ON DELETE CASCADE,
+    remote_user_id             INT                 REFERENCES remote_user (id) ON DELETE SET NULL,
+    hash                       TEXT                NOT NULL,
+    sha256                     TEXT                NOT NULL,
     -- File info
-    relative_path              TEXT        NOT NULL UNIQUE,
-    filename                   TEXT        NOT NULL,
-    created_at                 TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at                 TIMESTAMPTZ NOT NULL DEFAULT now(),
+    relative_path              TEXT                NOT NULL UNIQUE,
+    filename                   TEXT                NOT NULL,
+    created_at                 TIMESTAMPTZ         NOT NULL DEFAULT now(),
+    updated_at                 TIMESTAMPTZ         NOT NULL DEFAULT now(),
     -- Media info
-    width                      INT         NOT NULL,
-    height                     INT         NOT NULL,
-    is_video                   BOOLEAN     NOT NULL,
+    width                      INT                 NOT NULL,
+    height                     INT                 NOT NULL,
+    is_video                   BOOLEAN             NOT NULL,
     duration_ms                BIGINT,
-    orientation                INT         NOT NULL DEFAULT 1,
+    orientation                INT                 NOT NULL DEFAULT 1,
     -- Time
-    taken_at_local             TIMESTAMP   NOT NULL,
-    og_taken_at_local          TIMESTAMP   NOT NULL,
+    taken_at_local             TIMESTAMP           NOT NULL,
+    og_taken_at_local          TIMESTAMP           NOT NULL,
     taken_at_utc               TIMESTAMPTZ,
-    sort_timestamp             TIMESTAMPTZ NOT NULL,
+    sort_timestamp             TIMESTAMPTZ         NOT NULL,
     timezone_name              TEXT,
     timezone_offset_seconds    INT,
     og_timezone_offset_seconds INT,
@@ -89,12 +90,12 @@ CREATE TABLE media_item
     thumbnails_error           TEXT,
     analysis_error             TEXT,
     -- Frontend fields
-    use_panorama_viewer        BOOLEAN     NOT NULL,
+    use_panorama_viewer        BOOLEAN             NOT NULL,
     has_thumbnails             BOOLEAN GENERATED ALWAYS AS (thumbnails_status = 'done') STORED,
     month_id                   DATE GENERATED ALWAYS AS (date_trunc('month', taken_at_local)) STORED,
     user_caption               TEXT,
     -- Other
-    deleted                    BOOLEAN     NOT NULL DEFAULT false,
+    deleted                    BOOLEAN             NOT NULL DEFAULT false,
     missing_since              TIMESTAMPTZ,
     search_vector              TSVECTOR,
     CONSTRAINT width_positive CHECK (width > 0),
@@ -103,6 +104,15 @@ CREATE TABLE media_item
 
 ALTER TABLE app_user
     ADD COLUMN avatar_id VARCHAR(10) REFERENCES media_item (id) ON DELETE SET NULL;
+
+-- Tombstone table for permanently deleted media items (mobile delta sync).
+-- Intentionally has no FK to app_user so cascading user deletes do not fail inside the trigger.
+CREATE TABLE deleted_media_item
+(
+    media_item_id VARCHAR(10) PRIMARY KEY,
+    user_id       INT         NOT NULL,
+    deleted_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 
 -- The following tables store optional, detailed metadata for a MediaItem.
 -- They use a one-to-one relationship where the primary key is also a foreign key
@@ -205,8 +215,17 @@ CREATE INDEX idx_media_item_created_at ON media_item (created_at);
 CREATE INDEX idx_media_item_taken_at_local ON media_item (taken_at_local);
 CREATE INDEX idx_media_item_user_id ON media_item (user_id);
 CREATE INDEX idx_media_item_user_hash ON media_item (user_id, hash);
+CREATE INDEX idx_media_item_user_sha256
+    ON media_item (user_id, sha256)
+    WHERE deleted = false;
+CREATE INDEX idx_media_item_user_updated_at
+    ON media_item (user_id, updated_at);
 CREATE INDEX idx_media_item_not_deleted ON media_item (id) WHERE deleted = false;
 CREATE INDEX idx_media_item_search_lookup ON media_item (user_id, deleted, id);
+
+-- For mobile delta sync tombstone queries and pruning
+CREATE INDEX idx_deleted_media_item_user_deleted_at
+    ON deleted_media_item (user_id, deleted_at);
 
 -- For /timeline/ids
 CREATE INDEX idx_media_item_ids_timeline
