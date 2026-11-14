@@ -64,7 +64,6 @@ CREATE TABLE media_item
     user_id                 INT                 NOT NULL REFERENCES app_user (id) ON DELETE CASCADE,
     remote_user_id          INT                 REFERENCES remote_user (id) ON DELETE SET NULL,
     hash                    TEXT                NOT NULL,
-    sha256                  TEXT                NOT NULL,
     -- File info
     relative_path           TEXT                NOT NULL UNIQUE,
     filename                TEXT                NOT NULL,
@@ -223,9 +222,6 @@ CREATE INDEX idx_media_item_created_at ON media_item (created_at);
 CREATE INDEX idx_media_item_taken_at_local ON media_item (taken_at_local);
 CREATE INDEX idx_media_item_user_id ON media_item (user_id);
 CREATE INDEX idx_media_item_user_hash ON media_item (user_id, hash);
-CREATE INDEX idx_media_item_user_sha256
-    ON media_item (user_id, sha256)
-    WHERE deleted = false;
 CREATE INDEX idx_media_item_user_updated_at
     ON media_item (user_id, updated_at);
 CREATE INDEX idx_media_item_not_deleted ON media_item (id) WHERE deleted = false;
