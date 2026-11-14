@@ -1,0 +1,31 @@
+// proto definitions that apply only to mobile go here
+//(Note: when web.proto or mobile.proto needs to reference types defined in common.proto, we can add import "common.proto"; at the top of web.proto or mobile.proto.)
+syntax = "proto3";
+
+package api;
+
+option java_package = "dev.ruurd.photos.core.network.proto";
+option java_multiple_files = true;
+
+// --- Compact timeline delta sync (Room is the client-side source of truth) ---
+message TimelineSyncResponse {
+  // New or modified media items to be upserted into Room
+  repeated CompactTimelineItem upserted = 1;
+  // IDs of items moved to Bin/Trash or permanently purged via tombstones
+  repeated string deleted_ids = 2;
+  // Server timestamp (epoch ms) to persist and pass as `since` in the next sync request
+  int64 sync_timestamp = 3;
+  // True when `since` was omitted or older than tombstone retention (client must diff snapshot)
+  bool is_full_snapshot = 4;
+}
+
+message CompactTimelineItem {
+  string id = 1;                      // 10-char alphanumeric ID
+  int64 sort_timestamp = 2;           // Epoch millis (UTC) for deterministic chronological sorting
+  float ratio = 3;                    // width / height aspect ratio
+  bool is_video = 4;
+  bool has_thumbnails = 5;            // True if server pre-generated AVIF thumbnails are ready
+  int64 size_bytes = 6;               // Used for instant, zero-hash MediaStore deduplication
+  optional int32 duration_ms = 7;     // Video duration in milliseconds (if video)
+  sint32 timezone_offset_minutes = 8; // Offset of taken_at_local vs sort_timestamp in minutes
+}

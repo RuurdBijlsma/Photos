@@ -2,7 +2,7 @@
 import MdiCheckBold from '~icons/mdi/check-bold'
 import MdiFullscreen from '~icons/mdi/fullscreen'
 import MdiPlay from '~icons/mdi/play'
-import type { SimpleTimelineItem, TimelineItem } from '@/scripts/types/generated/timeline.ts'
+import type { SimpleTimelineItem, TimelineItem } from '@/scripts/types/generated/web.ts'
 import { toHms } from '@/scripts/utils.ts'
 import { useSelectionStore } from '@/scripts/stores/timeline/selectionStore.ts'
 import type { LocationQuery } from 'vue-router'

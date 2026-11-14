@@ -1,0 +1,36 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT hash, array_agg(id ORDER BY created_at ASC) AS \"cloud_ids!\"\n        FROM media_item\n        WHERE user_id = $1 AND deleted = false AND hash = ANY($2)\n        GROUP BY hash\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "hash",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "media_item",
+            "name": "hash"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "cloud_ids!",
+        "type_info": "VarcharArray",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4",
+        "TextArray"
+      ]
+    },
+    "nullable": [
+      false,
+      null
+    ]
+  },
+  "hash": "d55372f7ba9e9a549cafdc2f4e5e5970e7355561195af90f20f7e7279df0b324"
+}

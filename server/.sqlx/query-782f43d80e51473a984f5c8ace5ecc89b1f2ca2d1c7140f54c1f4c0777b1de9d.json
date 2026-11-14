@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                    UPDATE media_item\n                    SET analysis_status = 'pending', analysis_error = NULL, updated_at = now()\n                    WHERE relative_path = $1 AND user_id = $2 AND deleted = false\n                    ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "782f43d80e51473a984f5c8ace5ecc89b1f2ca2d1c7140f54c1f4c0777b1de9d"
+}

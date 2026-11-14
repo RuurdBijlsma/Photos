@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM deleted_media_item WHERE deleted_at < $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "e03323445639f6bedf4924fea6b47d6db7e3cab89dbaed469a18e029411d1b9a"
+}

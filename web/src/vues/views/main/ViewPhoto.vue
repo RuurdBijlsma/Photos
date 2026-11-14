@@ -23,7 +23,7 @@ import {
   type SimpleTimelineItem,
   type StorageReviewItem,
   TimelineItem,
-} from '@/scripts/types/generated/timeline.ts'
+} from '@/scripts/types/generated/web.ts'
 import MediaInfoPanel from '@/vues/components/viewer/components/MediaInfoPanel.vue'
 import {
   copyToClipboard,

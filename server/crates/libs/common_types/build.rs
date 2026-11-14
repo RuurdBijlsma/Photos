@@ -1,9 +1,18 @@
 #[allow(clippy::too_many_lines)]
 fn main() -> std::io::Result<()> {
-    println!("cargo:rerun-if-changed=proto/timeline.proto");
+    println!("cargo:rerun-if-changed=proto/common.proto");
+    println!("cargo:rerun-if-changed=proto/mobile.proto");
+    println!("cargo:rerun-if-changed=proto/web.proto");
 
-    let file_descriptors = protox::compile(["proto/timeline.proto"], ["proto/"])
-        .map_err(|e| std::io::Error::other(e.to_string()))?;
+    let file_descriptors = protox::compile(
+        [
+            "proto/common.proto",
+            "proto/mobile.proto",
+            "proto/web.proto",
+        ],
+        ["proto/"],
+    )
+    .map_err(|e| std::io::Error::other(e.to_string()))?;
 
     // 3. Create the prost_build configuration
     let mut config = prost_build::Config::new();
@@ -33,6 +42,17 @@ fn main() -> std::io::Result<()> {
     config.type_attribute(
         ".api.TimelineItem",
         "#[derive(serde::Serialize, serde::Deserialize, sqlx::FromRow)]",
+    );
+
+    // --- MOBILE STRUCTS ---
+    config.type_attribute(
+        ".api.TimelineSyncResponse",
+        "#[derive(serde::Serialize, serde::Deserialize)]",
+    );
+
+    config.type_attribute(
+        ".api.CompactTimelineItem",
+        "#[derive(serde::Serialize, serde::Deserialize)]",
     );
 
     // --- ALBUM STRUCTS ---

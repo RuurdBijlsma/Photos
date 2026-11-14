@@ -1,0 +1,93 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            mi.id,\n            (EXTRACT(EPOCH FROM mi.sort_timestamp) * 1000)::BIGINT AS \"sort_timestamp!\",\n            (mi.width::REAL / mi.height::REAL) AS \"ratio!\",\n            mi.is_video,\n            mi.has_thumbnails AS \"has_thumbnails!\",\n            mf.size_bytes,\n            mi.duration_ms::INT AS duration_ms,\n            ROUND(\n                EXTRACT(EPOCH FROM (mi.taken_at_local - (mi.sort_timestamp AT TIME ZONE 'UTC'))) / 60.0\n            )::INT AS \"timezone_offset_minutes!\"\n        FROM media_item mi\n        JOIN media_features mf ON mf.media_item_id = mi.id\n        WHERE mi.user_id = $1\n          AND mi.deleted = false\n          AND mi.updated_at > $2\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "media_item",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "sort_timestamp!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 2,
+        "name": "ratio!",
+        "type_info": "Float4",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 3,
+        "name": "is_video",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "media_item",
+            "name": "is_video"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "has_thumbnails!",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "media_item",
+            "name": "has_thumbnails"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "size_bytes",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "media_features",
+            "name": "size_bytes"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "duration_ms",
+        "type_info": "Int4",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 7,
+        "name": "timezone_offset_minutes!",
+        "type_info": "Int4",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      false,
+      null,
+      null,
+      false,
+      true,
+      false,
+      null,
+      null
+    ]
+  },
+  "hash": "3569fe55e800b4371c3cc42cae73d1daca8a62f0efa60b1592cfd28a51ab9b2d"
+}

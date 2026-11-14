@@ -64,7 +64,6 @@ CREATE TABLE cluster_tags
     embedding VECTOR(768) NOT NULL
 );
 
-CREATE INDEX idx_cluster_tags_user_id ON photo_cluster (user_id);
 CREATE INDEX idx_cluster_tags_embedding_hnsw
     ON cluster_tags
         USING hnsw (embedding vector_cosine_ops);

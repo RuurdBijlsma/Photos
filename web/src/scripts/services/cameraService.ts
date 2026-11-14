@@ -1,5 +1,5 @@
 import apiClient from './api.ts'
-import { FullCameraPhotosResponse, ListCameraResponse } from '@/scripts/types/generated/timeline.ts'
+import { FullCameraPhotosResponse, ListCameraResponse } from '@/scripts/types/generated/web.ts'
 
 const cameraService = {
   async list(): Promise<ListCameraResponse> {

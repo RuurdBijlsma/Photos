@@ -10,7 +10,7 @@ import MainLayoutContainer from '@/vues/components/MainLayoutContainer.vue'
 import GlowThumbnail from '@/vues/components/ui/GlowThumbnail.vue'
 import { useCameraStore } from '@/scripts/stores/cameraStore.ts'
 import { useStorage } from '@vueuse/core'
-import type { CameraInfo } from '@/scripts/types/generated/timeline.ts'
+import type { CameraInfo } from '@/scripts/types/generated/web.ts'
 import { useRefreshFunction } from '@/scripts/composables/useRefreshFunction.ts'
 import { useDelayedBoolean } from '@/scripts/composables/useDelayedBoolean.ts'
 

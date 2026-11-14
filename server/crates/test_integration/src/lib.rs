@@ -34,6 +34,11 @@ mod test_runner {
         test_update_full_resets_ingest_stages, test_visual_analysis_unique_percentage,
         test_watcher_delete,
     };
+    use crate::tests::test_mobile::{
+        test_check_hashes, test_mobile_sync_delta, test_mobile_sync_full_snapshot,
+        test_mobile_sync_hard_delete_tombstone, test_mobile_sync_retention_fallback,
+        test_mobile_sync_soft_delete_and_restore, test_prune_deleted_media_items,
+    };
     use crate::tests::test_onboarding::{test_onboarding, test_start_processing};
     use crate::tests::test_photos::{
         test_get_color_theme, test_get_full_item, test_get_full_item_albums, test_get_random_photo,
@@ -110,6 +115,14 @@ mod test_runner {
                 test_metadata_stage_active,
                 test_scan_skips_failed_ingest,
                 test_watcher_delete,
+                // -- Mobile sync --
+                test_mobile_sync_full_snapshot,
+                test_mobile_sync_delta,
+                test_mobile_sync_soft_delete_and_restore,
+                test_prune_deleted_media_items,
+                test_mobile_sync_retention_fallback,
+                test_check_hashes,
+                test_mobile_sync_hard_delete_tombstone,
             ]
         );
 

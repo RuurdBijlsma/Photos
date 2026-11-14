@@ -12,7 +12,7 @@ import MapContainer, {
 } from '../../components/map/map-view/MapContainer.vue'
 import mediaItemService from '@/scripts/services/mediaItemService.ts'
 import { useEventListener, useResizeObserver, useStorage, useThrottleFn } from '@vueuse/core'
-import type { MapPhotosResponse, SimpleTimelineItem } from '@/scripts/types/generated/timeline.ts'
+import type { MapPhotosResponse, SimpleTimelineItem } from '@/scripts/types/generated/web.ts'
 import SimpleTimeline from '@/vues/components/timeline/simple-timeline/SimpleTimeline.vue'
 import { useRoute } from 'vue-router'
 import { useRefreshFunction } from '@/scripts/composables/useRefreshFunction.ts'

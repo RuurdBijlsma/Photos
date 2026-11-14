@@ -3,8 +3,10 @@ use crate::handlers::JobResult;
 use app_state::constants::{TUS_LOCKS_FOLDER, TUS_UPLOADS_FOLDER, USER_UPLOAD_FOLDER};
 use chrono::Utc;
 use color_eyre::Result;
+use common_services::api::timeline::TOMBSTONE_RETENTION_DAYS;
 use common_services::database::jobs::Job;
 use common_services::database::user_store::UserStore;
+use sqlx::PgPool;
 use std::fs;
 use std::time::{Duration, SystemTime};
 use walkdir::WalkDir;
@@ -42,6 +44,10 @@ pub async fn handle(context: &WorkerContext, _job: &Job) -> Result<JobResult> {
     .execute(&context.pool)
     .await?;
 
+    // Prune delete tombstones past their retention window; clients syncing from an older point
+    // get a full snapshot instead.
+    prune_deleted_media_items(&context.pool).await?;
+
     // Sync media_count field on albums in case it drifted for some reason
     sqlx::query!(
         r"UPDATE album a
@@ -59,6 +65,18 @@ pub async fn handle(context: &WorkerContext, _job: &Job) -> Result<JobResult> {
     clean_old_upload_files(context).await?;
 
     Ok(JobResult::Done)
+}
+
+/// Prunes `deleted_media_item` rows past the timeline sync retention window.
+pub async fn prune_deleted_media_items(pool: &PgPool) -> Result<u64> {
+    let result = sqlx::query!(
+        "DELETE FROM deleted_media_item WHERE deleted_at < $1",
+        Utc::now() - chrono::Duration::days(TOMBSTONE_RETENTION_DAYS)
+    )
+    .execute(pool)
+    .await?;
+
+    Ok(result.rows_affected())
 }
 
 /// Cleans up expired `.uploading` files from user upload folders,

@@ -4,7 +4,7 @@ import type {
   MapPhotoItem,
   MapPhotosResponse,
   SimpleTimelineItem,
-} from '@/scripts/types/generated/timeline.ts'
+} from '@/scripts/types/generated/web.ts'
 import mediaItemService from '@/scripts/services/mediaItemService.ts'
 import { getThumbnailHeight } from '@/scripts/utils.ts'
 

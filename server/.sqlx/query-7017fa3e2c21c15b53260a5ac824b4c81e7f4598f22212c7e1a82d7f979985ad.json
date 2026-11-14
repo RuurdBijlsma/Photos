@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT id AS \"id!\"\n        FROM media_item\n        WHERE user_id = $1 AND deleted = true AND updated_at > $2\n        UNION\n        SELECT media_item_id AS \"id!\"\n        FROM deleted_media_item\n        WHERE user_id = $1 AND deleted_at > $2\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id!",
+        "type_info": "Varchar",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "7017fa3e2c21c15b53260a5ac824b4c81e7f4598f22212c7e1a82d7f979985ad"
+}

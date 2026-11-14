@@ -53,7 +53,8 @@ pub async fn soft_delete_items(
     sqlx::query!(
         r#"
             UPDATE media_item
-            SET deleted = true
+            SET deleted = true,
+                updated_at = now()
             WHERE id = ANY($1) AND user_id = $2
         "#,
         ids,
@@ -70,7 +71,8 @@ pub async fn restore_items(pool: &PgPool, user_id: i32, ids: &[String]) -> Resul
     sqlx::query!(
         r#"
             UPDATE media_item
-            SET deleted = false
+            SET deleted = false,
+                updated_at = now()
             WHERE id = ANY($1) AND user_id = $2
         "#,
         ids,

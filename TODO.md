@@ -27,16 +27,20 @@
 * import albums from google photos
 * duplicate photo remover tool
 * better error if exiftool isnt there (worker wont work then)
-* Google Takeout sidecar timestamps are treated as UTC; derive the real photo timezone/local time instead of storing and displaying UTC wall time.
+* Google Takeout sidecar timestamps are treated as UTC; derive the real photo timezone/local time instead of storing and
+  displaying UTC wall time.
 * apply rotation immidiately when going next/prev to other media item.
 * AVI toevoegen aan settings video_extensions
 * The original `PXL_20260911_122108760.jpg` puts exiftool in an infinite loop.
-  * possible solution -> if hangs (in media analyzer), then run:
-    * `exiftool -HDRPlusMakerNote= -overwrite_original <temp_file>`
-    * might as well also delete: `MakerNotes`
-  * on a temp file to get the exif data
-  * On a detected hang it should kill & restart the exiftool daemon
+    * possible solution -> if hangs (in media analyzer), then run:
+        * `exiftool -HDRPlusMakerNote= -overwrite_original <temp_file>`
+        * might as well also delete: `MakerNotes`
+    * on a temp file to get the exif data
+    * On a detected hang it should kill & restart the exiftool daemon
 * fix non-compile type sqlx queries overal
+* delete cache endpoints (full clear, metadata only, analysis only, thumbnails only).
+  * needs frontend UI (dialog to confirm because takes a long time to produce thumbs)
+* set production cookie_secure to true
 
 # INFRASTRUCTURE:
 

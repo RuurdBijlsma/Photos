@@ -15,6 +15,28 @@ EXECUTE FUNCTION notify_new_media_item();
 
 
 -- =========================================================================================
+-- Album Thumbnail Selection Trigger
+-- =========================================================================================
+
+CREATE OR REPLACE FUNCTION clear_album_thumbnail_user_selection_on_null()
+    RETURNS TRIGGER AS
+$$
+BEGIN
+    IF NEW.thumbnail_id IS NULL THEN
+        NEW.thumbnail_is_user_selected := false;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_clear_album_thumbnail_user_selection_on_null
+    BEFORE UPDATE OF thumbnail_id
+    ON album
+    FOR EACH ROW
+EXECUTE FUNCTION clear_album_thumbnail_user_selection_on_null();
+
+
+-- =========================================================================================
 -- Album Timestamp Triggers (Statement Level)
 -- =========================================================================================
 
@@ -104,8 +126,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS trg_album_media_item_count ON album_media_item;
-
 CREATE TRIGGER trg_album_media_item_count_insert
     AFTER INSERT
     ON album_media_item
@@ -175,8 +195,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS trg_media_item_soft_delete ON media_item;
-
 -- Bind the statement-level trigger to media_item
 CREATE TRIGGER trg_media_item_soft_delete
     AFTER UPDATE
@@ -196,23 +214,18 @@ BEGIN
     SET latest_media_item_timestamp   = sub.max_ts,
         earliest_media_item_timestamp = sub.min_ts,
         media_count                   = sub.cnt
-    FROM (
-             SELECT
-                 ami_all.album_id,
+    FROM (SELECT ami_all.album_id,
                  MAX(mi.sort_timestamp) as max_ts,
                  MIN(mi.sort_timestamp) as min_ts,
-                 COUNT(mi.id) as cnt
-             FROM album_media_item ami_all
-                      LEFT JOIN media_item mi ON ami_all.media_item_id = mi.id AND mi.deleted = false
-             WHERE ami_all.album_id IN (
-                 SELECT DISTINCT ami.album_id
-                 FROM album_media_item ami
-                          JOIN new_table nt ON ami.media_item_id = nt.id
-                          JOIN old_table ot ON nt.id = ot.id
-                 WHERE nt.deleted IS DISTINCT FROM ot.deleted
-             )
-             GROUP BY ami_all.album_id
-         ) sub
+                 COUNT(mi.id)           as cnt
+          FROM album_media_item ami_all
+                   LEFT JOIN media_item mi ON ami_all.media_item_id = mi.id AND mi.deleted = false
+          WHERE ami_all.album_id IN (SELECT DISTINCT ami.album_id
+                                     FROM album_media_item ami
+                                              JOIN new_table nt ON ami.media_item_id = nt.id
+                                              JOIN old_table ot ON nt.id = ot.id
+                                     WHERE nt.deleted IS DISTINCT FROM ot.deleted)
+          GROUP BY ami_all.album_id) sub
     WHERE a.id = sub.album_id;
 
     RETURN NULL;
@@ -226,3 +239,26 @@ CREATE TRIGGER trg_media_item_album_sync_update
     REFERENCING NEW TABLE AS new_table OLD TABLE AS old_table
     FOR EACH STATEMENT
 EXECUTE FUNCTION update_album_stats_on_media_item_soft_delete_stmt();
+
+-- =========================================================================================
+-- Record permanent media_item deletions in deleted_media_item
+-- =========================================================================================
+
+CREATE OR REPLACE FUNCTION record_deleted_media_item()
+    RETURNS TRIGGER AS
+$$
+BEGIN
+    INSERT INTO deleted_media_item (media_item_id, user_id, deleted_at)
+    VALUES (OLD.id, OLD.user_id, now())
+    ON CONFLICT (media_item_id) DO UPDATE
+        SET user_id    = EXCLUDED.user_id,
+            deleted_at = EXCLUDED.deleted_at;
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_media_item_after_delete
+    AFTER DELETE
+    ON media_item
+    FOR EACH ROW
+EXECUTE FUNCTION record_deleted_media_item();

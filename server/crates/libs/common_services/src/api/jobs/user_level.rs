@@ -182,7 +182,7 @@ pub async fn retry_user_job(pool: &PgPool, job_id: i64, user_id: i32) -> Result<
                 sqlx::query!(
                     r#"
                     UPDATE media_item
-                    SET thumbnails_status = 'pending', thumbnails_error = NULL
+                    SET thumbnails_status = 'pending', thumbnails_error = NULL, updated_at = now()
                     WHERE relative_path = $1 AND user_id = $2 AND deleted = false
                     "#,
                     relative_path,
@@ -195,7 +195,7 @@ pub async fn retry_user_job(pool: &PgPool, job_id: i64, user_id: i32) -> Result<
                 sqlx::query!(
                     r#"
                     UPDATE media_item
-                    SET analysis_status = 'pending', analysis_error = NULL
+                    SET analysis_status = 'pending', analysis_error = NULL, updated_at = now()
                     WHERE relative_path = $1 AND user_id = $2 AND deleted = false
                     "#,
                     relative_path,

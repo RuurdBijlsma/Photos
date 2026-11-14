@@ -2,7 +2,7 @@
 import { computed, onUnmounted, ref, watch } from 'vue'
 import { useSnackbarsStore } from '@/scripts/stores/snackbarStore.ts'
 import { useRoute, useRouter } from 'vue-router'
-import type { SimpleTimelineItem } from '@/scripts/types/generated/timeline.ts'
+import type { SimpleTimelineItem } from '@/scripts/types/generated/web.ts'
 import SimpleTimeline from '@/vues/components/timeline/simple-timeline/SimpleTimeline.vue'
 import SearchFilterMenu from '@/vues/components/ui/SearchFilterMenu.vue'
 import searchService from '@/scripts/services/searchService.ts'

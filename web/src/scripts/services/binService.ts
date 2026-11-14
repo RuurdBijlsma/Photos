@@ -1,6 +1,6 @@
 import type { AxiosResponse } from 'axios'
 import apiClient from './api.ts'
-import { OrderedMediaResponse } from '@/scripts/types/generated/timeline.ts'
+import { OrderedMediaResponse } from '@/scripts/types/generated/web.ts'
 
 const binService = {
   async getBinTimeline(): Promise<OrderedMediaResponse> {

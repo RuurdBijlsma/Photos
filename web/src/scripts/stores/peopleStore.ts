@@ -1,7 +1,7 @@
 import MdiAccountMultipleRemove from '~icons/mdi/account-multiple-remove'
 import { defineStore } from 'pinia'
 import { ref, shallowRef, triggerRef } from 'vue'
-import type { FullPersonMediaResponse, PersonInfo } from '@/scripts/types/generated/timeline.ts'
+import type { FullPersonMediaResponse, PersonInfo } from '@/scripts/types/generated/web.ts'
 import { useSnackbarsStore } from '@/scripts/stores/snackbarStore.ts'
 import peopleService from '@/scripts/services/peopleService.ts'
 import { useDialogStore } from '@/scripts/stores/dialogStore.ts'

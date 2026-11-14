@@ -6,7 +6,7 @@ import MdiSortCalendarAscending from '~icons/mdi/sort-calendar-ascending'
 import MdiSortCalendarDescending from '~icons/mdi/sort-calendar-descending'
 import MdiSortClockAscendingOutline from '~icons/mdi/sort-clock-ascending-outline'
 import MdiSortClockDescendingOutline from '~icons/mdi/sort-clock-descending-outline'
-import type { AlbumInfo } from '@/scripts/types/generated/timeline.ts'
+import type { AlbumInfo } from '@/scripts/types/generated/web.ts'
 import type { AlbumSort } from '@/scripts/types/api/album.ts'
 
 defineProps<{

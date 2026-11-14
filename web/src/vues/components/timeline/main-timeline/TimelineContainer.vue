@@ -14,7 +14,7 @@ import {
 } from 'vue'
 import { useDebounceFn, useEventListener, useResizeObserver, useThrottleFn } from '@vueuse/core'
 import { useVirtualizer } from '@tanstack/vue-virtual'
-import type { TimelineItem, TimelineMonthRatios } from '@/scripts/types/generated/timeline.ts'
+import type { TimelineItem, TimelineMonthRatios } from '@/scripts/types/generated/web.ts'
 import { useTimelineStore } from '@/scripts/stores/timeline/timelineStore.ts'
 import { getThumbnailHeight, requestIdleCallbackAsync } from '@/scripts/utils.ts'
 import type { LayoutRow, LayoutRowItem } from '@/scripts/types/timeline/layout.ts'

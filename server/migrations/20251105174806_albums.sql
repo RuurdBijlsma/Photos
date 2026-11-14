@@ -15,6 +15,7 @@ CREATE TABLE album
     name                          TEXT        NOT NULL,
     description                   TEXT,
     thumbnail_id                  VARCHAR(10) NULL REFERENCES media_item (id) ON DELETE SET NULL,
+    thumbnail_is_user_selected    BOOLEAN     NOT NULL DEFAULT false,
     -- This flag enables public, view-only link sharing without requiring a login.
     is_public                     BOOLEAN     NOT NULL DEFAULT false,
     -- sort columns: automatically updated via trigger

@@ -5,7 +5,7 @@ import {
   type TimelineItem,
   TimelineMonthRatios,
   type TimelineRatiosResponse,
-} from '@/scripts/types/generated/timeline.ts'
+} from '@/scripts/types/generated/web.ts'
 import timelineService from '@/scripts/services/timelineService.ts'
 import { useSnackbarsStore } from '@/scripts/stores/snackbarStore.ts'
 import { requestIdleCallbackAsync } from '@/scripts/utils.ts'

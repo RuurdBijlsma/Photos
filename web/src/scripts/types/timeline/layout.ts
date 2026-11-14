@@ -1,4 +1,4 @@
-import type { AlbumInfo, SimpleTimelineItem } from '@/scripts/types/generated/timeline.ts'
+import type { AlbumInfo, SimpleTimelineItem } from '@/scripts/types/generated/web.ts'
 
 export type TimelineContext = { album?: AlbumInfo; isBin?: boolean; isMissing?: boolean }
 

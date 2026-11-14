@@ -542,7 +542,8 @@ impl MediaItemStore {
         Ok(sqlx::query!(
             r#"
             UPDATE media_item
-            SET missing_since = NOW()
+            SET missing_since = NOW(),
+                updated_at = now()
             WHERE relative_path = ANY($1) AND missing_since IS NULL
             "#,
             relative_paths
@@ -559,7 +560,8 @@ impl MediaItemStore {
         Ok(sqlx::query!(
             r#"
             UPDATE media_item
-            SET missing_since = NULL
+            SET missing_since = NULL,
+                updated_at = now()
             WHERE relative_path = ANY($1) AND missing_since IS NOT NULL
             "#,
             relative_paths
@@ -576,7 +578,8 @@ impl MediaItemStore {
         Ok(sqlx::query_scalar!(
             r#"
             UPDATE media_item
-            SET deleted = true
+            SET deleted = true,
+                updated_at = now()
             WHERE relative_path = $1
             RETURNING id
             "#,
@@ -627,7 +630,8 @@ impl MediaItemStore {
         Ok(sqlx::query!(
             r#"
             UPDATE media_item
-            SET remote_user_id = $1
+            SET remote_user_id = $1,
+                updated_at = now()
             WHERE id = $2
             "#,
             remote_user_id,
@@ -770,7 +774,7 @@ impl MediaItemStore {
                     taken_at_local, taken_at_utc, sort_timestamp,
                     timezone_name, timezone_offset_seconds,
                     use_panorama_viewer, orientation, user_caption, search_vector,
-                    created_at, updated_at
+                    created_at, now()
                 FROM media_item
                 WHERE id = $1
             ),

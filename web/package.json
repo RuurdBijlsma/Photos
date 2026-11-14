@@ -23,7 +23,7 @@
     "prettier:check": "prettier --check src/",
     "perf": "node tests/perf/run.mjs --runs 5",
     "perf:check": "node tests/perf/check-perf-regression.mjs",
-    "proto:gen": "protoc --plugin=protoc-gen-ts_proto=.\\node_modules\\.bin\\protoc-gen-ts_proto.cmd --ts_proto_out=./src/scripts/types/generated --ts_proto_opt=esModuleInterop=true --proto_path=./src/proto src/proto/timeline.proto"
+    "proto:gen": "protoc --plugin=protoc-gen-ts_proto=.\\node_modules\\.bin\\protoc-gen-ts_proto.cmd --ts_proto_out=./src/scripts/types/generated --ts_proto_opt=esModuleInterop=true --proto_path=./src/proto src/proto/common.proto src/proto/web.proto"
   },
   "dependencies": {
     "@tanstack/vue-virtual": "^3.13.35",

@@ -14,7 +14,7 @@ import { onBeforeRouteLeave, onBeforeRouteUpdate, useRoute, useRouter } from 'vu
 import { computed, nextTick, onBeforeUnmount, ref, useTemplateRef, watch } from 'vue'
 import { useAlbumStore } from '@/scripts/stores/albumStore.ts'
 import type { AlbumSort } from '@/scripts/types/api/album.ts'
-import type { SimpleTimelineItem } from '@/scripts/types/generated/timeline.ts'
+import type { SimpleTimelineItem } from '@/scripts/types/generated/web.ts'
 import { useSnackbarsStore } from '@/scripts/stores/snackbarStore.ts'
 import { useDialogStore } from '@/scripts/stores/dialogStore.ts'
 import { useDebounceFn, useTextareaAutosize } from '@vueuse/core'

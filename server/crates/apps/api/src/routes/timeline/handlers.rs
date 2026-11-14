@@ -4,12 +4,16 @@ use axum::{Extension, Json};
 use axum_extra::protobuf::Protobuf;
 use chrono::NaiveDate;
 use common_services::api::app_error::AppError;
-use common_services::api::timeline::interfaces::{GetMediaByMonthParams, TimelineParams};
+use common_services::api::timeline::interfaces::{
+    GetMediaByMonthParams, TimelineParams, TimelineSyncParams,
+};
 use common_services::api::timeline::service::{
     get_photos_by_month, get_timeline_ids, get_timeline_ratios,
 };
-use common_types::pb::api::{TimelineItemsResponse, TimelineRatiosResponse};
+use common_services::api::timeline::sync::get_timeline_sync;
+use common_types::pb::api::{TimelineItemsResponse, TimelineRatiosResponse, TimelineSyncResponse};
 use sqlx::PgPool;
+use tracing::instrument;
 
 /// Get a timeline of all media ratios, grouped by month.
 ///
@@ -64,4 +68,19 @@ pub async fn get_photos_by_month_handler(
 
     let photos = get_photos_by_month(user.id, &pool, &month_ids, params.sort).await?;
     Ok(Protobuf(photos))
+}
+
+/// Compact timeline sync: full snapshot, or the items changed and ids deleted since a previous sync.
+///
+/// # Errors
+///
+/// Returns a `AppError` if `since` is not a valid timestamp or the database query fails.
+#[instrument(skip(pool, user), err(Debug))]
+pub async fn get_timeline_sync_handler(
+    State(pool): State<PgPool>,
+    Extension(user): Extension<ApiUser>,
+    Query(params): Query<TimelineSyncParams>,
+) -> Result<Protobuf<TimelineSyncResponse>, AppError> {
+    let response = get_timeline_sync(user.id, &pool, params.since).await?;
+    Ok(Protobuf(response))
 }

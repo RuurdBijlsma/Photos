@@ -1,9 +1,39 @@
 use crate::api::app_error::AppError;
 use crate::api::auth::interfaces::AuthClaims;
 use jsonwebtoken::{DecodingKey, Validation, decode};
+use sqlx::PgPool;
+use std::collections::HashMap;
 use std::io::{Error, ErrorKind};
 use std::path::{Path, PathBuf};
 use tokio::io::AsyncWriteExt;
+
+/// Maps every requested BLAKE3 hash to the non-deleted media item ids that have it.
+///
+/// Used by mobile to skip uploading a file the server already has.
+pub async fn check_hashes(
+    user_id: i32,
+    pool: &PgPool,
+    hashes: &[String],
+) -> Result<HashMap<String, Vec<String>>, AppError> {
+    if hashes.is_empty() {
+        return Ok(HashMap::new());
+    }
+
+    let rows = sqlx::query!(
+        r#"
+        SELECT hash, array_agg(id ORDER BY created_at ASC) AS "cloud_ids!"
+        FROM media_item
+        WHERE user_id = $1 AND deleted = false AND hash = ANY($2)
+        GROUP BY hash
+        "#,
+        user_id,
+        hashes
+    )
+    .fetch_all(pool)
+    .await?;
+
+    Ok(rows.into_iter().map(|r| (r.hash, r.cloud_ids)).collect())
+}
 
 pub fn decode_upload_token(token: &str, jwt_secret: &str) -> Result<AuthClaims, AppError> {
     let mut validation = Validation::default();

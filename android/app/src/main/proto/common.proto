@@ -1,0 +1,4 @@
+// proto definitions that apply to both mobile and web go here
+syntax = "proto3";
+
+package api;
