@@ -594,7 +594,7 @@ Adopt **Clean Architecture + MVI/MVVM** with **Unidirectional Data Flow (UDF)**.
           rare `size_bytes` collisions with >24h timestamp drift), compute BLAKE3 lazily and verify against the backend
           prior to streaming bytes.
 4. **Coil 3 Thumbnail Strategy (LCP & FPS Tuned):**
-    * **Target & Min SDK:** Targeting Android 17 and up (API level 37, Pixel devices) provides native
+    * **Target & Min SDK:** Targeting Android 15 and up (API level 35) provides native
       hardware-accelerated AVIF decoding via `ImageDecoder` and modern adaptive windowing (note API 37 ignores fixed
       orientation / non-resizable restrictions on large screens).
     * **Custom `MediaStoreThumbnailFetcher` (Scoped to Grid Thumbnails):** For `LOCAL_ONLY` and `SYNCED` items, wrap

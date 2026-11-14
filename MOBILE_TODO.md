@@ -1,6 +1,6 @@
 # MOBILE APP:
 
-Support for Android 17 and up (API level 37).
+Support for Android 15 and up (API level 35).
 
 ### Mobile stack:
 
