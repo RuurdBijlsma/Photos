@@ -1,5 +1,9 @@
 package dev.ruurd.photos.features.auth
 
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -38,6 +42,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -48,6 +53,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -57,8 +63,13 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import dev.ruurd.photos.R
+import dev.ruurd.photos.core.network.SessionManager
 import dev.ruurd.photos.ui.theme.PhotosRadii
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
+
+private const val PERMISSION_ACCESS_LOCAL_NETWORK = "android.permission.ACCESS_LOCAL_NETWORK"
 
 @Composable
 fun AuthScreen(
@@ -66,8 +77,53 @@ fun AuthScreen(
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
     val focusManager = LocalFocusManager.current
     var passwordVisible by remember { mutableStateOf(false) }
+    var localNetworkError by remember { mutableStateOf<String?>(null) }
+    var pendingAction by remember { mutableStateOf<(() -> Unit)?>(null) }
+    var hasLocalNetworkPermission by remember {
+        mutableStateOf(
+            Build.VERSION.SDK_INT < 37 ||
+                    ContextCompat.checkSelfPermission(context, PERMISSION_ACCESS_LOCAL_NETWORK) ==
+                    PackageManager.PERMISSION_GRANTED
+        )
+    }
+
+    val localNetworkPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        hasLocalNetworkPermission = granted
+        val action = pendingAction
+        pendingAction = null
+        if (granted) {
+            localNetworkError = null
+            action?.invoke()
+        } else {
+            localNetworkError =
+                "Local network permission is required to connect to a server on your Wi-Fi/LAN."
+        }
+    }
+
+    fun runWithLocalNetworkCheck(action: () -> Unit) {
+        localNetworkError = null
+        if (Build.VERSION.SDK_INT >= 37) {
+            val granted = ContextCompat.checkSelfPermission(
+                context,
+                PERMISSION_ACCESS_LOCAL_NETWORK
+            ) == PackageManager.PERMISSION_GRANTED
+            hasLocalNetworkPermission = granted
+
+            if (!granted && isLikelyLocalServerUrl(uiState.serverUrl)) {
+                pendingAction = action
+                localNetworkPermissionLauncher.launch(PERMISSION_ACCESS_LOCAL_NETWORK)
+                return
+            }
+        }
+        action()
+    }
+
+    val displayedError = localNetworkError ?: uiState.errorMessage
 
     Box(
         modifier = modifier
@@ -89,7 +145,7 @@ fun AuthScreen(
                 painter = painterResource(id = R.drawable.icon_transparent),
                 contentDescription = "Ruurd Photos",
                 contentScale = ContentScale.Fit,
-                modifier = Modifier.size(96.dp)
+                modifier = Modifier.size(72.dp)
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -125,7 +181,10 @@ fun AuthScreen(
                     // Server URL Field
                     OutlinedTextField(
                         value = uiState.serverUrl,
-                        onValueChange = viewModel::onServerUrlChanged,
+                        onValueChange = {
+                            localNetworkError = null
+                            viewModel.onServerUrlChanged(it)
+                        },
                         label = { Text("Server URL") },
                         placeholder = { Text("http://10.0.2.2:5272") },
                         leadingIcon = {
@@ -133,11 +192,22 @@ fun AuthScreen(
                         },
                         trailingIcon = {
                             if (uiState.isTestingServer) {
-                                CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(20.dp),
+                                    strokeWidth = 2.dp
+                                )
                             } else if (uiState.serverTestSuccess == true) {
-                                Icon(Icons.Default.CheckCircle, contentDescription = "Online", tint = MaterialTheme.colorScheme.primary)
+                                Icon(
+                                    Icons.Default.CheckCircle,
+                                    contentDescription = "Online",
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
                             } else if (uiState.serverTestSuccess == false) {
-                                Icon(Icons.Default.Error, contentDescription = "Error", tint = MaterialTheme.colorScheme.error)
+                                Icon(
+                                    Icons.Default.Error,
+                                    contentDescription = "Error",
+                                    tint = MaterialTheme.colorScheme.error
+                                )
                             }
                         },
                         singleLine = true,
@@ -148,7 +218,7 @@ fun AuthScreen(
                         keyboardActions = KeyboardActions(
                             onNext = { focusManager.moveFocus(FocusDirection.Down) }
                         ),
-                        shape = androidx.compose.foundation.shape.RoundedCornerShape(PhotosRadii.NestedCard),
+                        shape = RoundedCornerShape(PhotosRadii.NestedCard),
                         modifier = Modifier.fillMaxWidth()
                     )
 
@@ -157,7 +227,7 @@ fun AuthScreen(
                         horizontalArrangement = Arrangement.End
                     ) {
                         OutlinedButton(
-                            onClick = viewModel::testServerConnection,
+                            onClick = { runWithLocalNetworkCheck(viewModel::testServerConnection) },
                             shape = CircleShape,
                             enabled = !uiState.isTestingServer && !uiState.isLoading
                         ) {
@@ -168,7 +238,10 @@ fun AuthScreen(
                     // Email Field
                     OutlinedTextField(
                         value = uiState.email,
-                        onValueChange = viewModel::onEmailChanged,
+                        onValueChange = {
+                            localNetworkError = null
+                            viewModel.onEmailChanged(it)
+                        },
                         label = { Text("Email") },
                         leadingIcon = {
                             Icon(Icons.Default.Email, contentDescription = null)
@@ -181,14 +254,17 @@ fun AuthScreen(
                         keyboardActions = KeyboardActions(
                             onNext = { focusManager.moveFocus(FocusDirection.Down) }
                         ),
-                        shape = androidx.compose.foundation.shape.RoundedCornerShape(PhotosRadii.NestedCard),
+                        shape = RoundedCornerShape(PhotosRadii.NestedCard),
                         modifier = Modifier.fillMaxWidth()
                     )
 
                     // Password Field
                     OutlinedTextField(
                         value = uiState.password,
-                        onValueChange = viewModel::onPasswordChanged,
+                        onValueChange = {
+                            localNetworkError = null
+                            viewModel.onPasswordChanged(it)
+                        },
                         label = { Text("Password") },
                         leadingIcon = {
                             Icon(Icons.Default.Lock, contentDescription = null)
@@ -210,29 +286,41 @@ fun AuthScreen(
                         keyboardActions = KeyboardActions(
                             onDone = {
                                 focusManager.clearFocus()
-                                viewModel.login()
+                                runWithLocalNetworkCheck(viewModel::login)
                             }
                         ),
-                        shape = androidx.compose.foundation.shape.RoundedCornerShape(PhotosRadii.NestedCard),
+                        shape = RoundedCornerShape(PhotosRadii.NestedCard),
                         modifier = Modifier.fillMaxWidth()
                     )
 
                     // Error Message Banner
-                    AnimatedVisibility(visible = uiState.errorMessage != null) {
-                        uiState.errorMessage?.let { error ->
+                    AnimatedVisibility(visible = displayedError != null) {
+                        displayedError?.let { error ->
                             Card(
                                 colors = CardDefaults.cardColors(
                                     containerColor = MaterialTheme.colorScheme.errorContainer
                                 ),
-                                shape = androidx.compose.foundation.shape.RoundedCornerShape(PhotosRadii.NestedCard),
+                                shape = RoundedCornerShape(PhotosRadii.NestedCard),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                Text(
-                                    text = error,
-                                    color = MaterialTheme.colorScheme.onErrorContainer,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    modifier = Modifier.padding(12.dp)
-                                )
+                                Column(modifier = Modifier.padding(12.dp)) {
+                                    Text(
+                                        text = error,
+                                        color = MaterialTheme.colorScheme.onErrorContainer,
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
+                                    if (Build.VERSION.SDK_INT >= 37 && !hasLocalNetworkPermission) {
+                                        TextButton(
+                                            onClick = {
+                                                localNetworkPermissionLauncher.launch(
+                                                    PERMISSION_ACCESS_LOCAL_NETWORK
+                                                )
+                                            }
+                                        ) {
+                                            Text("Allow Local Network Access")
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
@@ -241,7 +329,7 @@ fun AuthScreen(
                     Button(
                         onClick = {
                             focusManager.clearFocus()
-                            viewModel.login()
+                            runWithLocalNetworkCheck(viewModel::login)
                         },
                         shape = CircleShape,
                         enabled = !uiState.isLoading,
@@ -266,4 +354,30 @@ fun AuthScreen(
             }
         }
     }
+}
+
+private fun isLikelyLocalServerUrl(rawUrl: String): Boolean {
+    val normalized = SessionManager.normalizeUrl(rawUrl)
+    if (normalized.isEmpty()) return false
+    val host = normalized.toHttpUrlOrNull()?.host?.lowercase() ?: return false
+
+    if (host == "localhost" || host == "127.0.0.1" || host == "::1") {
+        return false
+    }
+    if (host.endsWith(".local") || host.endsWith(".lan") || host.endsWith(".home") || !host.contains('.')) {
+        return true
+    }
+    val octets = host.split('.')
+    if (octets.size == 4) {
+        val first = octets[0].toIntOrNull() ?: return false
+        val second = octets[1].toIntOrNull() ?: return false
+        return when {
+            first == 10 -> true
+            first == 192 && second == 168 -> true
+            first == 172 && second in 16..31 -> true
+            first == 169 && second == 254 -> true
+            else -> false
+        }
+    }
+    return false
 }
