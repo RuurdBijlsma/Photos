@@ -109,28 +109,28 @@ implement notes
     * Add `deleted_media_item` tombstone table (`media_item_id`, `user_id`, `deleted_at`) + `AFTER DELETE ON media_item`
       trigger (do **not** add an `ON DELETE CASCADE` FK to `app_user`), plus index on `(user_id, deleted_at)`.
     * Add composite index `media_item (user_id, updated_at)` for fast delta sync queries.
-* **Audit `updated_at = now()` across `common_services`:**
+* [✅ Done] **Audit `updated_at = now()` across `common_services`:**
     * Ensure every `UPDATE media_item` path (soft-delete/restore in trash/removal, `MediaItemStore::upsert`,
       missing/unmark paths, metadata edits) updates `updated_at = now()`.
-* **Scheduled tombstone pruning (`CleanDB job handler`):**
+* [✅ Done] **Scheduled tombstone pruning (`CleanDB job handler`):**
     * Periodically prune `deleted_media_item` rows older than retention (e.g. 30–90 days).
-* **Refactor protobuf schemas:**
+* [✅ Done] **Refactor protobuf schemas:**
     * [✅ Done] Split `timeline.proto` into `common.proto`, `web.proto`, and `mobile.proto` (updating
       `common_types/build.rs` and
       `web/package.json` `proto:gen`).
     * Define `TimelineSyncResponse` and `CompactTimelineItem` (`id`, `sort_timestamp`, `ratio`, `is_video`,
       `has_thumbnails`, `size_bytes`, `duration_ms`, `timezone_offset_minutes`).
-* **Compact sync endpoint (`GET /api/timeline/sync?since=...`):**
+* [✅ Done] **Compact sync endpoint (`GET /api/timeline/sync?since=...`):**
     * Return `Protobuf<TimelineSyncResponse>` with `upserted` (joining `media_features` for `size_bytes` and deriving
       `timezone_offset_minutes`), `deleted_ids` (union of soft-deleted `media_item` and `deleted_media_item`
       tombstones),
       `sync_timestamp`, and `is_full_snapshot` (when `since` is omitted or older than tombstone retention).
     * Verify `CompressionLayer` in `server.rs` gzip-compresses the protobuf response when `Accept-Encoding: gzip` is
       sent.
-* **Hash check endpoint:**
+* [✅ Done] **Hash check endpoint:**
     * Implement `POST /api/upload/check-hashes` querying `media_item.hash` (BLAKE3 lowercase hex, indexed by
       `idx_media_item_user_hash`) and returning all non-deleted matching `cloud_ids` per hash.
-* **Verification:**
+* [✅ Done] **Verification:**
     * Add `test_integration` tests for full snapshot, delta upserts, soft-delete/restore, hard-delete tombstones,
       retention fallback, and `check-hashes`;
 
