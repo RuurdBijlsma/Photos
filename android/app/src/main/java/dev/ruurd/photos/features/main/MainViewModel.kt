@@ -42,6 +42,8 @@ class MainViewModel(
     private val _isAvatarMenuOpen = MutableStateFlow(false)
     private val _syncErrorMessage = MutableStateFlow<String?>(null)
 
+    private var hasRefreshedProfile = false
+
     private val connectionInfoFlow = combine(
         authRepository.serverUrl,
         networkMonitor.isOnline,
@@ -88,15 +90,30 @@ class MainViewModel(
     )
 
     init {
-        // Automatically perform background delta sync on launch and when connectivity returns
+        // Trigger background profile refresh and delta sync on launch and when connectivity returns
         viewModelScope.launch {
             combine(authRepository.authState, networkMonitor.isOnline) { auth, online ->
-                auth is AuthState.Authenticated && online
+                (auth is AuthState.Authenticated) to online
             }
                 .distinctUntilChanged()
-                .collect { canSync ->
-                    if (canSync && syncTimelineUseCase.syncState.value != SyncState.SYNCING) {
-                        syncNow(forceFullSnapshot = false)
+                .collect { (isAuthenticated, isOnline) ->
+                    if (!isAuthenticated) {
+                        hasRefreshedProfile = false
+                        return@collect
+                    }
+
+                    if (isOnline) {
+                        if (!hasRefreshedProfile) {
+                            viewModelScope.launch {
+                                if (authRepository.fetchCurrentUser().isSuccess) {
+                                    hasRefreshedProfile = true
+                                }
+                            }
+                        }
+
+                        if (syncTimelineUseCase.syncState.value != SyncState.SYNCING) {
+                            syncNow(forceFullSnapshot = false)
+                        }
                     }
                 }
         }

@@ -1,0 +1,64 @@
+<svg id="transprancy-3.svg" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="2860" height="3175.69" viewBox="0 0 2860 3175.69">
+  <defs>
+    <style>
+      .cls-1, .cls-2, .cls-3, .cls-4, .cls-5, .cls-6 {
+        fill-rule: evenodd;
+        opacity: 0.64;
+      }
+
+      .cls-1 {
+        fill: url(#linear-gradient);
+      }
+
+      .cls-2 {
+        fill: url(#linear-gradient-2);
+      }
+
+      .cls-3 {
+        fill: url(#linear-gradient-3);
+      }
+
+      .cls-4 {
+        fill: url(#linear-gradient-4);
+      }
+
+      .cls-5 {
+        fill: url(#linear-gradient-5);
+      }
+
+      .cls-6 {
+        fill: url(#linear-gradient-6);
+      }
+    </style>
+    <linearGradient id="linear-gradient" x1="122.828" y1="1800.16" x2="1343.363" y2="579.625" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fe9610"/>
+      <stop offset="1" stop-color="#ffcf11"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-2" x1="116.611" y1="2600.41" x2="1344.361" y2="1372.66" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#38be7d"/>
+      <stop offset="1" stop-color="#9bce39"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-3" x1="896.719" y1="2914.69" x2="1962.72" y2="1848.69" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0e75e8"/>
+      <stop offset="1" stop-color="#22b9e4"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-4" x1="1516.47" y1="2596.78" x2="2737" y2="1376.25" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#4f3ce2"/>
+      <stop offset="1" stop-color="#9650f5"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-5" x1="1515.455" y1="1803.75" x2="2743.236" y2="575.969" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#682bcd"/>
+      <stop offset="1" stop-color="#da36c9"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-6" x1="897" y1="1327" x2="1963" y2="261" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#df1e22"/>
+      <stop offset="1" stop-color="#fc7c2f"/>
+    </linearGradient>
+  </defs>
+  <path id="petal-beter_1_copy" data-name="petal-beter 1 copy" class="cls-1" d="M426,1639.11C-120.052,1323.85-7.045,904.232,49.426,806.421S421.58,405.648,959,715.928s557.069,726.2,465.669,884.492S943.35,1937.8,426,1639.11Z"/>
+  <path id="petal-beter_1_copy-2" data-name="petal-beter 1 copy" class="cls-2" d="M956.733,2461.82c-546.052,315.26-852.946,7.58-909.417-90.23s-161-522.68,376.418-832.96,907.437-119.33,998.827,38.96S1474.08,2163.12,956.733,2461.82Z"/>
+  <path id="petal-beter_1_copy-3" data-name="petal-beter 1 copy" class="cls-3" d="M1962.73,2433.21c0,630.52-419.9,742.46-532.84,742.46s-533.161-121.91-533.161-742.46,350.381-845.54,533.161-845.54S1962.73,1835.82,1962.73,2433.21Z"/>
+  <path id="petal-beter_1_copy-4" data-name="petal-beter 1 copy" class="cls-4" d="M2433.83,1537.28c546.05,315.27,433.04,734.88,376.57,832.69s-372.15,400.78-909.57,90.5-557.07-726.2-465.68-884.5S1916.48,1238.59,2433.83,1537.28Z"/>
+  <path id="petal-beter_1_copy-5" data-name="petal-beter 1 copy" class="cls-5" d="M1903.1,714.578c546.05-315.264,852.94-7.59,909.41,90.222s161.01,522.68-376.41,832.96-907.44,119.33-998.83-38.96S1385.75,1013.27,1903.1,714.578Z"/>
+  <path id="petal-beter_1" data-name="petal-beter 1" class="cls-6" d="M897,742.468C897,111.941,1316.9,0,1429.84,0S1963,121.908,1963,742.468,1612.62,1588,1429.84,1588,897,1339.85,897,742.468Z"/>
+</svg>
