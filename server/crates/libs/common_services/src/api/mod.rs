@@ -6,7 +6,6 @@ pub mod camera;
 pub mod daily_cards;
 pub mod explore;
 pub mod jobs;
-pub mod mobile;
 pub mod people;
 pub mod photos;
 pub mod s2s;

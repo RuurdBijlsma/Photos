@@ -35,7 +35,6 @@ pub async fn check_hashes(
     Ok(rows.into_iter().map(|r| (r.hash, r.cloud_ids)).collect())
 }
 
-
 pub fn decode_upload_token(token: &str, jwt_secret: &str) -> Result<AuthClaims, AppError> {
     let mut validation = Validation::default();
     validation.set_audience(&["upload"]);

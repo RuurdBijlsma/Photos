@@ -3,7 +3,9 @@ use crate::test_helpers::login;
 use chrono::{Duration, Utc};
 use color_eyre::Result;
 use color_eyre::eyre::{ContextCompat, bail};
+use common_services::api::auth::interfaces::LoginUser;
 use common_services::api::upload::interfaces::CheckHashesResponse;
+use common_types::dev_constants::{EMAIL, PASSWORD};
 use common_types::pb::api::TimelineSyncResponse;
 use prost::Message;
 use reqwest::StatusCode;
@@ -11,14 +13,12 @@ use reqwest::header::{ACCEPT_ENCODING, CONTENT_ENCODING};
 use std::collections::HashSet;
 use std::io::Cursor;
 
-/// Calls `GET /api/mobile/timeline/sync` and decodes the compact protobuf response.
+/// Calls `GET /api/timeline/sync` and decodes the compact protobuf response.
 async fn sync(context: &TestContext, since: Option<i64>) -> Result<TimelineSyncResponse> {
-    let mut request = context
-        .http_client
-        .get(format!(
-            "{}/api/mobile/timeline/sync",
-            context.settings.api.public_url
-        ));
+    let mut request = context.http_client.get(format!(
+        "{}/api/timeline/sync",
+        context.settings.api.public_url
+    ));
     if let Some(since) = since {
         request = request.query(&[("since", since)]);
     }
@@ -32,11 +32,10 @@ async fn sync(context: &TestContext, since: Option<i64>) -> Result<TimelineSyncR
 }
 
 async fn live_ids(context: &TestContext) -> Result<HashSet<String>> {
-    let ids: Vec<String> = sqlx::query_scalar!(
-        r#"SELECT id FROM media_item WHERE deleted = false"#
-    )
-    .fetch_all(&context.pool)
-    .await?;
+    let ids: Vec<String> =
+        sqlx::query_scalar!(r#"SELECT id FROM media_item WHERE deleted = false"#)
+            .fetch_all(&context.pool)
+            .await?;
     Ok(ids.into_iter().collect())
 }
 
@@ -56,9 +55,12 @@ pub async fn test_mobile_sync_full_snapshot(context: &TestContext) -> Result<()>
     let response = sync(context, None).await?;
 
     // ASSERT
-    assert!(response.is_full_snapshot, "no `since` means a full snapshot");
+    assert!(
+        response.is_full_snapshot,
+        "no `since` means a full snapshot"
+    );
     assert!(response.sync_timestamp > 0);
-    assert!(response.deleted_ids.is_empty());
+    assert_eq!(response.deleted_ids, Vec::<String>::new());
 
     let db_ids = live_ids(context).await?;
     assert!(!db_ids.is_empty(), "test library must contain media");
@@ -93,19 +95,34 @@ pub async fn test_mobile_sync_full_snapshot(context: &TestContext) -> Result<()>
     assert_eq!(item.is_video, expected.is_video);
     assert_eq!(item.has_thumbnails, expected.has_thumbnails);
     assert!((item.ratio - expected.ratio).abs() < 1e-6);
-    assert_eq!(item.timezone_offset_minutes, expected.timezone_offset_minutes);
+    assert_eq!(
+        item.timezone_offset_minutes,
+        expected.timezone_offset_minutes
+    );
 
     // The protobuf response must be gzip-compressed when the client asks for it. A separate client
     // is used because reqwest's automatic gzip decoding (enabled by the unified feature set) strips
-    // the `content-encoding` header from the response. It shares the context's cookie jar, so no
-    // second login is needed (that endpoint is rate limited).
+    // the `content-encoding` header from the response.
     let gzip_client = reqwest::Client::builder()
-        .cookie_provider(context.cookie_jar.clone())
+        .cookie_store(true)
         .no_gzip()
         .build()?;
+    let response = gzip_client
+        .post(format!(
+            "{}/api/auth/login",
+            context.settings.api.public_url
+        ))
+        .json(&LoginUser {
+            email: EMAIL.to_owned(),
+            password: PASSWORD.to_owned(),
+        })
+        .send()
+        .await?;
+    assert!(response.status().is_success());
+
     let compressed = gzip_client
         .get(format!(
-            "{}/api/mobile/timeline/sync",
+            "{}/api/timeline/sync",
             context.settings.api.public_url
         ))
         .header(ACCEPT_ENCODING, "gzip")
@@ -297,13 +314,12 @@ pub async fn test_prune_deleted_media_items(context: &TestContext) -> Result<()>
     worker::handlers::clean_db::prune_deleted_media_items(&context.pool).await?;
 
     // ASSERT
-    let remaining: HashSet<String> = sqlx::query_scalar!(
-        "SELECT media_item_id FROM deleted_media_item"
-    )
-    .fetch_all(&context.pool)
-    .await?
-    .into_iter()
-    .collect();
+    let remaining: HashSet<String> =
+        sqlx::query_scalar!("SELECT media_item_id FROM deleted_media_item")
+            .fetch_all(&context.pool)
+            .await?
+            .into_iter()
+            .collect();
     assert!(
         !remaining.contains(old_id),
         "tombstones past retention must be pruned"
@@ -313,9 +329,12 @@ pub async fn test_prune_deleted_media_items(context: &TestContext) -> Result<()>
         "recent tombstones must be kept"
     );
 
-    sqlx::query!("DELETE FROM deleted_media_item WHERE media_item_id = $1", recent_id)
-        .execute(&context.pool)
-        .await?;
+    sqlx::query!(
+        "DELETE FROM deleted_media_item WHERE media_item_id = $1",
+        recent_id
+    )
+    .execute(&context.pool)
+    .await?;
 
     Ok(())
 }

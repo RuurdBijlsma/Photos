@@ -3,7 +3,7 @@ use crate::handlers::JobResult;
 use app_state::constants::{TUS_LOCKS_FOLDER, TUS_UPLOADS_FOLDER, USER_UPLOAD_FOLDER};
 use chrono::Utc;
 use color_eyre::Result;
-use common_services::api::mobile::TOMBSTONE_RETENTION_DAYS;
+use common_services::api::timeline::TOMBSTONE_RETENTION_DAYS;
 use common_services::database::jobs::Job;
 use common_services::database::user_store::UserStore;
 use sqlx::PgPool;
@@ -44,7 +44,8 @@ pub async fn handle(context: &WorkerContext, _job: &Job) -> Result<JobResult> {
     .execute(&context.pool)
     .await?;
 
-    // Prune mobile sync tombstones past their retention window; older clients get a full snapshot.
+    // Prune delete tombstones past their retention window; clients syncing from an older point
+    // get a full snapshot instead.
     prune_deleted_media_items(&context.pool).await?;
 
     // Sync media_count field on albums in case it drifted for some reason
@@ -66,7 +67,7 @@ pub async fn handle(context: &WorkerContext, _job: &Job) -> Result<JobResult> {
     Ok(JobResult::Done)
 }
 
-/// Prunes mobile sync tombstones past their retention window.
+/// Prunes `deleted_media_item` rows past the timeline sync retention window.
 pub async fn prune_deleted_media_items(pool: &PgPool) -> Result<u64> {
     let result = sqlx::query!(
         "DELETE FROM deleted_media_item WHERE deleted_at < $1",

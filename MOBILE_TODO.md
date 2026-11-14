@@ -120,7 +120,7 @@ implement notes
       `web/package.json` `proto:gen`).
     * Define `TimelineSyncResponse` and `CompactTimelineItem` (`id`, `sort_timestamp`, `ratio`, `is_video`,
       `has_thumbnails`, `size_bytes`, `duration_ms`, `timezone_offset_minutes`).
-* **Compact sync endpoint (`GET /api/mobile/timeline/sync?since=...`):**
+* **Compact sync endpoint (`GET /api/timeline/sync?since=...`):**
     * Return `Protobuf<TimelineSyncResponse>` with `upserted` (joining `media_features` for `size_bytes` and deriving
       `timezone_offset_minutes`), `deleted_ids` (union of soft-deleted `media_item` and `deleted_media_item`
       tombstones),

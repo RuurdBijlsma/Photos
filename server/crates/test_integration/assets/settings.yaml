@@ -106,8 +106,8 @@ api:
   public_url: "http://localhost:5272"
   cookie_secure: false
   rate_limiting:
-    req_per_second: 30
-    burst_size: 30
+    req_per_second: 1000
+    burst_size: 1000
 
 secrets:
   jwt: "overwrite-me-with-env"

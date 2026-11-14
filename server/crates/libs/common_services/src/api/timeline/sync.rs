@@ -1,5 +1,5 @@
 use crate::api::app_error::AppError;
-use crate::api::mobile::TOMBSTONE_RETENTION_DAYS;
+use crate::api::timeline::TOMBSTONE_RETENTION_DAYS;
 use chrono::{DateTime, Duration, Utc};
 use common_types::pb::api::{CompactTimelineItem, TimelineSyncResponse};
 use sqlx::PgPool;

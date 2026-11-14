@@ -227,7 +227,7 @@ CREATE INDEX idx_media_item_user_updated_at
 CREATE INDEX idx_media_item_not_deleted ON media_item (id) WHERE deleted = false;
 CREATE INDEX idx_media_item_search_lookup ON media_item (user_id, deleted, id);
 
--- For mobile delta sync tombstone queries and pruning
+-- For timeline delta sync tombstone queries and pruning
 CREATE INDEX idx_deleted_media_item_user_deleted_at
     ON deleted_media_item (user_id, deleted_at);
 

@@ -145,7 +145,7 @@ guarantees full offline capability and instant local-to-cloud reconciliation wit
 ```
 ┌──────────────────────────────────────────────────────────────────────────────┐
 │                 Dedicated Compact Sync (Initial & Delta)                     │
-│  • Remote: GET /api/mobile/timeline/sync?since=... (Compact Protobuf, gzip)  │
+│  • Remote: GET /api/timeline/sync?since=... (Compact Protobuf, gzip)  │
 │    Payload: [id, sort_timestamp, tz_offset_min, ratio, is_video,             │
 │              has_thumbnails, size_bytes]                                     │
 │  • Computes `year_month` and writes in chunked batch inside one @Transaction │
@@ -278,7 +278,7 @@ We'll have to refactor the `timeline.proto` into `common.proto`, `web.proto`, an
       timeline** per folder. Crucially, **deduplication still runs across all scanned folders**, so if a user manually
       uploads a single screenshot via Share or Device Folders, it links cleanly as `SYNCED` instead of duplicating.
 5. **Delta Syncing (`since` parameter):**
-    * **Initial / Full Snapshot (`is_full_snapshot = true`):** Query `GET /api/mobile/timeline/sync` without `since`
+    * **Initial / Full Snapshot (`is_full_snapshot = true`):** Query `GET /api/timeline/sync` without `since`
       (or receive `is_full_snapshot = true` if `since` predates tombstone retention). Backend streams all non-deleted
       items (`deleted = false`, no tombstones). Room inserts them in chunked batches (to stay below SQLite's
       bind-parameter limit) inside a single `@Transaction` and stores `latestSyncTimestamp`. To clean up any missed
@@ -286,7 +286,7 @@ We'll have to refactor the `timeline.proto` into `common.proto`, `web.proto`, an
       NOT NULL` (excluding any `cloud_id` just linked via `check-hashes` in this pass) against `syncedCloudIds` in
       Kotlin—avoiding `NOT IN (:50kIds)` bind limits—and pass `staleCloudIds` (chunked in batches of ~500) through the
       same cloud-deletion transition used for `deleted_ids`.
-    * **Subsequent Launches:** Query `GET /api/mobile/timeline/sync?since={latestSyncTimestamp - 60_000}`. Backend
+    * **Subsequent Launches:** Query `GET /api/timeline/sync?since={latestSyncTimestamp - 60_000}`. Backend
       returns `upserted` (`deleted = false AND updated_at > since`) and `deleted_ids` unioning soft-deletes
       (`media_item WHERE deleted = true AND updated_at > since`) and hard-deletes (
       `deleted_media_item WHERE deleted_at > since`), or falls back to `is_full_snapshot = true` if `since` is older
@@ -466,7 +466,7 @@ Handle all state transitions inside Room `@Transaction`s:
 * **T + 50ms:** `MediaStore` scan reconciles new (and, when full permissions are granted, deleted) local photos across
   all folders via the zero-hash fast pass and registers any newly seen `bucketId`s in `device_folder` with default
   visibility/backup flags.
-* **T + 150ms:** Background delta sync calls `GET /api/mobile/timeline/sync?since=...` (if online). Any cloud changes
+* **T + 150ms:** Background delta sync calls `GET /api/timeline/sync?since=...` (if online). Any cloud changes
   are committed to Room in a single transaction, triggering a debounced layout update.
 
 ---

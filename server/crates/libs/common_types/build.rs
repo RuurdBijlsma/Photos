@@ -12,7 +12,7 @@ fn main() -> std::io::Result<()> {
         ],
         ["proto/"],
     )
-        .map_err(|e| std::io::Error::other(e.to_string()))?;
+    .map_err(|e| std::io::Error::other(e.to_string()))?;
 
     // 3. Create the prost_build configuration
     let mut config = prost_build::Config::new();
