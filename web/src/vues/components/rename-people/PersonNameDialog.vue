@@ -4,7 +4,7 @@ import MdiClose from '~icons/mdi/close'
 import { ref, computed, watch } from 'vue'
 import { useTheme } from 'vuetify/framework'
 import { usePeopleStore } from '@/scripts/stores/peopleStore'
-import type { PersonInfo } from '@/scripts/types/generated/timeline'
+import type { PersonInfo } from '@/scripts/types/generated/web'
 import MergePersonDialog from './MergePersonDialog.vue'
 import { useRoute, useRouter } from 'vue-router'
 

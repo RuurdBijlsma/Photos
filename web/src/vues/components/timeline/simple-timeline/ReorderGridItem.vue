@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import MdiPlay from '~icons/mdi/play'
-import type { SimpleTimelineItem } from '@/scripts/types/generated/timeline.ts'
+import type { SimpleTimelineItem } from '@/scripts/types/generated/web.ts'
 import { toHms } from '@/scripts/utils.ts'
 import mediaItemService from '@/scripts/services/mediaItemService.ts'
 import { computed } from 'vue'

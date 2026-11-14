@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { SimpleTimelineItem } from '@/scripts/types/generated/timeline.ts'
+import type { SimpleTimelineItem } from '@/scripts/types/generated/web.ts'
 import { computed, nextTick, ref, shallowRef, useTemplateRef, watch } from 'vue'
 import type { SimpleLayoutRow, TimelineContext } from '@/scripts/types/timeline/layout.ts'
 import { arrayToMap, getThumbnailHeight } from '@/scripts/utils.ts'

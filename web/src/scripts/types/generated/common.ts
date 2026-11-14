@@ -4,8 +4,6 @@
 //   protoc               v6.33.5
 // source: common.proto
 
-/* eslint-disable */
-
-export const protobufPackage = "api";
+export const protobufPackage = 'api'
 
 /** proto definitions that apply to both mobile and web go here */

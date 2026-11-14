@@ -7,7 +7,7 @@ import type {
   UpdateMediaItemRequest,
   UpdateMediaItemResponse,
 } from '@/scripts/types/api/mediaItem.ts'
-import { MapPhotosResponse } from '@/scripts/types/generated/timeline.ts'
+import { MapPhotosResponse } from '@/scripts/types/generated/web.ts'
 import type { ThemeVariant } from '@/scripts/constants.ts'
 import type { PannellumConfig } from '@/scripts/types/api/pannellumConfig.ts'
 

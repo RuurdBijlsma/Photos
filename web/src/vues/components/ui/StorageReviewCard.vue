@@ -6,7 +6,7 @@ import MdiDownload from '~icons/mdi/download'
 import MdiFullscreen from '~icons/mdi/fullscreen'
 import MdiPlay from '~icons/mdi/play'
 import { computed } from 'vue'
-import type { StorageReviewItem } from '@/scripts/types/generated/timeline.ts'
+import type { StorageReviewItem } from '@/scripts/types/generated/web.ts'
 import mediaItemService from '@/scripts/services/mediaItemService.ts'
 import { prettyBytes, toHms } from '@/scripts/utils.ts'
 

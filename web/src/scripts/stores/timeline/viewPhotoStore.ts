@@ -4,7 +4,7 @@ import type {
   SimpleTimelineItem,
   StorageReviewItem,
   TimelineItem,
-} from '@/scripts/types/generated/timeline.ts'
+} from '@/scripts/types/generated/web.ts'
 import { type LocationQuery, useRouter } from 'vue-router'
 import { useSnackbarsStore } from '@/scripts/stores/snackbarStore.ts'
 import mediaItemService from '@/scripts/services/mediaItemService.ts'

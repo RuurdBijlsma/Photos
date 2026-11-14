@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, shallowRef, triggerRef } from 'vue'
-import type { CameraInfo, FullCameraPhotosResponse } from '@/scripts/types/generated/timeline.ts'
+import type { CameraInfo, FullCameraPhotosResponse } from '@/scripts/types/generated/web.ts'
 import { useSnackbarsStore } from '@/scripts/stores/snackbarStore.ts'
 import { useObjStorage } from '@/scripts/utils.ts'
 import cameraService from '@/scripts/services/cameraService.ts'

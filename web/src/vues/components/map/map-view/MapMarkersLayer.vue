@@ -2,7 +2,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { GeoJSONSource, type Map as LibreMap, type MapSourceDataEvent, Marker } from 'maplibre-gl'
 import type * as GeoJSON from 'geojson'
-import type { MapPhotosResponse, SimpleTimelineItem } from '@/scripts/types/generated/timeline.ts'
+import type { MapPhotosResponse, SimpleTimelineItem } from '@/scripts/types/generated/web.ts'
 import {
   createPhotosGeoJson,
   getFeatureCoordinates,

@@ -1,8 +1,5 @@
 import apiClient from './api.ts'
-import {
-  StorageReviewResponse,
-  StorageSummaryResponse,
-} from '@/scripts/types/generated/timeline.ts'
+import { StorageReviewResponse, StorageSummaryResponse } from '@/scripts/types/generated/web.ts'
 import binService from '@/scripts/services/binService.ts'
 
 const storageService = {

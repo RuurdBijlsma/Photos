@@ -1,4 +1,4 @@
-import type { SimpleTimelineItem } from '@/scripts/types/generated/timeline.ts'
+import type { SimpleTimelineItem } from '@/scripts/types/generated/web.ts'
 
 export interface DailyCardResponse {
   id: number

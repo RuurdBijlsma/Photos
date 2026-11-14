@@ -7,7 +7,7 @@ import { useResizeObserver } from '@vueuse/core'
 import { useExploreStore } from '@/scripts/stores/exploreStore.ts'
 import { useResponsive } from '@/scripts/composables/useResponsive.ts'
 import ThumbnailImg from '@/vues/components/ui/ThumbnailImg.vue'
-import type { VisitedLocation } from '@/scripts/types/generated/timeline.ts'
+import type { VisitedLocation } from '@/scripts/types/generated/web.ts'
 
 const props = defineProps<{
   locations: VisitedLocation[]

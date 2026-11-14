@@ -5,10 +5,7 @@ import type {
   ExploreTableParams,
   HistogramResponse,
 } from '@/scripts/types/api/explore.ts'
-import {
-  LocationDetailsResponse,
-  type VisitedLocation,
-} from '@/scripts/types/generated/timeline.ts'
+import { LocationDetailsResponse, type VisitedLocation } from '@/scripts/types/generated/web.ts'
 
 const exploreService = {
   /**

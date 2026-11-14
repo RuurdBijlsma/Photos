@@ -4,7 +4,7 @@ import MdiArrowRight from '~icons/mdi/arrow-right'
 import { computed, ref } from 'vue'
 import { useTheme } from 'vuetify/framework'
 import { usePeopleStore } from '@/scripts/stores/peopleStore'
-import type { PersonInfo } from '@/scripts/types/generated/timeline'
+import type { PersonInfo } from '@/scripts/types/generated/web'
 
 const props = defineProps<{
   modelValue: boolean

@@ -1,5 +1,5 @@
 import apiClient from './api.ts'
-import { SearchResponse, SearchSuggestionsResponse } from '@/scripts/types/generated/timeline.ts'
+import { SearchResponse, SearchSuggestionsResponse } from '@/scripts/types/generated/web.ts'
 import type { AxiosResponse } from 'axios'
 import type { SearchFilterRanges, SearchParams } from '@/scripts/types/api/search.ts'
 

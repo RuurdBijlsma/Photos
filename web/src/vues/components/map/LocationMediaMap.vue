@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import BaseMap, { type StyleName } from '@/vues/components/map/BaseMap.vue'
-import type { LocationMediaItem } from '@/scripts/types/generated/timeline.ts'
+import type { LocationMediaItem } from '@/scripts/types/generated/web.ts'
 import { useStorage } from '@vueuse/core'
 import { LngLatBounds, Map as LibreMap } from 'maplibre-gl'
 import type * as GeoJSON from 'geojson'

@@ -1,5 +1,5 @@
 import apiClient, { SERVER_BASE_URL } from './api.ts'
-import { FullPersonMediaResponse, ListPeopleResponse } from '@/scripts/types/generated/timeline.ts'
+import { FullPersonMediaResponse, ListPeopleResponse } from '@/scripts/types/generated/web.ts'
 import type { AxiosResponse } from 'axios'
 import type { MergePersonRequest, UpdatePersonRequest } from '@/scripts/types/api/people.ts'
 

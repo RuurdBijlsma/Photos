@@ -16,7 +16,7 @@ import type {
   SortDirection,
   UpdateAlbumRequest,
 } from '@/scripts/types/api/album'
-import { FullAlbumMediaResponse, OrderedMediaResponse } from '@/scripts/types/generated/timeline.ts'
+import { FullAlbumMediaResponse, OrderedMediaResponse } from '@/scripts/types/generated/web.ts'
 
 const albumService = {
   getUserAlbums(

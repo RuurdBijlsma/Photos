@@ -1,4 +1,4 @@
-import type { TimelineItem } from '@/scripts/types/generated/timeline'
+import type { TimelineItem } from '@/scripts/types/generated/web'
 import type {
   CameraSettings,
   TimeDetails,

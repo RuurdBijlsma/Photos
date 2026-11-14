@@ -1,10 +1,7 @@
 import type { AxiosResponse } from 'axios'
 import apiClient from './api.ts'
 
-import {
-  TimelineItemsResponse,
-  TimelineRatiosResponse,
-} from '@/scripts/types/generated/timeline.ts'
+import { TimelineItemsResponse, TimelineRatiosResponse } from '@/scripts/types/generated/web.ts'
 
 const timelineService = {
   getTimelineIds(): Promise<AxiosResponse<string[]>> {

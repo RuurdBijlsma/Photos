@@ -1,10 +1,7 @@
 import { ref, type Ref, shallowRef, triggerRef } from 'vue'
 import { defineStore } from 'pinia'
 import type { ExploreMediaItem, HistogramResponse } from '@/scripts/types/api/explore.ts'
-import type {
-  LocationDetailsResponse,
-  VisitedLocation,
-} from '@/scripts/types/generated/timeline.ts'
+import type { LocationDetailsResponse, VisitedLocation } from '@/scripts/types/generated/web.ts'
 import exploreService from '@/scripts/services/exploreService.ts'
 import { useSnackbarsStore } from '@/scripts/stores/snackbarStore.ts'
 
