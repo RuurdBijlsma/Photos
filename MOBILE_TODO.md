@@ -112,19 +112,25 @@ implement notes
 * Handle expiring tokens safely via a mutex-guarded OkHttp `Authenticator` (no concurrent `/api/auth/refresh` races).
 * Build `AuthScreen` (custom server URL input validated via `GET /api/health`, email/password login).
 * Configure Coil 3 (`coil-network-okhttp` sharing `OkHttpClient`, 500 MB LRU disk cache, and custom
-  `MediaStoreThumbnailFetcher` calling `ContentResolver.loadThumbnail` with coroutine `CancellationSignal`).
+  `MediaStoreThumbnailFetcher` scoped to a `MediaStoreThumbnail` wrapper type calling `ContentResolver.loadThumbnail`
+  with coroutine `CancellationSignal`—leaving raw `content://` URIs untouched for Telephoto full-res/subsampling and
+  falling back to cloud thumbnails on `SecurityException`).
 * Add `NetworkMonitor` (`ConnectivityManager.NetworkCallback`) and subtle Offline / Syncing status indicator so missing
   internet degrades gracefully without errors.
 * Add dedicated compact timeline sync endpoint on backend (`GET /api/mobile/timeline/sync?since=...`) returning
   `CompactTimelineItem` protobufs (including `id`, `sort_timestamp`, `ratio`, `is_video`, `has_thumbnails`,
-  `size_bytes`, `duration_ms`, `timezone_offset_minutes`), plus `deleted_media_item` tombstone trigger (without
-  cascading FK to `app_user`) and `(user_id, updated_at)` index.
+  `size_bytes`, `duration_ms`, `timezone_offset_minutes`) plus `is_full_snapshot`, `deleted_media_item` tombstone
+  trigger (without cascading FK to `app_user`), and `(user_id, updated_at)` index.
 * Compile proto schemas (`common.proto` / `mobile.proto`) via the Protobuf Gradle plugin to generate Kotlin/Java models.
 * Implement repository sync: initial full sync and delta sync (using `since` timestamp with overlap window) directly
   into Room as the Single Source of Truth (non-unique `cloudId`, unique `localContentUri`, immutable surrogate `id`, and
-  canonical `is_visible_in_timeline` invariant so duplicate local copies never crash or duplicate in the grid).
+  canonical `is_visible_in_timeline` invariant so duplicate local copies never crash or duplicate in the grid). When
+  `is_full_snapshot == true`, diff existing Room `cloud_id`s against `syncedCloudIds` in Kotlin and run the
+  cloud-deletion transition on `staleCloudIds`.
 * Query local `MediaStore` (`IS_PENDING = 0 AND IS_TRASHED = 0 AND SIZE > 0`, handling `READ_MEDIA_IMAGES`,
-  `READ_MEDIA_VIDEO`, and `READ_MEDIA_VISUAL_USER_SELECTED`) and merge into Room using two-pass deduplication:
+  `READ_MEDIA_VIDEO`, and `READ_MEDIA_VISUAL_USER_SELECTED`) and merge into Room using two-pass deduplication, gating
+  cursor-omission deletion strictly on full per-type permissions (`READ_MEDIA_IMAGES` / `READ_MEDIA_VIDEO`) plus an
+  empty-cursor safety guard:
     * Fast pass: match `(size_bytes, ratio, timezone-aligned timestamp)` against `CLOUD_ONLY` Room records for instant,
       zero-hash `SYNCED` reconciliation without disk I/O.
     * Lazy crypto pass: defer SHA-256 hashing to when unmatched items are staged for upload/backup.
@@ -157,8 +163,10 @@ implement notes
 * UI screen for backup settings / `DeviceFoldersScreen`: browse non-timeline device folders, toggle auto-backup, select
   source folders (default `DCIM/*` excluding Screenshots), set Wi-Fi / charging constraints, and allow manual upload
   (per-item action / picker).
-* Room `upload_queue` table to track progress, errors, `UPLOADED_PENDING_SYNC` state, and resumable state (keeping
-  upload ticks out of `media_item` so timeline layout isn't recomputed during uploads).
+* Room `upload_queue` table to track progress, errors, `UPLOADED_PENDING_SYNC` state (reconciled via
+  `POST /api/upload/check-hashes` before applying `SyncTimelineUseCase` snapshots, with max-age/retry `FAILED`
+  handling), and resumable state (keeping upload ticks out of `media_item` so timeline layout isn't recomputed during
+  uploads).
 * `UploadWorker` implementation leveraging a derived `OkHttpClient` (with `120s+` read/write timeouts and `404`/`410`
   stale URL recovery) for TUS chunked resumable uploads.
 * Timeline badge overlays showing item status: syncing spinner, local-only icon, or cloud checkmark.
@@ -172,8 +180,8 @@ Fix:
   after every chunk so interrupted runs resume seamlessly without re-uploading bytes.
 - Run routine background auto-backups as normal constrained `WorkManager` batches (no `setForeground` needed).
 - Reserve `setForeground(createForegroundInfo())` (guarded against `ForegroundServiceStartNotAllowedException`) or
-  User-Initiated Data Transfer (UIDT) for explicit user-triggered "Back up now" / manual upload sessions started in
-  the foreground.
+  User-Initiated Data Transfer (UIDT) for explicit user-triggered "Back up now" / manual upload sessions started in the
+  foreground.
 ```
 
 ## Phase 4: Albums, Management & Deletion

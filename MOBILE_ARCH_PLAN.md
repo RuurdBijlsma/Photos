@@ -182,6 +182,8 @@ We'll have to refactor the `timeline.proto` into `common.proto`, `web.proto`, an
      repeated string deleted_ids = 2;
      // Server timestamp (epoch ms) to persist and pass as `since` in the next sync request
      int64 sync_timestamp = 3;
+     // True when `since` was omitted or older than tombstone retention (client must diff snapshot)
+     bool is_full_snapshot = 4;
    }
 
    message CompactTimelineItem {
@@ -275,13 +277,19 @@ We'll have to refactor the `timeline.proto` into `common.proto`, `web.proto`, an
       timeline** per folder. Crucially, **deduplication still runs across all scanned folders**, so if a user manually
       uploads a single screenshot via Share or Device Folders, it links cleanly as `SYNCED` instead of duplicating.
 5. **Delta Syncing (`since` parameter):**
-    * **Initial Launch:** Query `GET /api/mobile/timeline/sync` without `since`. Backend streams all non-deleted items
-      (`deleted = false`, no tombstones). Room inserts them in chunked batches (to stay below SQLite's bind-parameter
-      limit) inside a single `@Transaction` and stores `latestSyncTimestamp`.
+    * **Initial / Full Snapshot (`is_full_snapshot = true`):** Query `GET /api/mobile/timeline/sync` without `since`
+      (or receive `is_full_snapshot = true` if `since` predates tombstone retention). Backend streams all non-deleted
+      items (`deleted = false`, no tombstones). Room inserts them in chunked batches (to stay below SQLite's
+      bind-parameter limit) inside a single `@Transaction` and stores `latestSyncTimestamp`. To clean up any missed
+      server deletions when `is_full_snapshot == true`, diff `SELECT DISTINCT cloud_id FROM media_item WHERE cloud_id IS
+      NOT NULL` (excluding any `cloud_id` just linked via `check-hashes` in this pass) against `syncedCloudIds` in
+      Kotlin—avoiding `NOT IN (:50kIds)` bind limits—and pass `staleCloudIds` (chunked in batches of ~500) through the
+      same cloud-deletion transition used for `deleted_ids`.
     * **Subsequent Launches:** Query `GET /api/mobile/timeline/sync?since={latestSyncTimestamp - 60_000}`. Backend
       returns `upserted` (`deleted = false AND updated_at > since`) and `deleted_ids` unioning soft-deletes
       (`media_item WHERE deleted = true AND updated_at > since`) and hard-deletes (
-      `deleted_media_item WHERE deleted_at > since`).
+      `deleted_media_item WHERE deleted_at > since`), or falls back to `is_full_snapshot = true` if `since` is older
+      than tombstone retention.
     * To handle possible out-of-sync situations, do a full sync (without `?since`) periodically (e.g., weekly) and on
       pull-to-refresh.
 6. **Room Invalidation & Coalescing:**
@@ -364,11 +372,14 @@ Keep a **single `media_item` table** (preserving the fast composite-index query 
 Handle all state transitions inside Room `@Transaction`s:
 
 1. **Local item gets backed up → Cloud sync arrives (`SyncTimelineUseCase`):**
-   `LOCAL_ONLY` (`local_1234`) is uploaded via TUS. `IngestMetadata` runs asynchronously on the worker and creates
-   `cloudId` (`a1B2c3D4e5`). When `SyncTimelineUseCase` receives `a1B2c3D4e5`, it checks existing rows for `cloudId`,
-   and if none exist, runs Pass 1 deduplication against `LOCAL_ONLY` / `UPLOADED_PENDING_SYNC` rows (not just
-   `ScanLocalMediaUseCase` running against `CLOUD_ONLY` rows!) so you don't momentarily show duplicate photos in the
-   grid.
+   `LOCAL_ONLY` (`local_1234`) is uploaded via TUS (with its `sha256` already computed) and marked
+   `UPLOADED_PENDING_SYNC` in `upload_queue`. Before applying `TimelineSyncResponse`, if any `UPLOADED_PENDING_SYNC`
+   rows exist, `SyncTimelineUseCase` queries `POST /api/upload/check-hashes` with their `sha256` hashes (outside the
+   Room transaction) and reconciles any returned `cloud_id`s inside the `@Transaction` using rule #2—ensuring files
+   without EXIF dates (e.g. screenshots/WhatsApp where `MediaStore.DATE_MODIFIED` differs from server `sort_timestamp`
+   by `> 24h`) link cleanly instead of spawning duplicate `CLOUD_ONLY` rows. Mark `UPLOADED_PENDING_SYNC` rows as
+   `FAILED` after a max-age/retry threshold if server `IngestMetadata` permanently failed. For any remaining unlinked
+   `LOCAL_ONLY` rows, `SyncTimelineUseCase` still runs Pass 1 deduplication when a new `cloudId` arrives.
 2. **Pass 2 `check-hashes` returns matching `cloud_ids` (`[c1, c2, ...]`):**
     * **First, check for an unlinked `CLOUD_ONLY` row:** Query
       `SELECT * FROM media_item WHERE cloud_id IN (:cloudIds) AND sync_status = 'CLOUD_ONLY' LIMIT 1`. If found, merge
@@ -384,7 +395,8 @@ Handle all state transitions inside Room `@Transaction`s:
 3. **Server updates a cloud item (`SyncTimelineUseCase`):**
    `UPDATE media_item SET has_thumbnails = ..., sort_timestamp = ..., timezone_offset_minutes = ..., year_month = ... WHERE cloud_id = :cloudId`
    (updates the canonical row and any linked secondary copies).
-4. **Cloud item deleted (`deleted_ids` contains `a1B2c3D4e5` or user selects "Delete from Server"):**
+4. **Cloud item deleted (`deleted_ids` or full-snapshot `staleCloudIds` contains `a1B2c3D4e5`, or user selects "Delete
+   from Server"):**
    Do **not** blindly `DELETE FROM media_item WHERE cloud_id IN (:deletedIds)`! For every row
    `WHERE cloud_id = :cloudId`:
     * If `local_content_uri == null` → `DELETE` the row.
@@ -395,7 +407,12 @@ Handle all state transitions inside Room `@Transaction`s:
       the next pass. Clear `autoBackupSuppressed = false` only if the user explicitly triggers a manual upload/back up
       for that item.
 5. **Local file deleted from device (`ScanLocalMediaUseCase` or "Free up space"):**
-   For the removed local row:
+   **Permission & empty-cursor guard:** `ScanLocalMediaUseCase` must only treat omission from the `MediaStore` cursor as
+   device deletion for a media type when full access is granted (`READ_MEDIA_IMAGES` for images, `READ_MEDIA_VIDEO` for
+   videos), and must abort deletion reconciliation if `MediaStore` returns 0 rows while Room has local rows. Under
+   `READ_MEDIA_VISUAL_USER_SELECTED` (partial access), skip cursor-omission cleanup—only run this transition on
+   explicit app deletion (`MediaStore.createDeleteRequest`) or when probing a URI throws `FileNotFoundException` (never
+   `SecurityException`, which only indicates temporary grant revocation). For each confirmed removed local row:
     * If `cloud_id == null` → `DELETE` the row.
     * If `cloud_id != null` and **another row** with the same `cloud_id` exists → `DELETE` this row; if it was the
       canonical visible row (`is_visible_in_timeline == 1`), promote one remaining sibling row to
@@ -445,8 +462,9 @@ Handle all state transitions inside Room `@Transaction`s:
 * **T + ~20ms (Stage 2 — Full Timeline):** Read the slim projection for the full library from Room, partition all rows +
   build `TimelineLayoutIndex` on `Dispatchers.Default`, and emit. Because Stage 1 ended on a clean `year_month`
   boundary, the visible rows remain identical with zero layout jump.
-* **T + 50ms:** `MediaStore` scan reconciles new or deleted local photos across all folders via the zero-hash fast pass
-  and registers any newly seen `bucketId`s in `device_folder` with default visibility/backup flags.
+* **T + 50ms:** `MediaStore` scan reconciles new (and, when full permissions are granted, deleted) local photos across
+  all folders via the zero-hash fast pass and registers any newly seen `bucketId`s in `device_folder` with default
+  visibility/backup flags.
 * **T + 150ms:** Background delta sync calls `GET /api/mobile/timeline/sync?since=...` (if online). Any cloud changes
   are committed to Room in a single transaction, triggering a debounced layout update.
 
@@ -565,7 +583,8 @@ Adopt **Clean Architecture + MVI/MVVM** with **Unidirectional Data Flow (UDF)**.
         * `syncStatus`: `LOCAL_ONLY`, `SYNCED`, `CLOUD_ONLY` (transient `SYNCING` / `UPLOADED_PENDING_SYNC` lives in
           `upload_queue`)
     * **Permissions:** Request `READ_MEDIA_IMAGES` and `READ_MEDIA_VIDEO`, and handle Android 14+ partial access
-      (`READ_MEDIA_VISUAL_USER_SELECTED`) cleanly so granting partial access does not break or loop permission prompts.
+      (`READ_MEDIA_VISUAL_USER_SELECTED`) cleanly so granting partial access does not break or loop permission prompts;
+      track full vs. partial access per media type so cursor-omission deletion only runs when full access is granted.
     * **Matching Pipeline:**
         * *Fast Pass:* On startup/scan, query `CLOUD_ONLY` rows by `size_bytes` and match in Kotlin on `ratio` + exact
           or 15-minute timezone-aligned timestamp (`±2s` within `±24h`). Matched items flip to `SYNCED` with zero disk
@@ -577,12 +596,18 @@ Adopt **Clean Architecture + MVI/MVVM** with **Unidirectional Data Flow (UDF)**.
     * **Target & Min SDK:** Targeting Android 17 and up (API level 37, Pixel devices) provides native
       hardware-accelerated AVIF decoding via `ImageDecoder` and modern adaptive windowing (note API 37 ignores fixed
       orientation / non-resizable restrictions on large screens).
-    * **Custom `MediaStoreThumbnailFetcher`:** For `LOCAL_ONLY` and `SYNCED` items (`localContentUri`), register a
-      custom Coil `Fetcher` that calls `ContentResolver.loadThumbnail(uri, Size(widthPx, heightPx), signal)` instead of
-      Coil's default stream opener, avoiding full 12–50 MP file decodes and slow video frame extraction in the timeline
-      grid:
+    * **Custom `MediaStoreThumbnailFetcher` (Scoped to Grid Thumbnails):** For `LOCAL_ONLY` and `SYNCED` items, wrap
+      the URI in a dedicated `@Immutable data class MediaStoreThumbnail(val uri: Uri, val cloudId: String? = null)` and
+      register `MediaStoreThumbnailFetcher.Factory : Fetcher.Factory<MediaStoreThumbnail>` + a matching `Keyer` on Coil
+      instead of matching raw `content://` `Uri`s globally. Grid cells pass `MediaStoreThumbnail(localContentUri)` so
+      Coil calls `ContentResolver.loadThumbnail(uri, Size(widthPx, heightPx), signal)`, while `MediaViewerScreen`
+      (`ZoomableAsyncImage`) passes the raw `Uri` directly so Coil's built-in `ContentUriFetcher` and Telephoto's
+      `SubSamplingImageSource.contentUri(...)` serve full-resolution tiles without blurry zoom (optionally passing the
+      grid cell's `placeholderMemoryCacheKey`):
         * Wire `CancellationSignal` to the coroutine's `Job` (`invokeOnCompletion { signal.cancel() }`) so fast
           scrolling immediately aborts pending IPC thumbnail loads.
+        * On `SecurityException` (e.g., temporary URI grant revoked after restart under partial access), fall back to
+          the cloud thumbnail URL if `cloudId != null`.
         * On `loadThumbnail` failure, fall back to subsampled `ImageDecoder` for **images** and
           `MediaMetadataRetriever` / Coil's `VideoFrameDecoder` for **videos** (`ImageDecoder` cannot decode video
           URIs).
@@ -638,8 +663,9 @@ Adopt **Clean Architecture + MVI/MVVM** with **Unidirectional Data Flow (UDF)**.
       `try/catch (ForegroundServiceStartNotAllowedException)`) or Android's User-Initiated Data Transfer (`UIDT`) API
       for explicit user-triggered "Back up now" / manual upload sessions started in the foreground.
     * Because `IngestMetadata` runs asynchronously on the server worker after upload completion, mark the item in
-      `upload_queue` as `UPLOADED_PENDING_SYNC` until the next `SyncTimelineUseCase` links its `cloudId`—preventing
-      `EnqueueBackupUseCase` from re-uploading already transferred files.
+      `upload_queue` as `UPLOADED_PENDING_SYNC` until `SyncTimelineUseCase` reconciles its `sha256` via
+      `POST /api/upload/check-hashes` (and links its `cloudId`), or marks it `FAILED` after a max-age/retry threshold
+      if server ingest failed—preventing `EnqueueBackupUseCase` from re-uploading already transferred files.
 
 ---
 
