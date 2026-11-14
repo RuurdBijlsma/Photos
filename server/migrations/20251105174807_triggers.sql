@@ -15,6 +15,28 @@ EXECUTE FUNCTION notify_new_media_item();
 
 
 -- =========================================================================================
+-- Album Thumbnail Selection Trigger
+-- =========================================================================================
+
+CREATE OR REPLACE FUNCTION clear_album_thumbnail_user_selection_on_null()
+    RETURNS TRIGGER AS
+$$
+BEGIN
+    IF NEW.thumbnail_id IS NULL THEN
+        NEW.thumbnail_is_user_selected := false;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_clear_album_thumbnail_user_selection_on_null
+    BEFORE UPDATE OF thumbnail_id
+    ON album
+    FOR EACH ROW
+EXECUTE FUNCTION clear_album_thumbnail_user_selection_on_null();
+
+
+-- =========================================================================================
 -- Album Timestamp Triggers (Statement Level)
 -- =========================================================================================
 
@@ -104,8 +126,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS trg_album_media_item_count ON album_media_item;
-
 CREATE TRIGGER trg_album_media_item_count_insert
     AFTER INSERT
     ON album_media_item
@@ -174,8 +194,6 @@ BEGIN
     RETURN NULL;
 END;
 $$ LANGUAGE plpgsql;
-
-DROP TRIGGER IF EXISTS trg_media_item_soft_delete ON media_item;
 
 -- Bind the statement-level trigger to media_item
 CREATE TRIGGER trg_media_item_soft_delete

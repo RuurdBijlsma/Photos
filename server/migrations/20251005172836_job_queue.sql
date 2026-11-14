@@ -1,7 +1,23 @@
-CREATE TYPE job_type AS ENUM ('ingest_metadata', 'ingest_thumbnails', 'ingest_analysis',
-    'remove', 'scan', 'clean_db', 'cluster_faces', 'cluster_photos', 'import_album_item', 'update_global_centroid',
-    'clean_thumbnails', 'generate_daily_cards', 'calc_system_stats', 'handle_web_upload', 'ingest_takeout_batch',
-    'prune_missing_ingest_jobs');
+CREATE TYPE job_type AS ENUM (
+    'ingest_metadata',
+    'ingest_thumbnails',
+    'ingest_analysis',
+    'remove',
+    'scan',
+    'clean_db',
+    'cluster_faces',
+    'cluster_photos',
+    'import_album_item',
+    'update_global_centroid',
+    'clean_thumbnails',
+    'generate_daily_cards',
+    'calc_system_stats',
+    'handle_web_upload',
+    'ingest_takeout_batch',
+    'prune_missing_ingest_jobs',
+    'finalize_takeout_import',
+    'prepare_takeout_import'
+    );
 CREATE TYPE job_status AS ENUM ('queued', 'running', 'failed', 'done', 'cancelled');
 CREATE TYPE job_scope AS ENUM ('path', 'global');
 

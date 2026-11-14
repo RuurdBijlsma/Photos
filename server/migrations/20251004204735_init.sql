@@ -60,44 +60,42 @@ CREATE TABLE refresh_token
 CREATE TABLE media_item
 (
     -- Ids
-    id                         VARCHAR(10) PRIMARY KEY,
-    user_id                    INT                 NOT NULL REFERENCES app_user (id) ON DELETE CASCADE,
-    remote_user_id             INT                 REFERENCES remote_user (id) ON DELETE SET NULL,
-    hash                       TEXT                NOT NULL,
-    sha256                     TEXT                NOT NULL,
+    id                      VARCHAR(10) PRIMARY KEY,
+    user_id                 INT                 NOT NULL REFERENCES app_user (id) ON DELETE CASCADE,
+    remote_user_id          INT                 REFERENCES remote_user (id) ON DELETE SET NULL,
+    hash                    TEXT                NOT NULL,
+    sha256                  TEXT                NOT NULL,
     -- File info
-    relative_path              TEXT                NOT NULL UNIQUE,
-    filename                   TEXT                NOT NULL,
-    created_at                 TIMESTAMPTZ         NOT NULL DEFAULT now(),
-    updated_at                 TIMESTAMPTZ         NOT NULL DEFAULT now(),
+    relative_path           TEXT                NOT NULL UNIQUE,
+    filename                TEXT                NOT NULL,
+    created_at              TIMESTAMPTZ         NOT NULL DEFAULT now(),
+    updated_at              TIMESTAMPTZ         NOT NULL DEFAULT now(),
     -- Media info
-    width                      INT                 NOT NULL,
-    height                     INT                 NOT NULL,
-    is_video                   BOOLEAN             NOT NULL,
-    duration_ms                BIGINT,
-    orientation                INT                 NOT NULL DEFAULT 1,
+    width                   INT                 NOT NULL,
+    height                  INT                 NOT NULL,
+    is_video                BOOLEAN             NOT NULL,
+    duration_ms             BIGINT,
+    orientation             INT                 NOT NULL DEFAULT 1,
     -- Time
-    taken_at_local             TIMESTAMP           NOT NULL,
-    og_taken_at_local          TIMESTAMP           NOT NULL,
-    taken_at_utc               TIMESTAMPTZ,
-    sort_timestamp             TIMESTAMPTZ         NOT NULL,
-    timezone_name              TEXT,
-    timezone_offset_seconds    INT,
-    og_timezone_offset_seconds INT,
+    taken_at_local          TIMESTAMP           NOT NULL,
+    taken_at_utc            TIMESTAMPTZ,
+    sort_timestamp          TIMESTAMPTZ         NOT NULL,
+    timezone_name           TEXT,
+    timezone_offset_seconds INT,
     -- Ingest stages
-    thumbnails_status          ingest_stage_status NOT NULL DEFAULT 'pending',
-    analysis_status            ingest_stage_status NOT NULL DEFAULT 'pending',
-    thumbnails_error           TEXT,
-    analysis_error             TEXT,
+    thumbnails_status       ingest_stage_status NOT NULL DEFAULT 'pending',
+    analysis_status         ingest_stage_status NOT NULL DEFAULT 'pending',
+    thumbnails_error        TEXT,
+    analysis_error          TEXT,
     -- Frontend fields
-    use_panorama_viewer        BOOLEAN             NOT NULL,
-    has_thumbnails             BOOLEAN GENERATED ALWAYS AS (thumbnails_status = 'done') STORED,
-    month_id                   DATE GENERATED ALWAYS AS (date_trunc('month', taken_at_local)) STORED,
-    user_caption               TEXT,
+    use_panorama_viewer     BOOLEAN             NOT NULL,
+    has_thumbnails          BOOLEAN GENERATED ALWAYS AS (thumbnails_status = 'done') STORED,
+    month_id                DATE GENERATED ALWAYS AS (date_trunc('month', taken_at_local)) STORED,
+    user_caption            TEXT,
     -- Other
-    deleted                    BOOLEAN             NOT NULL DEFAULT false,
-    missing_since              TIMESTAMPTZ,
-    search_vector              TSVECTOR,
+    deleted                 BOOLEAN             NOT NULL DEFAULT false,
+    missing_since           TIMESTAMPTZ,
+    search_vector           TSVECTOR,
     CONSTRAINT width_positive CHECK (width > 0),
     CONSTRAINT height_positive CHECK (height > 0)
 );
@@ -113,6 +111,16 @@ CREATE TABLE deleted_media_item
     user_id       INT         NOT NULL,
     deleted_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- Tracks files whose metadata extraction failed terminally so scans skip them until recreated/removed.
+CREATE TABLE failed_ingest
+(
+    relative_path TEXT PRIMARY KEY,
+    user_id       INT         NOT NULL REFERENCES app_user (id) ON DELETE CASCADE,
+    error         TEXT        NOT NULL,
+    failed_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_failed_ingest_user_id ON failed_ingest (user_id);
 
 -- The following tables store optional, detailed metadata for a MediaItem.
 -- They use a one-to-one relationship where the primary key is also a foreign key
