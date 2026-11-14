@@ -105,20 +105,19 @@ implement notes
 
 ## Phase 0: Backend Changes & Proto Refactor
 
-* **Database migration(s) (`server/migrations`):**
+* [✅ Done] **Database migration(s) (`server/migrations`):**
     * Add `deleted_media_item` tombstone table (`media_item_id`, `user_id`, `deleted_at`) + `AFTER DELETE ON media_item`
       trigger (do **not** add an `ON DELETE CASCADE` FK to `app_user`), plus index on `(user_id, deleted_at)`.
     * Add composite index `media_item (user_id, updated_at)` for fast delta sync queries.
-    * Add `sha256 TEXT` column + partial index `(user_id, sha256) WHERE deleted = false` on `media_item` (keep existing
-      `media_item.hash` untouched so `app_data/cache` keys don't break).
 * **Audit `updated_at = now()` across `common_services`:**
     * Ensure every `UPDATE media_item` path (soft-delete/restore in trash/removal, `MediaItemStore::upsert`,
       missing/unmark paths, metadata edits) updates `updated_at = now()`.
 * **Scheduled tombstone pruning (`CleanDB job handler`):**
     * Periodically prune `deleted_media_item` rows older than retention (e.g. 30–90 days).
 * **Refactor protobuf schemas:**
-    * [✅ Done] Split `timeline.proto` into `common.proto`, `web.proto`, and `mobile.proto` (updating `common_types/build.rs` and
-      `web/package.json` `proto:gen`). 
+    * [✅ Done] Split `timeline.proto` into `common.proto`, `web.proto`, and `mobile.proto` (updating
+      `common_types/build.rs` and
+      `web/package.json` `proto:gen`).
     * Define `TimelineSyncResponse` and `CompactTimelineItem` (`id`, `sort_timestamp`, `ratio`, `is_video`,
       `has_thumbnails`, `size_bytes`, `duration_ms`, `timezone_offset_minutes`).
 * **Compact sync endpoint (`GET /api/mobile/timeline/sync?since=...`):**
@@ -128,10 +127,9 @@ implement notes
       `sync_timestamp`, and `is_full_snapshot` (when `since` is omitted or older than tombstone retention).
     * Verify `CompressionLayer` in `server.rs` gzip-compresses the protobuf response when `Accept-Encoding: gzip` is
       sent.
-* **SHA-256 ingest & hash check endpoint:**
-    * Compute and store `sha256` during `ingest_metadata` (_dont_ backfill existing `media_item` rows).
-    * Implement `POST /api/upload/check-hashes` returning all non-deleted matching `cloud_ids` per hash.
-    * Increase INGEST_CACHE_VERSION of metadata (ingest_cache.rs) so it doesnt use old cache files 
+* **Hash check endpoint:**
+    * Implement `POST /api/upload/check-hashes` querying `media_item.hash` (BLAKE3 lowercase hex, indexed by
+      `idx_media_item_user_hash`) and returning all non-deleted matching `cloud_ids` per hash.
 * **Verification:**
     * Add `test_integration` tests for full snapshot, delta upserts, soft-delete/restore, hard-delete tombstones,
       retention fallback, and `check-hashes`;
@@ -223,7 +221,7 @@ implement notes
   `CalculateTimelineLayoutUseCase`) to track progress, errors, TUS upload URL/offset, and `UPLOADED_PENDING_SYNC` state
   (reconciled via `POST /api/upload/check-hashes` before applying `SyncTimelineUseCase` snapshots, with max-age/retry
   `FAILED` handling).
-* Implement Pass 2 lazy SHA-256 hashing + `POST /api/upload/check-hashes` pre-upload deduplication:
+* Implement Pass 2 lazy BLAKE3 hashing + `POST /api/upload/check-hashes` pre-upload deduplication:
     * Prefer merging into an unlinked `CLOUD_ONLY` row if one matches; otherwise link to the first returned `cloud_id`
       with `is_visible_in_timeline = 0` when a canonical visible row for that `cloud_id` already exists.
 * Implement `UploadWorker` with a derived `OkHttpClient` (`120s+` read/write timeouts and `404`/`410` stale upload URL

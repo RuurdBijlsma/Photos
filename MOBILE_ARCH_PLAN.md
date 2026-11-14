@@ -135,11 +135,12 @@ guarantees full offline capability and instant local-to-cloud reconciliation wit
   `updated_at = now()`, so no `UPDATE` trigger is needed.
 * Add a composite index on `media_item (user_id, updated_at)` on Postgres so delta sync queries (`updated_at > since`)
   remain fast at 50k+ rows.
-* Note that `size_bytes` lives on `media_features` (`JOIN media_features mf ON mf.media_item_id = m.id`), and the
-  `sha256` column on `media_item` + `POST /api/upload/check-hashes` still need to be implemented on the backend
-  (currently `media_item` only stores a `hash` column; because `media_item.hash` is not `UNIQUE` on the server,
-  `check-hashes` should return all non-deleted matching `cloud_id`s per hash:
-  `SELECT sha256, array_agg(id ORDER BY created_at ASC) AS cloud_ids FROM media_item WHERE user_id = $1 AND deleted = false AND sha256 = ANY($2) GROUP BY sha256`).
+* Note that `size_bytes` lives on `media_features` (`JOIN media_features mf ON mf.media_item_id = m.id`), and
+  `POST /api/upload/check-hashes` still needs to be implemented on the backend (using `media_item.hash`, which already
+  stores the full-file BLAKE3 lowercase hex digest and is indexed by `idx_media_item_user_hash`; because
+  `media_item.hash` is not `UNIQUE` on the server, `check-hashes` should return all non-deleted matching `cloud_id`s
+  per hash:
+  `SELECT hash, array_agg(id ORDER BY created_at ASC) AS cloud_ids FROM media_item WHERE user_id = $1 AND deleted = false AND hash = ANY($2) GROUP BY hash`).
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────────┐
@@ -337,10 +338,10 @@ To prevent cold-start battery drain and disk thrashing, **the mobile app never h
 2. **Pass 2: On-Demand Crypto Verification (Deferred to Backup/Upload):**
     * For local items that did *not* match in Pass 1 (including duplicate local copies of an already-`SYNCED` file, or
       rare cases where `size_bytes` + `ratio` matched a `CLOUD_ONLY` item whose timestamp differed by >24h due to a web
-      date edit or missing `DATE_TAKEN`), the SHA-256 hash is calculated **only when staged for backup** (or lazily for
-      those rare size-collision candidates), matching the `sha256` column to be added to `media_item`.
+      date edit or missing `DATE_TAKEN`), the BLAKE3 hash (lowercase hex) is calculated **only when staged for backup**
+      (or lazily for those rare size-collision candidates), matching `media_item.hash` on the backend.
     * Before streaming bytes, a pre-upload check (`POST /api/upload/check-hashes`, to be implemented on the backend)
-      queries the backend with the SHA-256 hash and receives all non-deleted matching `cloud_id`s (`cloud_ids`). If
+      queries the backend with the BLAKE3 hash and receives all non-deleted matching `cloud_id`s (`cloud_ids`). If
       non-empty, the upload is skipped, and Room prefers merging into an unlinked `CLOUD_ONLY` row matching one of the
       returned `cloud_ids` or otherwise links the local row to the first `cloud_id` as `SYNCED` (respecting the
       canonical visibility rule below).
@@ -372,9 +373,9 @@ Keep a **single `media_item` table** (preserving the fast composite-index query 
 Handle all state transitions inside Room `@Transaction`s:
 
 1. **Local item gets backed up → Cloud sync arrives (`SyncTimelineUseCase`):**
-   `LOCAL_ONLY` (`local_1234`) is uploaded via TUS (with its `sha256` already computed) and marked
+   `LOCAL_ONLY` (`local_1234`) is uploaded via TUS (with its `blake3Hash` already computed) and marked
    `UPLOADED_PENDING_SYNC` in `upload_queue`. Before applying `TimelineSyncResponse`, if any `UPLOADED_PENDING_SYNC`
-   rows exist, `SyncTimelineUseCase` queries `POST /api/upload/check-hashes` with their `sha256` hashes (outside the
+   rows exist, `SyncTimelineUseCase` queries `POST /api/upload/check-hashes` with their BLAKE3 hashes (outside the
    Room transaction) and reconciles any returned `cloud_id`s inside the `@Transaction` using rule #2—ensuring files
    without EXIF dates (e.g. screenshots/WhatsApp where `MediaStore.DATE_MODIFIED` differs from server `sort_timestamp`
    by `> 24h`) link cleanly instead of spawning duplicate `CLOUD_ONLY` rows. Mark `UPLOADED_PENDING_SYNC` rows as
@@ -384,7 +385,7 @@ Handle all state transitions inside Room `@Transaction`s:
     * **First, check for an unlinked `CLOUD_ONLY` row:** Query
       `SELECT * FROM media_item WHERE cloud_id IN (:cloudIds) AND sync_status = 'CLOUD_ONLY' LIMIT 1`. If found, merge
       the `LOCAL_ONLY` row into that `CLOUD_ONLY` row (copy `localContentUri`, `bucketId`, `bucketName`, `relativePath`,
-      `sha256Hash` onto it, flip `syncStatus = SYNCED`, clear `autoBackupSuppressed = false`, and `DELETE` the old
+      `blake3Hash` onto it, flip `syncStatus = SYNCED`, clear `autoBackupSuppressed = false`, and `DELETE` the old
       `LOCAL_ONLY` row) so an unlinked cloud copy is never left stranded in the timeline.
     * **Otherwise (all matching `cloudIds` are already `SYNCED`, or not yet synced into Room):** Pick
       `cloudId = cloudIds.first()`
@@ -579,7 +580,7 @@ Adopt **Clean Architecture + MVI/MVVM** with **Unidirectional Data Flow (UDF)**.
         * `sortTimestamp`: UTC epoch millis
         * `timezoneOffsetMinutes`: Offset of local capture time from `sortTimestamp`
         * `yearMonth`: Precomputed `YYYYMM` integer for contiguous local-month grouping
-        * `sha256Hash`: File SHA-256 hash matching backend `media_item.sha256` (nullable, computed lazily)
+        * `blake3Hash`: File BLAKE3 hash (lowercase hex) matching backend `media_item.hash` (nullable, computed lazily)
         * `syncStatus`: `LOCAL_ONLY`, `SYNCED`, `CLOUD_ONLY` (transient `SYNCING` / `UPLOADED_PENDING_SYNC` lives in
           `upload_queue`)
     * **Permissions:** Request `READ_MEDIA_IMAGES` and `READ_MEDIA_VIDEO`, and handle Android 14+ partial access
@@ -590,7 +591,7 @@ Adopt **Clean Architecture + MVI/MVVM** with **Unidirectional Data Flow (UDF)**.
           or 15-minute timezone-aligned timestamp (`±2s` within `±24h`). Matched items flip to `SYNCED` with zero disk
           hashing.
         * *Lazy Crypto Verification:* For unmatched local items staged for upload (including duplicate local copies and
-          rare `size_bytes` collisions with >24h timestamp drift), compute SHA-256 lazily and verify against the backend
+          rare `size_bytes` collisions with >24h timestamp drift), compute BLAKE3 lazily and verify against the backend
           prior to streaming bytes.
 4. **Coil 3 Thumbnail Strategy (LCP & FPS Tuned):**
     * **Target & Min SDK:** Targeting Android 17 and up (API level 37, Pixel devices) provides native
@@ -653,8 +654,7 @@ Adopt **Clean Architecture + MVI/MVVM** with **Unidirectional Data Flow (UDF)**.
       sharing `CookieJar` and `Authenticator`) with longer read/write timeouts (e.g., `120s+`) so TUS part concatenation
       on finalize (configured up to `600s` in `nginx.conf`) doesn't hit OkHttp's default 10s timeout. If resuming via
       `HEAD`/`PATCH` returns `404`/`410` (expired/cleaned-up server upload), clear `tusUploadUrl` and restart from
-      upload
-      ticket creation.
+      upload ticket creation.
     * **Background vs. Foreground Execution (Android 15–17 limits):** Because `dataSync` Foreground Services enforce a
       **6-hour cumulative cap per 24 hours** and block background starts (`ForegroundServiceStartNotAllowedException`),
       let routine background auto-backups run as **normal constrained `WorkManager` batches**—persisting the TUS upload
@@ -663,7 +663,7 @@ Adopt **Clean Architecture + MVI/MVVM** with **Unidirectional Data Flow (UDF)**.
       `try/catch (ForegroundServiceStartNotAllowedException)`) or Android's User-Initiated Data Transfer (`UIDT`) API
       for explicit user-triggered "Back up now" / manual upload sessions started in the foreground.
     * Because `IngestMetadata` runs asynchronously on the server worker after upload completion, mark the item in
-      `upload_queue` as `UPLOADED_PENDING_SYNC` until `SyncTimelineUseCase` reconciles its `sha256` via
+      `upload_queue` as `UPLOADED_PENDING_SYNC` until `SyncTimelineUseCase` reconciles its `blake3Hash` via
       `POST /api/upload/check-hashes` (and links its `cloudId`), or marks it `FAILED` after a max-age/retry threshold
       if server ingest failed—preventing `EnqueueBackupUseCase` from re-uploading already transferred files.
 
