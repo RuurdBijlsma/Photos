@@ -43,6 +43,8 @@ Initial thoughts on libraries. not set in stone. Change if something better is a
 * in media-viewer
     * swipe up for info/gps/date pane
     * swipe down to return back to timeline (and sync timeline scroll position to viewed item)
+* initially, themeing based on dynamic color (built into android). dynamicLightColorScheme / dynamicDarkColorScheme.
+  LocalSemanticColors for sync/status badges
 
 ## LATER ON
 
@@ -66,6 +68,7 @@ Initial thoughts on libraries. not set in stone. Change if something better is a
     * drag to select in timeline
         * long press to enter selection mode, the drag to select many items quickly.
     * pinch to change grid density
+* settings for theme -> switch to materialkolor theme engine
 
 ## BONUS, NOT REQUIRED
 
