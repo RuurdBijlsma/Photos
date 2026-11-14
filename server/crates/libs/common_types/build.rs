@@ -1,8 +1,17 @@
 #[allow(clippy::too_many_lines)]
 fn main() -> std::io::Result<()> {
-    println!("cargo:rerun-if-changed=proto/timeline.proto");
+    println!("cargo:rerun-if-changed=proto/common.proto");
+    println!("cargo:rerun-if-changed=proto/mobile.proto");
+    println!("cargo:rerun-if-changed=proto/web.proto");
 
-    let file_descriptors = protox::compile(["proto/timeline.proto"], ["proto/"])
+    let file_descriptors = protox::compile(
+        [
+            "proto/common.proto",
+            "proto/mobile.proto",
+            "proto/web.proto",
+        ],
+        ["proto/"],
+    )
         .map_err(|e| std::io::Error::other(e.to_string()))?;
 
     // 3. Create the prost_build configuration

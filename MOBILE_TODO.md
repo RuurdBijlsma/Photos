@@ -113,9 +113,8 @@ implement notes
       `media_item.hash` untouched so `app_data/cache` keys don't break).
 * **Audit `updated_at = now()` across `common_services`:**
     * Ensure every `UPDATE media_item` path (soft-delete/restore in trash/removal, `MediaItemStore::upsert`,
-      missing/unmark
-      paths, metadata edits) updates `updated_at = now()`.
-* **Scheduled tombstone pruning (`libs/tasks`):**
+      missing/unmark paths, metadata edits) updates `updated_at = now()`.
+* **Scheduled tombstone pruning (`CleanDB job handler`):**
     * Periodically prune `deleted_media_item` rows older than retention (e.g. 30–90 days).
 * **Refactor protobuf schemas:**
     * Split `timeline.proto` into `common.proto`, `web.proto`, and `mobile.proto` (updating `common_types/build.rs` and

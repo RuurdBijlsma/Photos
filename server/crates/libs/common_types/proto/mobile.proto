@@ -1,0 +1,5 @@
+// proto definitions that apply only to mobile go here
+//(Note: when web.proto or mobile.proto needs to reference types defined in common.proto, we can add import "common.proto"; at the top of web.proto or mobile.proto.)
+syntax = "proto3";
+
+package api;
