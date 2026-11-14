@@ -4,6 +4,9 @@ syntax = "proto3";
 
 package api;
 
+option java_package = "dev.ruurd.photos.core.network.proto";
+option java_multiple_files = true;
+
 // --- Compact timeline delta sync (Room is the client-side source of truth) ---
 message TimelineSyncResponse {
   // New or modified media items to be upserted into Room
