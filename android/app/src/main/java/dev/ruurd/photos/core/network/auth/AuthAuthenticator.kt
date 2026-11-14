@@ -11,6 +11,7 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
 import okhttp3.Route
+import java.util.concurrent.TimeUnit
 
 class AuthAuthenticator(
     private val cookieJar: PersistentCookieJar,
@@ -24,13 +25,16 @@ class AuthAuthenticator(
     private val refreshClient by lazy {
         OkHttpClient.Builder()
             .cookieJar(cookieJar)
+            .connectTimeout(15, TimeUnit.SECONDS)
+            .readTimeout(15, TimeUnit.SECONDS)
+            .writeTimeout(15, TimeUnit.SECONDS)
             .build()
     }
 
     override fun authenticate(route: Route?, response: Response): Request? {
         val requestPath = response.request.url.encodedPath
 
-        // 1. Immediately abort if the failing request was login or refresh, or retried too many times
+        // 1. Abort if the failing request was login/refresh, or already retried
         if (requestPath.endsWith("/api/auth/login") ||
             requestPath.endsWith("/api/auth/refresh") ||
             responseCount(response) >= 2
@@ -38,22 +42,26 @@ class AuthAuthenticator(
             return null
         }
 
-        // Snapshot current access token from the request that failed
+        // Snapshot access token from the request that failed
         val failingAccessToken = extractAccessTokenFromRequest(response.request)
 
         synchronized(lock) {
-            // 2. Check if another concurrent thread already completed refresh while we were waiting
-            val currentAccessToken = cookieJar.getCookie("access_token")?.value
+            // 2. Check if another thread already refreshed the token while we waited
+            val currentAccessToken = cookieJar
+                .getCookie("access_token", response.request.url)
+                ?.value
 
             if (currentAccessToken != null && currentAccessToken != failingAccessToken) {
-                // Token was already refreshed by another thread! Retry with new cookie
-                return response.request.newBuilder().build()
+                // Token was already refreshed; strip stale Cookie header and retry
+                return response.request.newBuilder()
+                    .removeHeader("Cookie")
+                    .build()
             }
 
             // 3. Perform synchronized refresh call
             val baseUrl = sessionManager.getServerUrl().toHttpUrlOrNull() ?: return null
             val refreshUrl = baseUrl.newBuilder()
-                .encodedPath("/api/auth/refresh")
+                .addPathSegments("api/auth/refresh")
                 .build()
 
             val refreshRequest = Request.Builder()
@@ -61,22 +69,30 @@ class AuthAuthenticator(
                 .post("".toRequestBody())
                 .build()
 
-            try {
+            return try {
                 refreshClient.newCall(refreshRequest).execute().use { refreshResponse ->
-                    if (refreshResponse.isSuccessful) {
-                        // Refresh succeeded, new cookies are in CookieJar; retry original request
-                        return response.request.newBuilder().build()
-                    } else {
-                        // Refresh token was invalid/expired: log user out
-                        cookieJar.clear()
-                        scope.launch {
-                            sessionManager.setUnauthenticated()
+                    when {
+                        refreshResponse.isSuccessful -> {
+                            response.request.newBuilder()
+                                .removeHeader("Cookie")
+                                .build()
                         }
-                        return null
+                        refreshResponse.code == 401 || refreshResponse.code == 403 -> {
+                            // Refresh token invalid, expired, or revoked: clear session
+                            cookieJar.clear()
+                            scope.launch {
+                                sessionManager.setUnauthenticated()
+                            }
+                            null
+                        }
+                        else -> {
+                            // Transient failure (429 rate-limit, 5xx server restart, etc.): preserve session
+                            null
+                        }
                     }
                 }
             } catch (_: Exception) {
-                return null
+                null
             }
         }
     }

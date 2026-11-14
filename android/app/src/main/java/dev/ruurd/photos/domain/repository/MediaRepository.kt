@@ -11,6 +11,7 @@ interface MediaRepository {
 
     suspend fun getById(id: String): MediaEntity?
     suspend fun getByCloudId(cloudId: String): MediaEntity?
+    suspend fun getAllByCloudId(cloudId: String): List<MediaEntity>
     suspend fun getAllCloudIds(): List<String>
 
     suspend fun upsert(media: MediaEntity)

@@ -86,16 +86,21 @@ class SyncTimelineUseCase(
                             )
                         }
 
-                        // 2. Process upserts in chunked batches
+                        // 2. Process upserts in chunked batches (updating canonical + any duplicate local rows)
                         val itemsToUpsert = ArrayList<MediaEntity>(syncResponse.upsertedCount)
                         for (item in syncResponse.upsertedList) {
-                            val existing = if (item.id in existingCloudIds) {
-                                // TODO(Phase 1B): use getAllByCloudId once duplicate local copies can share a cloudId
-                                mediaRepository.getByCloudId(item.id)
+                            val existingRows = if (item.id in existingCloudIds) {
+                                mediaRepository.getAllByCloudId(item.id)
                             } else {
-                                null
+                                emptyList()
                             }
-                            itemsToUpsert.add(toMediaEntity(item, existing))
+                            if (existingRows.isEmpty()) {
+                                itemsToUpsert.add(toMediaEntity(item, existing = null))
+                            } else {
+                                for (existing in existingRows) {
+                                    itemsToUpsert.add(toMediaEntity(item, existing = existing))
+                                }
+                            }
                         }
 
                         if (itemsToUpsert.isNotEmpty()) {

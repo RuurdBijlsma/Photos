@@ -45,7 +45,7 @@ class SyncTimelineUseCaseTest {
         }
     }
 
-    /** Mirrors the DAO semantics the use case relies on (PK replace, update-by-cloud-id). */
+    /** Mirrors the DAO semantics the use case relies on (PK upsert, queries by cloudId). */
     private class FakeMediaRepository : MediaRepository {
         val items = mutableMapOf<String, MediaEntity>()
 
@@ -64,6 +64,9 @@ class SyncTimelineUseCaseTest {
 
         override suspend fun getByCloudId(cloudId: String): MediaEntity? =
             items.values.firstOrNull { it.cloudId == cloudId }
+
+        override suspend fun getAllByCloudId(cloudId: String): List<MediaEntity> =
+            items.values.filter { it.cloudId == cloudId }
 
         override suspend fun getAllCloudIds(): List<String> =
             items.values.mapNotNull { it.cloudId }.distinct()
@@ -218,6 +221,16 @@ class SyncTimelineUseCaseTest {
                     syncStatus = SyncStatus.SYNCED
                 )
             )
+            repo.upsert(
+                MediaEntity(
+                    id = "local_keepMeDup",
+                    cloudId = "keepMe",
+                    localContentUri = "content://media/external/images/media/9",
+                    ratio = 1f,
+                    isVisibleInTimeline = false,
+                    syncStatus = SyncStatus.SYNCED
+                )
+            )
 
             val result = useCase(api, repo, store)()
 
@@ -236,6 +249,10 @@ class SyncTimelineUseCaseTest {
             assertEquals(1.5f, updated.ratio)
             assertEquals("content://media/external/images/media/3", updated.localContentUri)
             assertEquals(SyncStatus.SYNCED, updated.syncStatus)
+
+            val updatedDup = repo.getById("local_keepMeDup")!!
+            assertEquals(1.5f, updatedDup.ratio)
+            assertEquals(false, updatedDup.isVisibleInTimeline)
 
             assertEquals(1_730_000_200_000L, store.latestSyncTimestamp.value)
         }

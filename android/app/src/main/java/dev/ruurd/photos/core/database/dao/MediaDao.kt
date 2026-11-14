@@ -1,10 +1,9 @@
 package dev.ruurd.photos.core.database.dao
 
 import androidx.room.Dao
-import androidx.room.Insert
-import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
+import androidx.room.Upsert
 import dev.ruurd.photos.core.database.entity.MediaEntity
 import dev.ruurd.photos.core.database.entity.SyncStatus
 import kotlinx.coroutines.flow.Flow
@@ -57,10 +56,10 @@ interface MediaDao {
     @Query("SELECT COUNT(*) FROM media_item")
     fun countTotalFlow(): Flow<Int>
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Upsert
     suspend fun upsert(media: MediaEntity)
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Upsert
     suspend fun upsertAll(mediaList: List<MediaEntity>)
 
     @Update

@@ -36,6 +36,10 @@ class MediaRepositoryImpl(
         mediaDao.getByCloudId(cloudId)
     }
 
+    override suspend fun getAllByCloudId(cloudId: String): List<MediaEntity> = withContext(dispatchers.io) {
+        mediaDao.getAllByCloudId(cloudId)
+    }
+
     override suspend fun getAllCloudIds(): List<String> = withContext(dispatchers.io) {
         mediaDao.getAllCloudIds()
     }
