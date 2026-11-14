@@ -44,6 +44,17 @@ fn main() -> std::io::Result<()> {
         "#[derive(serde::Serialize, serde::Deserialize, sqlx::FromRow)]",
     );
 
+    // --- MOBILE STRUCTS ---
+    config.type_attribute(
+        ".api.TimelineSyncResponse",
+        "#[derive(serde::Serialize, serde::Deserialize)]",
+    );
+
+    config.type_attribute(
+        ".api.CompactTimelineItem",
+        "#[derive(serde::Serialize, serde::Deserialize)]",
+    );
+
     // --- ALBUM STRUCTS ---
     config.type_attribute(
         ".api.AlbumRatiosResponse",

@@ -5,6 +5,7 @@ pub mod camera;
 pub mod daily_cards;
 pub mod explore;
 pub mod jobs;
+pub mod mobile;
 pub mod people;
 pub mod photos;
 pub mod root;
@@ -32,6 +33,7 @@ use crate::camera::router::camera_protected_router;
 use crate::daily_cards::router::daily_cards_protected_router;
 use crate::explore::router::explore_protected_router;
 use crate::jobs::router::{jobs_admin_router, jobs_protected_router};
+use crate::mobile::router::mobile_protected_router;
 use crate::photos::router::{photos_protected_router, photos_public_router};
 use crate::root::router::root_public_router;
 use crate::s2s::router::s2s_public_router;
@@ -100,6 +102,7 @@ fn protected_routes(api_state: ApiContext) -> Router<ApiContext> {
         .merge(trash_protected_router())
         .merge(jobs_protected_router())
         .merge(upload_protected_router())
+        .merge(mobile_protected_router())
         .merge(explore_protected_router())
         .route_layer(from_extractor_with_state::<ApiUser, ApiContext>(api_state))
 }

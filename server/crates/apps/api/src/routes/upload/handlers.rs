@@ -7,13 +7,16 @@ use chrono::{Duration, Utc};
 use common_services::alert;
 use common_services::api::app_error::AppError;
 use common_services::api::auth::interfaces::AuthClaims;
-use common_services::api::upload::interfaces::{TakeoutBatchPayload, TakeoutStartResponse};
-use common_services::api::upload::service::decode_upload_token;
+use common_services::api::upload::interfaces::{
+    CheckHashesRequest, CheckHashesResponse, TakeoutBatchPayload, TakeoutStartResponse,
+};
+use common_services::api::upload::service::{check_hashes, decode_upload_token};
 use common_services::database::jobs::JobType;
 use common_services::job_queue::enqueue_job;
 use fileloft_core::info::UploadInfoChanges;
 use fileloft_core::{Metadata, TusError, UploadInfo};
 use jsonwebtoken::{EncodingKey, Header, encode};
+use sqlx::PgPool;
 use std::collections::HashSet;
 use tracing::{error, info, warn};
 
@@ -37,6 +40,20 @@ pub async fn get_upload_jwt(
     .map_err(Into::<AppError>::into)?;
 
     Ok(Json(access_token))
+}
+
+/// Returns the non-deleted media item ids the server already has for the given BLAKE3 hashes.
+///
+/// # Errors
+///
+/// Returns a `AppError` if the database query fails.
+pub async fn check_hashes_handler(
+    State(pool): State<PgPool>,
+    Extension(user): Extension<ApiUser>,
+    Json(payload): Json<CheckHashesRequest>,
+) -> Result<Json<CheckHashesResponse>, AppError> {
+    let hashes = check_hashes(user.id, &pool, &payload.hashes).await?;
+    Ok(Json(CheckHashesResponse { hashes }))
 }
 
 // Decodes the JWT, extracts user ID, and overwrites any user-submitted userId key.

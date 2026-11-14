@@ -1,6 +1,7 @@
 use crate::api_state::ApiContext;
 use crate::upload::handlers::{
-    get_upload_jwt, handle_upload_finished, pre_create_handler, start_takeout_import,
+    check_hashes_handler, get_upload_jwt, handle_upload_finished, pre_create_handler,
+    start_takeout_import,
 };
 use app_state::constants::{TUS_LOCKS_FOLDER, TUS_UPLOADS_FOLDER};
 use axum::Router;
@@ -72,6 +73,7 @@ fn get_tus_handler(context: &ApiContext) -> TusHandler<FileStore, FileLocker> {
 pub fn upload_protected_router() -> Router<ApiContext> {
     Router::new()
         .route("/upload/jwt", get(get_upload_jwt))
+        .route("/upload/check-hashes", post(check_hashes_handler))
         .route("/upload/takeout/start", post(start_takeout_import))
 }
 

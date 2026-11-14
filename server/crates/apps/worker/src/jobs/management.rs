@@ -248,7 +248,8 @@ async fn mark_stage_failed(conn: &mut PgConnection, job: &Job, last_error: &str)
                 r#"
                 UPDATE media_item
                 SET thumbnails_status = 'failed',
-                    thumbnails_error = $2
+                    thumbnails_error = $2,
+                    updated_at = now()
                 WHERE relative_path = $1
                   AND deleted = false
                   AND thumbnails_status <> 'done'
@@ -264,7 +265,8 @@ async fn mark_stage_failed(conn: &mut PgConnection, job: &Job, last_error: &str)
                 r#"
                 UPDATE media_item
                 SET analysis_status = 'failed',
-                    analysis_error = $2
+                    analysis_error = $2,
+                    updated_at = now()
                 WHERE relative_path = $1
                   AND deleted = false
                   AND analysis_status <> 'done'

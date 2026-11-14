@@ -9,6 +9,7 @@ use color_eyre::eyre::{Result, eyre};
 use model_provider::ModelProvider;
 use photos_app::{AppOptions, run_app};
 use reqwest::Client;
+use reqwest::cookie::Jar;
 use sqlx::PgPool;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -35,6 +36,9 @@ pub struct TestContext {
     pub pool: PgPool,
     pub settings: AppSettings,
     pub http_client: Client,
+    /// Shared with `http_client`, so extra clients (e.g. one with decoding disabled) use the same
+    /// session without logging in again (the login endpoint is rate limited).
+    pub cookie_jar: Arc<Jar>,
     // Private fields for robust cleanup on Drop
     db_name: String,
     management_pool: PgPool,
@@ -73,7 +77,10 @@ impl TestContext {
         let (app_handle, shutdown_tx) = Self::spawn_services(&main_pool, &settings);
 
         // 4. Wait for the API to be ready to accept traffic (with cookie store enabled)
-        let http_client = Client::builder().cookie_store(true).build()?;
+        let cookie_jar = Arc::new(Jar::default());
+        let http_client = Client::builder()
+            .cookie_provider(cookie_jar.clone())
+            .build()?;
         Self::wait_for_healthy_api(&settings, &http_client).await?;
 
         info!("Test environment is ready.");
@@ -81,6 +88,7 @@ impl TestContext {
             pool: main_pool,
             settings,
             http_client,
+            cookie_jar,
             db_name,
             management_pool,
             media_dir,
