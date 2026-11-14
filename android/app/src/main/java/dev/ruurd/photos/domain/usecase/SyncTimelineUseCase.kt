@@ -9,10 +9,14 @@ import dev.ruurd.photos.core.network.proto.CompactTimelineItem
 import dev.ruurd.photos.core.network.proto.TimelineSyncResponse
 import dev.ruurd.photos.domain.model.SyncState
 import dev.ruurd.photos.domain.repository.MediaRepository
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import java.io.IOException
 import java.time.Instant
 import java.time.ZoneOffset
 
@@ -22,137 +26,139 @@ class SyncTimelineUseCase(
     private val sessionManager: SyncTimestampStore,
     private val dispatchers: AppDispatchers
 ) {
+    private val syncMutex = Mutex()
+
     private val _syncState = MutableStateFlow(SyncState.IDLE)
     val syncState: StateFlow<SyncState> = _syncState.asStateFlow()
 
     suspend operator fun invoke(forceFullSnapshot: Boolean = false): Result<TimelineSyncResponse> =
         withContext(dispatchers.io) {
-            _syncState.value = SyncState.SYNCING
-            try {
-                val latestSyncTimestamp = sessionManager.latestSyncTimestamp.value
-                val since = if (forceFullSnapshot || latestSyncTimestamp <= 0L) {
-                    null
-                } else {
-                    maxOf(0L, latestSyncTimestamp - 60_000L) // 60s overlap for concurrent ingest safety
-                }
-
-                val response = apiService.getTimelineSync(since = since)
-                if (!response.isSuccessful) {
-                    val state = if (response.code() in 500..599) {
-                        SyncState.SERVER_UNREACHABLE
+            syncMutex.withLock {
+                _syncState.value = SyncState.SYNCING
+                try {
+                    val latestSyncTimestamp = sessionManager.latestSyncTimestamp.value
+                    val since = if (forceFullSnapshot || latestSyncTimestamp <= 0L) {
+                        null
                     } else {
-                        SyncState.IDLE
-                    }
-                    _syncState.value = state
-                    return@withContext Result.failure(Exception("Sync request failed: HTTP ${response.code()}"))
-                }
-
-                val syncResponse = response.body()
-                    ?: return@withContext Result.failure(Exception("Sync response body is null"))
-
-                mediaRepository.withTransaction {
-                    // 1. Process deletions
-                    if (syncResponse.isFullSnapshot) {
-                        // Full snapshot reconciliation: diff local cloud_ids against received snapshot
-                        val syncedCloudIds = syncResponse.upsertedList.map { it.id }.toSet()
-                        val existingCloudIds = mediaRepository.getAllCloudIds()
-                        val staleCloudIds = existingCloudIds.filter { it !in syncedCloudIds }
-
-                        for (staleId in staleCloudIds) {
-                            val existing = mediaRepository.getByCloudId(staleId)
-                            if (existing != null) {
-                                if (existing.localContentUri != null) {
-                                    // Local copy exists: revert to LOCAL_ONLY, do not re-upload immediately
-                                    mediaRepository.transitionToLocalOnly(
-                                        cloudId = staleId,
-                                        isVisible = true
-                                    )
-                                } else {
-                                    // Pure cloud copy: delete row
-                                    mediaRepository.deleteCloudOnlyByCloudId(staleId)
-                                }
-                            }
-                        }
-                    } else {
-                        // Delta sync deletions
-                        for (deletedId in syncResponse.deletedIdsList) {
-                            val existing = mediaRepository.getByCloudId(deletedId)
-                            if (existing != null) {
-                                if (existing.localContentUri != null) {
-                                    mediaRepository.transitionToLocalOnly(
-                                        cloudId = deletedId,
-                                        isVisible = true
-                                    )
-                                } else {
-                                    mediaRepository.deleteCloudOnlyByCloudId(deletedId)
-                                }
-                            }
-                        }
+                        // 60s overlap prevents missing concurrent server ingests committed after sync starts
+                        maxOf(0L, latestSyncTimestamp - 60_000L)
                     }
 
-                    // 2. Process upserts in chunked batches
-                    val itemsToUpsert = mutableListOf<MediaEntity>()
-
-                    for (item in syncResponse.upsertedList) {
-                        val yearMonth = computeYearMonth(item.sortTimestamp, item.timezoneOffsetMinutes)
-                        val existing = mediaRepository.getByCloudId(item.id)
-
-                        if (existing != null) {
-                            // Update existing row
-                            val updated = existing.copy(
-                                sortTimestamp = item.sortTimestamp,
-                                timezoneOffsetMinutes = item.timezoneOffsetMinutes,
-                                yearMonth = yearMonth,
-                                ratio = item.ratio,
-                                isVideo = item.isVideo,
-                                durationMs = if (item.hasDurationMs()) item.durationMs else null,
-                                hasThumbnails = item.hasThumbnails,
-                                sizeBytes = item.sizeBytes
-                            )
-                            itemsToUpsert.add(updated)
+                    val response = apiService.getTimelineSync(since = since)
+                    if (!response.isSuccessful) {
+                        _syncState.value = if (response.code() in 500..599) {
+                            SyncState.SERVER_UNREACHABLE
                         } else {
-                            // New cloud item
-                            val entity = MediaEntity(
-                                id = "cloud_${item.id}",
-                                cloudId = item.id,
-                                localContentUri = null,
-                                bucketId = null,
-                                bucketName = null,
-                                relativePath = null,
-                                isVisibleInTimeline = true,
-                                autoBackupSuppressed = false,
-                                sizeBytes = item.sizeBytes,
-                                ratio = item.ratio,
-                                sortTimestamp = item.sortTimestamp,
-                                timezoneOffsetMinutes = item.timezoneOffsetMinutes,
-                                yearMonth = yearMonth,
-                                isVideo = item.isVideo,
-                                durationMs = if (item.hasDurationMs()) item.durationMs else null,
-                                hasThumbnails = item.hasThumbnails,
-                                syncStatus = SyncStatus.CLOUD_ONLY
+                            SyncState.IDLE
+                        }
+                        return@withLock Result.failure(
+                            Exception("Sync request failed: HTTP ${response.code()}")
+                        )
+                    }
+
+                    val syncResponse = response.body()
+                    if (syncResponse == null) {
+                        _syncState.value = SyncState.SERVER_UNREACHABLE
+                        return@withLock Result.failure(Exception("Sync response body is null"))
+                    }
+
+                    mediaRepository.withTransaction {
+                        val existingCloudIds = mediaRepository.getAllCloudIds().toHashSet()
+
+                        // 1. Process deletions (full snapshot diff or delta deleted_ids)
+                        val cloudIdsToRemove = if (syncResponse.isFullSnapshot) {
+                            val syncedCloudIds = HashSet<String>(syncResponse.upsertedCount).apply {
+                                for (item in syncResponse.upsertedList) {
+                                    add(item.id)
+                                }
+                            }
+                            existingCloudIds.filter { it !in syncedCloudIds }
+                        } else {
+                            syncResponse.deletedIdsList
+                        }
+
+                        for (cloudId in cloudIdsToRemove) {
+                            mediaRepository.deleteCloudOnlyByCloudId(cloudId)
+                            mediaRepository.transitionToLocalOnly(
+                                cloudId = cloudId,
+                                // TODO(Phase 1B): derive from device_folder.show_in_timeline
+                                isVisible = true
                             )
-                            itemsToUpsert.add(entity)
                         }
+
+                        // 2. Process upserts in chunked batches
+                        val itemsToUpsert = ArrayList<MediaEntity>(syncResponse.upsertedCount)
+                        for (item in syncResponse.upsertedList) {
+                            val existing = if (item.id in existingCloudIds) {
+                                // TODO(Phase 1B): use getAllByCloudId once duplicate local copies can share a cloudId
+                                mediaRepository.getByCloudId(item.id)
+                            } else {
+                                null
+                            }
+                            itemsToUpsert.add(toMediaEntity(item, existing))
+                        }
+
+                        if (itemsToUpsert.isNotEmpty()) {
+                            // Upsert in batches of 500 to stay well below SQLite bind limits
+                            itemsToUpsert.chunked(500).forEach { chunk ->
+                                mediaRepository.upsertAll(chunk)
+                            }
+                        }
+
+                        // 3. Persist server sync timestamp
+                        sessionManager.setLatestSyncTimestamp(syncResponse.syncTimestamp)
                     }
 
-                    if (itemsToUpsert.isNotEmpty()) {
-                        // Upsert in batches of 500 to stay well below SQLite bind limits
-                        itemsToUpsert.chunked(500).forEach { chunk ->
-                            mediaRepository.upsertAll(chunk)
-                        }
+                    _syncState.value = SyncState.IDLE
+                    Result.success(syncResponse)
+                } catch (e: CancellationException) {
+                    if (_syncState.value == SyncState.SYNCING) {
+                        _syncState.value = SyncState.IDLE
                     }
-
-                    // 3. Persist server sync timestamp
-                    sessionManager.setLatestSyncTimestamp(syncResponse.syncTimestamp)
+                    throw e
+                } catch (e: IOException) {
+                    _syncState.value = SyncState.SERVER_UNREACHABLE
+                    Result.failure(e)
+                } catch (e: Exception) {
+                    _syncState.value = SyncState.IDLE
+                    Result.failure(e)
                 }
-
-                _syncState.value = SyncState.IDLE
-                Result.success(syncResponse)
-            } catch (e: Exception) {
-                _syncState.value = SyncState.SERVER_UNREACHABLE
-                Result.failure(e)
             }
         }
+
+    private fun toMediaEntity(item: CompactTimelineItem, existing: MediaEntity?): MediaEntity {
+        val yearMonth = computeYearMonth(item.sortTimestamp, item.timezoneOffsetMinutes)
+        val durationMs = if (item.hasDurationMs()) item.durationMs else null
+
+        return existing?.copy(
+            sortTimestamp = item.sortTimestamp,
+            timezoneOffsetMinutes = item.timezoneOffsetMinutes,
+            yearMonth = yearMonth,
+            ratio = item.ratio,
+            isVideo = item.isVideo,
+            durationMs = durationMs,
+            hasThumbnails = item.hasThumbnails,
+            sizeBytes = item.sizeBytes
+        ) ?: MediaEntity(
+            id = "cloud_${item.id}",
+            cloudId = item.id,
+            localContentUri = null,
+            bucketId = null,
+            bucketName = null,
+            relativePath = null,
+            isVisibleInTimeline = true,
+            autoBackupSuppressed = false,
+            sizeBytes = item.sizeBytes,
+            ratio = item.ratio,
+            sortTimestamp = item.sortTimestamp,
+            timezoneOffsetMinutes = item.timezoneOffsetMinutes,
+            yearMonth = yearMonth,
+            isVideo = item.isVideo,
+            durationMs = durationMs,
+            hasThumbnails = item.hasThumbnails,
+            syncStatus = SyncStatus.CLOUD_ONLY
+        )
+    }
 
     private fun computeYearMonth(sortTimestamp: Long, timezoneOffsetMinutes: Int): Int {
         val epochWithOffset = sortTimestamp + (timezoneOffsetMinutes * 60_000L)

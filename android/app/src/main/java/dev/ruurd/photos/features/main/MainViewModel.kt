@@ -14,8 +14,8 @@ import dev.ruurd.photos.features.main.components.MainNavTab
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -88,15 +88,17 @@ class MainViewModel(
     )
 
     init {
-        // Automatically perform background delta sync on launch when online & authenticated
+        // Automatically perform background delta sync on launch and when connectivity returns
         viewModelScope.launch {
             combine(authRepository.authState, networkMonitor.isOnline) { auth, online ->
                 auth is AuthState.Authenticated && online
-            }.collect { canSync ->
-                if (canSync && syncTimelineUseCase.syncState.value == SyncState.IDLE) {
-                    syncNow(forceFullSnapshot = false)
-                }
             }
+                .distinctUntilChanged()
+                .collect { canSync ->
+                    if (canSync && syncTimelineUseCase.syncState.value != SyncState.SYNCING) {
+                        syncNow(forceFullSnapshot = false)
+                    }
+                }
         }
     }
 
@@ -109,6 +111,8 @@ class MainViewModel(
     }
 
     fun syncNow(forceFullSnapshot: Boolean = false) {
+        if (syncTimelineUseCase.syncState.value == SyncState.SYNCING) return
+
         viewModelScope.launch {
             _syncErrorMessage.value = null
             val result = syncTimelineUseCase(forceFullSnapshot = forceFullSnapshot)

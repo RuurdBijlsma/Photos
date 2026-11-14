@@ -3,10 +3,12 @@ package dev.ruurd.photos.features.auth
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import dev.ruurd.photos.core.network.SessionManager
 import dev.ruurd.photos.domain.repository.AuthRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 data class AuthUiState(
@@ -26,63 +28,87 @@ class AuthViewModel(
     private val _uiState = MutableStateFlow(AuthUiState())
     val uiState: StateFlow<AuthUiState> = _uiState.asStateFlow()
 
+    private var hasUserEditedServerUrl = false
+
     init {
         viewModelScope.launch {
             authRepository.serverUrl.collect { url ->
-                if (_uiState.value.serverUrl.isEmpty()) {
-                    _uiState.value = _uiState.value.copy(serverUrl = url)
+                if (!hasUserEditedServerUrl) {
+                    _uiState.update { it.copy(serverUrl = url) }
                 }
             }
         }
     }
 
     fun onServerUrlChanged(url: String) {
-        _uiState.value = _uiState.value.copy(
-            serverUrl = url,
-            serverTestSuccess = null,
-            errorMessage = null
-        )
+        hasUserEditedServerUrl = true
+        _uiState.update {
+            it.copy(
+                serverUrl = url,
+                serverTestSuccess = null,
+                errorMessage = null
+            )
+        }
     }
 
     fun onEmailChanged(email: String) {
-        _uiState.value = _uiState.value.copy(
-            email = email,
-            errorMessage = null
-        )
+        _uiState.update {
+            it.copy(
+                email = email,
+                errorMessage = null
+            )
+        }
     }
 
     fun onPasswordChanged(password: String) {
-        _uiState.value = _uiState.value.copy(
-            password = password,
-            errorMessage = null
-        )
+        _uiState.update {
+            it.copy(
+                password = password,
+                errorMessage = null
+            )
+        }
     }
 
     fun testServerConnection() {
-        val url = _uiState.value.serverUrl.trim()
-        if (url.isEmpty()) {
-            _uiState.value = _uiState.value.copy(errorMessage = "Server URL cannot be empty")
+        val currentState = _uiState.value
+        if (currentState.isTestingServer || currentState.isLoading) return
+
+        val normalizedUrl = SessionManager.normalizeUrl(currentState.serverUrl)
+        if (normalizedUrl.isEmpty()) {
+            _uiState.update { it.copy(errorMessage = "Server URL cannot be empty") }
             return
         }
 
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isTestingServer = true, errorMessage = null)
-            val result = authRepository.testServerConnection(url)
+            _uiState.update {
+                it.copy(
+                    isTestingServer = true,
+                    serverTestSuccess = null,
+                    errorMessage = null
+                )
+            }
+
+            val result = authRepository.testServerConnection(normalizedUrl)
             result.fold(
                 onSuccess = {
-                    authRepository.setServerUrl(url)
-                    _uiState.value = _uiState.value.copy(
-                        isTestingServer = false,
-                        serverTestSuccess = true,
-                        errorMessage = null
-                    )
+                    authRepository.setServerUrl(normalizedUrl)
+                    _uiState.update {
+                        it.copy(
+                            serverUrl = normalizedUrl,
+                            isTestingServer = false,
+                            serverTestSuccess = true,
+                            errorMessage = null
+                        )
+                    }
                 },
                 onFailure = { error ->
-                    _uiState.value = _uiState.value.copy(
-                        isTestingServer = false,
-                        serverTestSuccess = false,
-                        errorMessage = "Cannot reach server: ${error.localizedMessage}"
-                    )
+                    _uiState.update {
+                        it.copy(
+                            isTestingServer = false,
+                            serverTestSuccess = false,
+                            errorMessage = "Cannot reach server: ${error.localizedMessage ?: "Unknown error"}"
+                        )
+                    }
                 }
             )
         }
@@ -90,37 +116,47 @@ class AuthViewModel(
 
     fun login() {
         val state = _uiState.value
-        val url = state.serverUrl.trim()
+        if (state.isLoading) return
+
+        val normalizedUrl = SessionManager.normalizeUrl(state.serverUrl)
         val email = state.email.trim()
         val password = state.password
 
-        if (url.isEmpty()) {
-            _uiState.value = state.copy(errorMessage = "Please enter server URL")
+        if (normalizedUrl.isEmpty()) {
+            _uiState.update { it.copy(errorMessage = "Please enter server URL") }
             return
         }
         if (email.isEmpty()) {
-            _uiState.value = state.copy(errorMessage = "Please enter email")
+            _uiState.update { it.copy(errorMessage = "Please enter email") }
             return
         }
         if (password.isEmpty()) {
-            _uiState.value = state.copy(errorMessage = "Please enter password")
+            _uiState.update { it.copy(errorMessage = "Please enter password") }
             return
         }
 
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
-            authRepository.setServerUrl(url)
+            _uiState.update {
+                it.copy(
+                    serverUrl = normalizedUrl,
+                    isLoading = true,
+                    errorMessage = null
+                )
+            }
+            authRepository.setServerUrl(normalizedUrl)
 
             val loginResult = authRepository.login(email, password)
             loginResult.fold(
                 onSuccess = {
-                    _uiState.value = _uiState.value.copy(isLoading = false)
+                    _uiState.update { it.copy(isLoading = false) }
                 },
                 onFailure = { error ->
-                    _uiState.value = _uiState.value.copy(
-                        isLoading = false,
-                        errorMessage = error.localizedMessage ?: "Login failed"
-                    )
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            errorMessage = error.localizedMessage ?: "Login failed"
+                        )
+                    }
                 }
             )
         }

@@ -36,6 +36,14 @@ android {
     buildFeatures {
         compose = true
     }
+    sourceSets {
+        getByName("debug") {
+            java.directories.add("build/generated/java/generateDebugProto/java")
+        }
+        getByName("release") {
+            java.directories.add("build/generated/java/generateReleaseProto/java")
+        }
+    }
 }
 
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
