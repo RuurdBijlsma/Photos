@@ -3,7 +3,7 @@ package dev.ruurd.photos.domain.usecase
 import dev.ruurd.photos.core.common.AppDispatchers
 import dev.ruurd.photos.core.database.entity.MediaEntity
 import dev.ruurd.photos.core.database.entity.SyncStatus
-import dev.ruurd.photos.core.network.SessionManager
+import dev.ruurd.photos.core.network.SyncTimestampStore
 import dev.ruurd.photos.core.network.api.PhotosApiService
 import dev.ruurd.photos.core.network.proto.CompactTimelineItem
 import dev.ruurd.photos.core.network.proto.TimelineSyncResponse
@@ -18,8 +18,10 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runTest
 import okhttp3.RequestBody
 import okhttp3.ResponseBody
+import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import retrofit2.Response
@@ -35,15 +37,31 @@ class SyncTimelineUseCaseTest {
         override val main: CoroutineDispatcher = testDispatcher
     }
 
+    private class FakeSyncTimestampStore : SyncTimestampStore {
+        override val latestSyncTimestamp = MutableStateFlow(0L)
+
+        override suspend fun setLatestSyncTimestamp(timestamp: Long) {
+            latestSyncTimestamp.value = timestamp
+        }
+    }
+
+    /** Mirrors the DAO semantics the use case relies on (PK replace, update-by-cloud-id). */
     private class FakeMediaRepository : MediaRepository {
         val items = mutableMapOf<String, MediaEntity>()
 
-        override fun getTimelineStage1(limitMonths: Int): Flow<List<MediaEntity>> = flowOf(items.values.toList())
-        override fun getTimelineStage2(): Flow<List<MediaEntity>> = flowOf(items.values.toList())
-        override fun countVisible(): Flow<Int> = flowOf(items.values.count { it.isVisibleInTimeline })
+        override fun getTimelineStage1(limitMonths: Int): Flow<List<MediaEntity>> =
+            flowOf(items.values.toList())
+
+        override fun getTimelineStage2(): Flow<List<MediaEntity>> =
+            flowOf(items.values.toList())
+
+        override fun countVisible(): Flow<Int> =
+            flowOf(items.values.count { it.isVisibleInTimeline })
+
         override fun countTotal(): Flow<Int> = flowOf(items.size)
 
         override suspend fun getById(id: String): MediaEntity? = items[id]
+
         override suspend fun getByCloudId(cloudId: String): MediaEntity? =
             items.values.firstOrNull { it.cloudId == cloudId }
 
@@ -59,25 +77,30 @@ class SyncTimelineUseCaseTest {
         }
 
         override suspend fun transitionToLocalOnly(cloudId: String, isVisible: Boolean) {
-            val existing = items.values.firstOrNull { it.cloudId == cloudId }
-            if (existing != null && existing.localContentUri != null) {
-                items[existing.id] = existing.copy(
-                    cloudId = null,
-                    syncStatus = SyncStatus.LOCAL_ONLY,
-                    autoBackupSuppressed = true,
-                    isVisibleInTimeline = isVisible
-                )
-            }
+            items.values
+                .filter { it.cloudId == cloudId && it.localContentUri != null }
+                .forEach {
+                    items[it.id] = it.copy(
+                        cloudId = null,
+                        syncStatus = SyncStatus.LOCAL_ONLY,
+                        autoBackupSuppressed = true,
+                        isVisibleInTimeline = isVisible
+                    )
+                }
         }
 
         override suspend fun deleteCloudOnlyByCloudId(cloudId: String) {
-            val toRemove = items.values.filter { it.cloudId == cloudId && it.localContentUri == null }
-            toRemove.forEach { items.remove(it.id) }
+            items.values
+                .filter { it.cloudId == cloudId && it.localContentUri == null }
+                .map { it.id }
+                .forEach { items.remove(it) }
         }
 
         override suspend fun deleteByCloudId(cloudId: String) {
-            val toRemove = items.values.filter { it.cloudId == cloudId }
-            toRemove.forEach { items.remove(it.id) }
+            items.values
+                .filter { it.cloudId == cloudId }
+                .map { it.id }
+                .forEach { items.remove(it) }
         }
 
         override suspend fun deleteByCloudIds(cloudIds: List<String>) {
@@ -88,35 +111,31 @@ class SyncTimelineUseCaseTest {
     }
 
     private class FakePhotosApiService : PhotosApiService {
-        var syncResponseToReturn: TimelineSyncResponse? = null
+        var response: Response<TimelineSyncResponse> =
+            Response.success(TimelineSyncResponse.getDefaultInstance())
         var lastRequestedSince: Long? = null
 
         override suspend fun healthCheck(): Response<String> = Response.success("OK")
-        override suspend fun login(request: RequestBody): Response<ResponseBody> = Response.success(null)
+
+        override suspend fun login(request: RequestBody): Response<ResponseBody> =
+            Response.success(null)
+
         override suspend fun refresh(): Response<ResponseBody> = Response.success(null)
+
         override suspend fun logout(): Response<ResponseBody> = Response.success(null)
+
         override suspend fun getMe(): Response<ResponseBody> = Response.success(null)
 
         override suspend fun getTimelineSync(since: Long?): Response<TimelineSyncResponse> {
             lastRequestedSince = since
-            val body = syncResponseToReturn ?: TimelineSyncResponse.newBuilder().build()
-            return Response.success(body)
+            return response
         }
     }
 
-    @Test
-    fun `full snapshot sync upserts cloud items and updates sync timestamp`() = runTest(testDispatcher) {
-        val fakeRepo = FakeMediaRepository()
-        val fakeApi = FakePhotosApiService()
-
-        val mockSessionManager = object {
-            val latestSync = MutableStateFlow(0L)
-            fun update(ts: Long) { latestSync.value = ts }
-        }
-
-        val testItem = CompactTimelineItem.newBuilder()
-            .setId("cloudItem1")
-            .setSortTimestamp(1730000000000L)
+    private fun item(id: String, sortTimestamp: Long = 1_730_000_000_000L) =
+        CompactTimelineItem.newBuilder()
+            .setId(id)
+            .setSortTimestamp(sortTimestamp)
             .setRatio(1.5f)
             .setIsVideo(false)
             .setHasThumbnails(true)
@@ -124,94 +143,150 @@ class SyncTimelineUseCaseTest {
             .setTimezoneOffsetMinutes(120)
             .build()
 
-        fakeApi.syncResponseToReturn = TimelineSyncResponse.newBuilder()
-            .setIsFullSnapshot(true)
-            .setSyncTimestamp(1730000005000L)
-            .addUpserted(testItem)
-            .build()
-
-        // Test running sync directly via simulated logic matching SyncTimelineUseCase
-        val response = fakeApi.getTimelineSync(null).body()!!
-        assertEquals(null, fakeApi.lastRequestedSince)
-        assertTrue(response.isFullSnapshot)
-
-        // Upsert into repo
-        fakeRepo.upsert(
-            MediaEntity(
-                id = "cloud_${testItem.id}",
-                cloudId = testItem.id,
-                sortTimestamp = testItem.sortTimestamp,
-                ratio = testItem.ratio,
-                syncStatus = SyncStatus.CLOUD_ONLY,
-                isVisibleInTimeline = true
-            )
-        )
-
-        mockSessionManager.update(response.syncTimestamp)
-
-        assertEquals(1, fakeRepo.items.size)
-        val saved = fakeRepo.getByCloudId("cloudItem1")
-        assertNotNull(saved)
-        assertEquals(1.5f, saved?.ratio)
-        assertEquals(1730000005000L, mockSessionManager.latestSyncTimestamp.value)
-    }
+    private fun useCase(
+        api: FakePhotosApiService,
+        repo: FakeMediaRepository,
+        store: FakeSyncTimestampStore
+    ) = SyncTimelineUseCase(api, repo, store, dispatchers)
 
     @Test
-    fun `full snapshot diff removes stale cloud-only items and transitions local items`() = runTest(testDispatcher) {
-        val fakeRepo = FakeMediaRepository()
+    fun `full snapshot upserts cloud items and persists the sync timestamp`() =
+        runTest(testDispatcher) {
+            val repo = FakeMediaRepository()
+            val store = FakeSyncTimestampStore()
+            val api = FakePhotosApiService().apply {
+                response = Response.success(
+                    TimelineSyncResponse.newBuilder()
+                        .setIsFullSnapshot(true)
+                        .setSyncTimestamp(1_730_000_005_000L)
+                        .addUpserted(item("a1B2c3D4e5"))
+                        .build()
+                )
+            }
 
-        // Pre-populate with one cloud-only item and one synced item
-        fakeRepo.upsert(
-            MediaEntity(
-                id = "cloud_stale1",
-                cloudId = "stale1",
-                localContentUri = null,
-                syncStatus = SyncStatus.CLOUD_ONLY
+            val useCase = useCase(api, repo, store)
+            val result = useCase()
+
+            assertTrue(result.isSuccess)
+            assertNull(api.lastRequestedSince)
+
+            val saved = repo.getByCloudId("a1B2c3D4e5")!!
+            assertEquals(SyncStatus.CLOUD_ONLY, saved.syncStatus)
+            assertNull(saved.localContentUri)
+            assertEquals(1.5f, saved.ratio)
+            assertEquals(202410, saved.yearMonth)
+            assertEquals(true, saved.isVisibleInTimeline)
+
+            assertEquals(1_730_000_005_000L, store.latestSyncTimestamp.value)
+            assertEquals(SyncState.IDLE, useCase.syncState.value)
+        }
+
+    @Test
+    fun `delta sync uses a 60 second overlap and applies upserts and deletions`() =
+        runTest(testDispatcher) {
+            val repo = FakeMediaRepository()
+            val store = FakeSyncTimestampStore().apply {
+                latestSyncTimestamp.value = 1_730_000_100_000L
+            }
+            val api = FakePhotosApiService().apply {
+                response = Response.success(
+                    TimelineSyncResponse.newBuilder()
+                        .setIsFullSnapshot(false)
+                        .setSyncTimestamp(1_730_000_200_000L)
+                        .addDeletedIds("staleCloudOnly")
+                        .addDeletedIds("staleSynced")
+                        .addUpserted(item("keepMe"))
+                        .build()
+                )
+            }
+
+            repo.upsert(MediaEntity(id = "cloud_staleCloudOnly", cloudId = "staleCloudOnly"))
+            repo.upsert(
+                MediaEntity(
+                    id = "local_staleSynced",
+                    cloudId = "staleSynced",
+                    localContentUri = "content://media/external/images/media/2",
+                    syncStatus = SyncStatus.SYNCED
+                )
             )
-        )
-        fakeRepo.upsert(
+            repo.upsert(
+                MediaEntity(
+                    id = "local_keepMe",
+                    cloudId = "keepMe",
+                    localContentUri = "content://media/external/images/media/3",
+                    ratio = 1f,
+                    syncStatus = SyncStatus.SYNCED
+                )
+            )
+
+            val result = useCase(api, repo, store)()
+
+            assertTrue(result.isSuccess)
+            assertEquals(1_730_000_040_000L, api.lastRequestedSince)
+
+            assertNull(repo.getByCloudId("staleCloudOnly"))
+
+            val reverted = repo.getById("local_staleSynced")!!
+            assertEquals(SyncStatus.LOCAL_ONLY, reverted.syncStatus)
+            assertNull(reverted.cloudId)
+            assertEquals(true, reverted.autoBackupSuppressed)
+            assertEquals(true, reverted.isVisibleInTimeline)
+
+            val updated = repo.getById("local_keepMe")!!
+            assertEquals(1.5f, updated.ratio)
+            assertEquals("content://media/external/images/media/3", updated.localContentUri)
+            assertEquals(SyncStatus.SYNCED, updated.syncStatus)
+
+            assertEquals(1_730_000_200_000L, store.latestSyncTimestamp.value)
+        }
+
+    @Test
+    fun `full snapshot reconciles rows missing from the snapshot`() = runTest(testDispatcher) {
+        val repo = FakeMediaRepository()
+        val store = FakeSyncTimestampStore()
+        val api = FakePhotosApiService().apply {
+            response = Response.success(
+                TimelineSyncResponse.newBuilder()
+                    .setIsFullSnapshot(true)
+                    .setSyncTimestamp(1_730_000_300_000L)
+                    .addUpserted(item("stillOnServer"))
+                    .build()
+            )
+        }
+
+        repo.upsert(MediaEntity(id = "cloud_gone", cloudId = "gone"))
+        repo.upsert(
             MediaEntity(
-                id = "local_item2",
-                cloudId = "stale2",
-                localContentUri = "content://media/external/images/media/2",
+                id = "local_gone",
+                cloudId = "goneLocal",
+                localContentUri = "content://media/external/images/media/4",
                 syncStatus = SyncStatus.SYNCED
             )
         )
 
-        val syncedCloudIds = setOf("freshItem")
-        val existingCloudIds = fakeRepo.getAllCloudIds()
-        val staleCloudIds = existingCloudIds.filter { it !in syncedCloudIds }
+        val result = useCase(api, repo, store)()
 
-        for (staleId in staleCloudIds) {
-            val existing = fakeRepo.getByCloudId(staleId)
-            if (existing != null) {
-                if (existing.localContentUri != null) {
-                    fakeRepo.transitionToLocalOnly(staleId, isVisible = true)
-                } else {
-                    fakeRepo.deleteCloudOnlyByCloudId(staleId)
-                }
-            }
-        }
-
-        // Stale pure cloud item should be deleted
-        assertEquals(null, fakeRepo.getByCloudId("stale1"))
-
-        // Stale synced item with local copy should remain as LOCAL_ONLY with autoBackupSuppressed = true
-        val localRow = fakeRepo.getById("local_item2")
-        assertNotNull(localRow)
-        assertEquals(SyncStatus.LOCAL_ONLY, localRow?.syncStatus)
-        assertEquals(null, localRow?.cloudId)
-        assertEquals(true, localRow?.autoBackupSuppressed)
+        assertTrue(result.isSuccess)
+        assertNull(repo.getByCloudId("gone"))
+        assertEquals(SyncStatus.LOCAL_ONLY, repo.getById("local_gone")!!.syncStatus)
+        assertEquals(true, repo.getById("local_gone")!!.autoBackupSuppressed)
+        assertNotNull(repo.getByCloudId("stillOnServer"))
     }
 
     @Test
-    fun `delta sync passes since minus 60 second overlap`() = runTest(testDispatcher) {
-        val latestSync = 1730000100000L
-        val since = maxOf(0L, latestSync - 60_000L)
+    fun `server error fails the sync and keeps the stored timestamp`() = runTest(testDispatcher) {
+        val repo = FakeMediaRepository()
+        val store = FakeSyncTimestampStore()
+        val api = FakePhotosApiService().apply {
+            response = Response.error(503, "".toResponseBody())
+        }
 
-        val fakeApi = FakePhotosApiService()
-        fakeApi.getTimelineSync(since)
+        val useCase = useCase(api, repo, store)
+        val result = useCase()
 
-        assertEquals(1730000040000L, fakeApi.lastRequestedSince)
+        assertTrue(result.isFailure)
+        assertEquals(SyncState.SERVER_UNREACHABLE, useCase.syncState.value)
+        assertEquals(0L, store.latestSyncTimestamp.value)
+        assertTrue(repo.items.isEmpty())
     }
 }

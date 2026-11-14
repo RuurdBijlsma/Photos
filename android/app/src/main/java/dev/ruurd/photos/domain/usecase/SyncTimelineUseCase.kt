@@ -3,7 +3,7 @@ package dev.ruurd.photos.domain.usecase
 import dev.ruurd.photos.core.common.AppDispatchers
 import dev.ruurd.photos.core.database.entity.MediaEntity
 import dev.ruurd.photos.core.database.entity.SyncStatus
-import dev.ruurd.photos.core.network.SessionManager
+import dev.ruurd.photos.core.network.SyncTimestampStore
 import dev.ruurd.photos.core.network.api.PhotosApiService
 import dev.ruurd.photos.core.network.proto.CompactTimelineItem
 import dev.ruurd.photos.core.network.proto.TimelineSyncResponse
@@ -19,7 +19,7 @@ import java.time.ZoneOffset
 class SyncTimelineUseCase(
     private val apiService: PhotosApiService,
     private val mediaRepository: MediaRepository,
-    private val sessionManager: SessionManager,
+    private val sessionManager: SyncTimestampStore,
     private val dispatchers: AppDispatchers
 ) {
     private val _syncState = MutableStateFlow(SyncState.IDLE)

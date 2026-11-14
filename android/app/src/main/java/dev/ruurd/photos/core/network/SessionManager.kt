@@ -25,7 +25,7 @@ private val Context.sessionDataStore: DataStore<Preferences> by preferencesDataS
 class SessionManager(
     private val context: Context,
     private val scope: CoroutineScope
-) {
+) : SyncTimestampStore {
     companion object {
         const val DEFAULT_SERVER_URL = "http://10.0.2.2:5272"
 
@@ -46,7 +46,7 @@ class SessionManager(
     val authState: StateFlow<AuthState> = _authState.asStateFlow()
 
     private val _latestSyncTimestamp = MutableStateFlow(0L)
-    val latestSyncTimestamp: StateFlow<Long> = _latestSyncTimestamp.asStateFlow()
+    override val latestSyncTimestamp: StateFlow<Long> = _latestSyncTimestamp.asStateFlow()
 
     init {
         scope.launch {
@@ -118,7 +118,7 @@ class SessionManager(
         }
     }
 
-    suspend fun setLatestSyncTimestamp(timestamp: Long) {
+    override suspend fun setLatestSyncTimestamp(timestamp: Long) {
         _latestSyncTimestamp.value = timestamp
         context.sessionDataStore.edit { prefs ->
             prefs[KEY_LATEST_SYNC_TIMESTAMP] = timestamp

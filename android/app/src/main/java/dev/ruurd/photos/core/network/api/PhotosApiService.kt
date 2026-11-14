@@ -31,7 +31,6 @@ interface PhotosApiService {
     @GET("api/auth/me")
     suspend fun getMe(): Response<ResponseBody>
 
-    @Headers("Accept-Encoding: gzip")
     @GET("api/timeline/sync")
     suspend fun getTimelineSync(
         @Query("since") since: Long? = null
