@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE media_item\n            SET deleted = true,\n                updated_at = now()\n            WHERE id = ANY($1) AND user_id = $2\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "TextArray",
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "d257471cf509f735dc35f3e34bb66ef3f34edb0ab435ebce16ff0aa00ec9f3e4"
+}

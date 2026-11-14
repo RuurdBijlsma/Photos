@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            UPDATE media_item\n            SET deleted = true\n            WHERE relative_path = $1\n            RETURNING id\n            ",
+  "query": "\n            UPDATE media_item\n            SET deleted = true,\n                updated_at = now()\n            WHERE relative_path = $1\n            RETURNING id\n            ",
   "describe": {
     "columns": [
       {
@@ -24,5 +24,5 @@
       false
     ]
   },
-  "hash": "9ab67b6c9c7564d27673fe40223a4dce948be31b70bcc6984899db2d905315f2"
+  "hash": "62159f131c9ae3f5c9bd24077e2bf01039446973d9579cd4e65572799d031171"
 }
