@@ -88,8 +88,7 @@ pub async fn restore_albums(
         return Err(AppError::NotFound(
             backup_path
                 .file_name()
-                .map(|f| f.to_string_lossy().to_string())
-                .unwrap_or_default(),
+                .map_or_default(|f| f.to_string_lossy().to_string()),
         ));
     }
     // Load the backup contents
