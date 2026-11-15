@@ -148,7 +148,7 @@ class AuthViewModel(
             val loginResult = authRepository.login(email, password)
             loginResult.fold(
                 onSuccess = {
-                    _uiState.update { it.copy(isLoading = false) }
+                    _uiState.update { it.copy(isLoading = false, password = "") }
                 },
                 onFailure = { error ->
                     _uiState.update {

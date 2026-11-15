@@ -98,7 +98,11 @@ class MainViewModel(
                 .distinctUntilChanged()
                 .collect { (isAuthenticated, isOnline) ->
                     if (!isAuthenticated) {
+                        // Reset per-session UI so a later login does not inherit stale state.
                         hasRefreshedProfile = false
+                        _selectedTab.value = MainNavTab.PHOTOS
+                        _isAvatarMenuOpen.value = false
+                        _syncErrorMessage.value = null
                         return@collect
                     }
 

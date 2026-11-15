@@ -140,19 +140,19 @@ implement notes
 
 ### 1A: App Bootstrap, Auth & Cloud Sync
 
-* Set up Android project architecture (DI, Room database with SQLite WAL mode, M3 Dynamic Color + `LocalSemanticColors`,
+* [✅ Done] Set up Android project architecture (DI, Room database with SQLite WAL mode, M3 Dynamic Color + `LocalSemanticColors`,
   top-level navigation shell, and API 37 `network_security_config.xml` for local `http://` dev testing).
-* Set up Retrofit + OkHttp with a persistent `CookieJar` to persist cookie-based session auth across app launches,
+* [✅ Done] Set up Retrofit + OkHttp with a persistent `CookieJar` to persist cookie-based session auth across app launches,
   dynamic base URL support, and `dispatcher.maxRequestsPerHost = 12–16`.
-* Handle expiring tokens safely via a mutex-guarded OkHttp `Authenticator` (preventing concurrent `/api/auth/refresh`
+* [✅ Done] Handle expiring tokens safely via a mutex-guarded OkHttp `Authenticator` (preventing concurrent `/api/auth/refresh`
   races and 401 loops).
-* Build `AuthScreen` (custom server URL input validated via `GET /api/health`, email/password login).
+* [✅ Done] Build `AuthScreen` (custom server URL input validated via `GET /api/health`, email/password login).
 * Add `NetworkMonitor` (`ConnectivityManager.NetworkCallback`) and subtle Offline / Syncing status indicator so missing
   internet degrades gracefully without errors.
-* Compile `.proto` schemas (`common.proto` / `mobile.proto`) via the Protobuf Gradle plugin.
+* [✅ Done] Compile `.proto` schemas (`common.proto` / `mobile.proto`) via the Protobuf Gradle plugin.
 * Configure Coil 3 (`coil-network-okhttp` sharing `OkHttpClient`, 500 MB LRU disk cache, hardware bitmaps, AVIF via
   `ImageDecoder`).
-* Implement `SyncTimelineUseCase`: initial full snapshot and delta sync (`since - 60_000L` overlap) directly into Room's
+* [✅ Done] Implement `SyncTimelineUseCase`: initial full snapshot and delta sync (`since - 60_000L` overlap) directly into Room's
   `media_item` table (non-unique `cloudId`, unique `localContentUri`, immutable surrogate `id`). When
   `is_full_snapshot == true`, diff existing Room `cloud_id`s against `syncedCloudIds` in Kotlin and run the
   cloud-deletion transition on `staleCloudIds`.

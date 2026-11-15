@@ -49,21 +49,22 @@ fun PhotosTopBar(
 ) {
     val semanticColors = LocalSemanticColors.current
 
-    Row(
+    Box(
         modifier = modifier
             .fillMaxWidth()
             .statusBarsPadding()
             .height(56.dp)
             .padding(horizontal = 16.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
+        contentAlignment = Alignment.Center
     ) {
         // Left: Ruurd Photos flower-petal logo mark
         Image(
             painter = painterResource(id = R.drawable.icon_transparent),
             contentDescription = "Ruurd Photos",
             contentScale = ContentScale.Fit,
-            modifier = Modifier.size(32.dp)
+            modifier = Modifier
+                .align(Alignment.CenterStart)
+                .size(32.dp)
         )
 
         // Center: Subtle Connectivity / Sync Status Pill (hidden when idle & online)
@@ -71,7 +72,8 @@ fun PhotosTopBar(
         AnimatedVisibility(
             visible = showStatusPill,
             enter = fadeIn(),
-            exit = fadeOut()
+            exit = fadeOut(),
+            modifier = Modifier.align(Alignment.Center)
         ) {
             val (pillText, pillColor, pillIcon) = when {
                 !isOnline -> Triple("Offline", semanticColors.offline, Icons.Default.CloudOff)
@@ -125,6 +127,7 @@ fun PhotosTopBar(
 
         Box(
             modifier = Modifier
+                .align(Alignment.CenterEnd)
                 .size(38.dp)
                 .clip(CircleShape)
                 .background(MaterialTheme.colorScheme.primaryContainer)
