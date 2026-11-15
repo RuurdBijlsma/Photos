@@ -44,6 +44,9 @@ interface MediaDao {
     @Query("SELECT * FROM media_item WHERE cloud_id = :cloudId")
     suspend fun getAllByCloudId(cloudId: String): List<MediaEntity>
 
+    @Query("SELECT * FROM media_item WHERE local_content_uri IS NOT NULL AND is_video = :isVideo")
+    suspend fun getLocalRows(isVideo: Boolean): List<MediaEntity>
+
     @Query("SELECT DISTINCT cloud_id FROM media_item WHERE cloud_id IS NOT NULL")
     suspend fun getAllCloudIds(): List<String>
 
@@ -55,6 +58,9 @@ interface MediaDao {
 
     @Query("SELECT COUNT(*) FROM media_item")
     fun countTotalFlow(): Flow<Int>
+
+    @Query("SELECT COUNT(*) FROM media_item WHERE local_content_uri IS NOT NULL")
+    fun countLocalFlow(): Flow<Int>
 
     @Upsert
     suspend fun upsert(media: MediaEntity)
@@ -83,13 +89,15 @@ interface MediaDao {
         SET cloud_id = NULL,
             sync_status = :localOnlyStatus,
             auto_backup_suppressed = 1,
-            is_visible_in_timeline = :isVisible
+            is_visible_in_timeline = COALESCE(
+                (SELECT f.show_in_timeline FROM device_folder f WHERE f.bucket_id = media_item.bucket_id),
+                1
+            )
         WHERE cloud_id = :cloudId AND local_content_uri IS NOT NULL
         """
     )
     suspend fun transitionToLocalOnly(
         cloudId: String,
-        isVisible: Boolean,
         localOnlyStatus: SyncStatus = SyncStatus.LOCAL_ONLY
     )
 

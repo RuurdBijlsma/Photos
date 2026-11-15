@@ -18,6 +18,8 @@ object PhotosImageLoader {
 
         return ImageLoader.Builder(context)
             .components {
+                add(MediaStoreThumbnailFetcher.Factory())
+                add(MediaStoreThumbnailFetcher.ThumbnailKeyer())
                 add(
                     OkHttpNetworkFetcherFactory(
                         callFactory = { okHttpClient }

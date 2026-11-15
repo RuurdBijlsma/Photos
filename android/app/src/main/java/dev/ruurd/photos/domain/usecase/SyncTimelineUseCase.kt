@@ -79,11 +79,8 @@ class SyncTimelineUseCase(
 
                         for (cloudId in cloudIdsToRemove) {
                             mediaRepository.deleteCloudOnlyByCloudId(cloudId)
-                            mediaRepository.transitionToLocalOnly(
-                                cloudId = cloudId,
-                                // TODO(Phase 1B): derive from device_folder.show_in_timeline
-                                isVisible = true
-                            )
+                            // Visibility of the surviving local row comes from its device folder.
+                            mediaRepository.transitionToLocalOnly(cloudId = cloudId)
                         }
 
                         // 2. Process upserts in chunked batches (updating canonical + any duplicate local rows)

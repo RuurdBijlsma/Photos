@@ -1,5 +1,7 @@
 package dev.ruurd.photos.features.main
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -30,15 +32,22 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import dev.ruurd.photos.core.permissions.MediaPermissions
+import dev.ruurd.photos.domain.model.MediaAccessState
 import dev.ruurd.photos.domain.model.SyncState
 import dev.ruurd.photos.features.main.components.AvatarMenuSheet
 import dev.ruurd.photos.features.main.components.FloatingBottomNav
@@ -52,6 +61,23 @@ fun MainScreen(
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsState()
+
+    val context = LocalContext.current
+    var mediaAccess: MediaAccessState by remember { mutableStateOf(MediaPermissions.read(context)) }
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) {
+        mediaAccess = MediaPermissions.read(context)
+        viewModel.scanLocalMedia(mediaAccess)
+    }
+
+    LaunchedEffect(Unit) {
+        if (mediaAccess.hasAnyAccess) {
+            viewModel.scanLocalMedia(mediaAccess)
+        } else {
+            permissionLauncher.launch(MediaPermissions.requestedPermissions)
+        }
+    }
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -184,8 +210,8 @@ private fun PhotosTabContent(
                         modifier = Modifier.weight(1f)
                     )
                     MetricBox(
-                        title = "Total Synced",
-                        value = "${uiState.totalMediaCount}",
+                        title = "On Device",
+                        value = "${uiState.localMediaCount}",
                         modifier = Modifier.weight(1f)
                     )
                 }
@@ -247,7 +273,7 @@ private fun PhotosTabContent(
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(
                     text = if (uiState.visibleMediaCount > 0) {
-                        "Cloud library synchronized (${uiState.visibleMediaCount} items)\nReady for Phase 1B/1C justified grid"
+                        "Timeline has ${uiState.visibleMediaCount} items\n(${uiState.localMediaCount} on this device)"
                     } else {
                         "Tap 'Sync Cloud Library' above to fetch items from your server"
                     },

@@ -58,6 +58,7 @@ class MainActivity : ComponentActivity() {
                                 authRepository = container.authRepository,
                                 mediaRepository = container.mediaRepository,
                                 syncTimelineUseCase = container.syncTimelineUseCase,
+                                scanLocalMediaUseCase = container.scanLocalMediaUseCase,
                                 networkMonitor = container.networkMonitor
                             )
                         )

@@ -5,6 +5,7 @@ import dev.ruurd.photos.core.common.AppDispatchers
 import dev.ruurd.photos.core.database.AppDatabase
 import dev.ruurd.photos.core.database.dao.MediaDao
 import dev.ruurd.photos.core.database.entity.MediaEntity
+import dev.ruurd.photos.core.database.entity.SyncStatus
 import dev.ruurd.photos.domain.repository.MediaRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOn
@@ -28,6 +29,9 @@ class MediaRepositoryImpl(
     override fun countTotal(): Flow<Int> =
         mediaDao.countTotalFlow().flowOn(dispatchers.io)
 
+    override fun countLocal(): Flow<Int> =
+        mediaDao.countLocalFlow().flowOn(dispatchers.io)
+
     override suspend fun getById(id: String): MediaEntity? = withContext(dispatchers.io) {
         mediaDao.getById(id)
     }
@@ -44,6 +48,15 @@ class MediaRepositoryImpl(
         mediaDao.getAllCloudIds()
     }
 
+    override suspend fun getLocalRows(isVideo: Boolean): List<MediaEntity> = withContext(dispatchers.io) {
+        mediaDao.getLocalRows(isVideo)
+    }
+
+    override suspend fun findBySizeAndStatus(sizeBytes: Long, syncStatus: SyncStatus): List<MediaEntity> =
+        withContext(dispatchers.io) {
+            mediaDao.findBySizeAndStatus(sizeBytes, syncStatus)
+        }
+
     override suspend fun upsert(media: MediaEntity) = withContext(dispatchers.io) {
         mediaDao.upsert(media)
     }
@@ -52,8 +65,12 @@ class MediaRepositoryImpl(
         mediaDao.upsertAll(mediaList)
     }
 
-    override suspend fun transitionToLocalOnly(cloudId: String, isVisible: Boolean) = withContext(dispatchers.io) {
-        mediaDao.transitionToLocalOnly(cloudId, isVisible)
+    override suspend fun deleteById(id: String) = withContext(dispatchers.io) {
+        mediaDao.deleteById(id)
+    }
+
+    override suspend fun transitionToLocalOnly(cloudId: String) = withContext(dispatchers.io) {
+        mediaDao.transitionToLocalOnly(cloudId)
     }
 
     override suspend fun deleteCloudOnlyByCloudId(cloudId: String) = withContext(dispatchers.io) {

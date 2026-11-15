@@ -14,10 +14,15 @@ import dev.ruurd.photos.core.network.api.PhotosApiService
 import dev.ruurd.photos.core.network.auth.AuthAuthenticator
 import dev.ruurd.photos.core.network.cookie.PersistentCookieJar
 import dev.ruurd.photos.core.network.interceptor.DynamicBaseUrlInterceptor
+import dev.ruurd.photos.data.datasource.local.MediaStoreDataSource
 import dev.ruurd.photos.data.repository.AuthRepositoryImpl
+import dev.ruurd.photos.data.repository.DeviceFolderRepositoryImpl
 import dev.ruurd.photos.data.repository.MediaRepositoryImpl
 import dev.ruurd.photos.domain.repository.AuthRepository
+import dev.ruurd.photos.domain.repository.DeviceFolderRepository
+import dev.ruurd.photos.domain.repository.LocalMediaStore
 import dev.ruurd.photos.domain.repository.MediaRepository
+import dev.ruurd.photos.domain.usecase.ScanLocalMediaUseCase
 import dev.ruurd.photos.domain.usecase.SyncTimelineUseCase
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -41,6 +46,9 @@ interface AppContainer {
     val photosApiService: PhotosApiService
     val authRepository: AuthRepository
     val mediaRepository: MediaRepository
+    val deviceFolderRepository: DeviceFolderRepository
+    val localMediaStore: LocalMediaStore
+    val scanLocalMediaUseCase: ScanLocalMediaUseCase
     val syncTimelineUseCase: SyncTimelineUseCase
     val networkMonitor: NetworkMonitor
     val imageLoader: ImageLoader
@@ -130,6 +138,26 @@ class DefaultAppContainer(private val context: Context) : AppContainer {
         MediaRepositoryImpl(
             database = database,
             mediaDao = mediaDao,
+            dispatchers = dispatchers
+        )
+    }
+
+    override val deviceFolderRepository: DeviceFolderRepository by lazy {
+        DeviceFolderRepositoryImpl(
+            deviceFolderDao = deviceFolderDao,
+            dispatchers = dispatchers
+        )
+    }
+
+    override val localMediaStore: LocalMediaStore by lazy {
+        MediaStoreDataSource(context.contentResolver)
+    }
+
+    override val scanLocalMediaUseCase: ScanLocalMediaUseCase by lazy {
+        ScanLocalMediaUseCase(
+            localMediaStore = localMediaStore,
+            mediaRepository = mediaRepository,
+            deviceFolderRepository = deviceFolderRepository,
             dispatchers = dispatchers
         )
     }
