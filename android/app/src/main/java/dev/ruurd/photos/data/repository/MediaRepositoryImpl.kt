@@ -9,7 +9,6 @@ import dev.ruurd.photos.core.database.entity.SyncStatus
 import dev.ruurd.photos.domain.repository.MediaRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOn
-import kotlinx.coroutines.withContext
 
 class MediaRepositoryImpl(
     private val database: AppDatabase,
@@ -32,60 +31,58 @@ class MediaRepositoryImpl(
     override fun countLocal(): Flow<Int> =
         mediaDao.countLocalFlow().flowOn(dispatchers.io)
 
-    override suspend fun getById(id: String): MediaEntity? = withContext(dispatchers.io) {
-        mediaDao.getById(id)
-    }
+    override suspend fun getById(id: String): MediaEntity? = mediaDao.getById(id)
 
-    override suspend fun getByCloudId(cloudId: String): MediaEntity? = withContext(dispatchers.io) {
+    override suspend fun getByCloudId(cloudId: String): MediaEntity? =
         mediaDao.getByCloudId(cloudId)
-    }
 
-    override suspend fun getAllByCloudId(cloudId: String): List<MediaEntity> = withContext(dispatchers.io) {
+    override suspend fun getAllByCloudId(cloudId: String): List<MediaEntity> =
         mediaDao.getAllByCloudId(cloudId)
-    }
 
-    override suspend fun getAllCloudIds(): List<String> = withContext(dispatchers.io) {
-        mediaDao.getAllCloudIds()
-    }
+    override suspend fun getAllCloudIds(): List<String> = mediaDao.getAllCloudIds()
 
-    override suspend fun getLocalRows(isVideo: Boolean): List<MediaEntity> = withContext(dispatchers.io) {
+    override suspend fun getLocalRows(isVideo: Boolean): List<MediaEntity> =
         mediaDao.getLocalRows(isVideo)
-    }
 
-    override suspend fun findBySizeAndStatus(sizeBytes: Long, syncStatus: SyncStatus): List<MediaEntity> =
-        withContext(dispatchers.io) {
-            mediaDao.findBySizeAndStatus(sizeBytes, syncStatus)
+    override suspend fun findBySizeAndStatus(
+        sizeBytes: Long,
+        syncStatus: SyncStatus
+    ): List<MediaEntity> = mediaDao.findBySizeAndStatus(sizeBytes, syncStatus)
+
+    override suspend fun upsert(media: MediaEntity) = mediaDao.upsert(media)
+
+    override suspend fun upsertAll(mediaList: List<MediaEntity>) = mediaDao.upsertAll(mediaList)
+
+    override suspend fun deleteById(id: String) = mediaDao.deleteById(id)
+
+    override suspend fun transitionToLocalOnlyByCloudIds(cloudIds: List<String>) {
+        if (cloudIds.isEmpty()) return
+        cloudIds.chunked(BATCH_SIZE).forEach { chunk ->
+            mediaDao.transitionToLocalOnlyByCloudIds(chunk)
         }
-
-    override suspend fun upsert(media: MediaEntity) = withContext(dispatchers.io) {
-        mediaDao.upsert(media)
     }
 
-    override suspend fun upsertAll(mediaList: List<MediaEntity>) = withContext(dispatchers.io) {
-        mediaDao.upsertAll(mediaList)
+    override suspend fun deleteCloudOnlyByCloudIds(cloudIds: List<String>) {
+        if (cloudIds.isEmpty()) return
+        cloudIds.chunked(BATCH_SIZE).forEach { chunk ->
+            mediaDao.deleteCloudOnlyByCloudIds(chunk)
+        }
     }
 
-    override suspend fun deleteById(id: String) = withContext(dispatchers.io) {
-        mediaDao.deleteById(id)
-    }
+    override suspend fun deleteByCloudId(cloudId: String) = mediaDao.deleteByCloudId(cloudId)
 
-    override suspend fun transitionToLocalOnly(cloudId: String) = withContext(dispatchers.io) {
-        mediaDao.transitionToLocalOnly(cloudId)
-    }
-
-    override suspend fun deleteCloudOnlyByCloudId(cloudId: String) = withContext(dispatchers.io) {
-        mediaDao.deleteCloudOnlyByCloudId(cloudId)
-    }
-
-    override suspend fun deleteByCloudId(cloudId: String) = withContext(dispatchers.io) {
-        mediaDao.deleteByCloudId(cloudId)
-    }
-
-    override suspend fun deleteByCloudIds(cloudIds: List<String>) = withContext(dispatchers.io) {
-        mediaDao.deleteByCloudIds(cloudIds)
+    override suspend fun deleteByCloudIds(cloudIds: List<String>) {
+        if (cloudIds.isEmpty()) return
+        cloudIds.chunked(BATCH_SIZE).forEach { chunk ->
+            mediaDao.deleteByCloudIds(chunk)
+        }
     }
 
     override suspend fun <T> withTransaction(block: suspend () -> T): T {
         return database.withTransaction(block)
+    }
+
+    private companion object {
+        const val BATCH_SIZE = 500
     }
 }

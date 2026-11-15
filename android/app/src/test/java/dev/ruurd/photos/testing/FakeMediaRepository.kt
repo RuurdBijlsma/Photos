@@ -56,9 +56,11 @@ class FakeMediaRepository : MediaRepository {
         items.remove(id)
     }
 
-    override suspend fun transitionToLocalOnly(cloudId: String) {
+    override suspend fun transitionToLocalOnlyByCloudIds(cloudIds: List<String>) {
+        if (cloudIds.isEmpty()) return
+        val targetIds = cloudIds.toHashSet()
         items.values
-            .filter { it.cloudId == cloudId && it.localContentUri != null }
+            .filter { it.cloudId in targetIds && it.localContentUri != null }
             .forEach {
                 items[it.id] = it.copy(
                     cloudId = null,
@@ -70,9 +72,11 @@ class FakeMediaRepository : MediaRepository {
             }
     }
 
-    override suspend fun deleteCloudOnlyByCloudId(cloudId: String) {
+    override suspend fun deleteCloudOnlyByCloudIds(cloudIds: List<String>) {
+        if (cloudIds.isEmpty()) return
+        val targetIds = cloudIds.toHashSet()
         items.values
-            .filter { it.cloudId == cloudId && it.localContentUri == null }
+            .filter { it.cloudId in targetIds && it.localContentUri == null }
             .map { it.id }
             .forEach { items.remove(it) }
     }

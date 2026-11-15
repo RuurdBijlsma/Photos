@@ -143,10 +143,7 @@ class DefaultAppContainer(private val context: Context) : AppContainer {
     }
 
     override val deviceFolderRepository: DeviceFolderRepository by lazy {
-        DeviceFolderRepositoryImpl(
-            deviceFolderDao = deviceFolderDao,
-            dispatchers = dispatchers
-        )
+        DeviceFolderRepositoryImpl(deviceFolderDao = deviceFolderDao)
     }
 
     override val localMediaStore: LocalMediaStore by lazy {

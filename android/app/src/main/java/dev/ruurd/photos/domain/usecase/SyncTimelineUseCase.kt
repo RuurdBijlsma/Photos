@@ -78,10 +78,10 @@ class SyncTimelineUseCase(
                             syncResponse.deletedIdsList
                         }
 
-                        for (cloudId in cloudIdsToRemove) {
-                            mediaRepository.deleteCloudOnlyByCloudId(cloudId)
+                        if (cloudIdsToRemove.isNotEmpty()) {
+                            mediaRepository.deleteCloudOnlyByCloudIds(cloudIdsToRemove)
                             // Visibility of the surviving local row comes from its device folder.
-                            mediaRepository.transitionToLocalOnly(cloudId = cloudId)
+                            mediaRepository.transitionToLocalOnlyByCloudIds(cloudIdsToRemove)
                         }
 
                         // 2. Process upserts in chunked batches (updating canonical, linking

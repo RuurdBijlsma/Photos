@@ -35,13 +35,14 @@ class ScanLocalMediaUseCase(
     private val mediaRepository: MediaRepository,
     private val deviceFolderRepository: DeviceFolderRepository,
     private val dispatchers: AppDispatchers,
-    private val zone: ZoneId = ZoneId.systemDefault()
+    private val zoneProvider: () -> ZoneId = ZoneId::systemDefault
 ) {
     suspend operator fun invoke(access: MediaAccessState): Result<ScanResult> =
         withContext(dispatchers.io) {
             try {
                 if (!access.hasAnyAccess) return@withContext Result.success(ScanResult())
 
+                val zone = zoneProvider()
                 val images =
                     if (access.images != MediaAccess.NONE) localMediaStore.queryImages() else emptyList()
                 val videos =
@@ -79,11 +80,12 @@ class ScanLocalMediaUseCase(
                         val folder = folderFor(file, folders, newFolders)
                         val existing = knownByUri[file.contentUri]
                         if (collectUpsertForFile(
-                                file,
-                                existing,
-                                folder,
-                                matchedCloudRowIds,
-                                toUpsert
+                                file = file,
+                                existing = existing,
+                                folder = folder,
+                                zone = zone,
+                                matchedCloudRowIds = matchedCloudRowIds,
+                                toUpsert = toUpsert
                             )
                         ) {
                             deduplicated++
@@ -145,6 +147,7 @@ class ScanLocalMediaUseCase(
         file: LocalMediaFile,
         existing: MediaEntity?,
         folder: DeviceFolderEntity,
+        zone: ZoneId,
         matchedCloudRowIds: MutableSet<String>,
         toUpsert: MutableList<MediaEntity>
     ): Boolean {

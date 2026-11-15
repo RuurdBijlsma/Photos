@@ -93,21 +93,21 @@ interface MediaDao {
                 (SELECT f.show_in_timeline FROM device_folder f WHERE f.bucket_id = media_item.bucket_id),
                 1
             )
-        WHERE cloud_id = :cloudId AND local_content_uri IS NOT NULL
+        WHERE cloud_id IN (:cloudIds) AND local_content_uri IS NOT NULL
         """
     )
-    suspend fun transitionToLocalOnly(
-        cloudId: String,
+    suspend fun transitionToLocalOnlyByCloudIds(
+        cloudIds: List<String>,
         localOnlyStatus: SyncStatus = SyncStatus.LOCAL_ONLY
     )
 
     @Query(
         """
         DELETE FROM media_item
-        WHERE cloud_id = :cloudId AND local_content_uri IS NULL
+        WHERE cloud_id IN (:cloudIds) AND local_content_uri IS NULL
         """
     )
-    suspend fun deleteCloudOnlyByCloudId(cloudId: String)
+    suspend fun deleteCloudOnlyByCloudIds(cloudIds: List<String>)
 
     @Query("DELETE FROM media_item")
     suspend fun clearAll()

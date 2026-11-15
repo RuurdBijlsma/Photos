@@ -21,8 +21,8 @@ interface MediaRepository {
     suspend fun upsert(media: MediaEntity)
     suspend fun upsertAll(mediaList: List<MediaEntity>)
     suspend fun deleteById(id: String)
-    suspend fun transitionToLocalOnly(cloudId: String)
-    suspend fun deleteCloudOnlyByCloudId(cloudId: String)
+    suspend fun transitionToLocalOnlyByCloudIds(cloudIds: List<String>)
+    suspend fun deleteCloudOnlyByCloudIds(cloudIds: List<String>)
     suspend fun deleteByCloudId(cloudId: String)
     suspend fun deleteByCloudIds(cloudIds: List<String>)
     suspend fun <T> withTransaction(block: suspend () -> T): T

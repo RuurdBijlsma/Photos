@@ -78,13 +78,14 @@ class ScanLocalMediaUseCaseTest {
     private fun useCase(
         store: FakeLocalMediaStore,
         repo: FakeMediaRepository,
-        folders: FakeDeviceFolderRepository
+        folders: FakeDeviceFolderRepository,
+        zoneProvider: () -> ZoneId = { ZoneId.of("UTC") }
     ) = ScanLocalMediaUseCase(
         localMediaStore = store,
         mediaRepository = repo,
         deviceFolderRepository = folders,
         dispatchers = dispatchers,
-        zone = ZoneId.of("UTC")
+        zoneProvider = zoneProvider
     )
 
     private fun cloudOnly(
@@ -337,6 +338,27 @@ class ScanLocalMediaUseCaseTest {
         assertTrue(row.autoBackupSuppressed)
         assertEquals(1_730_000_000_000L, row.sortTimestamp)
     }
+
+    @Test
+    fun `zone provider is read on each scan instead of being cached at construction`() =
+        runTest(testDispatcher) {
+            val repo = FakeMediaRepository()
+            val folders = FakeDeviceFolderRepository()
+            // 2024-10-31T23:23Z is October in UTC, November in Europe/Amsterdam (UTC+1).
+            val timestamp = 1_730_417_000_000L
+            var currentZone = ZoneId.of("UTC")
+            val store = FakeLocalMediaStore(images = listOf(file(1, dateTakenMs = timestamp)))
+            val scan = useCase(store, repo, folders) { currentZone }
+
+            scan(fullAccess()).getOrThrow()
+            assertEquals(202410, repo.getById("local_1")!!.yearMonth)
+
+            currentZone = ZoneId.of("Europe/Amsterdam")
+            store.images = listOf(file(1, dateTakenMs = timestamp), file(2, dateTakenMs = timestamp))
+            scan(fullAccess()).getOrThrow()
+
+            assertEquals(202411, repo.getById("local_2")!!.yearMonth)
+        }
 
     @Test
     fun `partial access never deletes rows missing from the cursor`() = runTest(testDispatcher) {
