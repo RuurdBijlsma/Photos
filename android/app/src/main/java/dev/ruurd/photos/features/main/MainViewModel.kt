@@ -13,6 +13,7 @@ import dev.ruurd.photos.domain.repository.MediaRepository
 import dev.ruurd.photos.domain.usecase.ScanLocalMediaUseCase
 import dev.ruurd.photos.domain.usecase.SyncTimelineUseCase
 import dev.ruurd.photos.features.main.components.MainNavTab
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -47,6 +48,8 @@ class MainViewModel(
     private val _syncErrorMessage = MutableStateFlow<String?>(null)
 
     private var hasRefreshedProfile = false
+    private var scanJob: Job? = null
+    private var pendingScanAccess: MediaAccessState? = null
 
     private val connectionInfoFlow = combine(
         authRepository.serverUrl,
@@ -106,6 +109,9 @@ class MainViewModel(
                     if (!isAuthenticated) {
                         // Reset per-session UI so a later login does not inherit stale state.
                         hasRefreshedProfile = false
+                        scanJob?.cancel()
+                        scanJob = null
+                        pendingScanAccess = null
                         _selectedTab.value = MainNavTab.PHOTOS
                         _isAvatarMenuOpen.value = false
                         _syncErrorMessage.value = null
@@ -151,9 +157,22 @@ class MainViewModel(
 
     fun scanLocalMedia(access: MediaAccessState) {
         if (!access.hasAnyAccess) return
+        if (scanJob?.isActive == true) {
+            pendingScanAccess = access
+            return
+        }
 
-        viewModelScope.launch {
-            scanLocalMediaUseCase(access)
+        scanJob = viewModelScope.launch {
+            try {
+                scanLocalMediaUseCase(access)
+            } finally {
+                val nextAccess = pendingScanAccess
+                pendingScanAccess = null
+                if (nextAccess != null && nextAccess.hasAnyAccess) {
+                    scanJob = null
+                    scanLocalMedia(nextAccess)
+                }
+            }
         }
     }
 

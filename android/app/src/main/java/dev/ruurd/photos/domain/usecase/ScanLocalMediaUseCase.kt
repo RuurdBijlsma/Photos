@@ -26,8 +26,9 @@ data class ScanResult(
 
 /**
  * Reconciles `MediaStore` into Room's `media_item` table: registers newly seen folders with their
- * default visibility, upserts local rows, links them to already-known cloud rows via Pass 1
- * zero-hash deduplication, and (only with full per-type permission) applies device deletions.
+ * default visibility, upserts changed local rows in batches, links them to already-known cloud rows
+ * via Pass 1 zero-hash deduplication, and (only with full per-type permission) applies device
+ * deletions.
  */
 class ScanLocalMediaUseCase(
     private val localMediaStore: LocalMediaStore,
@@ -36,50 +37,77 @@ class ScanLocalMediaUseCase(
     private val dispatchers: AppDispatchers,
     private val zone: ZoneId = ZoneId.systemDefault()
 ) {
-    suspend operator fun invoke(access: MediaAccessState): Result<ScanResult> = withContext(dispatchers.io) {
-        try {
-            if (!access.hasAnyAccess) return@withContext Result.success(ScanResult())
+    suspend operator fun invoke(access: MediaAccessState): Result<ScanResult> =
+        withContext(dispatchers.io) {
+            try {
+                if (!access.hasAnyAccess) return@withContext Result.success(ScanResult())
 
-            val images = if (access.images != MediaAccess.NONE) localMediaStore.queryImages() else emptyList()
-            val videos = if (access.videos != MediaAccess.NONE) localMediaStore.queryVideos() else emptyList()
+                val images =
+                    if (access.images != MediaAccess.NONE) localMediaStore.queryImages() else emptyList()
+                val videos =
+                    if (access.videos != MediaAccess.NONE) localMediaStore.queryVideos() else emptyList()
 
-            val result = mediaRepository.withTransaction {
-                val imageRows = mediaRepository.getLocalRows(isVideo = false)
-                val videoRows = mediaRepository.getLocalRows(isVideo = true)
-                val knownByUri = HashMap<String, MediaEntity>(imageRows.size + videoRows.size)
-                (imageRows + videoRows).forEach { row ->
-                    row.localContentUri?.let { knownByUri[it] = row }
-                }
-
-                val folders = mutableMapOf<String, DeviceFolderEntity>()
-                var deduplicated = 0
-                for (file in images + videos) {
-                    if (upsertLocalFile(file, knownByUri[file.contentUri], folderFor(file, folders))) {
-                        deduplicated++
+                val result = mediaRepository.withTransaction {
+                    val imageRows = mediaRepository.getLocalRows(isVideo = false)
+                    val videoRows = mediaRepository.getLocalRows(isVideo = true)
+                    val knownByUri = HashMap<String, MediaEntity>(imageRows.size + videoRows.size)
+                    (imageRows + videoRows).forEach { row ->
+                        row.localContentUri?.let { knownByUri[it] = row }
                     }
+
+                    val folders = mutableMapOf<String, DeviceFolderEntity>()
+                    val newFolders = mutableListOf<DeviceFolderEntity>()
+                    val toUpsert = mutableListOf<MediaEntity>()
+                    val matchedCloudRowIds = HashSet<String>()
+                    var deduplicated = 0
+
+                    for (file in images + videos) {
+                        val folder = folderFor(file, folders, newFolders)
+                        val existing = knownByUri[file.contentUri]
+                        if (collectUpsertForFile(
+                                file,
+                                existing,
+                                folder,
+                                matchedCloudRowIds,
+                                toUpsert
+                            )
+                        ) {
+                            deduplicated++
+                        }
+                    }
+
+                    if (newFolders.isNotEmpty()) {
+                        deviceFolderRepository.upsertAll(newFolders)
+                    }
+                    if (toUpsert.isNotEmpty()) {
+                        toUpsert.chunked(500).forEach { chunk ->
+                            mediaRepository.upsertAll(chunk)
+                        }
+                    }
+
+                    val removed =
+                        reconcileRemovals(access.isFull(images = true), images, imageRows) +
+                                reconcileRemovals(access.isFull(images = false), videos, videoRows)
+
+                    ScanResult(
+                        scanned = images.size + videos.size,
+                        deduplicated = deduplicated,
+                        removed = removed
+                    )
                 }
 
-                val removed = reconcileRemovals(access.isFull(images = true), images, imageRows) +
-                    reconcileRemovals(access.isFull(images = false), videos, videoRows)
-
-                ScanResult(
-                    scanned = images.size + videos.size,
-                    deduplicated = deduplicated,
-                    removed = removed
-                )
+                Result.success(result)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Result.failure(e)
             }
-
-            Result.success(result)
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            Result.failure(e)
         }
-    }
 
     private suspend fun folderFor(
         file: LocalMediaFile,
-        cache: MutableMap<String, DeviceFolderEntity>
+        cache: MutableMap<String, DeviceFolderEntity>,
+        newFolders: MutableList<DeviceFolderEntity>
     ): DeviceFolderEntity {
         cache[file.bucketId]?.let { return it }
 
@@ -87,11 +115,11 @@ class ScanLocalMediaUseCase(
             val defaults = DeviceFolderRules.defaultsFor(file.relativePath)
             DeviceFolderEntity(
                 bucketId = file.bucketId,
-                displayName = file.bucketName ?: file.relativePath ?: file.bucketId,
+                displayName = file.bucketName ?: file.relativePath?.trimEnd('/') ?: file.bucketId,
                 relativePath = file.relativePath ?: "",
                 showInTimeline = defaults.showInTimeline,
                 backupEnabled = defaults.backupEnabled
-            ).also { deviceFolderRepository.upsertAll(listOf(it)) }
+            ).also { newFolders.add(it) }
         }
 
         cache[file.bucketId] = folder
@@ -99,34 +127,39 @@ class ScanLocalMediaUseCase(
     }
 
     /** @return true when the local file was linked to an existing cloud-only row. */
-    private suspend fun upsertLocalFile(
+    private suspend fun collectUpsertForFile(
         file: LocalMediaFile,
         existing: MediaEntity?,
-        folder: DeviceFolderEntity
+        folder: DeviceFolderEntity,
+        matchedCloudRowIds: MutableSet<String>,
+        toUpsert: MutableList<MediaEntity>
     ): Boolean {
         val local = LocalMediaMapper.toEntity(file, folder.showInTimeline, zone)
-        if (existing == null) return linkToCloudOrInsert(local)
+        if (existing == null) {
+            return linkToCloudOrQueueInsert(local, matchedCloudRowIds, toUpsert)
+        }
 
         // A cloud-linked row keeps the server's timestamp, month and visibility; the scan only
         // refreshes folder details. A local row follows its folder and the file MediaStore reports.
         val linked = existing.cloudId != null
-        mediaRepository.upsert(
-            existing.copy(
-                bucketId = local.bucketId,
-                bucketName = local.bucketName,
-                relativePath = local.relativePath,
-                isVisibleInTimeline = if (linked) {
-                    existing.isVisibleInTimeline
-                } else {
-                    folder.showInTimeline
-                },
-                sizeBytes = local.sizeBytes,
-                ratio = local.ratio,
-                sortTimestamp = if (linked) existing.sortTimestamp else local.sortTimestamp,
-                yearMonth = if (linked) existing.yearMonth else local.yearMonth,
-                durationMs = local.durationMs
-            )
+        val updated = existing.copy(
+            bucketId = local.bucketId,
+            bucketName = local.bucketName,
+            relativePath = local.relativePath,
+            isVisibleInTimeline = if (linked) {
+                existing.isVisibleInTimeline
+            } else {
+                folder.showInTimeline
+            },
+            sizeBytes = local.sizeBytes,
+            ratio = local.ratio,
+            sortTimestamp = if (linked) existing.sortTimestamp else local.sortTimestamp,
+            yearMonth = if (linked) existing.yearMonth else local.yearMonth,
+            durationMs = local.durationMs
         )
+        if (updated != existing) {
+            toUpsert.add(updated)
+        }
         return false
     }
 
@@ -134,25 +167,29 @@ class ScanLocalMediaUseCase(
      * Pass 1: same byte size, same aspect ratio, and a timestamp that differs only by a timezone
      * offset means it is the same media. Zero hashing, zero disk reads.
      */
-    private suspend fun linkToCloudOrInsert(local: MediaEntity): Boolean {
+    private suspend fun linkToCloudOrQueueInsert(
+        local: MediaEntity,
+        matchedCloudRowIds: MutableSet<String>,
+        toUpsert: MutableList<MediaEntity>
+    ): Boolean {
         val match = mediaRepository.findBySizeAndStatus(local.sizeBytes, SyncStatus.CLOUD_ONLY)
-            .firstOrNull {
-                PassOneDeduplication.isMatch(
-                    cloudRatio = it.ratio,
-                    cloudSortTimestamp = it.sortTimestamp,
-                    localRatio = local.ratio,
-                    localTimestampMs = local.sortTimestamp
-                )
+            .firstOrNull { candidate ->
+                candidate.id !in matchedCloudRowIds &&
+                        PassOneDeduplication.isMatch(
+                            cloudRatio = candidate.ratio,
+                            cloudSortTimestamp = candidate.sortTimestamp,
+                            localRatio = local.ratio,
+                            localTimestampMs = local.sortTimestamp
+                        )
             }
 
         if (match == null) {
-            mediaRepository.upsert(local)
+            toUpsert.add(local)
             return false
         }
 
-        // Delete first: `local_content_uri` is unique, so the row cannot exist twice.
-        mediaRepository.deleteById(local.id)
-        mediaRepository.upsert(
+        matchedCloudRowIds.add(match.id)
+        toUpsert.add(
             match.copy(
                 localContentUri = local.localContentUri,
                 bucketId = local.bucketId,
@@ -200,6 +237,9 @@ class ScanLocalMediaUseCase(
             else -> mediaRepository.upsert(
                 row.copy(
                     localContentUri = null,
+                    bucketId = null,
+                    bucketName = null,
+                    relativePath = null,
                     syncStatus = SyncStatus.CLOUD_ONLY,
                     isVisibleInTimeline = true
                 )

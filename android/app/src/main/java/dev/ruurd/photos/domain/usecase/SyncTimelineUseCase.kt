@@ -7,6 +7,7 @@ import dev.ruurd.photos.core.network.SyncTimestampStore
 import dev.ruurd.photos.core.network.api.PhotosApiService
 import dev.ruurd.photos.core.network.proto.CompactTimelineItem
 import dev.ruurd.photos.core.network.proto.TimelineSyncResponse
+import dev.ruurd.photos.domain.model.PassOneDeduplication
 import dev.ruurd.photos.domain.model.SyncState
 import dev.ruurd.photos.domain.repository.MediaRepository
 import kotlinx.coroutines.CancellationException
@@ -83,20 +84,42 @@ class SyncTimelineUseCase(
                             mediaRepository.transitionToLocalOnly(cloudId = cloudId)
                         }
 
-                        // 2. Process upserts in chunked batches (updating canonical + any duplicate local rows)
+                        // 2. Process upserts in chunked batches (updating canonical, linking
+                        //    matching LOCAL_ONLY rows via Pass 1, and updating duplicate local rows)
                         val itemsToUpsert = ArrayList<MediaEntity>(syncResponse.upsertedCount)
+                        val matchedLocalIds = HashSet<String>()
+
                         for (item in syncResponse.upsertedList) {
                             val existingRows = if (item.id in existingCloudIds) {
                                 mediaRepository.getAllByCloudId(item.id)
                             } else {
                                 emptyList()
                             }
-                            if (existingRows.isEmpty()) {
-                                itemsToUpsert.add(toMediaEntity(item, existing = null))
-                            } else {
+
+                            if (existingRows.isNotEmpty()) {
                                 for (existing in existingRows) {
                                     itemsToUpsert.add(toMediaEntity(item, existing = existing))
                                 }
+                                continue
+                            }
+
+                            val localMatch = mediaRepository
+                                .findBySizeAndStatus(item.sizeBytes, SyncStatus.LOCAL_ONLY)
+                                .firstOrNull { candidate ->
+                                    candidate.id !in matchedLocalIds &&
+                                            PassOneDeduplication.isMatch(
+                                                cloudRatio = item.ratio,
+                                                cloudSortTimestamp = item.sortTimestamp,
+                                                localRatio = candidate.ratio,
+                                                localTimestampMs = candidate.sortTimestamp
+                                            )
+                                }
+
+                            if (localMatch != null) {
+                                matchedLocalIds.add(localMatch.id)
+                                itemsToUpsert.add(toSyncedMediaEntity(item, localMatch))
+                            } else {
+                                itemsToUpsert.add(toMediaEntity(item, existing = null))
                             }
                         }
 
@@ -127,6 +150,26 @@ class SyncTimelineUseCase(
                 }
             }
         }
+
+    private fun toSyncedMediaEntity(item: CompactTimelineItem, local: MediaEntity): MediaEntity {
+        val yearMonth = computeYearMonth(item.sortTimestamp, item.timezoneOffsetMinutes)
+        val durationMs = if (item.hasDurationMs()) item.durationMs else null
+
+        return local.copy(
+            cloudId = item.id,
+            syncStatus = SyncStatus.SYNCED,
+            isVisibleInTimeline = true,
+            autoBackupSuppressed = false,
+            sortTimestamp = item.sortTimestamp,
+            timezoneOffsetMinutes = item.timezoneOffsetMinutes,
+            yearMonth = yearMonth,
+            ratio = item.ratio,
+            isVideo = item.isVideo,
+            durationMs = durationMs,
+            hasThumbnails = item.hasThumbnails,
+            sizeBytes = item.sizeBytes
+        )
+    }
 
     private fun toMediaEntity(item: CompactTimelineItem, existing: MediaEntity?): MediaEntity {
         val yearMonth = computeYearMonth(item.sortTimestamp, item.timezoneOffsetMinutes)

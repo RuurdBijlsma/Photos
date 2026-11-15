@@ -32,6 +32,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -46,6 +47,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.ruurd.photos.core.permissions.MediaPermissions
 import dev.ruurd.photos.domain.model.MediaAccessState
 import dev.ruurd.photos.domain.model.SyncState
@@ -63,19 +67,35 @@ fun MainScreen(
     val uiState by viewModel.uiState.collectAsState()
 
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     var mediaAccess: MediaAccessState by remember { mutableStateOf(MediaPermissions.read(context)) }
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) {
-        mediaAccess = MediaPermissions.read(context)
-        viewModel.scanLocalMedia(mediaAccess)
+        val currentAccess = MediaPermissions.read(context)
+        mediaAccess = currentAccess
+        viewModel.scanLocalMedia(currentAccess)
     }
 
     LaunchedEffect(Unit) {
-        if (mediaAccess.hasAnyAccess) {
-            viewModel.scanLocalMedia(mediaAccess)
-        } else {
+        if (!mediaAccess.hasAnyAccess) {
             permissionLauncher.launch(MediaPermissions.requestedPermissions)
+        }
+    }
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                val currentAccess = MediaPermissions.read(context)
+                mediaAccess = currentAccess
+                if (currentAccess.hasAnyAccess) {
+                    viewModel.scanLocalMedia(currentAccess)
+                }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
         }
     }
 

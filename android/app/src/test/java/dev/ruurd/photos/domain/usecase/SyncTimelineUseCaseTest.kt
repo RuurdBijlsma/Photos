@@ -115,6 +115,54 @@ class SyncTimelineUseCaseTest {
         }
 
     @Test
+    fun `sync links matching local-only rows via pass 1 without creating duplicates`() =
+        runTest(testDispatcher) {
+            val repo = FakeMediaRepository()
+            repo.upsert(
+                MediaEntity(
+                    id = "local_1",
+                    localContentUri = "content://media/external/images/media/1",
+                    bucketId = "camera",
+                    bucketName = "Camera",
+                    relativePath = "DCIM/Camera/",
+                    sizeBytes = 1024L,
+                    ratio = 1.5f,
+                    sortTimestamp = 1_730_000_000_000L + 3_600_000L, // 1h offset
+                    yearMonth = 202410,
+                    isVisibleInTimeline = true,
+                    syncStatus = SyncStatus.LOCAL_ONLY
+                )
+            )
+            val api = FakePhotosApiService().apply {
+                response = Response.success(
+                    TimelineSyncResponse.newBuilder()
+                        .setIsFullSnapshot(true)
+                        .setSyncTimestamp(1_730_000_005_000L)
+                        .addUpserted(item("a1B2c3D4e5"))
+                        .addUpserted(item("secondCloud"))
+                        .build()
+                )
+            }
+
+            val result = useCase(api, repo, FakeSyncTimestampStore())()
+
+            assertTrue(result.isSuccess)
+            assertEquals(2, repo.items.size)
+            assertNull(repo.getById("cloud_a1B2c3D4e5"))
+
+            val synced = repo.getById("local_1")!!
+            assertEquals(SyncStatus.SYNCED, synced.syncStatus)
+            assertEquals("a1B2c3D4e5", synced.cloudId)
+            assertEquals("content://media/external/images/media/1", synced.localContentUri)
+            assertEquals(1_730_000_000_000L, synced.sortTimestamp)
+            assertTrue(synced.isVisibleInTimeline)
+
+            // Second distinct cloud item with identical metadata must not hijack local_1
+            val second = repo.getById("cloud_secondCloud")!!
+            assertEquals(SyncStatus.CLOUD_ONLY, second.syncStatus)
+        }
+
+    @Test
     fun `delta sync uses a 60 second overlap and applies upserts and deletions`() =
         runTest(testDispatcher) {
             val repo = FakeMediaRepository()
