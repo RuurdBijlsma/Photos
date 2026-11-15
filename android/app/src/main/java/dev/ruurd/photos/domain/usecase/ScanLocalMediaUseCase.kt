@@ -72,12 +72,28 @@ class ScanLocalMediaUseCase(
 
                     val folders = mutableMapOf<String, DeviceFolderEntity>()
                     val newFolders = mutableListOf<DeviceFolderEntity>()
+                    val allFiles = images + videos
+                    val visibleFiles = ArrayList<Pair<LocalMediaFile, DeviceFolderEntity>>(allFiles.size)
+                    val hiddenFiles = ArrayList<Pair<LocalMediaFile, DeviceFolderEntity>>()
+
+                    for (file in allFiles) {
+                        val folder = folderFor(file, folders, newFolders)
+                        if (folder.showInTimeline) {
+                            visibleFiles.add(file to folder)
+                        } else {
+                            hiddenFiles.add(file to folder)
+                        }
+                    }
+
+                    // Process timeline-visible folders before hidden ones so Pass 1 links
+                    // e.g. DCIM/Camera copies to CLOUD_ONLY rows ahead of Download duplicates.
+                    val orderedFiles = visibleFiles.apply { addAll(hiddenFiles) }
+
                     val toUpsert = mutableListOf<MediaEntity>()
                     val matchedCloudRowIds = HashSet<String>()
                     var deduplicated = 0
 
-                    for (file in images + videos) {
-                        val folder = folderFor(file, folders, newFolders)
+                    for ((file, folder) in orderedFiles) {
                         val existing = knownByUri[file.contentUri]
                         if (collectUpsertForFile(
                                 file = file,

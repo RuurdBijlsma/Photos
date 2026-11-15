@@ -50,7 +50,13 @@ interface MediaDao {
     @Query("SELECT DISTINCT cloud_id FROM media_item WHERE cloud_id IS NOT NULL")
     suspend fun getAllCloudIds(): List<String>
 
-    @Query("SELECT * FROM media_item WHERE size_bytes = :sizeBytes AND sync_status = :syncStatus")
+    @Query(
+        """
+        SELECT * FROM media_item
+        WHERE size_bytes = :sizeBytes AND sync_status = :syncStatus
+        ORDER BY is_visible_in_timeline DESC, id ASC
+        """
+    )
     suspend fun findBySizeAndStatus(sizeBytes: Long, syncStatus: SyncStatus): List<MediaEntity>
 
     @Query("SELECT COUNT(*) FROM media_item WHERE is_visible_in_timeline = 1")

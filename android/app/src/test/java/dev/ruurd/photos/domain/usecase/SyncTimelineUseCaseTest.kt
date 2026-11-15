@@ -18,6 +18,7 @@ import okhttp3.RequestBody
 import okhttp3.ResponseBody
 import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -160,6 +161,66 @@ class SyncTimelineUseCaseTest {
             // Second distinct cloud item with identical metadata must not hijack local_1
             val second = repo.getById("cloud_secondCloud")!!
             assertEquals(SyncStatus.CLOUD_ONLY, second.syncStatus)
+        }
+
+    @Test
+    fun `pass 1 prefers visible local copy over hidden duplicate when linking`() =
+        runTest(testDispatcher) {
+            val repo = FakeMediaRepository()
+            // Hidden duplicate inserted first with a smaller id
+            repo.upsert(
+                MediaEntity(
+                    id = "local_1_download",
+                    localContentUri = "content://media/external/images/media/1",
+                    bucketId = "downloads",
+                    bucketName = "Download",
+                    relativePath = "Download/",
+                    sizeBytes = 1024L,
+                    ratio = 1.5f,
+                    sortTimestamp = 1_730_000_000_000L,
+                    yearMonth = 202410,
+                    isVisibleInTimeline = false,
+                    syncStatus = SyncStatus.LOCAL_ONLY
+                )
+            )
+            repo.upsert(
+                MediaEntity(
+                    id = "local_2_camera",
+                    localContentUri = "content://media/external/images/media/2",
+                    bucketId = "camera",
+                    bucketName = "Camera",
+                    relativePath = "DCIM/Camera/",
+                    sizeBytes = 1024L,
+                    ratio = 1.5f,
+                    sortTimestamp = 1_730_000_000_000L,
+                    yearMonth = 202410,
+                    isVisibleInTimeline = true,
+                    syncStatus = SyncStatus.LOCAL_ONLY
+                )
+            )
+            val api = FakePhotosApiService().apply {
+                response = Response.success(
+                    TimelineSyncResponse.newBuilder()
+                        .setIsFullSnapshot(true)
+                        .setSyncTimestamp(1_730_000_005_000L)
+                        .addUpserted(item("c1"))
+                        .build()
+                )
+            }
+
+            val result = useCase(api, repo, FakeSyncTimestampStore())()
+
+            assertTrue(result.isSuccess)
+
+            val cameraRow = repo.getById("local_2_camera")!!
+            assertEquals(SyncStatus.SYNCED, cameraRow.syncStatus)
+            assertEquals("c1", cameraRow.cloudId)
+            assertTrue(cameraRow.isVisibleInTimeline)
+
+            val downloadRow = repo.getById("local_1_download")!!
+            assertEquals(SyncStatus.LOCAL_ONLY, downloadRow.syncStatus)
+            assertNull(downloadRow.cloudId)
+            assertFalse(downloadRow.isVisibleInTimeline)
         }
 
     @Test

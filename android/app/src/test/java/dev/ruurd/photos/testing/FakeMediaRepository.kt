@@ -42,7 +42,12 @@ class FakeMediaRepository : MediaRepository {
         sizeBytes: Long,
         syncStatus: SyncStatus
     ): List<MediaEntity> =
-        items.values.filter { it.sizeBytes == sizeBytes && it.syncStatus == syncStatus }
+        items.values
+            .filter { it.sizeBytes == sizeBytes && it.syncStatus == syncStatus }
+            .sortedWith(
+                compareByDescending<MediaEntity> { it.isVisibleInTimeline }
+                    .thenBy { it.id }
+            )
 
     override suspend fun upsert(media: MediaEntity) {
         items[media.id] = media

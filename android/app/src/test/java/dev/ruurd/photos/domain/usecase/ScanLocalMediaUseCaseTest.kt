@@ -178,6 +178,33 @@ class ScanLocalMediaUseCaseTest {
     }
 
     @Test
+    fun `pass 1 prefers visible camera copy over hidden duplicate folder`() =
+        runTest(testDispatcher) {
+            val repo = FakeMediaRepository()
+            repo.upsert(cloudOnly("c1", sizeBytes = 1_001L))
+            val hiddenCopy = file(1, relativePath = "Download/", bucketId = "downloads")
+                .copy(sizeBytes = 1_001L)
+            val cameraCopy = file(2, relativePath = "DCIM/Camera/", bucketId = "camera")
+                .copy(sizeBytes = 1_001L)
+            // Download appears before Camera in the cursor
+            val store = FakeLocalMediaStore(images = listOf(hiddenCopy, cameraCopy))
+
+            val result = useCase(store, repo, FakeDeviceFolderRepository())(fullAccess()).getOrThrow()
+
+            assertEquals(1, result.deduplicated)
+
+            val synced = repo.getByCloudId("c1")!!
+            assertEquals(SyncStatus.SYNCED, synced.syncStatus)
+            assertEquals("content://media/external/media/2", synced.localContentUri)
+            assertEquals("camera", synced.bucketId)
+            assertTrue(synced.isVisibleInTimeline)
+
+            val hiddenRow = repo.getById("local_1")!!
+            assertEquals(SyncStatus.LOCAL_ONLY, hiddenRow.syncStatus)
+            assertFalse(hiddenRow.isVisibleInTimeline)
+        }
+
+    @Test
     fun `pass 1 tolerates a timezone-offset timestamp`() = runTest(testDispatcher) {
         val repo = FakeMediaRepository()
         repo.upsert(
