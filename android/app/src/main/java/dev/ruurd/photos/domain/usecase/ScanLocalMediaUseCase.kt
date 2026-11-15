@@ -25,10 +25,10 @@ data class ScanResult(
 )
 
 /**
- * Reconciles `MediaStore` into Room's `media_item` table: registers newly seen folders with their
- * default visibility, upserts changed local rows in batches, links them to already-known cloud rows
- * via Pass 1 zero-hash deduplication, and (only with full per-type permission) applies device
- * deletions.
+ * Reconciles `MediaStore` into Room's `media_item` table: applies device deletions first (only
+ * with full per-type permission), registers newly seen folders with their default visibility,
+ * upserts changed local rows in batches, and links unmatched files to known cloud rows via
+ * Pass 1 zero-hash deduplication.
  */
 class ScanLocalMediaUseCase(
     private val localMediaStore: LocalMediaStore,
@@ -48,10 +48,24 @@ class ScanLocalMediaUseCase(
                     if (access.videos != MediaAccess.NONE) localMediaStore.queryVideos() else emptyList()
 
                 val result = mediaRepository.withTransaction {
-                    val imageRows = mediaRepository.getLocalRows(isVideo = false)
-                    val videoRows = mediaRepository.getLocalRows(isVideo = true)
-                    val knownByUri = HashMap<String, MediaEntity>(imageRows.size + videoRows.size)
-                    (imageRows + videoRows).forEach { row ->
+                    val initialImageRows = mediaRepository.getLocalRows(isVideo = false)
+                    val initialVideoRows = mediaRepository.getLocalRows(isVideo = true)
+
+                    // Reconcile missing local files first so moved/renamed SYNCED files revert
+                    // to CLOUD_ONLY before Pass 1 links the replacement MediaStore URI.
+                    val removed =
+                        reconcileRemovals(access.isFull(images = true), images, initialImageRows) +
+                                reconcileRemovals(access.isFull(images = false), videos, initialVideoRows)
+
+                    val currentLocalRows = if (removed > 0) {
+                        mediaRepository.getLocalRows(isVideo = false) +
+                                mediaRepository.getLocalRows(isVideo = true)
+                    } else {
+                        initialImageRows + initialVideoRows
+                    }
+
+                    val knownByUri = HashMap<String, MediaEntity>(currentLocalRows.size)
+                    currentLocalRows.forEach { row ->
                         row.localContentUri?.let { knownByUri[it] = row }
                     }
 
@@ -85,10 +99,6 @@ class ScanLocalMediaUseCase(
                         }
                     }
 
-                    val removed =
-                        reconcileRemovals(access.isFull(images = true), images, imageRows) +
-                                reconcileRemovals(access.isFull(images = false), videos, videoRows)
-
                     ScanResult(
                         scanned = images.size + videos.size,
                         deduplicated = deduplicated,
@@ -113,9 +123,13 @@ class ScanLocalMediaUseCase(
 
         val folder = deviceFolderRepository.getFolder(file.bucketId) ?: run {
             val defaults = DeviceFolderRules.defaultsFor(file.relativePath)
+            val displayName = file.bucketName?.takeIf { it.isNotBlank() }
+                ?: file.relativePath?.trimEnd('/')?.takeIf { it.isNotEmpty() }
+                ?: file.bucketId
+
             DeviceFolderEntity(
                 bucketId = file.bucketId,
-                displayName = file.bucketName ?: file.relativePath?.trimEnd('/') ?: file.bucketId,
+                displayName = displayName,
                 relativePath = file.relativePath ?: "",
                 showInTimeline = defaults.showInTimeline,
                 backupEnabled = defaults.backupEnabled
@@ -139,23 +153,19 @@ class ScanLocalMediaUseCase(
             return linkToCloudOrQueueInsert(local, matchedCloudRowIds, toUpsert)
         }
 
-        // A cloud-linked row keeps the server's timestamp, month and visibility; the scan only
-        // refreshes folder details. A local row follows its folder and the file MediaStore reports.
+        // A cloud-linked row keeps the server's authoritative media metadata and visibility;
+        // the local scan only refreshes folder details.
         val linked = existing.cloudId != null
         val updated = existing.copy(
             bucketId = local.bucketId,
             bucketName = local.bucketName,
             relativePath = local.relativePath,
-            isVisibleInTimeline = if (linked) {
-                existing.isVisibleInTimeline
-            } else {
-                folder.showInTimeline
-            },
-            sizeBytes = local.sizeBytes,
-            ratio = local.ratio,
+            isVisibleInTimeline = if (linked) existing.isVisibleInTimeline else folder.showInTimeline,
+            sizeBytes = if (linked) existing.sizeBytes else local.sizeBytes,
+            ratio = if (linked) existing.ratio else local.ratio,
             sortTimestamp = if (linked) existing.sortTimestamp else local.sortTimestamp,
             yearMonth = if (linked) existing.yearMonth else local.yearMonth,
-            durationMs = local.durationMs
+            durationMs = if (linked) existing.durationMs else local.durationMs
         )
         if (updated != existing) {
             toUpsert.add(updated)

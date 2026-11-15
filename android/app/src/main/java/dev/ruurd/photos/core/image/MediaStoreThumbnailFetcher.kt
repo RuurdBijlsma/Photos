@@ -66,8 +66,16 @@ class MediaStoreThumbnailFetcher(
 
         val bitmap = try {
             withContext(Dispatchers.IO) {
-                coroutineContext.job.invokeOnCompletion { signal.cancel() }
-                options.context.contentResolver.loadThumbnail(data.uri, Size(width, height), signal)
+                val handle = coroutineContext.job.invokeOnCompletion { signal.cancel() }
+                try {
+                    options.context.contentResolver.loadThumbnail(
+                        data.uri,
+                        Size(width, height),
+                        signal
+                    )
+                } finally {
+                    handle.dispose()
+                }
             }
         } catch (e: OperationCanceledException) {
             currentCoroutineContext().ensureActive()
@@ -77,20 +85,19 @@ class MediaStoreThumbnailFetcher(
         return ImageFetchResult(bitmap.asImage(), isSampled = true, dataSource = DataSource.DISK)
     }
 
-    private suspend fun fetchLocalFallbackOrCloud(): FetchResult? {
+    private suspend fun fetchLocalFallbackOrCloud(): FetchResult? = try {
         val isVideo = data.isVideo ||
                 options.context.contentResolver.getType(data.uri)?.startsWith("video/") == true
 
         if (isVideo) {
-            loadVideoFrame()?.let { return it }
-            return fetchModel(data.cloudFallbackUrl)
-        }
-
-        return try {
+            loadVideoFrame() ?: fetchModel(data.cloudFallbackUrl)
+        } else {
             fetchModel(data.uri.toString()) ?: fetchModel(data.cloudFallbackUrl)
-        } catch (_: IOException) {
-            fetchModel(data.cloudFallbackUrl)
         }
+    } catch (_: SecurityException) {
+        fetchModel(data.cloudFallbackUrl)
+    } catch (_: IOException) {
+        fetchModel(data.cloudFallbackUrl)
     }
 
     private suspend fun loadVideoFrame(): FetchResult? {

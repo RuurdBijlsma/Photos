@@ -14,7 +14,7 @@ import dev.ruurd.photos.core.database.entity.MediaEntity
         MediaEntity::class,
         DeviceFolderEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {

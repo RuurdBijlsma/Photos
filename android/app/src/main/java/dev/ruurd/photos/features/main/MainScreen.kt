@@ -72,9 +72,8 @@ fun MainScreen(
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) {
-        val currentAccess = MediaPermissions.read(context)
-        mediaAccess = currentAccess
-        viewModel.scanLocalMedia(currentAccess)
+        // ON_RESUME fires when the permission dialog closes and triggers the scan once.
+        mediaAccess = MediaPermissions.read(context)
     }
 
     LaunchedEffect(Unit) {

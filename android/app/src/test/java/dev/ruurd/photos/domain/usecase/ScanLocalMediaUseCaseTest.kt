@@ -212,7 +212,10 @@ class ScanLocalMediaUseCaseTest {
                     id = "local_1",
                     cloudId = "c1",
                     localContentUri = "content://media/external/media/1",
-                    bucketId = "shots",
+                    bucketId = "old",
+                    sizeBytes = 9_999L,
+                    ratio = 1.777f,
+                    durationMs = 12_345,
                     sortTimestamp = 1_600_000_000_000L,
                     yearMonth = 202009,
                     isVisibleInTimeline = true,
@@ -220,16 +223,98 @@ class ScanLocalMediaUseCaseTest {
                 )
             )
             val store = FakeLocalMediaStore(
-                images = listOf(file(1, relativePath = "DCIM/Screenshots/", bucketId = "shots"))
+                images = listOf(
+                    file(
+                        id = 1,
+                        relativePath = "DCIM/Screenshots/",
+                        bucketId = "shots",
+                        width = 0,
+                        height = 0
+                    )
+                )
             )
 
             useCase(store, repo, FakeDeviceFolderRepository())(fullAccess()).getOrThrow()
 
             val row = repo.getById("local_1")!!
+            assertEquals("shots", row.bucketId)
+            assertEquals(9_999L, row.sizeBytes)
+            assertEquals(1.777f, row.ratio, 0.0001f)
+            assertEquals(12_345, row.durationMs)
             assertEquals(1_600_000_000_000L, row.sortTimestamp)
             assertEquals(202009, row.yearMonth)
             assertTrue(row.isVisibleInTimeline)
             assertEquals(SyncStatus.SYNCED, row.syncStatus)
+        }
+
+    @Test
+    fun `moving a synced file to a new MediaStore URI re-links it to the cloud row`() =
+        runTest(testDispatcher) {
+            val repo = FakeMediaRepository()
+            repo.upsert(
+                MediaEntity(
+                    id = "local_1",
+                    cloudId = "c1",
+                    localContentUri = "content://media/external/media/1",
+                    bucketId = "camera",
+                    sizeBytes = 1_002L,
+                    ratio = 4000f / 3000f,
+                    sortTimestamp = 1_730_000_000_000L,
+                    yearMonth = 202410,
+                    isVisibleInTimeline = true,
+                    syncStatus = SyncStatus.SYNCED
+                )
+            )
+            // Old URI 1 is gone; same file now lives at URI 2 with matching size/ratio/timestamp.
+            val movedFile = file(2).copy(sizeBytes = 1_002L)
+            val store = FakeLocalMediaStore(images = listOf(movedFile))
+
+            val result = useCase(store, repo, FakeDeviceFolderRepository())(fullAccess()).getOrThrow()
+
+            assertEquals(1, result.removed)
+            assertEquals(1, result.deduplicated)
+            assertNull(repo.getById("local_2"))
+
+            val synced = repo.getByCloudId("c1")!!
+            assertEquals("content://media/external/media/2", synced.localContentUri)
+            assertEquals(SyncStatus.SYNCED, synced.syncStatus)
+            assertTrue(synced.isVisibleInTimeline)
+        }
+
+    @Test
+    fun `removing a visible sibling while rescanning keeps the promoted copy visible`() =
+        runTest(testDispatcher) {
+            val repo = FakeMediaRepository()
+            repo.upsert(
+                MediaEntity(
+                    id = "local_gone",
+                    cloudId = "c1",
+                    localContentUri = "content://media/external/media/99",
+                    bucketId = "camera",
+                    isVisibleInTimeline = true,
+                    syncStatus = SyncStatus.SYNCED
+                )
+            )
+            repo.upsert(
+                MediaEntity(
+                    id = "local_keep",
+                    cloudId = "c1",
+                    localContentUri = "content://media/external/media/1",
+                    bucketId = "old_bucket",
+                    isVisibleInTimeline = false,
+                    syncStatus = SyncStatus.SYNCED
+                )
+            )
+            val store = FakeLocalMediaStore(
+                images = listOf(file(1, relativePath = "DCIM/NewFolder/", bucketId = "new_bucket"))
+            )
+
+            useCase(store, repo, FakeDeviceFolderRepository())(fullAccess()).getOrThrow()
+
+            assertNull(repo.getById("local_gone"))
+            val kept = repo.getById("local_keep")!!
+            assertTrue(kept.isVisibleInTimeline)
+            assertEquals("new_bucket", kept.bucketId)
         }
 
     @Test

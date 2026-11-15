@@ -1,5 +1,6 @@
 package dev.ruurd.photos.features.main
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -109,9 +110,9 @@ class MainViewModel(
                     if (!isAuthenticated) {
                         // Reset per-session UI so a later login does not inherit stale state.
                         hasRefreshedProfile = false
+                        pendingScanAccess = null
                         scanJob?.cancel()
                         scanJob = null
-                        pendingScanAccess = null
                         _selectedTab.value = MainNavTab.PHOTOS
                         _isAvatarMenuOpen.value = false
                         _syncErrorMessage.value = null
@@ -162,18 +163,24 @@ class MainViewModel(
             return
         }
 
-        scanJob = viewModelScope.launch {
+        lateinit var launchedJob: Job
+        launchedJob = viewModelScope.launch {
             try {
-                scanLocalMediaUseCase(access)
+                scanLocalMediaUseCase(access).onFailure { error ->
+                    Log.w(TAG, "Local media scan failed", error)
+                }
             } finally {
                 val nextAccess = pendingScanAccess
                 pendingScanAccess = null
-                if (nextAccess != null && nextAccess.hasAnyAccess) {
+                if (scanJob === launchedJob) {
                     scanJob = null
+                }
+                if (nextAccess != null && nextAccess.hasAnyAccess) {
                     scanLocalMedia(nextAccess)
                 }
             }
         }
+        scanJob = launchedJob
     }
 
     fun logout() {
@@ -183,6 +190,8 @@ class MainViewModel(
     }
 
     companion object {
+        private const val TAG = "MainViewModel"
+
         fun factory(
             authRepository: AuthRepository,
             mediaRepository: MediaRepository,
