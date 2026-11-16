@@ -1,6 +1,7 @@
 package dev.ruurd.photos.features.timeline
 
 import android.net.Uri
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -16,6 +17,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.layout.LazyLayoutCacheWindow
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -64,11 +66,16 @@ import kotlin.math.roundToInt
  * the right-edge scrubber. All geometry comes from `CalculateTimelineLayoutUseCase`; nothing here
  * measures, formats a date, or builds a URL per frame.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun TimelineScreen(
     viewModel: TimelineViewModel,
     baseUrl: String,
-    listState: LazyListState = rememberLazyListState(),
+    listState: LazyListState = rememberLazyListState(
+        cacheWindow = remember {
+            LazyLayoutCacheWindow(aheadFraction = 0.75f, behindFraction = 0.4f)
+        }
+    ),
     contentPadding: PaddingValues = PaddingValues(),
     isSyncing: Boolean = false,
     modifier: Modifier = Modifier

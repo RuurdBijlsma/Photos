@@ -7,6 +7,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,11 +16,13 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.lazy.layout.LazyLayoutCacheWindow
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Collections
@@ -39,10 +42,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -60,6 +66,7 @@ import dev.ruurd.photos.features.timeline.TimelineScreen
 import dev.ruurd.photos.features.timeline.TimelineViewModel
 import kotlinx.coroutines.launch
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun MainScreen(
     viewModel: MainViewModel,
@@ -67,7 +74,10 @@ fun MainScreen(
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val timelineListState = rememberLazyListState()
+    val timelineCacheWindow = remember {
+        LazyLayoutCacheWindow(aheadFraction = 0.75f, behindFraction = 0.4f)
+    }
+    val timelineListState = rememberLazyListState(cacheWindow = timelineCacheWindow)
     val coroutineScope = rememberCoroutineScope()
 
     val context = LocalContext.current
@@ -103,8 +113,8 @@ fun MainScreen(
     }
 
     // The grid runs edge to edge behind both floating bars, so the insets are content padding only.
-    val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() +
-            PhotosTopBarHeight
+    val statusBarHeight = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    val topInset = statusBarHeight + PhotosTopBarHeight
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() +
             FloatingBottomNavHeight
 
@@ -182,6 +192,15 @@ fun MainScreen(
             }
         }
 
+        // Kept behind PhotosTopBar (and shorter than it) so it stays hidden while the bar is
+        // visible and seamlessly keeps status bar icons legible when the bar scrolls away.
+        if (uiState.selectedTab == MainNavTab.PHOTOS) {
+            StatusBarScrim(
+                statusBarHeight = statusBarHeight,
+                modifier = Modifier.align(Alignment.TopCenter)
+            )
+        }
+
         AnimatedVisibility(
             visible = !hideTopBar,
             enter = slideInVertically { -it } + fadeIn(),
@@ -229,6 +248,27 @@ fun MainScreen(
 }
 
 @Composable
+private fun StatusBarScrim(
+    statusBarHeight: Dp,
+    modifier: Modifier = Modifier
+) {
+    if (statusBarHeight <= 0.dp) return
+    val scrimColor = MaterialTheme.colorScheme.background
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(statusBarHeight + STATUS_BAR_SCRIM_TAIL)
+            .background(
+                Brush.verticalGradient(
+                    0.0f to scrimColor.copy(alpha = 0.95f),
+                    0.65f to scrimColor.copy(alpha = 0.55f),
+                    1.0f to Color.Transparent
+                )
+            )
+    )
+}
+
+@Composable
 private fun PlaceholderTabContent(
     title: String,
     subtitle: String,
@@ -266,5 +306,6 @@ private fun PlaceholderTabContent(
     }
 }
 
+private val STATUS_BAR_SCRIM_TAIL = 24.dp
 private const val TOP_BAR_HIDE_THRESHOLD_PX = 96f
 private const val INDEX_WEIGHT_PX = 100_000f

@@ -24,6 +24,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -33,6 +34,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -69,8 +71,8 @@ import kotlin.math.roundToInt
  * and excludes the system back gesture so vertical drags never leave the app.
  *
  * The touch strip is always present (otherwise scrubbing could never start) but the thumb only fades
- * in while the list scrolls or the user drags. There is no track: the year pills appear during a drag,
- * kept left of the thumb so the finger never covers them.
+ * in when the list actually moves or the user drags (ignoring boundary overscroll), and lingers for
+ * a short delay after scrolling stops before fading out.
  */
 @Composable
 fun TimelineScrubber(
@@ -111,11 +113,44 @@ fun TimelineScrubber(
     }
 
     var isDragging by remember { mutableStateOf(false) }
+    var isScrubberVisible by remember { mutableStateOf(false) }
     var dragFraction by remember { mutableFloatStateOf(0f) }
     var draggedLabel by remember { mutableStateOf<String?>(null) }
     var sizePx by remember { mutableStateOf(IntSize.Zero) }
     var pillHeightPx by remember { mutableIntStateOf(0) }
     val dragState = remember { ScrubberDragState() }
+
+    LaunchedEffect(listState) {
+        var lastIndex = listState.firstVisibleItemIndex
+        var lastOffset = listState.firstVisibleItemScrollOffset
+        var hideJob: Job? = null
+
+        snapshotFlow {
+            ScrollObservation(
+                isDragging = isDragging,
+                isScrolling = listState.isScrollInProgress,
+                firstIndex = listState.firstVisibleItemIndex,
+                firstOffset = listState.firstVisibleItemScrollOffset
+            )
+        }.collect { obs ->
+            val moved = obs.firstIndex != lastIndex || obs.firstOffset != lastOffset
+            lastIndex = obs.firstIndex
+            lastOffset = obs.firstOffset
+
+            // Require actual position movement for list scrolls so boundary overscroll (e.g.
+            // pulling down at the top) does not pop the scrubber in.
+            if (obs.isDragging || (obs.isScrolling && moved)) {
+                hideJob?.cancel()
+                hideJob = null
+                isScrubberVisible = true
+            } else if (!obs.isDragging && !obs.isScrolling && isScrubberVisible && hideJob?.isActive != true) {
+                hideJob = launch {
+                    delay(SCRUBBER_HIDE_DELAY_MS)
+                    isScrubberVisible = false
+                }
+            }
+        }
+    }
 
     val scrollFraction by remember(layout, listState, viewportHeightDp, topPaddingDp, bottomPaddingDp) {
         derivedStateOf {
@@ -131,10 +166,10 @@ fun TimelineScrubber(
         }
     }
     val fraction = if (isDragging) dragFraction else scrollFraction
-    val visible = isDragging || listState.isScrollInProgress
+    val showVisuals = isDragging || isScrubberVisible
     val visualsAlpha by animateFloatAsState(
-        targetValue = if (visible) 1f else 0f,
-        animationSpec = tween(durationMillis = 120),
+        targetValue = if (showVisuals) 1f else 0f,
+        animationSpec = tween(durationMillis = if (showVisuals) 120 else 250),
         label = "scrubber_alpha"
     )
 
@@ -360,6 +395,13 @@ private class ScrubberDragState {
     var pauseJob: Job? = null
 }
 
+private data class ScrollObservation(
+    val isDragging: Boolean,
+    val isScrolling: Boolean,
+    val firstIndex: Int,
+    val firstOffset: Int
+)
+
 @Immutable
 private data class MeasuredYearMark(
     val year: Int,
@@ -377,3 +419,4 @@ private val ThumbIconSize = 24.dp
 private val ThumbVisibleWidth = ThumbDiameter * 0.8f
 private val PillGap = 6.dp
 private const val SCRUB_PAUSE_MS = 80L
+private const val SCRUBBER_HIDE_DELAY_MS = 1_500L
