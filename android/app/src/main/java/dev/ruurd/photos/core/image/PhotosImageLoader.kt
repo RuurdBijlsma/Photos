@@ -20,8 +20,6 @@ object PhotosImageLoader {
         val cacheDir = context.cacheDir.resolve("image_cache")
 
         return ImageLoader.Builder(context)
-            .bitmapFactoryMaxParallelism(8)
-            .logger(DebugLogger(Logger.Level.Info))
             .components {
                 add(MediaStoreThumbnailFetcher.Factory())
                 add(MediaStoreThumbnailFetcher.ThumbnailKeyer())
