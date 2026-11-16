@@ -147,10 +147,10 @@ implement notes
 * [✅ Done] Handle expiring tokens safely via a mutex-guarded OkHttp `Authenticator` (preventing concurrent `/api/auth/refresh`
   races and 401 loops).
 * [✅ Done] Build `AuthScreen` (custom server URL input validated via `GET /api/health`, email/password login).
-* Add `NetworkMonitor` (`ConnectivityManager.NetworkCallback`) and subtle Offline / Syncing status indicator so missing
+* [✅ Done] Add `NetworkMonitor` (`ConnectivityManager.NetworkCallback`) and subtle Offline / Syncing status indicator so missing
   internet degrades gracefully without errors.
 * [✅ Done] Compile `.proto` schemas (`common.proto` / `mobile.proto`) via the Protobuf Gradle plugin.
-* Configure Coil 3 (`coil-network-okhttp` sharing `OkHttpClient`, 500 MB LRU disk cache, hardware bitmaps, AVIF via
+* [✅ Done] Configure Coil 3 (`coil-network-okhttp` sharing `OkHttpClient`, 500 MB LRU disk cache, hardware bitmaps, AVIF via
   `ImageDecoder`).
 * [✅ Done] Implement `SyncTimelineUseCase`: initial full snapshot and delta sync (`since - 60_000L` overlap) directly into Room's
   `media_item` table (non-unique `cloudId`, unique `localContentUri`, immutable surrogate `id`). When
@@ -159,17 +159,17 @@ implement notes
 
 ### 1B: Local MediaStore & Pass 1 Deduplication
 
-* Request `READ_MEDIA_IMAGES` and `READ_MEDIA_VIDEO`, and handle Android 14+ partial access
+* [✅ Done] Request `READ_MEDIA_IMAGES` and `READ_MEDIA_VIDEO`, and handle Android 14+ partial access
   (`READ_MEDIA_VISUAL_USER_SELECTED`) cleanly.
-* Add `DeviceFolderEntity` + default discovery rules (`DCIM/*` excluding `DCIM/Screenshots` and `DCIM/Screen*` get
+* [✅ Done] Add `DeviceFolderEntity` + default discovery rules (`DCIM/*` excluding `DCIM/Screenshots` and `DCIM/Screen*` get
   `showInTimeline = true`, `backupEnabled = true`; all other folders default to `false`) and denormalized
   `is_visible_in_timeline` on `MediaEntity`.
-* Implement `ScanLocalMediaUseCase`: query `MediaStore` (`IS_PENDING = 0 AND IS_TRASHED = 0 AND SIZE > 0`, swapping
+* [✅ Done] Implement `ScanLocalMediaUseCase`: query `MediaStore` (`IS_PENDING = 0 AND IS_TRASHED = 0 AND SIZE > 0`, swapping
   dimensions for `90`/`270` orientation, falling back from `DATE_TAKEN` to `DATE_MODIFIED * 1000L`), gating
   cursor-omission deletion strictly on full per-type permissions plus an empty-cursor safety guard.
-* Run Pass 1 zero-hash deduplication against `CLOUD_ONLY` Room rows matching `size_bytes`, aspect `ratio`, and exact or
+* [✅ Done] Run Pass 1 zero-hash deduplication against `CLOUD_ONLY` Room rows matching `size_bytes`, aspect `ratio`, and exact or
   15-minute timezone-aligned timestamps (`±2s` within `±24h`) to flip matches to `SYNCED` with zero disk I/O.
-* Register custom `MediaStoreThumbnailFetcher` scoped to a `MediaStoreThumbnail` wrapper type calling
+* [✅ Done] Register custom `MediaStoreThumbnailFetcher` scoped to a `MediaStoreThumbnail` wrapper type calling
   `ContentResolver.loadThumbnail` with coroutine `CancellationSignal`, `SecurityException` cloud fallback, and
   subsampled `ImageDecoder` / `VideoFrameDecoder` fallbacks—leaving raw `content://` URIs untouched for Phase 2
   Telephoto.
