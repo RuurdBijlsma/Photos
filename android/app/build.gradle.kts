@@ -24,6 +24,10 @@ android {
     buildTypes {
         release {
             optimization {
+                // Note: currently scoped to androidx.**, kotlin.**, and kotlinx.**.
+                // If we ever broaden R8 shrinking to all packages,
+                // add -keep class org.aomedia.avif.android.** { *; } to app/src/main/keepRules/rules.keep
+                // so JNI callbacks into AvifDecoder.Info aren't stripped
                 enable = true
                 packageScope = setOf("androidx.**", "kotlin.**", "kotlinx.**")
             }
@@ -65,6 +69,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.datastore.preferences)
+    implementation(libs.aomedia.avif)
 
     // Room
     implementation(libs.androidx.room.runtime)

@@ -20,6 +20,7 @@ navigationCompose = "2.10.2"
 datastore = "1.3.0"
 kotlinxCollectionsImmutable = "0.5.2"
 kotlinxCoroutines = "1.10.1"
+aomediaAvif = "1.3.0.841110fd"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -38,6 +39,7 @@ androidx-compose-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-
 androidx-compose-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
 androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3" }
 androidx-compose-material-icons-extended = { group = "androidx.compose.material", name = "material-icons-extended" }
+aomedia-avif = { group = "org.aomedia.avif.android", name = "avif", version.ref = "aomediaAvif" }
 
 # Room
 androidx-room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "room" }

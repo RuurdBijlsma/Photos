@@ -25,6 +25,7 @@ object PhotosImageLoader {
             .components {
                 add(MediaStoreThumbnailFetcher.Factory())
                 add(MediaStoreThumbnailFetcher.ThumbnailKeyer())
+                add(LibavifDecoder.Factory())
                 add(
                     OkHttpNetworkFetcherFactory(
                         callFactory = { okHttpClient }
@@ -33,13 +34,13 @@ object PhotosImageLoader {
             }
             .memoryCache {
                 MemoryCache.Builder()
-                    .maxSizePercent(context, 0.50)
+                    .maxSizePercent(context, 0.35)
                     .build()
             }
             .diskCache {
                 DiskCache.Builder()
                     .directory(cacheDir.toOkioPath())
-                    .maxSizeBytes(2L * 1024 * 1024 * 1024) // 2 GB LRU disk cache
+                    .maxSizeBytes(1L * 1024 * 1024 * 1024) // 1 GB LRU disk cache
                     .build()
             }
             .build()
