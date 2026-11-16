@@ -1,6 +1,6 @@
 package dev.ruurd.photos.domain.usecase
 
-import dev.ruurd.photos.core.database.entity.MediaEntity
+import dev.ruurd.photos.core.database.entity.TimelineMediaProjection
 import dev.ruurd.photos.domain.model.MonthHeaderUiItem
 import dev.ruurd.photos.domain.model.TimelineGridItemUiModel
 import dev.ruurd.photos.domain.model.TimelineLayoutIndex
@@ -37,7 +37,7 @@ class CalculateTimelineLayoutUseCase(
 ) {
 
     operator fun invoke(
-        media: List<MediaEntity>,
+        media: List<TimelineMediaProjection>,
         params: TimelineLayoutParams
     ): TimelineLayoutIndex {
         if (media.isEmpty() || params.containerWidthPx <= 0) return TimelineLayoutIndex()
@@ -56,7 +56,7 @@ class CalculateTimelineLayoutUseCase(
         val yearStarts = LinkedHashMap<Int, Int>()
         var offsetPx = 0
 
-        val rowMedia = ArrayList<MediaEntity>()
+        val rowMedia = ArrayList<TimelineMediaProjection>()
         var rowWidthPx = 0f
 
         fun finishRow(firstOfMonth: Boolean, lastOfMonth: Boolean, flushToWidth: Boolean) {
@@ -82,11 +82,11 @@ class CalculateTimelineLayoutUseCase(
                 if (leftover != 0 && widths[last] + leftover > 0) widths[last] += leftover
             }
 
-            val uiItems = rowMedia.mapIndexed { index, entity ->
-                entity.toGridItem(widthDp = widths[index] / density)
+            val uiItems = rowMedia.mapIndexed { index, item ->
+                item.toGridItem(widthDp = widths[index] / density)
             }.toPersistentList()
 
-            rowMedia.forEach { entity -> itemOffsets[entity.id] = items.size }
+            rowMedia.forEach { item -> itemOffsets[item.id] = items.size }
             items.add(
                 TimelineRowUiItem(
                     id = "row_${rowMedia.first().id}",
@@ -122,9 +122,9 @@ class CalculateTimelineLayoutUseCase(
             offsetPx += headerHeightPx
 
             var firstOfMonth = true
-            monthMedia.forEachIndexed { index, entity ->
-                rowMedia.add(entity)
-                rowWidthPx += ratioOf(entity) * desiredHeightPx
+            monthMedia.forEachIndexed { index, item ->
+                rowMedia.add(item)
+                rowWidthPx += ratioOf(item) * desiredHeightPx
                 val gapsPx = (rowMedia.size - 1) * gapPx
                 if (rowWidthPx + gapsPx > containerWidthPx) {
                     finishRow(
@@ -161,7 +161,7 @@ class CalculateTimelineLayoutUseCase(
             ?: maxThumbnailHeightPx
     }
 
-    private fun MediaEntity.toGridItem(widthDp: Float) = TimelineGridItemUiModel(
+    private fun TimelineMediaProjection.toGridItem(widthDp: Float) = TimelineGridItemUiModel(
         id = id,
         localContentUri = localContentUri,
         cloudId = cloudId,
@@ -199,7 +199,7 @@ class CalculateTimelineLayoutUseCase(
         const val DEFAULT_MAX_THUMBNAIL_PX = 720
         val THUMBNAIL_LADDER_PX = intArrayOf(144, 240, 360, 480, 720, 1080, 1440)
 
-        fun ratioOf(entity: MediaEntity): Float =
-            if (entity.ratio.isFinite() && entity.ratio > 0f) entity.ratio else 1f
+        fun ratioOf(item: TimelineMediaProjection): Float =
+            if (item.ratio.isFinite() && item.ratio > 0f) item.ratio else 1f
     }
 }

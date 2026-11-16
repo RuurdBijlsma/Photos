@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -36,7 +35,7 @@ class MainActivity : ComponentActivity() {
             RuurdPhotosTheme {
                 val authState by container.authRepository.authState.collectAsState()
 
-                when (authState) {
+                when (val state = authState) {
                     is AuthState.Loading -> {
                         Box(
                             modifier = Modifier
@@ -54,7 +53,9 @@ class MainActivity : ComponentActivity() {
                         AuthScreen(viewModel = authViewModel)
                     }
                     is AuthState.Authenticated -> {
+                        val userKey = "user_${state.user.id}"
                         val mainViewModel: MainViewModel = viewModel(
+                            key = "${userKey}_main",
                             factory = MainViewModel.factory(
                                 authRepository = container.authRepository,
                                 syncTimelineUseCase = container.syncTimelineUseCase,
@@ -63,6 +64,7 @@ class MainActivity : ComponentActivity() {
                             )
                         )
                         val timelineViewModel: TimelineViewModel = viewModel(
+                            key = "${userKey}_timeline",
                             factory = TimelineViewModel.factory(
                                 observeTimelineUseCase = container.observeTimelineUseCase,
                                 calculateTimelineLayoutUseCase = container.calculateTimelineLayoutUseCase,

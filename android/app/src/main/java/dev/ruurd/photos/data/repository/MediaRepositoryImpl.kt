@@ -6,6 +6,7 @@ import dev.ruurd.photos.core.database.AppDatabase
 import dev.ruurd.photos.core.database.dao.MediaDao
 import dev.ruurd.photos.core.database.entity.MediaEntity
 import dev.ruurd.photos.core.database.entity.SyncStatus
+import dev.ruurd.photos.core.database.entity.TimelineMediaProjection
 import dev.ruurd.photos.domain.repository.MediaRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOn
@@ -16,10 +17,10 @@ class MediaRepositoryImpl(
     private val dispatchers: AppDispatchers
 ) : MediaRepository {
 
-    override fun getTimelineStage1(limitMonths: Int): Flow<List<MediaEntity>> =
+    override fun getTimelineStage1(limitMonths: Int): Flow<List<TimelineMediaProjection>> =
         mediaDao.getTimelineStage1(limitMonths).flowOn(dispatchers.io)
 
-    override fun getTimelineStage2(): Flow<List<MediaEntity>> =
+    override fun getTimelineStage2(): Flow<List<TimelineMediaProjection>> =
         mediaDao.getTimelineStage2().flowOn(dispatchers.io)
 
     override suspend fun getById(id: String): MediaEntity? = mediaDao.getById(id)

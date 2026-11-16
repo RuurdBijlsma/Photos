@@ -50,7 +50,7 @@ class TimelineViewModel(
         }
     }
         .flowOn(dispatchers.default)
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), TimelineUiState())
+        .stateIn(viewModelScope, SharingStarted.Lazily, TimelineUiState())
 
     fun onViewportChanged(widthPx: Int, density: Float) {
         if (widthPx <= 0 || density <= 0f) return

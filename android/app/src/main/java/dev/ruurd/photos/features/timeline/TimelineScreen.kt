@@ -29,6 +29,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -201,17 +202,28 @@ private fun TimelineTile(
     val widthPx = (item.widthDp * density).roundToInt().coerceAtLeast(1)
     val heightPx = (heightDp * density).roundToInt().coerceAtLeast(1)
 
-    val request = remember(item, thumbnailTargetHeightPx, baseUrl, widthPx, heightPx, isScrubbing) {
+    var loadSucceeded by remember(item.id, thumbnailTargetHeightPx, baseUrl, widthPx, heightPx) {
+        mutableStateOf(false)
+    }
+    val activeScrubbing = isScrubbing && !loadSucceeded
+
+    val request = remember(
+        item,
+        thumbnailTargetHeightPx,
+        baseUrl,
+        widthPx,
+        heightPx,
+        activeScrubbing
+    ) {
         ImageRequest.Builder(context)
             .data(tileModel(item, baseUrl, thumbnailTargetHeightPx))
             .size(widthPx, heightPx)
             .apply {
-                if (isScrubbing) {
-                    // Fast scrubbing: reuse what is already decoded/downloaded instead of flooding
-                    // the network and decoders with rows the user is flying past.
-                    memoryCachePolicy(CachePolicy.READ_ONLY)
+                if (activeScrubbing) {
+                    // Fast scrubbing: reuse memory/disk caches without flooding MediaStore IPC or network.
+                    memoryCachePolicy(CachePolicy.ENABLED)
                     diskCachePolicy(CachePolicy.READ_ONLY)
-                    networkCachePolicy(CachePolicy.READ_ONLY)
+                    networkCachePolicy(CachePolicy.DISABLED)
                 }
             }
             .build()
@@ -223,14 +235,19 @@ private fun TimelineTile(
             .height(heightDp.dp)
             .background(MaterialTheme.colorScheme.surfaceContainerHigh)
     ) {
-        AsyncImage(
-            model = request,
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxSize()
-        )
+        // Coil 3's default model equality ignores CachePolicy changes, so uncached tiles that were
+        // skipped during scrubbing must re-mount once scrubbing stops.
+        key(!activeScrubbing) {
+            AsyncImage(
+                model = request,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                onSuccess = { loadSucceeded = true },
+                modifier = Modifier.fillMaxSize()
+            )
+        }
 
-        if (item.isVideo && item.durationLabel != null) {
+        if (item.isVideo) {
             Row(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
@@ -248,12 +265,14 @@ private fun TimelineTile(
                     tint = Color.White,
                     modifier = Modifier.size(12.dp)
                 )
-                Spacer(modifier = Modifier.width(2.dp))
-                Text(
-                    text = item.durationLabel,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = Color.White
-                )
+                if (item.durationLabel != null) {
+                    Spacer(modifier = Modifier.width(2.dp))
+                    Text(
+                        text = item.durationLabel,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.White
+                    )
+                }
             }
         }
 

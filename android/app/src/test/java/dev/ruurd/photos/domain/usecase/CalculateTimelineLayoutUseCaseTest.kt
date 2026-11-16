@@ -1,6 +1,7 @@
 package dev.ruurd.photos.domain.usecase
 
-import dev.ruurd.photos.core.database.entity.MediaEntity
+import dev.ruurd.photos.core.database.entity.SyncStatus
+import dev.ruurd.photos.core.database.entity.TimelineMediaProjection
 import dev.ruurd.photos.domain.model.MonthHeaderUiItem
 import dev.ruurd.photos.domain.model.TimelineRowUiItem
 import org.junit.Assert.assertEquals
@@ -16,11 +17,16 @@ class CalculateTimelineLayoutUseCaseTest {
     private val params = TimelineLayoutParams(containerWidthPx = containerWidthPx, density = density)
     private val useCase = CalculateTimelineLayoutUseCase(currentYearProvider = { 2026 })
 
-    private fun media(id: String, yearMonth: Int, ratio: Float = 1f) = MediaEntity(
+    private fun media(id: String, yearMonth: Int, ratio: Float = 1f) = TimelineMediaProjection(
         id = id,
+        cloudId = null,
+        localContentUri = null,
         yearMonth = yearMonth,
         ratio = ratio,
-        sortTimestamp = (2_000_000_000_000L - id.hashCode()).coerceAtLeast(0)
+        isVideo = false,
+        durationMs = null,
+        hasThumbnails = false,
+        syncStatus = SyncStatus.LOCAL_ONLY
     )
 
     /** Width/height ratio of square items, so a full row is exactly two tiles. */

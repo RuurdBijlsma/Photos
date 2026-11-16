@@ -6,6 +6,7 @@ import androidx.room.Update
 import androidx.room.Upsert
 import dev.ruurd.photos.core.database.entity.MediaEntity
 import dev.ruurd.photos.core.database.entity.SyncStatus
+import dev.ruurd.photos.core.database.entity.TimelineMediaProjection
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -13,27 +14,34 @@ interface MediaDao {
 
     @Query(
         """
-        SELECT * FROM media_item
+        SELECT id, cloud_id, local_content_uri, year_month, ratio, is_video, duration_ms, has_thumbnails, sync_status
+        FROM media_item
         WHERE is_visible_in_timeline = 1
-          AND year_month IN (
-            SELECT DISTINCT year_month FROM media_item
-            WHERE is_visible_in_timeline = 1
-            ORDER BY year_month DESC
-            LIMIT :limitMonths
+          AND year_month >= COALESCE(
+            (
+              SELECT MIN(year_month) FROM (
+                SELECT DISTINCT year_month FROM media_item
+                WHERE is_visible_in_timeline = 1
+                ORDER BY year_month DESC
+                LIMIT :limitMonths
+              )
+            ),
+            0
           )
         ORDER BY year_month DESC, sort_timestamp DESC, id DESC
         """
     )
-    fun getTimelineStage1(limitMonths: Int = 2): Flow<List<MediaEntity>>
+    fun getTimelineStage1(limitMonths: Int = 2): Flow<List<TimelineMediaProjection>>
 
     @Query(
         """
-        SELECT * FROM media_item
+        SELECT id, cloud_id, local_content_uri, year_month, ratio, is_video, duration_ms, has_thumbnails, sync_status
+        FROM media_item
         WHERE is_visible_in_timeline = 1
         ORDER BY year_month DESC, sort_timestamp DESC, id DESC
         """
     )
-    fun getTimelineStage2(): Flow<List<MediaEntity>>
+    fun getTimelineStage2(): Flow<List<TimelineMediaProjection>>
 
     @Query("SELECT * FROM media_item WHERE id = :id LIMIT 1")
     suspend fun getById(id: String): MediaEntity?

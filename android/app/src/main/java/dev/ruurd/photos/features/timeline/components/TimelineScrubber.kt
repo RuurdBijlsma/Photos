@@ -100,11 +100,9 @@ fun TimelineScrubber(
     var isDragging by remember { mutableStateOf(false) }
     var dragFraction by remember { mutableFloatStateOf(0f) }
     var draggedLabel by remember { mutableStateOf<String?>(null) }
-    var lastHapticYear by remember { mutableStateOf<Int?>(null) }
     var sizePx by remember { mutableStateOf(IntSize.Zero) }
     var pillHeightPx by remember { mutableIntStateOf(0) }
-    var seekJob by remember { mutableStateOf<Job?>(null) }
-    var pauseJob by remember { mutableStateOf<Job?>(null) }
+    val dragState = remember { ScrubberDragState() }
 
     val scrollFraction by remember(layout, listState, viewportHeightDp, bottomPaddingDp) {
         derivedStateOf {
@@ -134,17 +132,17 @@ fun TimelineScrubber(
         draggedLabel = activeLayout.monthLabelAt(index)
 
         val year = activeLayout.yearAt(index)
-        if (year != null && year != lastHapticYear) {
+        if (year != null && year != dragState.lastHapticYear) {
             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-            lastHapticYear = year
+            dragState.lastHapticYear = year
         }
 
         val rowTopDp = activeLayout.rows.getOrNull(index)?.estimatedOffsetTopDp ?: 0f
         val withinRowOffsetPx =
             ((targetOffsetDp - rowTopDp).coerceAtLeast(0f) * density.density).roundToInt()
 
-        seekJob?.cancel()
-        seekJob = scope.launch { listState.scrollToItem(index, withinRowOffsetPx) }
+        dragState.seekJob?.cancel()
+        dragState.seekJob = scope.launch { listState.scrollToItem(index, withinRowOffsetPx) }
     }
 
     Box(
@@ -153,24 +151,24 @@ fun TimelineScrubber(
             .width(ScrubberWidth)
             .systemGestureExclusion()
             .onSizeChanged { sizePx = it }
-            .pointerInput(Unit) {
+            .pointerInput(listState, density) {
                 try {
                     detectVerticalDragGestures(
                         onDragStart = { offset ->
-                            pauseJob?.cancel()
+                            dragState.pauseJob?.cancel()
                             isDragging = true
-                            lastHapticYear = null
+                            dragState.lastHapticYear = null
                             currentOnScrubbingChanged(true)
                             seek(offset.y / size.height.coerceAtLeast(1))
                         },
                         onDragEnd = {
-                            pauseJob?.cancel()
+                            dragState.pauseJob?.cancel()
                             isDragging = false
                             draggedLabel = null
                             currentOnScrubbingChanged(false)
                         },
                         onDragCancel = {
-                            pauseJob?.cancel()
+                            dragState.pauseJob?.cancel()
                             isDragging = false
                             draggedLabel = null
                             currentOnScrubbingChanged(false)
@@ -178,8 +176,8 @@ fun TimelineScrubber(
                         onVerticalDrag = { change, _ ->
                             change.consume()
                             currentOnScrubbingChanged(true)
-                            pauseJob?.cancel()
-                            pauseJob = scope.launch {
+                            dragState.pauseJob?.cancel()
+                            dragState.pauseJob = scope.launch {
                                 delay(SCRUB_PAUSE_MS)
                                 currentOnScrubbingChanged(false)
                             }
@@ -187,7 +185,7 @@ fun TimelineScrubber(
                         }
                     )
                 } finally {
-                    pauseJob?.cancel()
+                    dragState.pauseJob?.cancel()
                     isDragging = false
                     draggedLabel = null
                     currentOnScrubbingChanged(false)
@@ -274,11 +272,17 @@ fun TimelineScrubber(
     }
 }
 
+private class ScrubberDragState {
+    var lastHapticYear: Int? = null
+    var seekJob: Job? = null
+    var pauseJob: Job? = null
+}
+
 @Immutable
 private data class MeasuredYearMark(
     val fraction: Float,
     val textLayout: TextLayoutResult
 )
 
-private val ScrubberWidth = 40.dp
+private val ScrubberWidth = 28.dp
 private const val SCRUB_PAUSE_MS = 80L
