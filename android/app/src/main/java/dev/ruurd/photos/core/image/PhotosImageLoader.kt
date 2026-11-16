@@ -2,9 +2,12 @@ package dev.ruurd.photos.core.image
 
 import android.content.Context
 import coil3.ImageLoader
+import coil3.bitmapFactoryMaxParallelism
 import coil3.disk.DiskCache
 import coil3.memory.MemoryCache
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
+import coil3.util.DebugLogger
+import coil3.util.Logger
 import okhttp3.OkHttpClient
 import okio.Path.Companion.toOkioPath
 
@@ -17,6 +20,8 @@ object PhotosImageLoader {
         val cacheDir = context.cacheDir.resolve("image_cache")
 
         return ImageLoader.Builder(context)
+            .bitmapFactoryMaxParallelism(8)
+            .logger(DebugLogger(Logger.Level.Info))
             .components {
                 add(MediaStoreThumbnailFetcher.Factory())
                 add(MediaStoreThumbnailFetcher.ThumbnailKeyer())
@@ -28,13 +33,13 @@ object PhotosImageLoader {
             }
             .memoryCache {
                 MemoryCache.Builder()
-                    .maxSizePercent(context, 0.25)
+                    .maxSizePercent(context, 0.50)
                     .build()
             }
             .diskCache {
                 DiskCache.Builder()
                     .directory(cacheDir.toOkioPath())
-                    .maxSizeBytes(500L * 1024 * 1024) // 500 MB LRU disk cache
+                    .maxSizeBytes(2L * 1024 * 1024 * 1024) // 2 GB LRU disk cache
                     .build()
             }
             .build()
