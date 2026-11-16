@@ -143,26 +143,29 @@ fun TimelineScreen(
 
 @Composable
 private fun MonthHeader(item: MonthHeaderUiItem, heightDp: Float) {
-    Row(
+    // Baseline alignment does not use the row's fixed height, so the texts are wrapped in a Box that
+    // bottom-aligns them; that keeps the gap above the month larger than the gap below it.
+    Box(
         modifier = Modifier
             .fillMaxWidth()
             .height(heightDp.dp)
-            .padding(start = 24.dp, end = 24.dp, bottom = 12.dp),
-        verticalAlignment = Alignment.Bottom,
-        horizontalArrangement = Arrangement.spacedBy(16.dp)
+            .padding(start = 24.dp, end = 24.dp, top = 16.dp, bottom = 10.dp),
+        contentAlignment = Alignment.BottomStart
     ) {
-        Text(
-            text = item.title,
-            style = MaterialTheme.typography.headlineMedium,
-            modifier = Modifier.alignByBaseline()
-        )
-        item.yearLabel?.let { year ->
+        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             Text(
-                text = year,
-                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Medium),
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                text = item.title,
+                style = MaterialTheme.typography.headlineMedium,
                 modifier = Modifier.alignByBaseline()
             )
+            item.yearLabel?.let { year ->
+                Text(
+                    text = year,
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Medium),
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                    modifier = Modifier.alignByBaseline()
+                )
+            }
         }
     }
 }

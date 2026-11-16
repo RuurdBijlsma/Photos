@@ -31,11 +31,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -104,13 +104,27 @@ fun MainScreen(
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() +
             FloatingBottomNavHeight
 
-    val scrolledDown by remember(timelineListState) {
-        derivedStateOf {
-            timelineListState.firstVisibleItemIndex > 0 ||
-                    timelineListState.firstVisibleItemScrollOffset > TOP_BAR_HIDE_THRESHOLD_PX
+    // Hide on scroll-down, show again after scrolling up the same distance (not only at the very top).
+    var topBarHidden by remember { mutableStateOf(false) }
+    LaunchedEffect(timelineListState) {
+        var lastIndex = timelineListState.firstVisibleItemIndex
+        var lastOffset = timelineListState.firstVisibleItemScrollOffset
+        var travelled = 0f
+        snapshotFlow {
+            timelineListState.firstVisibleItemIndex to timelineListState.firstVisibleItemScrollOffset
+        }.collect { (index, offset) ->
+            // An index change also resets the offset, so weight it far above any real offset delta.
+            val delta = (index - lastIndex) * INDEX_WEIGHT_PX + (offset - lastOffset)
+            lastIndex = index
+            lastOffset = offset
+            if (delta == 0f) return@collect
+            if (travelled * delta < 0f) travelled = 0f
+            travelled += delta
+            if (travelled > TOP_BAR_HIDE_THRESHOLD_PX) topBarHidden = true
+            if (travelled < -TOP_BAR_HIDE_THRESHOLD_PX) topBarHidden = false
         }
     }
-    val hideTopBar = uiState.selectedTab == MainNavTab.PHOTOS && scrolledDown
+    val hideTopBar = uiState.selectedTab == MainNavTab.PHOTOS && topBarHidden
 
     Box(
         modifier = modifier
@@ -219,4 +233,5 @@ private fun PlaceholderTabContent(
     }
 }
 
-private const val TOP_BAR_HIDE_THRESHOLD_PX = 96
+private const val TOP_BAR_HIDE_THRESHOLD_PX = 96f
+private const val INDEX_WEIGHT_PX = 100_000f

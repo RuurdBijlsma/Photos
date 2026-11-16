@@ -10,11 +10,16 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.systemGestureExclusion
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.UnfoldMore
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -63,8 +68,9 @@ import kotlin.math.roundToInt
  * thumb by row offset instead of row index so unequal row heights do not make it jitter, and excludes
  * the system back gesture so vertical drags never leave the app.
  *
- * The touch strip is always present (otherwise scrubbing could never start) but only the visuals fade
- * in while the list scrolls or the user drags. The track itself only appears during a drag.
+ * The touch strip is always present (otherwise scrubbing could never start) but the thumb only fades
+ * in while the list scrolls or the user drags. There is no track: the year pills appear during a drag,
+ * kept left of the thumb so the finger never covers them.
  */
 @Composable
 fun TimelineScrubber(
@@ -85,8 +91,8 @@ fun TimelineScrubber(
     val currentMaxScrollDp by rememberUpdatedState(maxScrollDp(layout, viewportHeightDp, topPaddingDp, bottomPaddingDp))
     val currentOnScrubbingChanged by rememberUpdatedState(onScrubbingChanged)
 
-    val trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
-    val thumbColor = MaterialTheme.colorScheme.primary
+    val thumbColor = MaterialTheme.colorScheme.onSurface
+    val thumbIconColor = MaterialTheme.colorScheme.surface
     val pillColor = MaterialTheme.colorScheme.surfaceContainerHighest
     val pillTextColor = MaterialTheme.colorScheme.onSurface
     val activePillColor = MaterialTheme.colorScheme.primary
@@ -212,35 +218,15 @@ fun TimelineScrubber(
             null
         }
 
-        Canvas(
-            modifier = Modifier
-                .fillMaxSize()
-                // Dragging draws at full alpha so the layered pills are not clipped by the layer bounds.
-                .alpha(if (isDragging) 1f else visualsAlpha)
-        ) {
-            val inset = 6.dp.toPx()
-            val trackWidth = 4.dp.toPx()
-            // Right edge of the screen: the box deliberately overhangs it for the clipped thumb.
-            val screenRight = size.width - ScrubberOverhang.toPx()
-            val trackX = screenRight - inset - trackWidth
-            val thumbDiameter = 16.dp.toPx()
-            // Center the thumb slightly past the right edge so ~30% of the circle is clipped off-screen.
-            val thumbCenter = Offset(
-                x = screenRight - thumbDiameter * 0.2f,
-                y = (size.height - thumbDiameter) * fraction + thumbDiameter / 2f
-            )
-
+        Canvas(modifier = Modifier.fillMaxSize()) {
             if (isDragging) {
-                drawRoundRect(
-                    color = trackColor,
-                    topLeft = Offset(trackX, 0f),
-                    size = Size(trackWidth, size.height),
-                    cornerRadius = CornerRadius(trackWidth / 2)
-                )
+                val screenRight = size.width - ScrubberOverhang.toPx()
+                // Right edge of the pills: just left of the thumb so the finger cannot cover them.
+                val pillRight = screenRight - ThumbVisibleWidth.toPx() - PillGap.toPx()
                 drawYearPills(
                     marks = measuredYearMarks,
                     activeYear = activeYear,
-                    trackX = trackX,
+                    rightEdge = pillRight,
                     pillColor = pillColor,
                     activePillColor = activePillColor,
                     paddingX = 6.dp.toPx(),
@@ -248,8 +234,32 @@ fun TimelineScrubber(
                     gap = 4.dp.toPx()
                 )
             }
+        }
 
-            drawCircle(color = thumbColor, radius = thumbDiameter / 2f, center = thumbCenter)
+        val thumbSizePx = with(density) { ThumbDiameter.roundToPx() }
+        // Left of the visible part of the circle: the rest hangs past the screen edge.
+        val thumbLeftPx = sizePx.width -
+                with(density) { ScrubberOverhang.roundToPx() + ThumbVisibleWidth.roundToPx() }
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .offset {
+                    IntOffset(
+                        x = thumbLeftPx,
+                        y = ((sizePx.height - thumbSizePx) * fraction).roundToInt()
+                    )
+                }
+                .alpha(if (isDragging) 1f else visualsAlpha)
+                .size(ThumbDiameter)
+                .background(color = thumbColor, shape = CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Filled.UnfoldMore,
+                contentDescription = null,
+                tint = thumbIconColor,
+                modifier = Modifier.size(ThumbIconSize)
+            )
         }
 
         if (isDragging) {
@@ -274,7 +284,10 @@ fun TimelineScrubber(
                         .onSizeChanged { pillHeightPx = it.height }
                         .offset {
                             IntOffset(
-                                x = (-56).dp.roundToPx(),
+                                // Same right edge as the year pills, so nothing hides under the finger.
+                                x = -with(density) {
+                                    (ScrubberOverhang + ThumbVisibleWidth + PillGap).roundToPx()
+                                },
                                 y = pillYPx
                             )
                         }
@@ -294,11 +307,11 @@ fun TimelineScrubber(
     }
 }
 
-/** Small opaque pills next to the track, skipping any that would overlap the previous one. */
+/** Small opaque pills left of the thumb, skipping any that would overlap the previous one. */
 private fun DrawScope.drawYearPills(
     marks: List<MeasuredYearMark>,
     activeYear: Int?,
-    trackX: Float,
+    rightEdge: Float,
     pillColor: Color,
     activePillColor: Color,
     paddingX: Float,
@@ -316,7 +329,7 @@ private fun DrawScope.drawYearPills(
             .coerceIn(0f, (size.height - pillHeight).coerceAtLeast(0f))
 
         if (pillTop >= previousBottom + gap) {
-            val left = trackX - gap - pillWidth
+            val left = rightEdge - pillWidth
             drawRoundRect(
                 color = if (isActive) activePillColor else pillColor,
                 topLeft = Offset(left, pillTop),
@@ -359,4 +372,10 @@ private data class MeasuredYearMark(
 
 private val ScrubberWidth = 28.dp
 private val ScrubberOverhang = 12.dp
+private val ThumbDiameter = 40.dp
+private val ThumbIconSize = 24.dp
+
+/** Visible part of the thumb, i.e. everything left of the screen edge (20% hangs past it). */
+private val ThumbVisibleWidth = ThumbDiameter * 0.8f
+private val PillGap = 6.dp
 private const val SCRUB_PAUSE_MS = 80L
