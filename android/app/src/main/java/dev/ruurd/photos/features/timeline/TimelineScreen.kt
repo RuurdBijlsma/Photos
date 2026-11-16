@@ -68,6 +68,7 @@ fun TimelineScreen(
     viewModel: TimelineViewModel,
     baseUrl: String,
     listState: LazyListState = rememberLazyListState(),
+    contentPadding: PaddingValues = PaddingValues(),
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -76,6 +77,11 @@ fun TimelineScreen(
 
     var isScrubbing by remember { mutableStateOf(false) }
     var viewportHeightDp by remember { mutableFloatStateOf(0f) }
+
+    // Rows scroll under the floating top bar and bottom nav; the padding only offsets the content
+    // edges so the first and last rows are reachable.
+    val topPaddingDp = contentPadding.calculateTopPadding().value
+    val bottomPaddingDp = contentPadding.calculateBottomPadding().value + EXTRA_BOTTOM_PADDING_DP
 
     Box(
         modifier = modifier
@@ -98,7 +104,10 @@ fun TimelineScreen(
                 LazyColumn(
                     state = listState,
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(bottom = TIMELINE_BOTTOM_PADDING_DP.dp)
+                    contentPadding = PaddingValues(
+                        top = topPaddingDp.dp,
+                        bottom = bottomPaddingDp.dp
+                    )
                 ) {
                     items(
                         items = layout.rows,
@@ -114,14 +123,17 @@ fun TimelineScreen(
                     }
                 }
 
-                if (layout.totalHeightDp + TIMELINE_BOTTOM_PADDING_DP > viewportHeightDp) {
+                if (layout.totalHeightDp + topPaddingDp + bottomPaddingDp > viewportHeightDp) {
                     TimelineScrubber(
                         layout = layout,
                         listState = listState,
                         viewportHeightDp = viewportHeightDp,
-                        bottomPaddingDp = TIMELINE_BOTTOM_PADDING_DP,
+                        topPaddingDp = topPaddingDp,
+                        bottomPaddingDp = bottomPaddingDp,
                         onScrubbingChanged = { isScrubbing = it },
-                        modifier = Modifier.align(Alignment.CenterEnd)
+                        modifier = Modifier
+                            .align(Alignment.CenterEnd)
+                            .padding(top = topPaddingDp.dp, bottom = bottomPaddingDp.dp)
                     )
                 }
             }
@@ -304,7 +316,7 @@ private fun EmptyTimeline(modifier: Modifier = Modifier) {
 }
 
 private val ITEM_GAP_DP = CalculateTimelineLayoutUseCase.ITEM_GAP_DP
-private const val TIMELINE_BOTTOM_PADDING_DP = 24f
+private const val EXTRA_BOTTOM_PADDING_DP = 24f
 
 private fun tileModel(
     item: TimelineGridItemUiModel,

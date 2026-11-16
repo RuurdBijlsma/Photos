@@ -7,6 +7,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -41,6 +42,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -51,6 +53,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -224,14 +227,41 @@ fun AuthScreen(
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.End
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
+                        UrlSchemeChip(
+                            scheme = "http",
+                            selected = uiState.serverUrl.startsWith("http://", ignoreCase = true),
+                            onClick = {
+                                localNetworkError = null
+                                viewModel.onServerSchemeSelected("http")
+                            }
+                        )
+                        UrlSchemeChip(
+                            scheme = "https",
+                            selected = uiState.serverUrl.startsWith("https://", ignoreCase = true),
+                            onClick = {
+                                localNetworkError = null
+                                viewModel.onServerSchemeSelected("https")
+                            }
+                        )
+                        Spacer(modifier = Modifier.weight(1f))
                         OutlinedButton(
-                            onClick = { runWithLocalNetworkCheck(viewModel::testServerConnection) },
+                            onClick = {
+                                if (uiState.isTestingServer) {
+                                    viewModel.cancelServerTest()
+                                } else {
+                                    runWithLocalNetworkCheck(viewModel::testServerConnection)
+                                }
+                            },
                             shape = CircleShape,
-                            enabled = !uiState.isTestingServer && !uiState.isLoading
+                            enabled = !uiState.isLoading
                         ) {
-                            Text("Test Connection", style = MaterialTheme.typography.labelMedium)
+                            Text(
+                                text = if (uiState.isTestingServer) "Cancel" else "Test Connection",
+                                style = MaterialTheme.typography.labelMedium
+                            )
                         }
                     }
 
@@ -352,6 +382,41 @@ fun AuthScreen(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun UrlSchemeChip(
+    scheme: String,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    Surface(
+        shape = CircleShape,
+        color = if (selected) {
+            MaterialTheme.colorScheme.secondaryContainer
+        } else {
+            MaterialTheme.colorScheme.surfaceContainerHighest
+        },
+        modifier = Modifier
+            .height(28.dp)
+            .clip(CircleShape)
+            .clickable(onClick = onClick)
+    ) {
+        Box(
+            modifier = Modifier.padding(horizontal = 10.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = scheme,
+                style = MaterialTheme.typography.labelSmall,
+                color = if (selected) {
+                    MaterialTheme.colorScheme.onSecondaryContainer
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                }
+            )
         }
     }
 }

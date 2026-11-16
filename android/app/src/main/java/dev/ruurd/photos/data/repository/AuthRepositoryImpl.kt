@@ -9,13 +9,21 @@ import dev.ruurd.photos.domain.model.User
 import dev.ruurd.photos.domain.repository.AuthRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import okhttp3.Call
+import okhttp3.Callback
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.Response
 import org.json.JSONObject
+import java.io.IOException
+import java.util.concurrent.TimeUnit
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 
 class AuthRepositoryImpl(
     private val apiService: PhotosApiService,
@@ -24,6 +32,14 @@ class AuthRepositoryImpl(
     private val directClient: OkHttpClient,
     private val dispatchers: AppDispatchers
 ) : AuthRepository {
+
+    // Reachability checks should fail fast instead of waiting out the 15s socket timeouts.
+    private val testClient: OkHttpClient by lazy {
+        directClient.newBuilder()
+            .connectTimeout(5, TimeUnit.SECONDS)
+            .readTimeout(5, TimeUnit.SECONDS)
+            .build()
+    }
 
     override val authState: StateFlow<AuthState> = sessionManager.authState
     override val serverUrl: StateFlow<String> = sessionManager.serverUrl
@@ -48,7 +64,9 @@ class AuthRepositoryImpl(
                     .get()
                     .build()
 
-                directClient.newCall(request).execute().use { response ->
+                // Enqueued instead of execute() so cancelling the caller aborts the socket instead of
+                // blocking the IO dispatcher until the connect timeout expires.
+                testClient.newCall(request).await().use { response ->
                     if (response.isSuccessful) {
                         Result.success(Unit)
                     } else {
@@ -140,4 +158,20 @@ class AuthRepositoryImpl(
             Result.failure(e)
         }
     }
+}
+
+/** Suspends on an enqueued call so cancellation cancels the request itself. */
+private suspend fun Call.await(): Response = suspendCancellableCoroutine { continuation ->
+    continuation.invokeOnCancellation { cancel() }
+    enqueue(
+        object : Callback {
+            override fun onFailure(call: Call, e: IOException) {
+                continuation.resumeWithException(e)
+            }
+
+            override fun onResponse(call: Call, response: Response) {
+                continuation.resume(response)
+            }
+        }
+    )
 }

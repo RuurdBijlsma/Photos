@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import dev.ruurd.photos.core.network.SessionManager
 import dev.ruurd.photos.domain.repository.AuthRepository
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -29,6 +30,7 @@ class AuthViewModel(
     val uiState: StateFlow<AuthUiState> = _uiState.asStateFlow()
 
     private var hasUserEditedServerUrl = false
+    private var serverTestJob: Job? = null
 
     init {
         viewModelScope.launch {
@@ -48,6 +50,20 @@ class AuthViewModel(
                 serverTestSuccess = null,
                 errorMessage = null
             )
+        }
+    }
+
+    /** Rewrites only the scheme, so tapping an `http`/`https` chip never eats the host or port. */
+    fun onServerSchemeSelected(scheme: String) {
+        val current = _uiState.value.serverUrl
+        onServerUrlChanged("$scheme://${current.substringAfter("://", current).trimStart('/')}")
+    }
+
+    fun cancelServerTest() {
+        serverTestJob?.cancel()
+        serverTestJob = null
+        _uiState.update {
+            it.copy(isTestingServer = false, serverTestSuccess = null, errorMessage = null)
         }
     }
 
@@ -79,7 +95,7 @@ class AuthViewModel(
             return
         }
 
-        viewModelScope.launch {
+        serverTestJob = viewModelScope.launch {
             _uiState.update {
                 it.copy(
                     isTestingServer = true,

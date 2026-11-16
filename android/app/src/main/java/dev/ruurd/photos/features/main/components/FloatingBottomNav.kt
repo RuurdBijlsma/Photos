@@ -42,6 +42,9 @@ enum class MainNavTab(
     EXPLORE("Explore", Icons.Default.Explore)
 }
 
+/** Total height of the floating nav (pill + vertical padding), excluding the navigation bar inset. */
+val FloatingBottomNavHeight = 80.dp
+
 @Composable
 fun FloatingBottomNav(
     selectedTab: MainNavTab,

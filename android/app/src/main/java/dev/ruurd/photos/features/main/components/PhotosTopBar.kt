@@ -39,6 +39,9 @@ import dev.ruurd.photos.domain.model.SyncState
 import dev.ruurd.photos.domain.model.User
 import dev.ruurd.photos.ui.theme.LocalSemanticColors
 
+/** Height of the top bar content, excluding the status bar inset. */
+val PhotosTopBarHeight = 56.dp
+
 @Composable
 fun PhotosTopBar(
     currentUser: User?,
@@ -53,7 +56,7 @@ fun PhotosTopBar(
         modifier = modifier
             .fillMaxWidth()
             .statusBarsPadding()
-            .height(56.dp)
+            .height(PhotosTopBarHeight)
             .padding(horizontal = 16.dp),
         contentAlignment = Alignment.Center
     ) {
