@@ -22,15 +22,6 @@ class MediaRepositoryImpl(
     override fun getTimelineStage2(): Flow<List<MediaEntity>> =
         mediaDao.getTimelineStage2().flowOn(dispatchers.io)
 
-    override fun countVisible(): Flow<Int> =
-        mediaDao.countVisibleFlow().flowOn(dispatchers.io)
-
-    override fun countTotal(): Flow<Int> =
-        mediaDao.countTotalFlow().flowOn(dispatchers.io)
-
-    override fun countLocal(): Flow<Int> =
-        mediaDao.countLocalFlow().flowOn(dispatchers.io)
-
     override suspend fun getById(id: String): MediaEntity? = mediaDao.getById(id)
 
     override suspend fun getByCloudId(cloudId: String): MediaEntity? =

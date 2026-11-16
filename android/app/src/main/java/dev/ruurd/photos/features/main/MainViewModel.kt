@@ -10,7 +10,6 @@ import dev.ruurd.photos.domain.model.MediaAccessState
 import dev.ruurd.photos.domain.model.SyncState
 import dev.ruurd.photos.domain.model.User
 import dev.ruurd.photos.domain.repository.AuthRepository
-import dev.ruurd.photos.domain.repository.MediaRepository
 import dev.ruurd.photos.domain.usecase.ScanLocalMediaUseCase
 import dev.ruurd.photos.domain.usecase.SyncTimelineUseCase
 import dev.ruurd.photos.features.main.components.MainNavTab
@@ -28,9 +27,6 @@ data class MainUiState(
     val serverUrl: String = "",
     val isOnline: Boolean = false,
     val syncState: SyncState = SyncState.IDLE,
-    val visibleMediaCount: Int = 0,
-    val totalMediaCount: Int = 0,
-    val localMediaCount: Int = 0,
     val selectedTab: MainNavTab = MainNavTab.PHOTOS,
     val isAvatarMenuOpen: Boolean = false,
     val syncErrorMessage: String? = null
@@ -38,7 +34,6 @@ data class MainUiState(
 
 class MainViewModel(
     private val authRepository: AuthRepository,
-    private val mediaRepository: MediaRepository,
     private val syncTimelineUseCase: SyncTimelineUseCase,
     private val scanLocalMediaUseCase: ScanLocalMediaUseCase,
     networkMonitor: NetworkMonitor
@@ -58,12 +53,6 @@ class MainViewModel(
         syncTimelineUseCase.syncState
     ) { url, online, sync -> Triple(url, online, sync) }
 
-    private val countsFlow = combine(
-        mediaRepository.countVisible(),
-        mediaRepository.countTotal(),
-        mediaRepository.countLocal()
-    ) { visible, total, local -> Triple(visible, total, local) }
-
     private val uiControlsFlow = combine(
         _selectedTab,
         _isAvatarMenuOpen,
@@ -73,11 +62,9 @@ class MainViewModel(
     val uiState: StateFlow<MainUiState> = combine(
         authRepository.authState,
         connectionInfoFlow,
-        countsFlow,
         uiControlsFlow
-    ) { authState, conn, counts, controls ->
+    ) { authState, conn, controls ->
         val (serverUrl, isOnline, syncState) = conn
-        val (visibleCount, totalCount, localCount) = counts
         val (tab, menuOpen, error) = controls
         val user = (authState as? AuthState.Authenticated)?.user
 
@@ -86,9 +73,6 @@ class MainViewModel(
             serverUrl = serverUrl,
             isOnline = isOnline,
             syncState = syncState,
-            visibleMediaCount = visibleCount,
-            totalMediaCount = totalCount,
-            localMediaCount = localCount,
             selectedTab = tab,
             isAvatarMenuOpen = menuOpen,
             syncErrorMessage = error
@@ -194,7 +178,6 @@ class MainViewModel(
 
         fun factory(
             authRepository: AuthRepository,
-            mediaRepository: MediaRepository,
             syncTimelineUseCase: SyncTimelineUseCase,
             scanLocalMediaUseCase: ScanLocalMediaUseCase,
             networkMonitor: NetworkMonitor
@@ -203,7 +186,6 @@ class MainViewModel(
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
                 return MainViewModel(
                     authRepository = authRepository,
-                    mediaRepository = mediaRepository,
                     syncTimelineUseCase = syncTimelineUseCase,
                     scanLocalMediaUseCase = scanLocalMediaUseCase,
                     networkMonitor = networkMonitor

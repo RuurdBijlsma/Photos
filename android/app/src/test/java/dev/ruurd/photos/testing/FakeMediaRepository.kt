@@ -18,12 +18,6 @@ class FakeMediaRepository : MediaRepository {
 
     override fun getTimelineStage2(): Flow<List<MediaEntity>> = flowOf(items.values.toList())
 
-    override fun countVisible(): Flow<Int> = flowOf(items.values.count { it.isVisibleInTimeline })
-
-    override fun countTotal(): Flow<Int> = flowOf(items.size)
-
-    override fun countLocal(): Flow<Int> = flowOf(items.values.count { it.localContentUri != null })
-
     override suspend fun getById(id: String): MediaEntity? = items[id]
 
     override suspend fun getByCloudId(cloudId: String): MediaEntity? =

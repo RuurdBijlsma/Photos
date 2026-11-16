@@ -20,6 +20,7 @@ import dev.ruurd.photos.features.auth.AuthScreen
 import dev.ruurd.photos.features.auth.AuthViewModel
 import dev.ruurd.photos.features.main.MainScreen
 import dev.ruurd.photos.features.main.MainViewModel
+import dev.ruurd.photos.features.timeline.TimelineViewModel
 import dev.ruurd.photos.ui.theme.RuurdPhotosTheme
 
 class MainActivity : ComponentActivity() {
@@ -56,13 +57,22 @@ class MainActivity : ComponentActivity() {
                         val mainViewModel: MainViewModel = viewModel(
                             factory = MainViewModel.factory(
                                 authRepository = container.authRepository,
-                                mediaRepository = container.mediaRepository,
                                 syncTimelineUseCase = container.syncTimelineUseCase,
                                 scanLocalMediaUseCase = container.scanLocalMediaUseCase,
                                 networkMonitor = container.networkMonitor
                             )
                         )
-                        MainScreen(viewModel = mainViewModel)
+                        val timelineViewModel: TimelineViewModel = viewModel(
+                            factory = TimelineViewModel.factory(
+                                observeTimelineUseCase = container.observeTimelineUseCase,
+                                calculateTimelineLayoutUseCase = container.calculateTimelineLayoutUseCase,
+                                dispatchers = container.dispatchers
+                            )
+                        )
+                        MainScreen(
+                            viewModel = mainViewModel,
+                            timelineViewModel = timelineViewModel
+                        )
                     }
                 }
             }

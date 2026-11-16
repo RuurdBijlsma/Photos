@@ -59,15 +59,6 @@ interface MediaDao {
     )
     suspend fun findBySizeAndStatus(sizeBytes: Long, syncStatus: SyncStatus): List<MediaEntity>
 
-    @Query("SELECT COUNT(*) FROM media_item WHERE is_visible_in_timeline = 1")
-    fun countVisibleFlow(): Flow<Int>
-
-    @Query("SELECT COUNT(*) FROM media_item")
-    fun countTotalFlow(): Flow<Int>
-
-    @Query("SELECT COUNT(*) FROM media_item WHERE local_content_uri IS NOT NULL")
-    fun countLocalFlow(): Flow<Int>
-
     @Upsert
     suspend fun upsert(media: MediaEntity)
 

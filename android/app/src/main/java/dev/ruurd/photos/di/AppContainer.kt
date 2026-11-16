@@ -1,5 +1,6 @@
 package dev.ruurd.photos.di
 
+import android.app.ActivityManager
 import android.content.Context
 import coil3.ImageLoader
 import dev.ruurd.photos.core.common.AppDispatchers
@@ -22,6 +23,8 @@ import dev.ruurd.photos.domain.repository.AuthRepository
 import dev.ruurd.photos.domain.repository.DeviceFolderRepository
 import dev.ruurd.photos.domain.repository.LocalMediaStore
 import dev.ruurd.photos.domain.repository.MediaRepository
+import dev.ruurd.photos.domain.usecase.CalculateTimelineLayoutUseCase
+import dev.ruurd.photos.domain.usecase.ObserveTimelineUseCase
 import dev.ruurd.photos.domain.usecase.ScanLocalMediaUseCase
 import dev.ruurd.photos.domain.usecase.SyncTimelineUseCase
 import kotlinx.coroutines.CoroutineScope
@@ -50,6 +53,8 @@ interface AppContainer {
     val localMediaStore: LocalMediaStore
     val scanLocalMediaUseCase: ScanLocalMediaUseCase
     val syncTimelineUseCase: SyncTimelineUseCase
+    val observeTimelineUseCase: ObserveTimelineUseCase
+    val calculateTimelineLayoutUseCase: CalculateTimelineLayoutUseCase
     val networkMonitor: NetworkMonitor
     val imageLoader: ImageLoader
 }
@@ -168,10 +173,20 @@ class DefaultAppContainer(private val context: Context) : AppContainer {
         )
     }
 
+    override val observeTimelineUseCase: ObserveTimelineUseCase by lazy {
+        ObserveTimelineUseCase(mediaRepository = mediaRepository, dispatchers = dispatchers)
+    }
+
+    override val calculateTimelineLayoutUseCase: CalculateTimelineLayoutUseCase by lazy {
+        val activityManager = context.getSystemService(ActivityManager::class.java)
+        CalculateTimelineLayoutUseCase(
+            maxThumbnailHeightPx = if (activityManager?.isLowRamDevice == true) 480 else 720
+        )
+    }
+
     override val networkMonitor: NetworkMonitor by lazy {
         NetworkMonitor(context, applicationScope)
     }
-
     override val imageLoader: ImageLoader by lazy {
         PhotosImageLoader.create(context, okHttpClient)
     }
