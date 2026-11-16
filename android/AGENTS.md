@@ -1,11 +1,17 @@
 Check for performance regressions in timeline:
 
+Ensure `dev.ruurd.photos` is signed in on the test device, media permissions are granted, and the
+timeline is non-empty.
+
 ```powershell
 ./gradlew :benchmark:connectedBenchmarkAndroidTest
 
 # When updating baseline:
-node script/check-perf-regression.mjs --update-baseline
+./gradlew :benchmark:updatePerfBaseline
 
-# Otherwise
-node script/check-perf-regression.mjs
+# Otherwise (check latest benchmark output against perf/baseline.json):
+./gradlew :benchmark:checkPerfRegression
+
+# Or run benchmarks and check in one command:
+./gradlew :benchmark:benchmarkAndCheck
 ```

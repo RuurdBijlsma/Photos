@@ -11,3 +11,5 @@
 #   public *;
 #}
 -keep class org.aomedia.avif.android.** { *; }
+# Protobuf JavaLite looks up generated message fields (e.g. `upserted_`, `PARSER`) by name via reflection.
+-keep class * extends com.google.protobuf.GeneratedMessageLite { *; }
