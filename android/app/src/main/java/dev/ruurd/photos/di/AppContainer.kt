@@ -30,6 +30,7 @@ import dev.ruurd.photos.domain.usecase.SyncTimelineUseCase
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.withContext
 import okhttp3.Dispatcher
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
@@ -80,7 +81,17 @@ class DefaultAppContainer(private val context: Context) : AppContainer {
     }
 
     override val sessionManager: SessionManager by lazy {
-        SessionManager(context, applicationScope)
+        SessionManager(
+            context = context,
+            scope = applicationScope,
+            onClearSessionData = {
+                withContext(dispatchers.io) {
+                    mediaRepository.clearAll()
+                    imageLoader.memoryCache?.clear()
+                    imageLoader.diskCache?.clear()
+                }
+            }
+        )
     }
 
     override val cookieJar: PersistentCookieJar by lazy {
@@ -185,8 +196,9 @@ class DefaultAppContainer(private val context: Context) : AppContainer {
     }
 
     override val networkMonitor: NetworkMonitor by lazy {
-        NetworkMonitor(context, applicationScope)
+        NetworkMonitor(context)
     }
+
     override val imageLoader: ImageLoader by lazy {
         PhotosImageLoader.create(context, okHttpClient)
     }

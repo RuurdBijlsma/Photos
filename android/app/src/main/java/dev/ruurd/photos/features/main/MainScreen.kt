@@ -34,6 +34,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -48,6 +49,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.ruurd.photos.core.permissions.MediaPermissions
 import dev.ruurd.photos.domain.model.MediaAccessState
+import dev.ruurd.photos.domain.model.SyncState
 import dev.ruurd.photos.features.main.components.AvatarMenuSheet
 import dev.ruurd.photos.features.main.components.FloatingBottomNav
 import dev.ruurd.photos.features.main.components.FloatingBottomNavHeight
@@ -56,6 +58,7 @@ import dev.ruurd.photos.features.main.components.PhotosTopBar
 import dev.ruurd.photos.features.main.components.PhotosTopBarHeight
 import dev.ruurd.photos.features.timeline.TimelineScreen
 import dev.ruurd.photos.features.timeline.TimelineViewModel
+import kotlinx.coroutines.launch
 
 @Composable
 fun MainScreen(
@@ -65,6 +68,7 @@ fun MainScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val timelineListState = rememberLazyListState()
+    val coroutineScope = rememberCoroutineScope()
 
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -104,15 +108,34 @@ fun MainScreen(
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() +
             FloatingBottomNavHeight
 
-    // Hide on scroll-down, show again after scrolling up the same distance (not only at the very top).
+    // Hide on scroll-down, reveal on scroll-up or near the top; ignore non-scroll layout shifts.
     var topBarHidden by remember { mutableStateOf(false) }
     LaunchedEffect(timelineListState) {
         var lastIndex = timelineListState.firstVisibleItemIndex
         var lastOffset = timelineListState.firstVisibleItemScrollOffset
         var travelled = 0f
         snapshotFlow {
-            timelineListState.firstVisibleItemIndex to timelineListState.firstVisibleItemScrollOffset
-        }.collect { (index, offset) ->
+            Triple(
+                timelineListState.isScrollInProgress,
+                timelineListState.firstVisibleItemIndex,
+                timelineListState.firstVisibleItemScrollOffset
+            )
+        }.collect { (isScrolling, index, offset) ->
+            if (index == 0 && offset <= TOP_BAR_HIDE_THRESHOLD_PX.toInt()) {
+                topBarHidden = false
+                if (offset == 0) {
+                    travelled = 0f
+                    lastIndex = 0
+                    lastOffset = 0
+                    return@collect
+                }
+            }
+            if (!isScrolling) {
+                lastIndex = index
+                lastOffset = offset
+                travelled = 0f
+                return@collect
+            }
             // An index change also resets the offset, so weight it far above any real offset delta.
             val delta = (index - lastIndex) * INDEX_WEIGHT_PX + (offset - lastOffset)
             lastIndex = index
@@ -137,7 +160,8 @@ fun MainScreen(
                     viewModel = timelineViewModel,
                     baseUrl = uiState.serverUrl,
                     listState = timelineListState,
-                    contentPadding = PaddingValues(top = topInset, bottom = bottomInset)
+                    contentPadding = PaddingValues(top = topInset, bottom = bottomInset),
+                    isSyncing = uiState.syncState == SyncState.SYNCING
                 )
             }
             MainNavTab.COLLECTIONS -> {
@@ -175,7 +199,16 @@ fun MainScreen(
 
         FloatingBottomNav(
             selectedTab = uiState.selectedTab,
-            onTabSelected = viewModel::onTabSelected,
+            onTabSelected = { tab ->
+                if (tab == MainNavTab.PHOTOS && uiState.selectedTab == MainNavTab.PHOTOS) {
+                    topBarHidden = false
+                    coroutineScope.launch {
+                        timelineListState.animateScrollToItem(0)
+                    }
+                } else {
+                    viewModel.onTabSelected(tab)
+                }
+            },
             onSearchClick = { /* Handled in future phases */ },
             modifier = Modifier.align(Alignment.BottomCenter)
         )

@@ -64,9 +64,9 @@ import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
 /**
- * Right-edge timeline scrubber. Jumps with `scrollToItem` (never animated) while dragging, tracks the
- * thumb by row offset instead of row index so unequal row heights do not make it jitter, and excludes
- * the system back gesture so vertical drags never leave the app.
+ * Right-edge timeline scrubber. Jumps synchronously with `requestScrollToItem` while dragging,
+ * tracks the thumb by row offset instead of row index so unequal row heights do not make it jitter,
+ * and excludes the system back gesture so vertical drags never leave the app.
  *
  * The touch strip is always present (otherwise scrubbing could never start) but the thumb only fades
  * in while the list scrolls or the user drags. There is no track: the year pills appear during a drag,
@@ -159,8 +159,7 @@ fun TimelineScrubber(
         val withinRowOffsetPx =
             ((targetOffsetDp - rowTopDp).coerceAtLeast(0f) * density.density).roundToInt()
 
-        dragState.seekJob?.cancel()
-        dragState.seekJob = scope.launch { listState.scrollToItem(index, withinRowOffsetPx) }
+        listState.requestScrollToItem(index, withinRowOffsetPx)
     }
 
     Box(
@@ -358,7 +357,6 @@ private fun yearLabelStyle(color: Color) = TextStyle(
 
 private class ScrubberDragState {
     var lastHapticYear: Int? = null
-    var seekJob: Job? = null
     var pauseJob: Job? = null
 }
 

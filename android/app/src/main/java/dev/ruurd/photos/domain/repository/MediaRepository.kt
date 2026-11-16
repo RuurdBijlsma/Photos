@@ -23,5 +23,6 @@ interface MediaRepository {
     suspend fun deleteCloudOnlyByCloudIds(cloudIds: List<String>)
     suspend fun deleteByCloudId(cloudId: String)
     suspend fun deleteByCloudIds(cloudIds: List<String>)
+    suspend fun clearAll()
     suspend fun <T> withTransaction(block: suspend () -> T): T
 }

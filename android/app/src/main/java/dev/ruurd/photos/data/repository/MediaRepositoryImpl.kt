@@ -70,6 +70,8 @@ class MediaRepositoryImpl(
         }
     }
 
+    override suspend fun clearAll() = mediaDao.clearAll()
+
     override suspend fun <T> withTransaction(block: suspend () -> T): T {
         return database.withTransaction(block)
     }

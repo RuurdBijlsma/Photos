@@ -107,6 +107,11 @@ class FakeMediaRepository : MediaRepository {
         emitTimeline()
     }
 
+    override suspend fun clearAll() {
+        items.clear()
+        emitTimeline()
+    }
+
     override suspend fun <T> withTransaction(block: suspend () -> T): T = block()
 
     private fun emitTimeline() {

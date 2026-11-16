@@ -18,12 +18,15 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 private val Context.sessionDataStore: DataStore<Preferences> by preferencesDataStore(name = "session_prefs")
 
 class SessionManager(
     private val context: Context,
-    scope: CoroutineScope
+    scope: CoroutineScope,
+    private val onClearSessionData: suspend () -> Unit = {}
 ) : SyncTimestampStore {
     companion object {
         const val DEFAULT_SERVER_URL = "http://10.0.2.2:5272"
@@ -49,6 +52,8 @@ class SessionManager(
             }
         }
     }
+
+    private val sessionMutex = Mutex()
 
     private val _serverUrl = MutableStateFlow(DEFAULT_SERVER_URL)
     val serverUrl: StateFlow<String> = _serverUrl.asStateFlow()
@@ -103,37 +108,49 @@ class SessionManager(
 
     suspend fun setAuthenticated(user: User) {
         initJob.join()
-        _authState.value = AuthState.Authenticated(user)
-        context.sessionDataStore.edit { prefs ->
-            prefs[KEY_USER_ID] = user.id
-            prefs[KEY_USER_EMAIL] = user.email
-            prefs[KEY_USER_NAME] = user.name
-            prefs[KEY_USER_ROLE] = user.role
-            if (user.mediaFolder != null) {
-                prefs[KEY_USER_MEDIA_FOLDER] = user.mediaFolder
-            } else {
-                prefs.remove(KEY_USER_MEDIA_FOLDER)
-            }
-            if (user.avatarId != null) {
-                prefs[KEY_USER_AVATAR_ID] = user.avatarId
-            } else {
-                prefs.remove(KEY_USER_AVATAR_ID)
+        sessionMutex.withLock {
+            _authState.value = AuthState.Authenticated(user)
+            context.sessionDataStore.edit { prefs ->
+                prefs[KEY_USER_ID] = user.id
+                prefs[KEY_USER_EMAIL] = user.email
+                prefs[KEY_USER_NAME] = user.name
+                prefs[KEY_USER_ROLE] = user.role
+                if (user.mediaFolder != null) {
+                    prefs[KEY_USER_MEDIA_FOLDER] = user.mediaFolder
+                } else {
+                    prefs.remove(KEY_USER_MEDIA_FOLDER)
+                }
+                if (user.avatarId != null) {
+                    prefs[KEY_USER_AVATAR_ID] = user.avatarId
+                } else {
+                    prefs.remove(KEY_USER_AVATAR_ID)
+                }
             }
         }
     }
 
     suspend fun setUnauthenticated() {
         initJob.join()
-        _authState.value = AuthState.Unauthenticated
-        _latestSyncTimestamp.value = 0L
-        context.sessionDataStore.edit { prefs ->
-            prefs.remove(KEY_USER_ID)
-            prefs.remove(KEY_USER_EMAIL)
-            prefs.remove(KEY_USER_NAME)
-            prefs.remove(KEY_USER_ROLE)
-            prefs.remove(KEY_USER_MEDIA_FOLDER)
-            prefs.remove(KEY_USER_AVATAR_ID)
-            prefs.remove(KEY_LATEST_SYNC_TIMESTAMP)
+        sessionMutex.withLock {
+            if (_authState.value is AuthState.Unauthenticated) return@withLock
+            try {
+                onClearSessionData()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                // Best-effort local cleanup; never block signing out.
+            }
+            _authState.value = AuthState.Unauthenticated
+            _latestSyncTimestamp.value = 0L
+            context.sessionDataStore.edit { prefs ->
+                prefs.remove(KEY_USER_ID)
+                prefs.remove(KEY_USER_EMAIL)
+                prefs.remove(KEY_USER_NAME)
+                prefs.remove(KEY_USER_ROLE)
+                prefs.remove(KEY_USER_MEDIA_FOLDER)
+                prefs.remove(KEY_USER_AVATAR_ID)
+                prefs.remove(KEY_LATEST_SYNC_TIMESTAMP)
+            }
         }
     }
 

@@ -27,6 +27,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -69,6 +70,7 @@ fun TimelineScreen(
     baseUrl: String,
     listState: LazyListState = rememberLazyListState(),
     contentPadding: PaddingValues = PaddingValues(),
+    isSyncing: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -92,7 +94,7 @@ fun TimelineScreen(
             }
     ) {
         when {
-            uiState.isLoading -> {
+            uiState.isLoading || (layout.isEmpty && isSyncing) -> {
                 CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
             }
 
@@ -217,10 +219,17 @@ private fun TimelineTile(
     val widthPx = (item.widthDp * density).roundToInt().coerceAtLeast(1)
     val heightPx = (heightDp * density).roundToInt().coerceAtLeast(1)
 
-    var loadSucceeded by remember(item.id, thumbnailTargetHeightPx, baseUrl, widthPx, heightPx) {
+    var loadSucceeded by remember(item, thumbnailTargetHeightPx, baseUrl, widthPx, heightPx) {
         mutableStateOf(false)
     }
-    val activeScrubbing = isScrubbing && !loadSucceeded
+    var gateLoads by remember(item, thumbnailTargetHeightPx, baseUrl, widthPx, heightPx) {
+        mutableStateOf(isScrubbing)
+    }
+    LaunchedEffect(isScrubbing, loadSucceeded) {
+        if (!isScrubbing && !loadSucceeded) {
+            gateLoads = false
+        }
+    }
 
     val request = remember(
         item,
@@ -228,13 +237,13 @@ private fun TimelineTile(
         baseUrl,
         widthPx,
         heightPx,
-        activeScrubbing
+        gateLoads
     ) {
         ImageRequest.Builder(context)
             .data(tileModel(item, baseUrl, thumbnailTargetHeightPx))
             .size(widthPx, heightPx)
             .apply {
-                if (activeScrubbing) {
+                if (gateLoads) {
                     // Fast scrubbing: reuse memory/disk caches without flooding MediaStore IPC or network.
                     memoryCachePolicy(CachePolicy.ENABLED)
                     diskCachePolicy(CachePolicy.READ_ONLY)
@@ -252,7 +261,7 @@ private fun TimelineTile(
     ) {
         // Coil 3's default model equality ignores CachePolicy changes, so uncached tiles that were
         // skipped during scrubbing must re-mount once scrubbing stops.
-        key(!activeScrubbing) {
+        key(gateLoads) {
             AsyncImage(
                 model = request,
                 contentDescription = null,
