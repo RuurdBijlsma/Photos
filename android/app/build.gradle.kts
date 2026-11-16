@@ -32,6 +32,12 @@ android {
                 packageScope = setOf("androidx.**", "kotlin.**", "kotlinx.**")
             }
         }
+        create("benchmark") {
+            initWith(getByName("release"))
+            signingConfig = signingConfigs.getByName("debug")
+            matchingFallbacks += listOf("release")
+            isDebuggable = false
+        }
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -46,6 +52,9 @@ android {
         }
         getByName("release") {
             java.directories.add("build/generated/java/generateReleaseProto/java")
+        }
+        getByName("benchmark") {
+            java.directories.add("build/generated/java/generateBenchmarkProto/java")
         }
     }
 }
@@ -95,6 +104,7 @@ dependencies {
     // Kotlinx
     implementation(libs.kotlinx.collections.immutable)
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.androidx.profileinstaller)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

@@ -176,12 +176,12 @@ implement notes
 
 ### 1C: Justified Timeline UI & Fast Scrubber
 
-* Implement 2-stage Room timeline queries over the composite index `(is_visible_in_timeline, year_month DESC,
+* [✅ Done] Implement 2-stage Room timeline queries over the composite index `(is_visible_in_timeline, year_month DESC,
   sort_timestamp DESC, id DESC)`: Stage 1 (top 2 `year_month`s for fast cold-start LCP) and Stage 2 (full library),
   with `.debounce(150)` on background `Flow` updates.
-* Build `CalculateTimelineLayoutUseCase` on `Dispatchers.Default` (`@Immutable` UI models, `ImmutableList`,
+* [✅ Done] Build `CalculateTimelineLayoutUseCase` on `Dispatchers.Default` (`@Immutable` UI models, `ImmutableList`,
   pixel-snapped item widths, `rowHeightDp * density` thumbnail ladder capped at `720`/`480`, and `TimelineLayoutIndex`).
-* Build `TimelineScreen`: Compose `LazyColumn` of typed `MonthHeaderUiItem` and `TimelineRowUiItem`s (no `crossfade` in
+* [✅ Done] Build `TimelineScreen`: Compose `LazyColumn` of typed `MonthHeaderUiItem` and `TimelineRowUiItem`s (no `crossfade` in
   grid cells) plus draggable right-edge `TimelineScrubber` (`Modifier.systemGestureExclusion()`, instant `scrollToItem`,
   thumb tracking via `estimatedOffsetTopDp / totalHeightDp`, `isScrubbing` image-load gating, and floating
   `DateOverlay`).

@@ -70,6 +70,9 @@ import dev.ruurd.photos.features.timeline.components.TimelineScrubber
 import dev.ruurd.photos.ui.theme.MontserratFontFamily
 import dev.ruurd.photos.ui.theme.PhotosRadii
 import kotlin.math.roundToInt
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTagsAsResourceId
 
 /**
  * Read-only justified timeline: a `LazyColumn` of typed month headers and precomputed photo rows, plus
@@ -117,7 +120,8 @@ fun TimelineScreen(
         }
     }
 
-    val statusBarOnlyTopDp = (contentPadding.calculateTopPadding() - topBarHeight).coerceAtLeast(0.dp)
+    val statusBarOnlyTopDp =
+        (contentPadding.calculateTopPadding() - topBarHeight).coerceAtLeast(0.dp)
     val datePillTopOffset by animateDpAsState(
         targetValue = if (topBarVisible) {
             contentPadding.calculateTopPadding() + 8.dp
@@ -130,6 +134,7 @@ fun TimelineScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
+            .semantics { testTagsAsResourceId = true }
             .onSizeChanged {
                 viewModel.onViewportChanged(it.width, density.density)
                 viewportHeightDp = with(density) { it.height.toDp().value }
@@ -147,7 +152,9 @@ fun TimelineScreen(
             else -> {
                 LazyColumn(
                     state = listState,
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .testTag("timeline_list"),
                     contentPadding = PaddingValues(
                         top = topPaddingDp.dp,
                         bottom = bottomPaddingDp.dp
@@ -191,6 +198,7 @@ fun TimelineScreen(
                         modifier = Modifier
                             .align(Alignment.CenterEnd)
                             .padding(top = topPaddingDp.dp, bottom = bottomPaddingDp.dp)
+                            .testTag("timeline_scrubber")
                     )
                 }
             }
