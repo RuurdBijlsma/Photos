@@ -13,7 +13,7 @@ const MIN_ABS_DELTA_MS = 0.5
 // Fail if P95 frameOverrunMs exceeds 4ms past VSync (0ms = zero dropped frames at P95).
 const MAX_P95_OVERRUN_MS = 4.0
 
-function findLatestBenchmarkJson(dir) {
+function collectBenchmarkJsons(dir) {
   if (!fs.existsSync(dir)) {
     throw new Error(`Benchmark output directory not found: ${dir}`)
   }
@@ -21,11 +21,16 @@ function findLatestBenchmarkJson(dir) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const full = path.join(dir, entry.name)
     if (entry.isDirectory()) {
-      files.push(...findLatestBenchmarkJson(full))
+      files.push(...collectBenchmarkJsons(full))
     } else if (entry.name.endsWith('-benchmarkData.json')) {
       files.push({ path: full, mtime: fs.statSync(full).mtimeMs })
     }
   }
+  return files
+}
+
+function findLatestBenchmarkJson(dir) {
+  const files = collectBenchmarkJsons(dir)
   files.sort((a, b) => b.mtime - a.mtime)
   return files[0]?.path
 }

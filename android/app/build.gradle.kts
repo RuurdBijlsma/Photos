@@ -29,7 +29,6 @@ android {
                 // add -keep class org.aomedia.avif.android.** { *; } to app/src/main/keepRules/rules.keep
                 // so JNI callbacks into AvifDecoder.Info aren't stripped
                 enable = true
-                packageScope = setOf("androidx.**", "kotlin.**", "kotlinx.**")
             }
         }
         create("benchmark") {

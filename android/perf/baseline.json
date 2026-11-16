@@ -1,0 +1,44 @@
+{
+  "context": {
+    "brand": "google",
+    "device": "husky",
+    "fingerprint": "google/husky/husky:17/CP3A.261005.005/16271449:user/release-keys",
+    "id": "CP3A.261005.005",
+    "model": "Pixel 8 Pro",
+    "type": "user",
+    "version": {
+      "codename": "REL",
+      "sdk": 37
+    }
+  },
+  "benchmarks": {
+    "scrollTimelineFling": {
+      "frameDurationCpuMs": {
+        "p50": 4.531575,
+        "p90": 6.471166599999998,
+        "p95": 7.1848629,
+        "p99": 8.735445140000005
+      },
+      "frameOverrunMs": {
+        "p50": -8.060351,
+        "p90": -6.435512,
+        "p95": -5.559362300000002,
+        "p99": -3.4523975199999977
+      }
+    },
+    "scrubTimeline": {
+      "frameDurationCpuMs": {
+        "p50": 6.572347,
+        "p90": 13.0429602,
+        "p95": 14.507804400000003,
+        "p99": 16.973745959999995
+      },
+      "frameOverrunMs": {
+        "p50": -5.717651,
+        "p90": -0.47503999999999974,
+        "p95": 1.2362094000000006,
+        "p99": 5.648116479999992
+      }
+    }
+  }
+}
