@@ -19,6 +19,7 @@ import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Dns
+import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -37,7 +38,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import dev.ruurd.photos.domain.model.SyncState
 import dev.ruurd.photos.domain.model.User
 import dev.ruurd.photos.ui.theme.PhotosRadii
@@ -49,6 +49,7 @@ fun AvatarMenuSheet(
     serverUrl: String,
     isOnline: Boolean,
     syncState: SyncState,
+    syncErrorMessage: String? = null,
     onSyncClick: () -> Unit,
     onLogoutClick: () -> Unit,
     onDismissRequest: () -> Unit,
@@ -144,23 +145,32 @@ fun AvatarMenuSheet(
                     Row(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        val (statusText, statusIcon) = if (isOnline) {
-                            "Connected" to Icons.Default.CloudDone
-                        } else {
-                            "Offline" to Icons.Default.CloudOff
+                        val (statusText, statusIcon, statusTint) = when {
+                            !isOnline -> Triple("Offline", Icons.Default.CloudOff, MaterialTheme.colorScheme.outline)
+                            syncErrorMessage != null || syncState == SyncState.SERVER_UNREACHABLE || syncState == SyncState.ERROR ->
+                                Triple(
+                                    syncErrorMessage ?: "Server unreachable",
+                                    Icons.Default.ErrorOutline,
+                                    MaterialTheme.colorScheme.error
+                                )
+                            else -> Triple("Connected", Icons.Default.CloudDone, MaterialTheme.colorScheme.primary)
                         }
 
                         Icon(
                             imageVector = statusIcon,
                             contentDescription = null,
-                            tint = if (isOnline) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+                            tint = statusTint,
                             modifier = Modifier.size(18.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = statusText,
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = if (statusTint == MaterialTheme.colorScheme.error) {
+                                MaterialTheme.colorScheme.error
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            }
                         )
                     }
                 }

@@ -132,7 +132,9 @@ class FakeMediaRepository : MediaRepository {
                     isVideo = it.isVideo,
                     durationMs = it.durationMs,
                     hasThumbnails = it.hasThumbnails,
-                    syncStatus = it.syncStatus
+                    syncStatus = it.syncStatus,
+                    sortTimestamp = it.sortTimestamp,
+                    timezoneOffsetMinutes = it.timezoneOffsetMinutes
                 )
             }
     }

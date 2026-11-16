@@ -146,7 +146,8 @@ class DefaultAppContainer(private val context: Context) : AppContainer {
             sessionManager = sessionManager,
             cookieJar = cookieJar,
             directClient = directClient,
-            dispatchers = dispatchers
+            dispatchers = dispatchers,
+            applicationScope = applicationScope
         )
     }
 

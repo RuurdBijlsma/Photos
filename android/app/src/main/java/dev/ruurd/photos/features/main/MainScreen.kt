@@ -1,5 +1,6 @@
 package dev.ruurd.photos.features.main
 
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -7,7 +8,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
- import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,6 +20,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
@@ -27,8 +29,13 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Collections
 import androidx.compose.material.icons.filled.Explore
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -79,6 +86,7 @@ fun MainScreen(
     }
     val timelineListState = rememberLazyListState(cacheWindow = timelineCacheWindow)
     val coroutineScope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
 
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -90,9 +98,27 @@ fun MainScreen(
         mediaAccess = MediaPermissions.read(context)
     }
 
+    BackHandler(enabled = uiState.destination == MainDestination.SEARCH) {
+        viewModel.onBackFromSearch()
+    }
+
     LaunchedEffect(Unit) {
         if (!mediaAccess.hasAnyAccess) {
             permissionLauncher.launch(MediaPermissions.requestedPermissions)
+        }
+    }
+
+    LaunchedEffect(uiState.syncErrorMessage) {
+        val message = uiState.syncErrorMessage ?: return@LaunchedEffect
+        val result = snackbarHostState.showSnackbar(
+            message = message,
+            actionLabel = "Retry",
+            withDismissAction = true,
+            duration = SnackbarDuration.Long
+        )
+        when (result) {
+            SnackbarResult.ActionPerformed -> viewModel.syncNow()
+            SnackbarResult.Dismissed -> viewModel.clearSyncError()
         }
     }
 
@@ -157,24 +183,26 @@ fun MainScreen(
             if (travelled < -TOP_BAR_HIDE_THRESHOLD_PX) topBarHidden = false
         }
     }
-    val hideTopBar = uiState.selectedTab == MainNavTab.PHOTOS && topBarHidden
+    val hideTopBar = uiState.destination == MainDestination.PHOTOS && topBarHidden
 
     Box(
         modifier = modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
-        when (uiState.selectedTab) {
-            MainNavTab.PHOTOS -> {
+        when (uiState.destination) {
+            MainDestination.PHOTOS -> {
                 TimelineScreen(
                     viewModel = timelineViewModel,
                     baseUrl = uiState.serverUrl,
                     listState = timelineListState,
                     contentPadding = PaddingValues(top = topInset, bottom = bottomInset),
+                    topBarHeight = PhotosTopBarHeight,
+                    topBarVisible = !hideTopBar,
                     isSyncing = uiState.syncState == SyncState.SYNCING
                 )
             }
-            MainNavTab.COLLECTIONS -> {
+            MainDestination.COLLECTIONS -> {
                 PlaceholderTabContent(
                     title = "Collections",
                     subtitle = "Albums, Device Folders and People will appear here in Phase 2 & 3.",
@@ -182,11 +210,19 @@ fun MainScreen(
                     modifier = Modifier.padding(top = topInset, bottom = bottomInset)
                 )
             }
-            MainNavTab.EXPLORE -> {
+            MainDestination.EXPLORE -> {
                 PlaceholderTabContent(
                     title = "Explore",
-                    subtitle = "Search by places, categories, and memories.",
+                    subtitle = "Explore your stats, locations, and memories.",
                     icon = Icons.Default.Explore,
+                    modifier = Modifier.padding(top = topInset, bottom = bottomInset)
+                )
+            }
+            MainDestination.SEARCH -> {
+                PlaceholderTabContent(
+                    title = "Search",
+                    subtitle = "Semantic, people, and place search will appear here.",
+                    icon = Icons.Default.Search,
                     modifier = Modifier.padding(top = topInset, bottom = bottomInset)
                 )
             }
@@ -194,7 +230,7 @@ fun MainScreen(
 
         // Kept behind PhotosTopBar (and shorter than it) so it stays hidden while the bar is
         // visible and seamlessly keeps status bar icons legible when the bar scrolls away.
-        if (uiState.selectedTab == MainNavTab.PHOTOS) {
+        if (uiState.destination == MainDestination.PHOTOS) {
             StatusBarScrim(
                 statusBarHeight = statusBarHeight,
                 modifier = Modifier.align(Alignment.TopCenter)
@@ -211,15 +247,30 @@ fun MainScreen(
                 currentUser = uiState.currentUser,
                 isOnline = uiState.isOnline,
                 syncState = uiState.syncState,
+                hasSyncError = uiState.syncErrorMessage != null,
+                onStatusPillClick = {
+                    if (uiState.isOnline && uiState.syncState != SyncState.SYNCING) {
+                        viewModel.syncNow()
+                    }
+                },
                 onAvatarClick = { viewModel.setAvatarMenuOpen(true) },
                 modifier = Modifier.background(MaterialTheme.colorScheme.background)
             )
         }
 
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .navigationBarsPadding()
+                .padding(bottom = FloatingBottomNavHeight + 4.dp, start = 16.dp, end = 16.dp)
+        )
+
         FloatingBottomNav(
-            selectedTab = uiState.selectedTab,
+            selectedTab = uiState.destination.asNavTabOrNull(),
+            showSearchButton = uiState.destination != MainDestination.SEARCH,
             onTabSelected = { tab ->
-                if (tab == MainNavTab.PHOTOS && uiState.selectedTab == MainNavTab.PHOTOS) {
+                if (tab == MainNavTab.PHOTOS && uiState.destination == MainDestination.PHOTOS) {
                     topBarHidden = false
                     coroutineScope.launch {
                         timelineListState.animateScrollToItem(0)
@@ -228,7 +279,7 @@ fun MainScreen(
                     viewModel.onTabSelected(tab)
                 }
             },
-            onSearchClick = { /* Handled in future phases */ },
+            onSearchClick = viewModel::onSearchSelected,
             modifier = Modifier.align(Alignment.BottomCenter)
         )
 
@@ -239,6 +290,7 @@ fun MainScreen(
                 serverUrl = uiState.serverUrl,
                 isOnline = uiState.isOnline,
                 syncState = uiState.syncState,
+                syncErrorMessage = uiState.syncErrorMessage,
                 onSyncClick = { viewModel.syncNow(forceFullSnapshot = true) },
                 onLogoutClick = viewModel::logout,
                 onDismissRequest = { viewModel.setAvatarMenuOpen(false) }

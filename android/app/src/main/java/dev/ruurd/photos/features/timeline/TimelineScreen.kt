@@ -1,6 +1,12 @@
 package dev.ruurd.photos.features.timeline
 
 import android.net.Uri
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -27,10 +33,12 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
@@ -47,6 +55,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import coil3.request.CachePolicy
@@ -58,13 +67,14 @@ import dev.ruurd.photos.domain.model.TimelineGridItemUiModel
 import dev.ruurd.photos.domain.model.TimelineRowUiItem
 import dev.ruurd.photos.domain.usecase.CalculateTimelineLayoutUseCase
 import dev.ruurd.photos.features.timeline.components.TimelineScrubber
+import dev.ruurd.photos.ui.theme.MontserratFontFamily
 import dev.ruurd.photos.ui.theme.PhotosRadii
 import kotlin.math.roundToInt
 
 /**
  * Read-only justified timeline: a `LazyColumn` of typed month headers and precomputed photo rows, plus
- * the right-edge scrubber. All geometry comes from `CalculateTimelineLayoutUseCase`; nothing here
- * measures, formats a date, or builds a URL per frame.
+ * the right-edge scrubber and floating scroll date pill. All geometry comes from
+ * `CalculateTimelineLayoutUseCase`; nothing here measures, formats a date, or builds a URL per frame.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -77,6 +87,8 @@ fun TimelineScreen(
         }
     ),
     contentPadding: PaddingValues = PaddingValues(),
+    topBarHeight: Dp = 0.dp,
+    topBarVisible: Boolean = true,
     isSyncing: Boolean = false,
     modifier: Modifier = Modifier
 ) {
@@ -91,6 +103,29 @@ fun TimelineScreen(
     // edges so the first and last rows are reachable.
     val topPaddingDp = contentPadding.calculateTopPadding().value
     val bottomPaddingDp = contentPadding.calculateBottomPadding().value + EXTRA_BOTTOM_PADDING_DP
+    val topBufferPx = with(density) { DATE_PILL_TOP_BUFFER_DP.dp.roundToPx() }
+
+    val datePillLabel by remember(layout, listState, topBufferPx) {
+        derivedStateOf {
+            val isScrolledPastTop = listState.firstVisibleItemIndex > 0 ||
+                    listState.firstVisibleItemScrollOffset > topBufferPx
+            if (!isScrolledPastTop || layout.isEmpty) {
+                null
+            } else {
+                layout.dateLabelAt(listState.firstVisibleItemIndex)
+            }
+        }
+    }
+
+    val statusBarOnlyTopDp = (contentPadding.calculateTopPadding() - topBarHeight).coerceAtLeast(0.dp)
+    val datePillTopOffset by animateDpAsState(
+        targetValue = if (topBarVisible) {
+            contentPadding.calculateTopPadding() + 8.dp
+        } else {
+            statusBarOnlyTopDp + 8.dp
+        },
+        label = "date_pill_top_offset"
+    )
 
     Box(
         modifier = modifier
@@ -132,6 +167,19 @@ fun TimelineScreen(
                     }
                 }
 
+                AnimatedVisibility(
+                    visible = datePillLabel != null,
+                    enter = fadeIn() + slideInVertically { -it / 2 },
+                    exit = fadeOut() + slideOutVertically { -it / 2 },
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(top = datePillTopOffset)
+                ) {
+                    datePillLabel?.let { label ->
+                        FloatingDatePill(label = label)
+                    }
+                }
+
                 if (layout.totalHeightDp + topPaddingDp + bottomPaddingDp > viewportHeightDp) {
                     TimelineScrubber(
                         layout = layout,
@@ -147,6 +195,30 @@ fun TimelineScreen(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun FloatingDatePill(
+    label: String,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        tonalElevation = 6.dp,
+        shadowElevation = 8.dp,
+        modifier = modifier
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelLarge.copy(
+                fontFamily = MontserratFontFamily,
+                fontWeight = FontWeight.SemiBold
+            ),
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+        )
     }
 }
 
@@ -336,6 +408,7 @@ private fun EmptyTimeline(modifier: Modifier = Modifier) {
 
 private val ITEM_GAP_DP = CalculateTimelineLayoutUseCase.ITEM_GAP_DP
 private const val EXTRA_BOTTOM_PADDING_DP = 24f
+private const val DATE_PILL_TOP_BUFFER_DP = 180f
 
 private fun tileModel(
     item: TimelineGridItemUiModel,

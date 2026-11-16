@@ -14,7 +14,7 @@ interface MediaDao {
 
     @Query(
         """
-        SELECT id, cloud_id, local_content_uri, year_month, ratio, is_video, duration_ms, has_thumbnails, sync_status
+        SELECT id, cloud_id, local_content_uri, year_month, ratio, is_video, duration_ms, has_thumbnails, sync_status, sort_timestamp, timezone_offset_minutes
         FROM media_item
         WHERE is_visible_in_timeline = 1
           AND year_month >= COALESCE(
@@ -35,7 +35,7 @@ interface MediaDao {
 
     @Query(
         """
-        SELECT id, cloud_id, local_content_uri, year_month, ratio, is_video, duration_ms, has_thumbnails, sync_status
+        SELECT id, cloud_id, local_content_uri, year_month, ratio, is_video, duration_ms, has_thumbnails, sync_status, sort_timestamp, timezone_offset_minutes
         FROM media_item
         WHERE is_visible_in_timeline = 1
         ORDER BY year_month DESC, sort_timestamp DESC, id DESC

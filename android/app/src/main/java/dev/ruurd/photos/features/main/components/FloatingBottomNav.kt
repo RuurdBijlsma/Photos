@@ -1,6 +1,13 @@
 package dev.ruurd.photos.features.main.components
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -28,6 +35,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -43,11 +51,12 @@ enum class MainNavTab(
 }
 
 /** Total height of the floating nav (pill + vertical padding), excluding the navigation bar inset. */
-val FloatingBottomNavHeight = 80.dp
+val FloatingBottomNavHeight = 86.dp
 
 @Composable
 fun FloatingBottomNav(
-    selectedTab: MainNavTab,
+    selectedTab: MainNavTab?,
+    showSearchButton: Boolean = true,
     onTabSelected: (MainNavTab) -> Unit,
     onSearchClick: () -> Unit,
     modifier: Modifier = Modifier
@@ -69,8 +78,7 @@ fun FloatingBottomNav(
             modifier = Modifier.height(56.dp)
         ) {
             Row(
-                modifier = Modifier
-                    .padding(horizontal = 6.dp, vertical = 6.dp),
+                modifier = Modifier.padding(horizontal = 6.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
@@ -79,16 +87,16 @@ fun FloatingBottomNav(
 
                     val containerColor by animateColorAsState(
                         targetValue = if (isSelected) {
-                            MaterialTheme.colorScheme.secondaryContainer
+                            MaterialTheme.colorScheme.primaryContainer
                         } else {
-                            MaterialTheme.colorScheme.surfaceContainerHigh
+                            Color.Transparent
                         },
                         label = "tab_container_color"
                     )
 
                     val contentColor by animateColorAsState(
                         targetValue = if (isSelected) {
-                            MaterialTheme.colorScheme.onSecondaryContainer
+                            MaterialTheme.colorScheme.onPrimaryContainer
                         } else {
                             MaterialTheme.colorScheme.onSurfaceVariant
                         },
@@ -124,7 +132,7 @@ fun FloatingBottomNav(
                                 color = contentColor,
                                 style = MaterialTheme.typography.labelLarge.copy(
                                     fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
-                                    fontSize = 13.sp
+                                    fontSize = 14.sp
                                 )
                             )
                         }
@@ -133,29 +141,37 @@ fun FloatingBottomNav(
             }
         }
 
-        Spacer(modifier = Modifier.width(10.dp))
-
-        // Detached Search Button (CircleShape, surfaceContainerHigh, 56.dp)
-        Surface(
-            shape = CircleShape,
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-            tonalElevation = 6.dp,
-            shadowElevation = 8.dp,
-            modifier = Modifier.size(56.dp)
+        AnimatedVisibility(
+            visible = showSearchButton,
+            enter = fadeIn() + scaleIn(initialScale = 0.8f) + expandHorizontally(),
+            exit = fadeOut() + scaleOut(targetScale = 0.8f) + shrinkHorizontally()
         ) {
-            Box(
-                modifier = Modifier
-                    .size(56.dp)
-                    .clip(CircleShape)
-                    .clickable(onClick = onSearchClick),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Search,
-                    contentDescription = "Search",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(22.dp)
-                )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Spacer(modifier = Modifier.width(10.dp))
+
+                // Detached Search Button (CircleShape, surfaceContainerHigh, matches nav pill height)
+                Surface(
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    tonalElevation = 6.dp,
+                    shadowElevation = 8.dp,
+                    modifier = Modifier.size(56.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(56.dp)
+                            .clip(CircleShape)
+                            .clickable(onClick = onSearchClick),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Search,
+                            contentDescription = "Search",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+                }
             }
         }
     }

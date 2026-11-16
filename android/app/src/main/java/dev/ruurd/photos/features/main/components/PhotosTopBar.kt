@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -47,6 +48,8 @@ fun PhotosTopBar(
     currentUser: User?,
     isOnline: Boolean,
     syncState: SyncState,
+    hasSyncError: Boolean = false,
+    onStatusPillClick: () -> Unit = {},
     onAvatarClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -70,8 +73,13 @@ fun PhotosTopBar(
                 .size(32.dp)
         )
 
-        // Center: Subtle Connectivity / Sync Status Pill (hidden when idle & online)
-        val showStatusPill = !isOnline || syncState == SyncState.SYNCING || syncState == SyncState.SERVER_UNREACHABLE
+        // Center: Subtle Connectivity / Sync Status Pill (hidden when idle & online with no error)
+        val showStatusPill = !isOnline ||
+                syncState == SyncState.SYNCING ||
+                syncState == SyncState.SERVER_UNREACHABLE ||
+                syncState == SyncState.ERROR ||
+                hasSyncError
+
         AnimatedVisibility(
             visible = showStatusPill,
             enter = fadeIn(),
@@ -81,17 +89,20 @@ fun PhotosTopBar(
             val (pillText, pillColor, pillIcon) = when {
                 !isOnline -> Triple("Offline", semanticColors.offline, Icons.Default.CloudOff)
                 syncState == SyncState.SYNCING -> Triple("Syncing...", semanticColors.syncing, Icons.Default.Sync)
-                syncState == SyncState.SERVER_UNREACHABLE -> Triple("Reconnecting...", semanticColors.offline, Icons.Default.CloudOff)
+                syncState == SyncState.SERVER_UNREACHABLE -> Triple("Server unreachable", semanticColors.error, Icons.Default.CloudOff)
+                syncState == SyncState.ERROR || hasSyncError -> Triple("Sync failed", semanticColors.error, Icons.Default.ErrorOutline)
                 else -> Triple("", Color.Transparent, Icons.Default.Sync)
             }
 
             Box(
                 modifier = Modifier
                     .height(30.dp)
+                    .clip(CircleShape)
                     .background(
                         color = pillColor.copy(alpha = 0.15f),
                         shape = CircleShape
                     )
+                    .clickable(enabled = isOnline && syncState != SyncState.SYNCING, onClick = onStatusPillClick)
                     .padding(horizontal = 12.dp),
                 contentAlignment = Alignment.Center
             ) {

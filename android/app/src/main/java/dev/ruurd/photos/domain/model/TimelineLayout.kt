@@ -37,6 +37,8 @@ data class TimelineRowUiItem(
     val isLastOfMonth: Boolean,
     /** Thumbnail ladder step in px, picked from the rendered row height. */
     val thumbnailTargetHeightPx: Int,
+    /** Pre-formatted capture date of the first item in this row (e.g. "Today", "Sat, 24 Oct"). */
+    val dateLabel: String = "",
     override val estimatedOffsetTopDp: Float
 ) : TimelineListItem
 
@@ -101,4 +103,13 @@ class TimelineLayoutIndex(
     fun monthLabelAt(index: Int): String? = rows.getOrNull(index)?.let { monthLabels[it.yearMonth] }
 
     fun yearAt(index: Int): Int? = rows.getOrNull(index)?.let { it.yearMonth / 100 }
+
+    fun dateLabelAt(index: Int): String? {
+        val row = when (val item = rows.getOrNull(index)) {
+            is TimelineRowUiItem -> item
+            is MonthHeaderUiItem -> rows.getOrNull(index + 1) as? TimelineRowUiItem
+            null -> null
+        }
+        return row?.dateLabel?.takeIf { it.isNotEmpty() }
+    }
 }

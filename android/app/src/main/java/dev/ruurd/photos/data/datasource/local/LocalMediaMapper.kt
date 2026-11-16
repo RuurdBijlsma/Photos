@@ -20,6 +20,9 @@ object LocalMediaMapper {
         return date.year * 100 + date.monthValue
     }
 
+    fun timezoneOffsetMinutes(timestampMs: Long, zone: ZoneId): Int =
+        zone.rules.getOffset(Instant.ofEpochMilli(timestampMs)).totalSeconds / 60
+
     fun toEntity(
         file: LocalMediaFile,
         isVisibleInTimeline: Boolean,
@@ -36,7 +39,7 @@ object LocalMediaMapper {
         sizeBytes = file.sizeBytes,
         ratio = ratio(file.width, file.height, file.orientation),
         sortTimestamp = file.dateTakenMs,
-        timezoneOffsetMinutes = 0,
+        timezoneOffsetMinutes = timezoneOffsetMinutes(file.dateTakenMs, zone),
         yearMonth = yearMonth(file.dateTakenMs, zone),
         isVideo = file.isVideo,
         durationMs = file.durationMs,

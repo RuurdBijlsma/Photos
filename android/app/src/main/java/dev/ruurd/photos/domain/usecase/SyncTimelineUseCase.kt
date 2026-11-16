@@ -50,7 +50,7 @@ class SyncTimelineUseCase(
                         _syncState.value = if (response.code() in 500..599) {
                             SyncState.SERVER_UNREACHABLE
                         } else {
-                            SyncState.IDLE
+                            SyncState.ERROR
                         }
                         return@withLock Result.failure(
                             Exception("Sync request failed: HTTP ${response.code()}")
@@ -145,7 +145,7 @@ class SyncTimelineUseCase(
                     _syncState.value = SyncState.SERVER_UNREACHABLE
                     Result.failure(e)
                 } catch (e: Exception) {
-                    _syncState.value = SyncState.IDLE
+                    _syncState.value = SyncState.ERROR
                     Result.failure(e)
                 }
             }

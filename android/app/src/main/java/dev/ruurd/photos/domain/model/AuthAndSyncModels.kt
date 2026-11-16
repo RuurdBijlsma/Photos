@@ -19,5 +19,6 @@ enum class SyncState {
     IDLE,
     SYNCING,
     OFFLINE,
-    SERVER_UNREACHABLE
+    SERVER_UNREACHABLE,
+    ERROR
 }

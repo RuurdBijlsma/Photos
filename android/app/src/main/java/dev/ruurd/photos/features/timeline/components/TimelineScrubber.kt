@@ -1,7 +1,10 @@
 package dev.ruurd.photos.features.timeline.components
 
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
@@ -21,6 +24,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.UnfoldMore
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
@@ -37,12 +41,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
@@ -70,9 +74,8 @@ import kotlin.math.roundToInt
  * tracks the thumb by row offset instead of row index so unequal row heights do not make it jitter,
  * and excludes the system back gesture so vertical drags never leave the app.
  *
- * The touch strip is always present (otherwise scrubbing could never start) but the thumb only fades
- * in when the list actually moves or the user drags (ignoring boundary overscroll), and lingers for
- * a short delay after scrolling stops before fading out.
+ * The touch strip is always present (otherwise scrubbing could never start) while the thumb slides
+ * in horizontally from the right when scrolling/dragging and slides back out after a short delay.
  */
 @Composable
 fun TimelineScrubber(
@@ -93,8 +96,9 @@ fun TimelineScrubber(
     val currentMaxScrollDp by rememberUpdatedState(maxScrollDp(layout, viewportHeightDp, topPaddingDp, bottomPaddingDp))
     val currentOnScrubbingChanged by rememberUpdatedState(onScrubbingChanged)
 
-    val thumbColor = MaterialTheme.colorScheme.onSurface
-    val thumbIconColor = MaterialTheme.colorScheme.surface
+    val thumbColor = MaterialTheme.colorScheme.surfaceContainerHigh
+    val thumbIconColor = MaterialTheme.colorScheme.onSurface
+    val thumbBorderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
     val pillColor = MaterialTheme.colorScheme.surfaceContainerHighest
     val pillTextColor = MaterialTheme.colorScheme.onSurface
     val activePillColor = MaterialTheme.colorScheme.primary
@@ -167,13 +171,18 @@ fun TimelineScrubber(
     }
     val fraction = if (isDragging) dragFraction else scrollFraction
     val showVisuals = isDragging || isScrubberVisible
-    val visualsAlpha by animateFloatAsState(
+    val revealProgress by animateFloatAsState(
         targetValue = if (showVisuals) 1f else 0f,
-        animationSpec = tween(durationMillis = if (showVisuals) 120 else 250),
-        label = "scrubber_alpha"
+        animationSpec = if (showVisuals) {
+            spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMedium)
+        } else {
+            tween(durationMillis = 240)
+        },
+        label = "scrubber_slide"
     )
+    val slideOutPx = with(density) { (ThumbVisibleWidth + 12.dp).toPx() }
 
-    fun seek(rawFraction: Float) {
+    fun seek(rawFraction: Float, triggerYearHaptic: Boolean) {
         val activeLayout = currentLayout
         if (activeLayout.isEmpty) return
 
@@ -186,7 +195,9 @@ fun TimelineScrubber(
 
         val year = activeLayout.yearAt(index)
         if (year != null && year != dragState.lastHapticYear) {
-            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+            if (triggerYearHaptic && dragState.lastHapticYear != null) {
+                haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
+            }
             dragState.lastHapticYear = year
         }
 
@@ -213,7 +224,11 @@ fun TimelineScrubber(
                             isDragging = true
                             dragState.lastHapticYear = null
                             currentOnScrubbingChanged(true)
-                            seek(offset.y / size.height.coerceAtLeast(1))
+                            haptic.performHapticFeedback(HapticFeedbackType.SegmentFrequentTick)
+                            seek(
+                                rawFraction = offset.y / size.height.coerceAtLeast(1),
+                                triggerYearHaptic = false
+                            )
                         },
                         onDragEnd = {
                             dragState.pauseJob?.cancel()
@@ -235,7 +250,10 @@ fun TimelineScrubber(
                                 delay(SCRUB_PAUSE_MS)
                                 currentOnScrubbingChanged(false)
                             }
-                            seek(change.position.y / size.height.coerceAtLeast(1))
+                            seek(
+                                rawFraction = change.position.y / size.height.coerceAtLeast(1),
+                                triggerYearHaptic = true
+                            )
                         }
                     )
                 } finally {
@@ -274,7 +292,12 @@ fun TimelineScrubber(
         // Left of the visible part of the circle: the rest hangs past the screen edge.
         val thumbLeftPx = sizePx.width -
                 with(density) { ScrubberOverhang.roundToPx() + ThumbVisibleWidth.roundToPx() }
-        Box(
+        Surface(
+            shape = CircleShape,
+            color = thumbColor,
+            tonalElevation = 4.dp,
+            shadowElevation = 6.dp,
+            border = BorderStroke(1.dp, thumbBorderColor),
             modifier = Modifier
                 .align(Alignment.TopStart)
                 .offset {
@@ -283,17 +306,22 @@ fun TimelineScrubber(
                         y = ((sizePx.height - thumbSizePx) * fraction).roundToInt()
                     )
                 }
-                .alpha(if (isDragging) 1f else visualsAlpha)
+                .graphicsLayer {
+                    val effectiveReveal = if (isDragging) 1f else revealProgress
+                    translationX = (1f - effectiveReveal) * slideOutPx
+                }
                 .size(ThumbDiameter)
-                .background(color = thumbColor, shape = CircleShape),
-            contentAlignment = Alignment.Center
         ) {
-            Icon(
-                imageVector = Icons.Filled.UnfoldMore,
-                contentDescription = null,
-                tint = thumbIconColor,
-                modifier = Modifier.size(ThumbIconSize)
-            )
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = Icons.Filled.UnfoldMore,
+                    contentDescription = null,
+                    tint = thumbIconColor,
+                    modifier = Modifier
+                        .offset(x = -ThumbIconOpticalShift)
+                        .size(ThumbIconSize)
+                )
+            }
         }
 
         if (isDragging) {
@@ -341,7 +369,48 @@ fun TimelineScrubber(
     }
 }
 
-/** Small opaque pills left of the thumb, skipping any that would overlap the previous one. */
+internal data class PlacedYearMark(
+    val top: Float,
+    val height: Float
+)
+
+/**
+ * Selects which year marks to show while reserving the oldest year (last in list) so intermediate
+ * recent-ish years (e.g. 2005) never hide the oldest year in the library (e.g. 1997).
+ */
+internal fun selectVisibleYearMarkIndices(
+    marks: List<PlacedYearMark>,
+    gap: Float
+): List<Int> {
+    if (marks.isEmpty()) return emptyList()
+    if (marks.size == 1) return listOf(0)
+
+    val first = marks.first()
+    val lastIndex = marks.lastIndex
+    val last = marks[lastIndex]
+
+    val firstBottom = first.top + first.height
+    if (last.top < firstBottom + gap) {
+        return listOf(0)
+    }
+
+    val selected = ArrayList<Int>(marks.size)
+    selected.add(0)
+    var previousBottom = firstBottom
+
+    for (i in 1 until lastIndex) {
+        val mark = marks[i]
+        if (mark.top >= previousBottom + gap && mark.top + mark.height + gap <= last.top) {
+            selected.add(i)
+            previousBottom = mark.top + mark.height
+        }
+    }
+
+    selected.add(lastIndex)
+    return selected
+}
+
+/** Small opaque pills left of the thumb, keeping both ends of the year range visible. */
 private fun DrawScope.drawYearPills(
     marks: List<MeasuredYearMark>,
     activeYear: Int?,
@@ -352,27 +421,36 @@ private fun DrawScope.drawYearPills(
     paddingY: Float,
     gap: Float
 ) {
-    var previousBottom = Float.NEGATIVE_INFINITY
-    marks.forEach { mark ->
+    if (marks.isEmpty()) return
+
+    val placed = marks.map { mark ->
         val isActive = mark.year == activeYear
         val text = if (isActive) mark.activeTextLayout else mark.textLayout
-        val textSize = text.size
-        val pillHeight = textSize.height + paddingY * 2
-        val pillWidth = textSize.width + paddingX * 2
+        val pillHeight = text.size.height + paddingY * 2
         val pillTop = (size.height * mark.fraction - pillHeight / 2f)
             .coerceIn(0f, (size.height - pillHeight).coerceAtLeast(0f))
+        PlacedYearMark(top = pillTop, height = pillHeight)
+    }
 
-        if (pillTop >= previousBottom + gap) {
-            val left = rightEdge - pillWidth
-            drawRoundRect(
-                color = if (isActive) activePillColor else pillColor,
-                topLeft = Offset(left, pillTop),
-                size = Size(pillWidth, pillHeight),
-                cornerRadius = CornerRadius(pillHeight / 2f)
-            )
-            drawText(textLayoutResult = text, topLeft = Offset(left + paddingX, pillTop + paddingY))
-            previousBottom = pillTop + pillHeight
-        }
+    val visibleIndices = selectVisibleYearMarkIndices(placed, gap)
+    for (i in visibleIndices) {
+        val mark = marks[i]
+        val placement = placed[i]
+        val isActive = mark.year == activeYear
+        val text = if (isActive) mark.activeTextLayout else mark.textLayout
+        val pillWidth = text.size.width + paddingX * 2
+        val left = rightEdge - pillWidth
+
+        drawRoundRect(
+            color = if (isActive) activePillColor else pillColor,
+            topLeft = Offset(left, placement.top),
+            size = Size(pillWidth, placement.height),
+            cornerRadius = CornerRadius(placement.height / 2f)
+        )
+        drawText(
+            textLayoutResult = text,
+            topLeft = Offset(left + paddingX, placement.top + paddingY)
+        )
     }
 }
 
@@ -410,13 +488,14 @@ private data class MeasuredYearMark(
     val activeTextLayout: TextLayoutResult
 )
 
-private val ScrubberWidth = 28.dp
-private val ScrubberOverhang = 12.dp
-private val ThumbDiameter = 40.dp
-private val ThumbIconSize = 24.dp
+private val ScrubberWidth = 36.dp
+private val ScrubberOverhang = 20.dp
+private val ThumbDiameter = 52.dp
+private val ThumbIconSize = 28.dp
 
-/** Visible part of the thumb, i.e. everything left of the screen edge (20% hangs past it). */
-private val ThumbVisibleWidth = ThumbDiameter * 0.8f
+/** Visible part of the thumb, i.e. everything left of the screen edge (35% hangs past it). */
+private val ThumbVisibleWidth = ThumbDiameter * 0.67f
+private val ThumbIconOpticalShift = 4.dp
 private val PillGap = 6.dp
 private const val SCRUB_PAUSE_MS = 80L
 private const val SCRUBBER_HIDE_DELAY_MS = 1_500L

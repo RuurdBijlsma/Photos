@@ -28,5 +28,11 @@ data class TimelineMediaProjection(
     val hasThumbnails: Boolean,
 
     @ColumnInfo(name = "sync_status")
-    val syncStatus: SyncStatus
+    val syncStatus: SyncStatus,
+
+    @ColumnInfo(name = "sort_timestamp")
+    val sortTimestamp: Long = 0L,
+
+    @ColumnInfo(name = "timezone_offset_minutes")
+    val timezoneOffsetMinutes: Int = 0
 )

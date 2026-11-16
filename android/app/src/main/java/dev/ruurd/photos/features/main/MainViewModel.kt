@@ -21,13 +21,28 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import java.io.IOException
+
+enum class MainDestination {
+    PHOTOS,
+    COLLECTIONS,
+    EXPLORE,
+    SEARCH;
+
+    fun asNavTabOrNull(): MainNavTab? = when (this) {
+        PHOTOS -> MainNavTab.PHOTOS
+        COLLECTIONS -> MainNavTab.COLLECTIONS
+        EXPLORE -> MainNavTab.EXPLORE
+        SEARCH -> null
+    }
+}
 
 data class MainUiState(
     val currentUser: User? = null,
     val serverUrl: String = "",
     val isOnline: Boolean = false,
     val syncState: SyncState = SyncState.IDLE,
-    val selectedTab: MainNavTab = MainNavTab.PHOTOS,
+    val destination: MainDestination = MainDestination.PHOTOS,
     val isAvatarMenuOpen: Boolean = false,
     val syncErrorMessage: String? = null
 )
@@ -39,7 +54,8 @@ class MainViewModel(
     networkMonitor: NetworkMonitor
 ) : ViewModel() {
 
-    private val _selectedTab = MutableStateFlow(MainNavTab.PHOTOS)
+    private val _destination = MutableStateFlow(MainDestination.PHOTOS)
+    private var lastNonSearchTab: MainNavTab = MainNavTab.PHOTOS
     private val _isAvatarMenuOpen = MutableStateFlow(false)
     private val _syncErrorMessage = MutableStateFlow<String?>(null)
 
@@ -54,10 +70,10 @@ class MainViewModel(
     ) { url, online, sync -> Triple(url, online, sync) }
 
     private val uiControlsFlow = combine(
-        _selectedTab,
+        _destination,
         _isAvatarMenuOpen,
         _syncErrorMessage
-    ) { tab, menuOpen, error -> Triple(tab, menuOpen, error) }
+    ) { destination, menuOpen, error -> Triple(destination, menuOpen, error) }
 
     val uiState: StateFlow<MainUiState> = combine(
         authRepository.authState,
@@ -65,7 +81,7 @@ class MainViewModel(
         uiControlsFlow
     ) { authState, conn, controls ->
         val (serverUrl, isOnline, syncState) = conn
-        val (tab, menuOpen, error) = controls
+        val (destination, menuOpen, error) = controls
         val user = (authState as? AuthState.Authenticated)?.user
 
         MainUiState(
@@ -73,7 +89,7 @@ class MainViewModel(
             serverUrl = serverUrl,
             isOnline = isOnline,
             syncState = syncState,
-            selectedTab = tab,
+            destination = destination,
             isAvatarMenuOpen = menuOpen,
             syncErrorMessage = error
         )
@@ -97,7 +113,8 @@ class MainViewModel(
                         pendingScanAccess = null
                         scanJob?.cancel()
                         scanJob = null
-                        _selectedTab.value = MainNavTab.PHOTOS
+                        lastNonSearchTab = MainNavTab.PHOTOS
+                        _destination.value = MainDestination.PHOTOS
                         _isAvatarMenuOpen.value = false
                         _syncErrorMessage.value = null
                         return@collect
@@ -121,11 +138,30 @@ class MainViewModel(
     }
 
     fun onTabSelected(tab: MainNavTab) {
-        _selectedTab.value = tab
+        lastNonSearchTab = tab
+        _destination.value = when (tab) {
+            MainNavTab.PHOTOS -> MainDestination.PHOTOS
+            MainNavTab.COLLECTIONS -> MainDestination.COLLECTIONS
+            MainNavTab.EXPLORE -> MainDestination.EXPLORE
+        }
+    }
+
+    fun onSearchSelected() {
+        _destination.value = MainDestination.SEARCH
+    }
+
+    fun onBackFromSearch() {
+        if (_destination.value == MainDestination.SEARCH) {
+            onTabSelected(lastNonSearchTab)
+        }
     }
 
     fun setAvatarMenuOpen(open: Boolean) {
         _isAvatarMenuOpen.value = open
+    }
+
+    fun clearSyncError() {
+        _syncErrorMessage.value = null
     }
 
     fun syncNow(forceFullSnapshot: Boolean = false) {
@@ -135,8 +171,16 @@ class MainViewModel(
             _syncErrorMessage.value = null
             val result = syncTimelineUseCase(forceFullSnapshot = forceFullSnapshot)
             result.onFailure { error ->
-                _syncErrorMessage.value = error.localizedMessage ?: "Sync failed"
+                _syncErrorMessage.value = formatSyncError(error)
             }
+        }
+    }
+
+    private fun formatSyncError(error: Throwable): String {
+        val detail = error.localizedMessage?.takeIf { it.isNotBlank() }
+        return when (error) {
+            is IOException -> "Couldn't reach server to sync cloud library"
+            else -> if (detail != null) "Cloud sync failed: $detail" else "Cloud sync failed"
         }
     }
 

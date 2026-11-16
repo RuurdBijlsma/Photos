@@ -8,8 +8,11 @@ import dev.ruurd.photos.domain.model.TimelineListItem
 import dev.ruurd.photos.domain.model.TimelineRowUiItem
 import dev.ruurd.photos.domain.model.TimelineYearMark
 import kotlinx.collections.immutable.toPersistentList
+import java.time.Instant
 import java.time.LocalDate
 import java.time.Month
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.util.Locale
 import kotlin.math.min
@@ -33,7 +36,8 @@ data class TimelineLayoutParams(
  */
 class CalculateTimelineLayoutUseCase(
     private val maxThumbnailHeightPx: Int = DEFAULT_MAX_THUMBNAIL_PX,
-    private val currentYearProvider: () -> Int = { LocalDate.now().year }
+    private val currentYearProvider: () -> Int = { LocalDate.now().year },
+    private val todayProvider: () -> LocalDate = { LocalDate.now() }
 ) {
 
     operator fun invoke(
@@ -48,6 +52,7 @@ class CalculateTimelineLayoutUseCase(
         val headerHeightPx = (HEADER_HEIGHT_DP * density).roundToInt()
         val desiredHeightPx = (params.desiredRowHeightDp * density).roundToInt().coerceAtLeast(1)
         val currentYear = currentYearProvider()
+        val today = todayProvider()
 
         val items = ArrayList<TimelineListItem>(media.size + 16)
         val monthOffsets = HashMap<Int, Int>()
@@ -82,6 +87,7 @@ class CalculateTimelineLayoutUseCase(
                 if (leftover != 0 && widths[last] + leftover > 0) widths[last] += leftover
             }
 
+            val firstItem = rowMedia.first()
             val uiItems = rowMedia.mapIndexed { index, item ->
                 item.toGridItem(widthDp = widths[index] / density)
             }.toPersistentList()
@@ -89,13 +95,14 @@ class CalculateTimelineLayoutUseCase(
             rowMedia.forEach { item -> itemOffsets[item.id] = items.size }
             items.add(
                 TimelineRowUiItem(
-                    id = "row_${rowMedia.first().id}",
-                    yearMonth = rowMedia.first().yearMonth,
+                    id = "row_${firstItem.id}",
+                    yearMonth = firstItem.yearMonth,
                     heightDp = heightPx / density,
                     items = uiItems,
                     isFirstOfMonth = firstOfMonth,
                     isLastOfMonth = lastOfMonth,
                     thumbnailTargetHeightPx = thumbnailHeightFor(heightPx),
+                    dateLabel = formatDateLabel(firstItem, today, currentYear),
                     estimatedOffsetTopDp = offsetPx / density
                 )
             )
@@ -172,6 +179,24 @@ class CalculateTimelineLayoutUseCase(
         syncStatus = syncStatus
     )
 
+    private fun formatDateLabel(
+        item: TimelineMediaProjection,
+        today: LocalDate,
+        currentYear: Int
+    ): String {
+        if (item.sortTimestamp <= 0L) return ""
+        val localDate = Instant.ofEpochMilli(
+            item.sortTimestamp + item.timezoneOffsetMinutes * 60_000L
+        ).atZone(ZoneOffset.UTC).toLocalDate()
+
+        return when {
+            localDate == today -> "Today"
+            localDate == today.minusDays(1) -> "Yesterday"
+            localDate.year == currentYear -> localDate.format(CURRENT_YEAR_DATE_FORMATTER)
+            else -> localDate.format(OTHER_YEAR_DATE_FORMATTER)
+        }
+    }
+
     private fun formatDuration(durationMs: Int): String {
         val totalSeconds = durationMs / 1000
         val minutes = totalSeconds / 60
@@ -198,6 +223,11 @@ class CalculateTimelineLayoutUseCase(
         const val MAX_SIZE_MULTIPLIER = 1.5f
         const val DEFAULT_MAX_THUMBNAIL_PX = 720
         val THUMBNAIL_LADDER_PX = intArrayOf(144, 240, 360, 480, 720, 1080, 1440)
+
+        private val CURRENT_YEAR_DATE_FORMATTER =
+            DateTimeFormatter.ofPattern("EEE, d MMM", Locale.ENGLISH)
+        private val OTHER_YEAR_DATE_FORMATTER =
+            DateTimeFormatter.ofPattern("EEE, d MMM yyyy", Locale.ENGLISH)
 
         fun ratioOf(item: TimelineMediaProjection): Float =
             if (item.ratio.isFinite() && item.ratio > 0f) item.ratio else 1f

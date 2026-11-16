@@ -8,6 +8,8 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.time.LocalDate
+import java.time.ZoneOffset
 import kotlin.math.roundToInt
 
 class CalculateTimelineLayoutUseCaseTest {
@@ -15,9 +17,18 @@ class CalculateTimelineLayoutUseCaseTest {
     private val density = 3f
     private val containerWidthPx = 1080
     private val params = TimelineLayoutParams(containerWidthPx = containerWidthPx, density = density)
-    private val useCase = CalculateTimelineLayoutUseCase(currentYearProvider = { 2026 })
+    private val useCase = CalculateTimelineLayoutUseCase(
+        currentYearProvider = { 2026 },
+        todayProvider = { LocalDate.of(2026, 11, 16) }
+    )
 
-    private fun media(id: String, yearMonth: Int, ratio: Float = 1f) = TimelineMediaProjection(
+    private fun media(
+        id: String,
+        yearMonth: Int,
+        ratio: Float = 1f,
+        sortTimestamp: Long = 0L,
+        timezoneOffsetMinutes: Int = 0
+    ) = TimelineMediaProjection(
         id = id,
         cloudId = null,
         localContentUri = null,
@@ -26,7 +37,9 @@ class CalculateTimelineLayoutUseCaseTest {
         isVideo = false,
         durationMs = null,
         hasThumbnails = false,
-        syncStatus = SyncStatus.LOCAL_ONLY
+        syncStatus = SyncStatus.LOCAL_ONLY,
+        sortTimestamp = sortTimestamp,
+        timezoneOffsetMinutes = timezoneOffsetMinutes
     )
 
     /** Width/height ratio of square items, so a full row is exactly two tiles. */
@@ -129,6 +142,40 @@ class CalculateTimelineLayoutUseCaseTest {
         assertEquals(layout.rows.lastIndex, layout.findRowIndexAtOffsetDp(layout.totalHeightDp))
         assertTrue(layout.yearFractions.isNotEmpty())
         assertEquals(2026, layout.yearAt(0))
+    }
+
+    @Test
+    fun `formats row date labels for today, yesterday, current year, and past years`() {
+        fun millis(date: LocalDate) = date.atTime(14, 0).toInstant(ZoneOffset.UTC).toEpochMilli()
+
+        val items = listOf(
+            media("today", 202611, sortTimestamp = millis(LocalDate.of(2026, 11, 16))),
+            media("yesterday", 202611, sortTimestamp = millis(LocalDate.of(2026, 11, 15))),
+            media("oct", 202610, sortTimestamp = millis(LocalDate.of(2026, 10, 24))),
+            media("old", 201608, sortTimestamp = millis(LocalDate.of(2016, 8, 9)))
+        )
+
+        val layout = useCase(items, params)
+        val rows = layout.rows.filterIsInstance<TimelineRowUiItem>()
+
+        assertEquals("Today", rows[0].dateLabel)
+        // "today" and "yesterday" share the 202611 row when width fits 2 items; check isolated months too
+        val singleRowLayout = useCase(
+            listOf(
+                media("today", 202611, ratio = 3f, sortTimestamp = millis(LocalDate.of(2026, 11, 16))),
+                media("yesterday", 202611, ratio = 3f, sortTimestamp = millis(LocalDate.of(2026, 11, 15))),
+                media("oct", 202610, ratio = 3f, sortTimestamp = millis(LocalDate.of(2026, 10, 24))),
+                media("old", 201608, ratio = 3f, sortTimestamp = millis(LocalDate.of(2016, 8, 9)))
+            ),
+            params
+        )
+        val singleRows = singleRowLayout.rows.filterIsInstance<TimelineRowUiItem>()
+        assertEquals("Today", singleRows[0].dateLabel)
+        assertEquals("Yesterday", singleRows[1].dateLabel)
+        assertEquals("Sat, 24 Oct", singleRows[2].dateLabel)
+        assertEquals("Tue, 9 Aug 2016", singleRows[3].dateLabel)
+        // Month header resolves the date label of its first row
+        assertEquals("Today", singleRowLayout.dateLabelAt(0))
     }
 
     @Test

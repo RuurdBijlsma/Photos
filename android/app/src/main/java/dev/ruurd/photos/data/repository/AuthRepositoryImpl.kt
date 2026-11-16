@@ -8,7 +8,9 @@ import dev.ruurd.photos.domain.model.AuthState
 import dev.ruurd.photos.domain.model.User
 import dev.ruurd.photos.domain.repository.AuthRepository
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import okhttp3.Call
@@ -30,14 +32,16 @@ class AuthRepositoryImpl(
     private val sessionManager: SessionManager,
     private val cookieJar: PersistentCookieJar,
     private val directClient: OkHttpClient,
-    private val dispatchers: AppDispatchers
+    private val dispatchers: AppDispatchers,
+    private val applicationScope: CoroutineScope
 ) : AuthRepository {
 
-    // Reachability checks should fail fast instead of waiting out the 15s socket timeouts.
-    private val testClient: OkHttpClient by lazy {
+    // Reachability checks and best-effort logout should fail fast instead of waiting out 30s timeouts.
+    private val shortTimeoutClient: OkHttpClient by lazy {
         directClient.newBuilder()
             .connectTimeout(5, TimeUnit.SECONDS)
             .readTimeout(5, TimeUnit.SECONDS)
+            .writeTimeout(5, TimeUnit.SECONDS)
             .build()
     }
 
@@ -66,7 +70,7 @@ class AuthRepositoryImpl(
 
                 // Enqueued instead of execute() so cancelling the caller aborts the socket instead of
                 // blocking the IO dispatcher until the connect timeout expires.
-                testClient.newCall(request).await().use { response ->
+                shortTimeoutClient.newCall(request).await().use { response ->
                     if (response.isSuccessful) {
                         Result.success(Unit)
                     } else {
@@ -111,15 +115,39 @@ class AuthRepositoryImpl(
 
     override suspend fun logout(): Result<Unit> = withContext(dispatchers.io) {
         try {
-            try {
-                apiService.logout()
-            } catch (e: CancellationException) {
-                throw e
-            } catch (_: Exception) {
-                // Ignore network error on logout
+            val baseUrl = sessionManager.getServerUrl().toHttpUrlOrNull()
+            val logoutUrl = baseUrl?.newBuilder()?.addPathSegments("api/auth/logout")?.build()
+            val cookieHeader = logoutUrl?.let { url ->
+                cookieJar.loadForRequest(url)
+                    .takeIf { it.isNotEmpty() }
+                    ?.joinToString("; ") { "${it.name}=${it.value}" }
             }
+
+            // Clear local auth immediately so sign out never hangs when the server is offline.
             cookieJar.clear()
             sessionManager.setUnauthenticated()
+
+            if (logoutUrl != null) {
+                applicationScope.launch(dispatchers.io) {
+                    try {
+                        val request = Request.Builder()
+                            .url(logoutUrl)
+                            .apply {
+                                if (!cookieHeader.isNullOrEmpty()) {
+                                    header("Cookie", cookieHeader)
+                                }
+                            }
+                            .post("".toRequestBody())
+                            .build()
+                        shortTimeoutClient.newCall(request).await().close()
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (_: Exception) {
+                        // Best-effort server token revocation; local session is already cleared.
+                    }
+                }
+            }
+
             Result.success(Unit)
         } catch (e: CancellationException) {
             throw e
