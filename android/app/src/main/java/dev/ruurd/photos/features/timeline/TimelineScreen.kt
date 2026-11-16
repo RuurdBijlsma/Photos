@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
@@ -54,6 +55,7 @@ import dev.ruurd.photos.domain.model.TimelineRowUiItem
 import dev.ruurd.photos.domain.usecase.CalculateTimelineLayoutUseCase
 import dev.ruurd.photos.features.timeline.components.TimelineScrubber
 import dev.ruurd.photos.ui.theme.PhotosRadii
+import kotlin.math.roundToInt
 
 /**
  * Read-only justified timeline: a `LazyColumn` of typed month headers and precomputed photo rows, plus
@@ -64,11 +66,11 @@ import dev.ruurd.photos.ui.theme.PhotosRadii
 fun TimelineScreen(
     viewModel: TimelineViewModel,
     baseUrl: String,
+    listState: LazyListState = rememberLazyListState(),
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val layout = uiState.layout
-    val listState = rememberLazyListState()
     val density = LocalDensity.current
 
     var isScrubbing by remember { mutableStateOf(false) }
@@ -95,7 +97,7 @@ fun TimelineScreen(
                 LazyColumn(
                     state = listState,
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(bottom = 24.dp)
+                    contentPadding = PaddingValues(bottom = TIMELINE_BOTTOM_PADDING_DP.dp)
                 ) {
                     items(
                         items = layout.rows,
@@ -111,10 +113,12 @@ fun TimelineScreen(
                     }
                 }
 
-                if (layout.totalHeightDp > viewportHeightDp) {
+                if (layout.totalHeightDp + TIMELINE_BOTTOM_PADDING_DP > viewportHeightDp) {
                     TimelineScrubber(
                         layout = layout,
                         listState = listState,
+                        viewportHeightDp = viewportHeightDp,
+                        bottomPaddingDp = TIMELINE_BOTTOM_PADDING_DP,
                         onScrubbingChanged = { isScrubbing = it },
                         modifier = Modifier.align(Alignment.CenterEnd)
                     )
@@ -134,12 +138,17 @@ private fun MonthHeader(item: MonthHeaderUiItem, heightDp: Float) {
         verticalAlignment = Alignment.Bottom,
         horizontalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Text(text = item.title, style = MaterialTheme.typography.headlineMedium)
+        Text(
+            text = item.title,
+            style = MaterialTheme.typography.headlineMedium,
+            modifier = Modifier.alignByBaseline()
+        )
         item.yearLabel?.let { year ->
             Text(
                 text = year,
                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Medium),
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                modifier = Modifier.alignByBaseline()
             )
         }
     }
@@ -188,9 +197,14 @@ private fun TimelineTile(
     isScrubbing: Boolean
 ) {
     val context = LocalContext.current
-    val request = remember(item, thumbnailTargetHeightPx, baseUrl, isScrubbing) {
+    val density = LocalDensity.current.density
+    val widthPx = (item.widthDp * density).roundToInt().coerceAtLeast(1)
+    val heightPx = (heightDp * density).roundToInt().coerceAtLeast(1)
+
+    val request = remember(item, thumbnailTargetHeightPx, baseUrl, widthPx, heightPx, isScrubbing) {
         ImageRequest.Builder(context)
             .data(tileModel(item, baseUrl, thumbnailTargetHeightPx))
+            .size(widthPx, heightPx)
             .apply {
                 if (isScrubbing) {
                     // Fast scrubbing: reuse what is already decoded/downloaded instead of flooding
@@ -271,6 +285,7 @@ private fun EmptyTimeline(modifier: Modifier = Modifier) {
 }
 
 private val ITEM_GAP_DP = CalculateTimelineLayoutUseCase.ITEM_GAP_DP
+private const val TIMELINE_BOTTOM_PADDING_DP = 24f
 
 private fun tileModel(
     item: TimelineGridItemUiModel,

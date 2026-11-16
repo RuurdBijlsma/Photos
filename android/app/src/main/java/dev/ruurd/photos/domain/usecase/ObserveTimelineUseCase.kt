@@ -3,6 +3,7 @@ package dev.ruurd.photos.domain.usecase
 import dev.ruurd.photos.core.common.AppDispatchers
 import dev.ruurd.photos.core.database.entity.MediaEntity
 import dev.ruurd.photos.domain.repository.MediaRepository
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.debounce
@@ -15,6 +16,7 @@ import kotlinx.coroutines.flow.flowOn
  * invalidations are coalesced, so a sync or MediaStore scan re-lays out once per batch instead of
  * once per row.
  */
+@OptIn(FlowPreview::class)
 class ObserveTimelineUseCase(
     private val mediaRepository: MediaRepository,
     private val dispatchers: AppDispatchers

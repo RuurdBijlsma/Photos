@@ -60,6 +60,21 @@ class CalculateTimelineLayoutUseCaseTest {
     }
 
     @Test
+    fun `trailing row within stretch limit fits container width without gap overflow`() {
+        // Two 3:4 portrait items (405 px each at 180.dp * 3 = 540 px) total 816 px with gap (< 1080),
+        // so they land in the trailing finishRow call with rawMultiplier ~ 1.33 <= 1.5.
+        val layout = useCase(
+            listOf(media("p1", 202610, 0.75f), media("p2", 202610, 0.75f)),
+            params
+        )
+        val row = layout.rows.filterIsInstance<TimelineRowUiItem>().single()
+        val gapPx = (CalculateTimelineLayoutUseCase.ITEM_GAP_DP * density).roundToInt()
+        val tilesPx = row.items.sumOf { (it.widthDp * density).roundToInt() }
+
+        assertEquals(containerWidthPx, tilesPx + gapPx)
+    }
+
+    @Test
     fun `incomplete month row does not stretch beyond the desired height`() {
         // Three squares: a full row of two, then a single tile that must stay at the desired height.
         val layout = useCase((1..3).map { square("square$it", 202610) }, params)
@@ -104,6 +119,8 @@ class CalculateTimelineLayoutUseCaseTest {
         assertEquals(0, layout.findRowIndexAtPercentage(0f))
         assertEquals(layout.rows.lastIndex, layout.findRowIndexAtPercentage(1f))
         assertTrue(layout.findRowIndexAtPercentage(0.5f) in 0..layout.rows.lastIndex)
+        assertEquals(0, layout.findRowIndexAtOffsetDp(0f))
+        assertEquals(layout.rows.lastIndex, layout.findRowIndexAtOffsetDp(layout.totalHeightDp))
         assertTrue(layout.yearFractions.isNotEmpty())
         assertEquals(2026, layout.yearAt(0))
     }

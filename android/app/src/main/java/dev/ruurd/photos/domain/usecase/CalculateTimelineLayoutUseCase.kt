@@ -62,18 +62,20 @@ class CalculateTimelineLayoutUseCase(
         fun finishRow(firstOfMonth: Boolean, lastOfMonth: Boolean, flushToWidth: Boolean) {
             if (rowMedia.isEmpty()) return
             val gapsPx = (rowMedia.size - 1) * gapPx
-            val multiplier = if (flushToWidth) {
-                min((containerWidthPx - gapsPx).toFloat() / rowWidthPx, MAX_SIZE_MULTIPLIER)
-            } else {
+            val availableWidth = (containerWidthPx - gapsPx).coerceAtLeast(1).toFloat()
+            val rawMultiplier = availableWidth / rowWidthPx
+            val isFlush = flushToWidth || rawMultiplier <= MAX_SIZE_MULTIPLIER
+            val multiplier = when {
+                flushToWidth -> min(rawMultiplier, MAX_SIZE_MULTIPLIER)
+                rawMultiplier <= MAX_SIZE_MULTIPLIER -> rawMultiplier
                 // A month that ends on an incomplete row must not stretch into giant blocks.
-                val raw = containerWidthPx.toFloat() / rowWidthPx
-                if (raw > MAX_SIZE_MULTIPLIER) 1f else raw
+                else -> 1f
             }
             val heightPx = (desiredHeightPx * multiplier).roundToInt().coerceAtLeast(1)
             val widths = IntArray(rowMedia.size) { index ->
                 (ratioOf(rowMedia[index]) * heightPx).roundToInt().coerceAtLeast(1)
             }
-            if (flushToWidth) {
+            if (isFlush) {
                 // Rounding leaves a few px; hand them to the last tile so the row ends flush.
                 val leftover = containerWidthPx - widths.sum() - gapsPx
                 val last = widths.lastIndex

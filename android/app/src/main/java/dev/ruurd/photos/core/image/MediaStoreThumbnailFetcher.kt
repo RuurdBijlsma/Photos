@@ -13,6 +13,7 @@ import coil3.fetch.FetchResult
 import coil3.fetch.Fetcher
 import coil3.fetch.ImageFetchResult
 import coil3.key.Keyer
+import coil3.request.CachePolicy
 import coil3.request.Options
 import coil3.size.Dimension
 import kotlinx.coroutines.CancellationException
@@ -46,17 +47,27 @@ class MediaStoreThumbnailFetcher(
     private val imageLoader: ImageLoader
 ) : Fetcher {
 
-    override suspend fun fetch(): FetchResult? = try {
-        loadThumbnail()
-    } catch (_: SecurityException) {
-        // Temporary grant revoked (e.g. partial access after a restart): fall back to the server.
-        fetchModel(data.cloudFallbackUrl)
-    } catch (_: FileNotFoundException) {
-        // Local file was removed before the next scan reconciled Room: fall back to the server.
-        fetchModel(data.cloudFallbackUrl)
-    } catch (_: IOException) {
-        // No MediaStore thumbnail yet: decode subsampled locally, falling back to cloud if needed.
-        fetchLocalFallbackOrCloud()
+    override suspend fun fetch(): FetchResult? {
+        // Skip MediaStore/decoder IPC while fast-scrubbing (Coil's memory cache still serves hits
+        // before fetch() is invoked).
+        if (options.diskCachePolicy == CachePolicy.READ_ONLY ||
+            options.diskCachePolicy == CachePolicy.DISABLED
+        ) {
+            return null
+        }
+
+        return try {
+            loadThumbnail()
+        } catch (_: SecurityException) {
+            // Temporary grant revoked (e.g. partial access after a restart): fall back to the server.
+            fetchModel(data.cloudFallbackUrl)
+        } catch (_: FileNotFoundException) {
+            // Local file was removed before the next scan reconciled Room: fall back to the server.
+            fetchModel(data.cloudFallbackUrl)
+        } catch (_: IOException) {
+            // No MediaStore thumbnail yet: decode subsampled locally, falling back to cloud if needed.
+            fetchLocalFallbackOrCloud()
+        }
     }
 
     private suspend fun loadThumbnail(): FetchResult {

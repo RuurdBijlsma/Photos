@@ -72,9 +72,13 @@ class TimelineLayoutIndex(
     val isEmpty: Boolean get() = rows.isEmpty()
 
     /** Row/header index whose top is nearest above [fraction] (0f..1f) of the total height. */
-    fun findRowIndexAtPercentage(fraction: Float): Int {
+    fun findRowIndexAtPercentage(fraction: Float): Int =
+        findRowIndexAtOffsetDp(fraction.coerceIn(0f, 1f) * totalHeightDp)
+
+    /** Row/header index whose top is nearest above [offsetDp] from the top of the timeline. */
+    fun findRowIndexAtOffsetDp(offsetDp: Float): Int {
         if (rows.isEmpty()) return 0
-        val target = fraction.coerceIn(0f, 1f) * totalHeightDp
+        val target = offsetDp.coerceIn(0f, totalHeightDp)
         var low = 0
         var high = rows.lastIndex
         var index = 0

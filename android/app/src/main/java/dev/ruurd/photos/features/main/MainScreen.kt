@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Collections
 import androidx.compose.material.icons.filled.Explore
@@ -50,6 +51,7 @@ fun MainScreen(
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val timelineListState = rememberLazyListState()
 
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -111,7 +113,8 @@ fun MainScreen(
                 MainNavTab.PHOTOS -> {
                     TimelineScreen(
                         viewModel = timelineViewModel,
-                        baseUrl = uiState.serverUrl
+                        baseUrl = uiState.serverUrl,
+                        listState = timelineListState
                     )
                 }
                 MainNavTab.COLLECTIONS -> {
