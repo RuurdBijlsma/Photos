@@ -428,8 +428,8 @@ class ScanLocalMediaUseCaseTest {
             val row = repo.getById("local_1")!!
             assertTrue(row.autoBackupSuppressed)
             assertEquals(1_730_000_000_000L, row.sortTimestamp)
-            // 1_730_000_000_000L is Oct 27 2024 (CEST -> UTC+2, 120 minutes).
-            assertEquals(120, row.timezoneOffsetMinutes)
+            // 1_730_000_000_000L is 2024-10-27T03:33:20Z, after DST ended (CET -> UTC+1, 60 minutes).
+            assertEquals(60, row.timezoneOffsetMinutes)
         }
 
     @Test

@@ -23,7 +23,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.layout.LazyLayoutCacheWindow
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
@@ -37,6 +37,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
@@ -51,7 +52,12 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
@@ -63,6 +69,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import coil3.request.CachePolicy
@@ -74,6 +81,7 @@ import dev.ruurd.photos.domain.model.TimelineGridItemUiModel
 import dev.ruurd.photos.domain.model.TimelineLayoutIndex
 import dev.ruurd.photos.domain.model.TimelineRowUiItem
 import dev.ruurd.photos.domain.usecase.CalculateTimelineLayoutUseCase
+import dev.ruurd.photos.features.main.components.PullToRefreshState
 import dev.ruurd.photos.features.timeline.components.TimelineScrubber
 import dev.ruurd.photos.ui.theme.MontserratFontFamily
 import dev.ruurd.photos.ui.theme.PhotosRadii
@@ -99,6 +107,7 @@ fun TimelineScreen(
     topBarVisible: Boolean = true,
     isSyncing: Boolean = false,
     isBootstrapping: Boolean = false,
+    pullToRefreshState: PullToRefreshState? = null,
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -110,6 +119,10 @@ fun TimelineScreen(
 
     LaunchedEffect(isBootstrapping) {
         viewModel.setBootstrapping(isBootstrapping)
+    }
+
+    DisposableEffect(pullToRefreshState) {
+        onDispose { pullToRefreshState?.reset() }
     }
 
     // Keep the viewport pinned to index 0 when newer months are prepended while already at the top;
@@ -148,6 +161,50 @@ fun TimelineScreen(
         }
     }
 
+    val isEmptyState = !uiState.isLoading && !isBootstrapping && layout.isEmpty && !isSyncing
+    val currentIsEmpty by rememberUpdatedState(isEmptyState)
+    val pullNestedScrollConnection = remember(pullToRefreshState, listState) {
+        if (pullToRefreshState == null) {
+            null
+        } else {
+            object : NestedScrollConnection {
+                override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                    if (source == NestedScrollSource.UserInput &&
+                        available.y < 0f &&
+                        pullToRefreshState.isPulled
+                    ) {
+                        val consumedY = pullToRefreshState.onPullDelta(available.y)
+                        return Offset(0f, consumedY)
+                    }
+                    return Offset.Zero
+                }
+
+                override fun onPostScroll(
+                    consumed: Offset,
+                    available: Offset,
+                    source: NestedScrollSource
+                ): Offset {
+                    val atTop = currentIsEmpty || !listState.canScrollBackward
+                    if (source == NestedScrollSource.UserInput &&
+                        available.y > 0f &&
+                        !isScrubbing &&
+                        atTop
+                    ) {
+                        val consumedY = pullToRefreshState.onPullDelta(available.y)
+                        return Offset(0f, consumedY)
+                    }
+                    return Offset.Zero
+                }
+
+                override suspend fun onPreFling(available: Velocity): Velocity {
+                    val wasPulled = pullToRefreshState.isPulled
+                    pullToRefreshState.onRelease()
+                    return if (wasPulled) available else Velocity.Zero
+                }
+            }
+        }
+    }
+
     // Rows scroll under the floating top bar and bottom nav; the padding only offsets the content
     // edges so the first and last rows are reachable.
     val topPaddingDp = contentPadding.calculateTopPadding().value
@@ -156,6 +213,13 @@ fun TimelineScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
+            .then(
+                if (pullNestedScrollConnection != null) {
+                    Modifier.nestedScroll(pullNestedScrollConnection)
+                } else {
+                    Modifier
+                }
+            )
             .semantics { testTagsAsResourceId = true }
             .onSizeChanged {
                 viewModel.onViewportChanged(it.width, density.density)
@@ -168,7 +232,11 @@ fun TimelineScreen(
             }
 
             layout.isEmpty -> {
-                EmptyTimeline(modifier = Modifier.align(Alignment.Center))
+                EmptyTimeline(
+                    contentPadding = contentPadding,
+                    pullToRefreshState = pullToRefreshState,
+                    modifier = Modifier.fillMaxSize()
+                )
             }
 
             else -> {
@@ -176,22 +244,46 @@ fun TimelineScreen(
                     state = listState,
                     modifier = Modifier
                         .fillMaxSize()
+                        .graphicsLayer {
+                            val offset = pullToRefreshState?.contentOffsetPx ?: 0f
+                            if (offset != 0f) {
+                                translationY = offset
+                            }
+                        }
                         .testTag("timeline_list"),
                     contentPadding = PaddingValues(
                         top = topPaddingDp.dp,
                         bottom = bottomPaddingDp.dp
                     )
                 ) {
-                    items(
+                    itemsIndexed(
                         items = layout.rows,
-                        key = { item -> item.id },
-                        contentType = { item ->
+                        key = { _, item -> item.id },
+                        contentType = { _, item ->
                             if (item is MonthHeaderUiItem) "header" else "row"
                         }
-                    ) { item ->
+                    ) { index, item ->
+                        val cascadeModifier = if (pullToRefreshState != null && index < CASCADE_ROW_LIMIT) {
+                            Modifier.pullCascadeGraphicsLayer(
+                                index = index,
+                                pullState = pullToRefreshState,
+                                scaleRows = item is TimelineRowUiItem
+                            )
+                        } else {
+                            Modifier
+                        }
                         when (item) {
-                            is MonthHeaderUiItem -> MonthHeader(item, layout.headerHeightDp)
-                            is TimelineRowUiItem -> TimelineRow(item, baseUrl, isScrubbing)
+                            is MonthHeaderUiItem -> MonthHeader(
+                                item = item,
+                                heightDp = layout.headerHeightDp,
+                                modifier = cascadeModifier
+                            )
+                            is TimelineRowUiItem -> TimelineRow(
+                                item = item,
+                                baseUrl = baseUrl,
+                                isScrubbing = isScrubbing,
+                                modifier = cascadeModifier
+                            )
                         }
                     }
                 }
@@ -220,6 +312,23 @@ fun TimelineScreen(
                     )
                 }
             }
+        }
+    }
+}
+
+private fun Modifier.pullCascadeGraphicsLayer(
+    index: Int,
+    pullState: PullToRefreshState,
+    scaleRows: Boolean
+): Modifier = graphicsLayer {
+    val progress = pullState.pullProgress
+    if (progress > 0f) {
+        val clamped = progress.coerceAtMost(1.35f)
+        translationY = index * CASCADE_STEP_DP.dp.toPx() * clamped
+        if (scaleRows) {
+            val scale = 1f - 0.015f * clamped.coerceAtMost(1.1f)
+            scaleX = scale
+            scaleY = scale
         }
     }
 }
@@ -296,11 +405,15 @@ private fun FloatingDatePill(
 }
 
 @Composable
-private fun MonthHeader(item: MonthHeaderUiItem, heightDp: Float) {
+private fun MonthHeader(
+    item: MonthHeaderUiItem,
+    heightDp: Float,
+    modifier: Modifier = Modifier
+) {
     // Baseline alignment does not use the row's fixed height, so the texts are wrapped in a Box that
     // bottom-aligns them; that keeps the gap above the month larger than the gap below it.
     Box(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .height(heightDp.dp)
             .padding(start = 24.dp, end = 24.dp, top = 16.dp, bottom = 10.dp),
@@ -325,7 +438,12 @@ private fun MonthHeader(item: MonthHeaderUiItem, heightDp: Float) {
 }
 
 @Composable
-private fun TimelineRow(item: TimelineRowUiItem, baseUrl: String, isScrubbing: Boolean) {
+private fun TimelineRow(
+    item: TimelineRowUiItem,
+    baseUrl: String,
+    isScrubbing: Boolean,
+    modifier: Modifier = Modifier
+) {
     val shape = RoundedCornerShape(
         topStart = if (item.isFirstOfMonth) PhotosRadii.Card else 0.dp,
         topEnd = if (item.isFirstOfMonth) PhotosRadii.Card else 0.dp,
@@ -335,7 +453,7 @@ private fun TimelineRow(item: TimelineRowUiItem, baseUrl: String, isScrubbing: B
 
     // The row gap is part of the row box so its height matches the precomputed offsets.
     Box(
-        modifier = Modifier.padding(
+        modifier = modifier.padding(
             bottom = if (item.isLastOfMonth) 0.dp else ITEM_GAP_DP.dp
         )
     ) {
@@ -472,19 +590,44 @@ private fun TimelineTile(
 }
 
 @Composable
-private fun EmptyTimeline(modifier: Modifier = Modifier) {
-    Box(modifier = modifier.padding(32.dp), contentAlignment = Alignment.Center) {
-        Text(
-            text = "No photos yet.\nBacked-up photos and camera folders will appear here.",
-            style = MaterialTheme.typography.bodyMedium.copy(textAlign = TextAlign.Center),
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+private fun EmptyTimeline(
+    contentPadding: PaddingValues,
+    pullToRefreshState: PullToRefreshState?,
+    modifier: Modifier = Modifier
+) {
+    val emptyListState = rememberLazyListState()
+    LazyColumn(
+        state = emptyListState,
+        contentPadding = contentPadding,
+        modifier = modifier.graphicsLayer {
+            val offset = pullToRefreshState?.contentOffsetPx ?: 0f
+            if (offset != 0f) {
+                translationY = offset
+            }
+        }
+    ) {
+        item {
+            Box(
+                modifier = Modifier
+                    .fillParentMaxSize()
+                    .padding(32.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "No photos yet.\nBacked-up photos and camera folders will appear here.",
+                    style = MaterialTheme.typography.bodyMedium.copy(textAlign = TextAlign.Center),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
     }
 }
 
 private val ITEM_GAP_DP = CalculateTimelineLayoutUseCase.ITEM_GAP_DP
 private const val EXTRA_BOTTOM_PADDING_DP = 24f
 private const val DATE_PILL_TOP_BUFFER_DP = 180f
+private const val CASCADE_ROW_LIMIT = 8
+private const val CASCADE_STEP_DP = 3f
 
 /** Mutable-without-recomposition flag for "this tile already rendered its image". */
 private class TileLoadState {

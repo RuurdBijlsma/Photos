@@ -61,7 +61,7 @@ class MainViewModel(
     private val localMediaStore: LocalMediaStore,
     syncTimestampStore: SyncTimestampStore,
     scanStateStore: ScanStateStore,
-    networkMonitor: NetworkMonitor
+    private val networkMonitor: NetworkMonitor
 ) : ViewModel() {
 
     private val _destination = MutableStateFlow(MainDestination.PHOTOS)
@@ -192,6 +192,15 @@ class MainViewModel(
         _syncErrorMessage.value = null
     }
 
+    fun refreshTimeline(access: MediaAccessState) {
+        if (access.hasAnyAccess) {
+            scanLocalMedia(access, immediate = true)
+        }
+        if (networkMonitor.isOnline.value) {
+            syncNow(forceFullSnapshot = true)
+        }
+    }
+
     fun syncNow(forceFullSnapshot: Boolean = false) {
         if (syncJob?.isActive == true || syncTimelineUseCase.syncState.value == SyncState.SYNCING) {
             if (!_initialSyncSettled.value && syncJob?.isActive != true) {
@@ -234,7 +243,7 @@ class MainViewModel(
         }
     }
 
-    fun scanLocalMedia(access: MediaAccessState) {
+    fun scanLocalMedia(access: MediaAccessState, immediate: Boolean = false) {
         if (!access.hasAnyAccess) {
             _initialScanSettled.value = true
             return
@@ -246,7 +255,7 @@ class MainViewModel(
             return
         }
 
-        val shouldDelayStartupScan = isFirstLaunchScan && _initialScanSettled.value
+        val shouldDelayStartupScan = !immediate && isFirstLaunchScan && _initialScanSettled.value
         isFirstLaunchScan = false
 
         lateinit var launchedJob: Job
@@ -272,7 +281,7 @@ class MainViewModel(
                     nextAccess != null &&
                     nextAccess.hasAnyAccess
                 ) {
-                    scanLocalMedia(nextAccess)
+                    scanLocalMedia(nextAccess, immediate = immediate)
                 }
             }
         }

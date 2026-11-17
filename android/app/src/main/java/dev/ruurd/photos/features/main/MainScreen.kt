@@ -71,6 +71,7 @@ import dev.ruurd.photos.features.main.components.FloatingBottomNavHeight
 import dev.ruurd.photos.features.main.components.MainNavTab
 import dev.ruurd.photos.features.main.components.PhotosTopBar
 import dev.ruurd.photos.features.main.components.PhotosTopBarHeight
+import dev.ruurd.photos.features.main.components.rememberPullToRefreshState
 import dev.ruurd.photos.features.timeline.TimelineScreen
 import dev.ruurd.photos.features.timeline.TimelineViewModel
 import kotlinx.coroutines.launch
@@ -107,6 +108,13 @@ fun MainScreen(
             viewModel.onMediaAccessDenied()
         }
     }
+
+    val pullToRefreshState = rememberPullToRefreshState(
+        isOnline = uiState.isOnline,
+        isRefreshing = uiState.syncState == SyncState.SYNCING,
+        onRefresh = { viewModel.refreshTimeline(MediaPermissions.read(context)) },
+        onOfflineRefresh = { viewModel.refreshTimeline(MediaPermissions.read(context)) }
+    )
 
     BackHandler(enabled = uiState.destination == MainDestination.SEARCH) {
         viewModel.onBackFromSearch()
@@ -223,7 +231,8 @@ fun MainScreen(
                     topBarHeight = PhotosTopBarHeight,
                     topBarVisible = !hideTopBar,
                     isSyncing = uiState.syncState == SyncState.SYNCING,
-                    isBootstrapping = uiState.isBootstrapping
+                    isBootstrapping = uiState.isBootstrapping,
+                    pullToRefreshState = pullToRefreshState
                 )
             }
             MainDestination.COLLECTIONS -> {
@@ -272,6 +281,7 @@ fun MainScreen(
                 isOnline = uiState.isOnline,
                 syncState = uiState.syncState,
                 hasSyncError = uiState.syncErrorMessage != null,
+                pullToRefreshState = pullToRefreshState,
                 onStatusPillClick = {
                     if (uiState.isOnline && uiState.syncState != SyncState.SYNCING) {
                         viewModel.syncNow()
