@@ -2,6 +2,7 @@ package dev.ruurd.photos.data.datasource.local
 
 import android.content.ContentResolver
 import android.content.ContentUris
+import android.content.Context
 import android.database.Cursor
 import android.net.Uri
 import android.provider.MediaStore
@@ -13,13 +14,18 @@ import dev.ruurd.photos.domain.repository.LocalMediaStore
  * Omitted rows only mean "deleted from the device" when the caller holds full permission for that
  * media type; [dev.ruurd.photos.domain.model.ScanGuards] decides that.
  */
-class MediaStoreDataSource(private val contentResolver: ContentResolver) : LocalMediaStore {
+class MediaStoreDataSource(private val context: Context) : LocalMediaStore {
+
+    private val contentResolver: ContentResolver = context.contentResolver
 
     override suspend fun queryImages(): List<LocalMediaFile> =
         query(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, isVideo = false)
 
     override suspend fun queryVideos(): List<LocalMediaFile> =
         query(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, isVideo = true)
+
+    override suspend fun generation(): Long =
+        MediaStore.getGeneration(context, MediaStore.VOLUME_EXTERNAL)
 
     private fun query(collection: Uri, isVideo: Boolean): List<LocalMediaFile> {
         val projection = BASE_PROJECTION + if (isVideo) arrayOf(MediaStore.Video.Media.DURATION) else emptyArray<String>()

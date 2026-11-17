@@ -10,6 +10,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import dev.ruurd.photos.domain.model.AuthState
 import dev.ruurd.photos.domain.model.User
+import dev.ruurd.photos.domain.repository.ScanStateStore
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -27,7 +28,7 @@ class SessionManager(
     private val context: Context,
     scope: CoroutineScope,
     private val onClearSessionData: suspend () -> Unit = {}
-) : SyncTimestampStore {
+) : SyncTimestampStore, ScanStateStore {
     companion object {
         const val DEFAULT_SERVER_URL = "http://10.0.2.2:5272"
 
@@ -39,6 +40,7 @@ class SessionManager(
         private val KEY_USER_MEDIA_FOLDER = stringPreferencesKey("user_media_folder")
         private val KEY_USER_AVATAR_ID = stringPreferencesKey("user_avatar_id")
         private val KEY_LATEST_SYNC_TIMESTAMP = longPreferencesKey("latest_sync_timestamp")
+        private val KEY_SCAN_SIGNATURE = stringPreferencesKey("scan_signature")
 
         fun normalizeUrl(url: String): String {
             val trimmed = url.trim().trimEnd('/')
@@ -150,6 +152,8 @@ class SessionManager(
                 prefs.remove(KEY_USER_MEDIA_FOLDER)
                 prefs.remove(KEY_USER_AVATAR_ID)
                 prefs.remove(KEY_LATEST_SYNC_TIMESTAMP)
+                // The local rows are gone, so the next scan must not be skipped as unchanged.
+                prefs.remove(KEY_SCAN_SIGNATURE)
             }
         }
     }
@@ -159,6 +163,15 @@ class SessionManager(
         _latestSyncTimestamp.value = timestamp
         context.sessionDataStore.edit { prefs ->
             prefs[KEY_LATEST_SYNC_TIMESTAMP] = timestamp
+        }
+    }
+
+    override suspend fun lastScanSignature(): String? =
+        context.sessionDataStore.data.first()[KEY_SCAN_SIGNATURE]
+
+    override suspend fun setLastScanSignature(signature: String) {
+        context.sessionDataStore.edit { prefs ->
+            prefs[KEY_SCAN_SIGNATURE] = signature
         }
     }
 

@@ -14,6 +14,7 @@ import dev.ruurd.photos.domain.model.ScanGuards
 import dev.ruurd.photos.domain.repository.DeviceFolderRepository
 import dev.ruurd.photos.domain.repository.LocalMediaStore
 import dev.ruurd.photos.domain.repository.MediaRepository
+import dev.ruurd.photos.domain.repository.ScanStateStore
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.withContext
 import java.time.ZoneId
@@ -29,11 +30,15 @@ data class ScanResult(
  * with full per-type permission), registers newly seen folders with their default visibility,
  * upserts changed local rows in batches, and links unmatched files to known cloud rows via
  * Pass 1 zero-hash deduplication.
+ *
+ * Returns early without scanning when the `MediaStore` volume generation, the grants and the
+ * timezone are unchanged since the last completed scan.
  */
 class ScanLocalMediaUseCase(
     private val localMediaStore: LocalMediaStore,
     private val mediaRepository: MediaRepository,
     private val deviceFolderRepository: DeviceFolderRepository,
+    private val scanStateStore: ScanStateStore,
     private val dispatchers: AppDispatchers,
     private val zoneProvider: () -> ZoneId = ZoneId::systemDefault
 ) {
@@ -42,7 +47,21 @@ class ScanLocalMediaUseCase(
             try {
                 if (!access.hasAnyAccess) return@withContext Result.success(ScanResult())
 
+                // `MediaStore` bumps its volume generation on every insert/delete, so an unchanged
+                // generation means Room already matches the device. The signature also covers the
+                // inputs the scan derives rows from (grants, and the zone that sets `year_month`).
+                // A partial selection is not tracked by the generation, so those scans always run.
                 val zone = zoneProvider()
+                val signature = if (access.hasPartialAccess) {
+                    null
+                } else {
+                    val generation = localMediaStore.generation()
+                    "$generation:${access.images}:${access.videos}:${zone.id}"
+                }
+                if (signature != null && scanStateStore.lastScanSignature() == signature) {
+                    return@withContext Result.success(ScanResult())
+                }
+
                 val images =
                     if (access.images != MediaAccess.NONE) localMediaStore.queryImages() else emptyList()
                 val videos =
@@ -124,6 +143,9 @@ class ScanLocalMediaUseCase(
                     )
                 }
 
+                if (signature != null) {
+                    scanStateStore.setLastScanSignature(signature)
+                }
                 Result.success(result)
             } catch (e: CancellationException) {
                 throw e

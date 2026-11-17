@@ -2,6 +2,7 @@ package dev.ruurd.photos.di
 
 import android.app.ActivityManager
 import android.content.Context
+import android.content.pm.ApplicationInfo
 import coil3.ImageLoader
 import dev.ruurd.photos.core.common.AppDispatchers
 import dev.ruurd.photos.core.common.DefaultAppDispatchers
@@ -111,10 +112,6 @@ class DefaultAppContainer(private val context: Context) : AppContainer {
             maxRequestsPerHost = 16
         }
 
-        val logging = HttpLoggingInterceptor().apply {
-            level = HttpLoggingInterceptor.Level.BASIC
-        }
-
         val dynamicBaseUrlInterceptor = DynamicBaseUrlInterceptor(sessionManager)
         val authenticator = AuthAuthenticator(cookieJar, sessionManager, applicationScope)
 
@@ -123,7 +120,17 @@ class DefaultAppContainer(private val context: Context) : AppContainer {
             .cookieJar(cookieJar)
             .authenticator(authenticator)
             .addInterceptor(dynamicBaseUrlInterceptor)
-            .addInterceptor(logging)
+            .apply {
+                // This client also serves Coil, so request logging in a release build would add two
+                // log lines per thumbnail.
+                if (isDebuggable()) {
+                    addInterceptor(
+                        HttpLoggingInterceptor().apply {
+                            level = HttpLoggingInterceptor.Level.BASIC
+                        }
+                    )
+                }
+            }
             .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
             .writeTimeout(30, TimeUnit.SECONDS)
@@ -164,7 +171,7 @@ class DefaultAppContainer(private val context: Context) : AppContainer {
     }
 
     override val localMediaStore: LocalMediaStore by lazy {
-        MediaStoreDataSource(context.contentResolver)
+        MediaStoreDataSource(context)
     }
 
     override val scanLocalMediaUseCase: ScanLocalMediaUseCase by lazy {
@@ -172,6 +179,7 @@ class DefaultAppContainer(private val context: Context) : AppContainer {
             localMediaStore = localMediaStore,
             mediaRepository = mediaRepository,
             deviceFolderRepository = deviceFolderRepository,
+            scanStateStore = sessionManager,
             dispatchers = dispatchers
         )
     }
@@ -199,6 +207,9 @@ class DefaultAppContainer(private val context: Context) : AppContainer {
     override val networkMonitor: NetworkMonitor by lazy {
         NetworkMonitor(context)
     }
+
+    private fun isDebuggable(): Boolean =
+        (context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
 
     override val imageLoader: ImageLoader by lazy {
         PhotosImageLoader.create(context, okHttpClient)

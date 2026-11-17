@@ -52,6 +52,9 @@ interface MediaDao {
     @Query("SELECT * FROM media_item WHERE cloud_id = :cloudId")
     suspend fun getAllByCloudId(cloudId: String): List<MediaEntity>
 
+    @Query("SELECT * FROM media_item WHERE cloud_id IN (:cloudIds)")
+    suspend fun getAllByCloudIds(cloudIds: List<String>): List<MediaEntity>
+
     @Query("SELECT * FROM media_item WHERE local_content_uri IS NOT NULL AND is_video = :isVideo")
     suspend fun getLocalRows(isVideo: Boolean): List<MediaEntity>
 
@@ -66,6 +69,19 @@ interface MediaDao {
         """
     )
     suspend fun findBySizeAndStatus(sizeBytes: Long, syncStatus: SyncStatus): List<MediaEntity>
+
+    /** Batched [findBySizeAndStatus] so a sync does not query once per item. */
+    @Query(
+        """
+        SELECT * FROM media_item
+        WHERE size_bytes IN (:sizeBytes) AND sync_status = :syncStatus
+        ORDER BY is_visible_in_timeline DESC, id ASC
+        """
+    )
+    suspend fun findBySizesAndStatus(
+        sizeBytes: List<Long>,
+        syncStatus: SyncStatus
+    ): List<MediaEntity>
 
     @Upsert
     suspend fun upsert(media: MediaEntity)

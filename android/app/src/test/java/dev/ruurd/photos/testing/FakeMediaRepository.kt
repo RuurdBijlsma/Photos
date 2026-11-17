@@ -37,6 +37,11 @@ class FakeMediaRepository : MediaRepository {
     override suspend fun getAllByCloudId(cloudId: String): List<MediaEntity> =
         items.values.filter { it.cloudId == cloudId }
 
+    override suspend fun getAllByCloudIds(cloudIds: List<String>): List<MediaEntity> {
+        val ids = cloudIds.toHashSet()
+        return items.values.filter { it.cloudId in ids }
+    }
+
     override suspend fun getLocalRows(isVideo: Boolean): List<MediaEntity> =
         items.values.filter { it.localContentUri != null && it.isVideo == isVideo }
 
@@ -53,6 +58,19 @@ class FakeMediaRepository : MediaRepository {
                 compareByDescending<MediaEntity> { it.isVisibleInTimeline }
                     .thenBy { it.id }
             )
+
+    override suspend fun findBySizesAndStatus(
+        sizeBytes: List<Long>,
+        syncStatus: SyncStatus
+    ): List<MediaEntity> {
+        val sizes = sizeBytes.toHashSet()
+        return items.values
+            .filter { it.sizeBytes in sizes && it.syncStatus == syncStatus }
+            .sortedWith(
+                compareByDescending<MediaEntity> { it.isVisibleInTimeline }
+                    .thenBy { it.id }
+            )
+    }
 
     override suspend fun upsert(media: MediaEntity) {
         items[media.id] = media

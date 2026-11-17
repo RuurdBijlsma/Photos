@@ -14,6 +14,7 @@ import dev.ruurd.photos.domain.usecase.ScanLocalMediaUseCase
 import dev.ruurd.photos.domain.usecase.SyncTimelineUseCase
 import dev.ruurd.photos.features.main.components.MainNavTab
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -194,6 +195,9 @@ class MainViewModel(
         lateinit var launchedJob: Job
         launchedJob = viewModelScope.launch {
             try {
+                // Let the first timeline frame and its visible thumbnails land before competing for
+                // SQLite and MediaStore; the scan result only affects later frames.
+                delay(STARTUP_SCAN_DELAY_MS)
                 scanLocalMediaUseCase(access).onFailure { error ->
                     Log.w(TAG, "Local media scan failed", error)
                 }
@@ -219,6 +223,7 @@ class MainViewModel(
 
     companion object {
         private const val TAG = "MainViewModel"
+        private const val STARTUP_SCAN_DELAY_MS = 500L
 
         fun factory(
             authRepository: AuthRepository,

@@ -23,4 +23,8 @@ data class MediaAccessState(
     } else {
         videos == MediaAccess.FULL
     }
+
+    /** A partial grant only covers a picker selection, which the volume generation does not track. */
+    val hasPartialAccess: Boolean
+        get() = images == MediaAccess.PARTIAL || videos == MediaAccess.PARTIAL
 }

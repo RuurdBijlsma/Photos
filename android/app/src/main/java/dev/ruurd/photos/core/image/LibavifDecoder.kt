@@ -8,6 +8,7 @@ import coil3.decode.Decoder
 import coil3.decode.ImageSource
 import coil3.fetch.SourceFetchResult
 import coil3.request.Options
+import coil3.request.allowHardware
 import coil3.request.maxBitmapSize
 import coil3.size.Dimension
 import coil3.size.Scale
@@ -71,9 +72,19 @@ class LibavifDecoder(
         }
 
         DecodeResult(
-            image = bitmap.asImage(),
+            image = (if (options.allowHardware) bitmap.toHardwareBitmapOrSelf() else bitmap).asImage(),
             isSampled = isSampled
         )
+    }
+
+    /**
+     * Uploads to a GPU texture here instead of letting `RenderThread` upload a software bitmap while
+     * the next frames are already being drawn. Falls back to the software bitmap when the copy fails.
+     */
+    private fun Bitmap.toHardwareBitmapOrSelf(): Bitmap = try {
+        copy(Bitmap.Config.HARDWARE, false)?.also { recycle() } ?: this
+    } catch (_: Throwable) {
+        this
     }
 
     private fun readToDirectByteBuffer(imageSource: ImageSource): ByteBuffer {

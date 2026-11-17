@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -56,6 +57,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import coil3.request.CachePolicy
@@ -64,6 +66,7 @@ import dev.ruurd.photos.core.database.entity.SyncStatus
 import dev.ruurd.photos.core.image.MediaStoreThumbnail
 import dev.ruurd.photos.domain.model.MonthHeaderUiItem
 import dev.ruurd.photos.domain.model.TimelineGridItemUiModel
+import dev.ruurd.photos.domain.model.TimelineLayoutIndex
 import dev.ruurd.photos.domain.model.TimelineRowUiItem
 import dev.ruurd.photos.domain.usecase.CalculateTimelineLayoutUseCase
 import dev.ruurd.photos.features.timeline.components.TimelineScrubber
@@ -106,30 +109,6 @@ fun TimelineScreen(
     // edges so the first and last rows are reachable.
     val topPaddingDp = contentPadding.calculateTopPadding().value
     val bottomPaddingDp = contentPadding.calculateBottomPadding().value + EXTRA_BOTTOM_PADDING_DP
-    val topBufferPx = with(density) { DATE_PILL_TOP_BUFFER_DP.dp.roundToPx() }
-
-    val datePillLabel by remember(layout, listState, topBufferPx) {
-        derivedStateOf {
-            val isScrolledPastTop = listState.firstVisibleItemIndex > 0 ||
-                    listState.firstVisibleItemScrollOffset > topBufferPx
-            if (!isScrolledPastTop || layout.isEmpty) {
-                null
-            } else {
-                layout.dateLabelAt(listState.firstVisibleItemIndex)
-            }
-        }
-    }
-
-    val statusBarOnlyTopDp =
-        (contentPadding.calculateTopPadding() - topBarHeight).coerceAtLeast(0.dp)
-    val datePillTopOffset by animateDpAsState(
-        targetValue = if (topBarVisible) {
-            contentPadding.calculateTopPadding() + 8.dp
-        } else {
-            statusBarOnlyTopDp + 8.dp
-        },
-        label = "date_pill_top_offset"
-    )
 
     Box(
         modifier = modifier
@@ -174,18 +153,14 @@ fun TimelineScreen(
                     }
                 }
 
-                AnimatedVisibility(
-                    visible = datePillLabel != null,
-                    enter = fadeIn() + slideInVertically { -it / 2 },
-                    exit = fadeOut() + slideOutVertically { -it / 2 },
-                    modifier = Modifier
-                        .align(Alignment.TopCenter)
-                        .padding(top = datePillTopOffset)
-                ) {
-                    datePillLabel?.let { label ->
-                        FloatingDatePill(label = label)
-                    }
-                }
+                FloatingDatePillOverlay(
+                    layout = layout,
+                    listState = listState,
+                    topPadding = contentPadding.calculateTopPadding(),
+                    topBarHeight = topBarHeight,
+                    topBarVisible = topBarVisible,
+                    modifier = Modifier.align(Alignment.TopCenter)
+                )
 
                 if (layout.totalHeightDp + topPaddingDp + bottomPaddingDp > viewportHeightDp) {
                     TimelineScrubber(
@@ -202,6 +177,52 @@ fun TimelineScreen(
                     )
                 }
             }
+        }
+    }
+}
+
+/**
+ * Owns the scroll-derived label and the top-bar-hide offset, so neither a date change nor the slide
+ * animation recomposes `TimelineScreen` or the list.
+ */
+@Composable
+private fun FloatingDatePillOverlay(
+    layout: TimelineLayoutIndex,
+    listState: LazyListState,
+    topPadding: Dp,
+    topBarHeight: Dp,
+    topBarVisible: Boolean,
+    modifier: Modifier = Modifier
+) {
+    val topBufferPx = with(LocalDensity.current) { DATE_PILL_TOP_BUFFER_DP.dp.roundToPx() }
+
+    val datePillLabel by remember(layout, listState, topBufferPx) {
+        derivedStateOf {
+            val isScrolledPastTop = listState.firstVisibleItemIndex > 0 ||
+                    listState.firstVisibleItemScrollOffset > topBufferPx
+            if (!isScrolledPastTop || layout.isEmpty) {
+                null
+            } else {
+                layout.dateLabelAt(listState.firstVisibleItemIndex)
+            }
+        }
+    }
+
+    val statusBarOnlyTopDp = (topPadding - topBarHeight).coerceAtLeast(0.dp)
+    val datePillTopOffset = animateDpAsState(
+        targetValue = if (topBarVisible) topPadding + 8.dp else statusBarOnlyTopDp + 8.dp,
+        label = "date_pill_top_offset"
+    )
+
+    AnimatedVisibility(
+        visible = datePillLabel != null,
+        enter = fadeIn() + slideInVertically { -it / 2 },
+        exit = fadeOut() + slideOutVertically { -it / 2 },
+        // Layout-offset only: `.padding()` would relayout this subtree on every animation frame.
+        modifier = modifier.offset { IntOffset(0, datePillTopOffset.value.roundToPx()) }
+    ) {
+        datePillLabel?.let { label ->
+            FloatingDatePill(label = label)
         }
     }
 }
@@ -306,15 +327,18 @@ private fun TimelineTile(
     val widthPx = (item.widthDp * density).roundToInt().coerceAtLeast(1)
     val heightPx = (heightDp * density).roundToInt().coerceAtLeast(1)
 
-    var loadSucceeded by remember(item, thumbnailTargetHeightPx, baseUrl, widthPx, heightPx) {
-        mutableStateOf(false)
+    // Plain holder, not state: setting this from `onSuccess` must not recompose the tile.
+    val loadState = remember(item, thumbnailTargetHeightPx, baseUrl, widthPx, heightPx) {
+        TileLoadState()
     }
     var gateLoads by remember(item, thumbnailTargetHeightPx, baseUrl, widthPx, heightPx) {
         mutableStateOf(isScrubbing)
     }
-    LaunchedEffect(isScrubbing, loadSucceeded) {
-        if (!isScrubbing && !loadSucceeded) {
-            gateLoads = false
+    if (gateLoads) {
+        LaunchedEffect(isScrubbing) {
+            if (!isScrubbing && !loadState.succeeded) {
+                gateLoads = false
+            }
         }
     }
 
@@ -353,7 +377,7 @@ private fun TimelineTile(
                 model = request,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
-                onSuccess = { loadSucceeded = true },
+                onSuccess = { loadState.succeeded = true },
                 modifier = Modifier.fillMaxSize()
             )
         }
@@ -417,6 +441,11 @@ private fun EmptyTimeline(modifier: Modifier = Modifier) {
 private val ITEM_GAP_DP = CalculateTimelineLayoutUseCase.ITEM_GAP_DP
 private const val EXTRA_BOTTOM_PADDING_DP = 24f
 private const val DATE_PILL_TOP_BUFFER_DP = 180f
+
+/** Mutable-without-recomposition flag for "this tile already rendered its image". */
+private class TileLoadState {
+    var succeeded = false
+}
 
 private fun tileModel(
     item: TimelineGridItemUiModel,

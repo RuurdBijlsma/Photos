@@ -12,8 +12,10 @@ interface MediaRepository {
     suspend fun getById(id: String): MediaEntity?
     suspend fun getByCloudId(cloudId: String): MediaEntity?
     suspend fun getAllByCloudId(cloudId: String): List<MediaEntity>
+    suspend fun getAllByCloudIds(cloudIds: List<String>): List<MediaEntity>
     suspend fun getLocalRows(isVideo: Boolean): List<MediaEntity>
     suspend fun findBySizeAndStatus(sizeBytes: Long, syncStatus: SyncStatus): List<MediaEntity>
+    suspend fun findBySizesAndStatus(sizeBytes: List<Long>, syncStatus: SyncStatus): List<MediaEntity>
     suspend fun getAllCloudIds(): List<String>
 
     suspend fun upsert(media: MediaEntity)

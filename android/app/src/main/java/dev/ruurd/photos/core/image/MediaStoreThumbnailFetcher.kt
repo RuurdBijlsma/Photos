@@ -21,6 +21,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.job
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import java.io.FileNotFoundException
 import java.io.IOException
@@ -44,7 +46,9 @@ data class MediaStoreThumbnail(
 class MediaStoreThumbnailFetcher(
     private val data: MediaStoreThumbnail,
     private val options: Options,
-    private val imageLoader: ImageLoader
+    private val imageLoader: ImageLoader,
+    /** Caps concurrent Binder IPC; this fetcher returns decoded bitmaps, so it bypasses Coil's decoder cap. */
+    private val ioLimiter: Semaphore
 ) : Fetcher {
 
     override suspend fun fetch(): FetchResult? {
@@ -70,7 +74,9 @@ class MediaStoreThumbnailFetcher(
         }
     }
 
-    private suspend fun loadThumbnail(): FetchResult {
+    // The permit is released before any cloud fallback so a slow network reply cannot stall the
+    // MediaStore budget of the other tiles.
+    private suspend fun loadThumbnail(): FetchResult = ioLimiter.withPermit {
         val width = requestedDimensionPx(options.size.width)
         val height = requestedDimensionPx(options.size.height)
         val signal = CancellationSignal()
@@ -93,7 +99,7 @@ class MediaStoreThumbnailFetcher(
             throw e
         }
 
-        return ImageFetchResult(bitmap.asImage(), isSampled = true, dataSource = DataSource.DISK)
+        ImageFetchResult(bitmap.asImage(), isSampled = true, dataSource = DataSource.DISK)
     }
 
     private suspend fun fetchLocalFallbackOrCloud(): FetchResult? = try {
@@ -115,27 +121,29 @@ class MediaStoreThumbnailFetcher(
         val width = requestedDimensionPx(options.size.width)
         val height = requestedDimensionPx(options.size.height)
 
-        return withContext(Dispatchers.IO) {
-            try {
-                MediaMetadataRetriever().use { retriever ->
-                    retriever.setDataSource(options.context, data.uri)
-                    val frame = retriever.getScaledFrameAtTime(
-                        -1L,
-                        MediaMetadataRetriever.OPTION_CLOSEST_SYNC,
-                        width,
-                        height
-                    ) ?: return@withContext null
+        return ioLimiter.withPermit {
+            withContext(Dispatchers.IO) {
+                try {
+                    MediaMetadataRetriever().use { retriever ->
+                        retriever.setDataSource(options.context, data.uri)
+                        val frame = retriever.getScaledFrameAtTime(
+                            -1L,
+                            MediaMetadataRetriever.OPTION_CLOSEST_SYNC,
+                            width,
+                            height
+                        ) ?: return@withContext null
 
-                    ImageFetchResult(
-                        frame.asImage(),
-                        isSampled = true,
-                        dataSource = DataSource.DISK
-                    )
+                        ImageFetchResult(
+                            frame.asImage(),
+                            isSampled = true,
+                            dataSource = DataSource.DISK
+                        )
+                    }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (_: Exception) {
+                    null
                 }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (_: Exception) {
-                null
             }
         }
     }
@@ -151,12 +159,14 @@ class MediaStoreThumbnailFetcher(
         return fetcher.fetch()
     }
 
-    class Factory : Fetcher.Factory<MediaStoreThumbnail> {
+    class Factory(maxParallelism: Int = DEFAULT_MAX_PARALLELISM) : Fetcher.Factory<MediaStoreThumbnail> {
+        private val ioLimiter = Semaphore(maxParallelism)
+
         override fun create(
             data: MediaStoreThumbnail,
             options: Options,
             imageLoader: ImageLoader
-        ): Fetcher = MediaStoreThumbnailFetcher(data, options, imageLoader)
+        ): Fetcher = MediaStoreThumbnailFetcher(data, options, imageLoader, ioLimiter)
     }
 
     class ThumbnailKeyer : Keyer<MediaStoreThumbnail> {
@@ -166,5 +176,6 @@ class MediaStoreThumbnailFetcher(
 
     private companion object {
         const val DEFAULT_SIZE_PX = 480
+        const val DEFAULT_MAX_PARALLELISM = 4
     }
 }

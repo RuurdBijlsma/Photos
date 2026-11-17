@@ -31,6 +31,9 @@ class MediaRepositoryImpl(
     override suspend fun getAllByCloudId(cloudId: String): List<MediaEntity> =
         mediaDao.getAllByCloudId(cloudId)
 
+    override suspend fun getAllByCloudIds(cloudIds: List<String>): List<MediaEntity> =
+        if (cloudIds.isEmpty()) emptyList() else mediaDao.getAllByCloudIds(cloudIds)
+
     override suspend fun getAllCloudIds(): List<String> = mediaDao.getAllCloudIds()
 
     override suspend fun getLocalRows(isVideo: Boolean): List<MediaEntity> =
@@ -40,6 +43,12 @@ class MediaRepositoryImpl(
         sizeBytes: Long,
         syncStatus: SyncStatus
     ): List<MediaEntity> = mediaDao.findBySizeAndStatus(sizeBytes, syncStatus)
+
+    override suspend fun findBySizesAndStatus(
+        sizeBytes: List<Long>,
+        syncStatus: SyncStatus
+    ): List<MediaEntity> =
+        if (sizeBytes.isEmpty()) emptyList() else mediaDao.findBySizesAndStatus(sizeBytes, syncStatus)
 
     override suspend fun upsert(media: MediaEntity) = mediaDao.upsert(media)
 

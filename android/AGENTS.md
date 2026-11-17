@@ -15,3 +15,17 @@ timeline is non-empty.
 # Or run benchmarks and check in one command:
 ./gradlew :benchmark:benchmarkAndCheck
 ```
+
+## Baseline profile (`app/src/main/baseline-prof.txt`)
+
+Recorded from the timeline with `BaselineProfileGenerator`. Sign in and grant media permissions
+first: the connected test uninstalls the app, so its data is gone afterwards.
+
+R8 rewrites the committed original class names for minified variants, so the profile must be
+recorded with `-PbaselineProfileRecording` (turns R8 off for the `benchmark` variant only; perf
+benchmarks keep the minified build). Then copy the generated profile over the committed one:
+
+```powershell
+./gradlew :benchmark:connectedBenchmarkAndroidTest "-Pandroid.testInstrumentationRunnerArguments.class=dev.ruurd.photos.benchmark.BaselineProfileGenerator" -PbaselineProfileRecording
+# -> benchmark/build/outputs/connected_android_test_additional_output/benchmark/connected/<device>/*-baseline-prof.txt
+```

@@ -64,6 +64,21 @@ class CalculateTimelineLayoutUseCase(
         val rowMedia = ArrayList<TimelineMediaProjection>()
         var rowWidthPx = 0f
 
+        // Consecutive rows are almost always on the same day, so both the label and the date are
+        // computed once per day instead of once per row.
+        var lastDateKey = Long.MIN_VALUE
+        var lastDateLabel = ""
+
+        fun dateLabelOf(item: TimelineMediaProjection): String {
+            if (item.sortTimestamp <= 0L) return ""
+            val key = (item.sortTimestamp + item.timezoneOffsetMinutes * 60_000L).floorDiv(DAY_MS)
+            if (key != lastDateKey) {
+                lastDateKey = key
+                lastDateLabel = formatDateLabel(item, today, currentYear)
+            }
+            return lastDateLabel
+        }
+
         fun finishRow(firstOfMonth: Boolean, lastOfMonth: Boolean, flushToWidth: Boolean) {
             if (rowMedia.isEmpty()) return
             val gapsPx = (rowMedia.size - 1) * gapPx
@@ -102,7 +117,7 @@ class CalculateTimelineLayoutUseCase(
                     isFirstOfMonth = firstOfMonth,
                     isLastOfMonth = lastOfMonth,
                     thumbnailTargetHeightPx = thumbnailHeightFor(heightPx),
-                    dateLabel = formatDateLabel(firstItem, today, currentYear),
+                    dateLabel = dateLabelOf(firstItem),
                     estimatedOffsetTopDp = offsetPx / density
                 )
             )
@@ -113,7 +128,14 @@ class CalculateTimelineLayoutUseCase(
             rowWidthPx = 0f
         }
 
-        for ((yearMonth, monthMedia) in media.groupBy { it.yearMonth }) {
+        // The query is ordered by year_month DESC, so months are consecutive runs; grouping with
+        // `groupBy` would allocate a map plus a list per month for the whole library.
+        var monthStart = 0
+        while (monthStart < media.size) {
+            val yearMonth = media[monthStart].yearMonth
+            var monthEnd = monthStart + 1
+            while (monthEnd < media.size && media[monthEnd].yearMonth == yearMonth) monthEnd++
+
             yearStarts.putIfAbsent(yearMonth / 100, offsetPx)
             monthOffsets[yearMonth] = items.size
             monthLabels[yearMonth] = shortMonthLabel(yearMonth)
@@ -129,20 +151,22 @@ class CalculateTimelineLayoutUseCase(
             offsetPx += headerHeightPx
 
             var firstOfMonth = true
-            monthMedia.forEachIndexed { index, item ->
+            for (index in monthStart until monthEnd) {
+                val item = media[index]
                 rowMedia.add(item)
                 rowWidthPx += ratioOf(item) * desiredHeightPx
                 val gapsPx = (rowMedia.size - 1) * gapPx
                 if (rowWidthPx + gapsPx > containerWidthPx) {
                     finishRow(
                         firstOfMonth = firstOfMonth,
-                        lastOfMonth = index == monthMedia.lastIndex,
+                        lastOfMonth = index == monthEnd - 1,
                         flushToWidth = true
                     )
                     firstOfMonth = false
                 }
             }
             finishRow(firstOfMonth = firstOfMonth, lastOfMonth = true, flushToWidth = false)
+            monthStart = monthEnd
         }
 
         val totalHeightPx = offsetPx
@@ -201,7 +225,7 @@ class CalculateTimelineLayoutUseCase(
         val totalSeconds = durationMs / 1000
         val minutes = totalSeconds / 60
         val seconds = totalSeconds % 60
-        return "%d:%02d".format(Locale.US, minutes, seconds)
+        return if (seconds < 10) "$minutes:0$seconds" else "$minutes:$seconds"
     }
 
     private fun monthTitle(yearMonth: Int): String =
@@ -228,6 +252,8 @@ class CalculateTimelineLayoutUseCase(
             DateTimeFormatter.ofPattern("EEE, d MMM", Locale.ENGLISH)
         private val OTHER_YEAR_DATE_FORMATTER =
             DateTimeFormatter.ofPattern("EEE, d MMM yyyy", Locale.ENGLISH)
+
+        private const val DAY_MS = 86_400_000L
 
         fun ratioOf(item: TimelineMediaProjection): Float =
             if (item.ratio.isFinite() && item.ratio > 0f) item.ratio else 1f

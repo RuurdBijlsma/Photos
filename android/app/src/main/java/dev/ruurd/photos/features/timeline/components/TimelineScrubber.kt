@@ -156,7 +156,9 @@ fun TimelineScrubber(
         }
     }
 
-    val scrollFraction by remember(layout, listState, viewportHeightDp, topPaddingDp, bottomPaddingDp) {
+    // Kept as a State and read inside the offset lambda only: a per-pixel read in composition would
+    // recompose this whole composable on every scroll frame.
+    val scrollFraction = remember(layout, listState, viewportHeightDp, topPaddingDp, bottomPaddingDp) {
         derivedStateOf {
             val maxScroll = maxScrollDp(layout, viewportHeightDp, topPaddingDp, bottomPaddingDp)
             if (maxScroll <= 1f || layout.rows.isEmpty()) {
@@ -169,7 +171,6 @@ fun TimelineScrubber(
             }
         }
     }
-    val fraction = if (isDragging) dragFraction else scrollFraction
     val showVisuals = isDragging || isScrubberVisible
     val revealProgress by animateFloatAsState(
         targetValue = if (showVisuals) 1f else 0f,
@@ -301,6 +302,7 @@ fun TimelineScrubber(
             modifier = Modifier
                 .align(Alignment.TopStart)
                 .offset {
+                    val fraction = if (isDragging) dragFraction else scrollFraction.value
                     IntOffset(
                         x = thumbLeftPx,
                         y = ((sizePx.height - thumbSizePx) * fraction).roundToInt()

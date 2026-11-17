@@ -9,6 +9,7 @@ import dev.ruurd.photos.domain.model.MediaAccess
 import dev.ruurd.photos.domain.model.MediaAccessState
 import dev.ruurd.photos.domain.repository.DeviceFolderRepository
 import dev.ruurd.photos.domain.repository.LocalMediaStore
+import dev.ruurd.photos.domain.repository.ScanStateStore
 import dev.ruurd.photos.testing.FakeMediaRepository
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -35,10 +36,21 @@ class ScanLocalMediaUseCaseTest {
 
     private class FakeLocalMediaStore(
         var images: List<LocalMediaFile> = emptyList(),
-        var videos: List<LocalMediaFile> = emptyList()
+        var videos: List<LocalMediaFile> = emptyList(),
+        var generation: Long = 1L
     ) : LocalMediaStore {
         override suspend fun queryImages(): List<LocalMediaFile> = images
         override suspend fun queryVideos(): List<LocalMediaFile> = videos
+        override suspend fun generation(): Long = generation
+    }
+
+    private class FakeScanStateStore : ScanStateStore {
+        var signature: String? = null
+
+        override suspend fun lastScanSignature(): String? = signature
+        override suspend fun setLastScanSignature(signature: String) {
+            this.signature = signature
+        }
     }
 
     private class FakeDeviceFolderRepository : DeviceFolderRepository {
@@ -79,11 +91,13 @@ class ScanLocalMediaUseCaseTest {
         store: FakeLocalMediaStore,
         repo: FakeMediaRepository,
         folders: FakeDeviceFolderRepository,
+        scanState: FakeScanStateStore = FakeScanStateStore(),
         zoneProvider: () -> ZoneId = { ZoneId.of("UTC") }
     ) = ScanLocalMediaUseCase(
         localMediaStore = store,
         mediaRepository = repo,
         deviceFolderRepository = folders,
+        scanStateStore = scanState,
         dispatchers = dispatchers,
         zoneProvider = zoneProvider
     )
@@ -504,6 +518,39 @@ class ScanLocalMediaUseCaseTest {
 
         assertEquals(0, result.scanned)
         assertTrue(repo.items.isEmpty())
+    }
+
+    @Test
+    fun `unchanged media store generation skips the scan`() = runTest(testDispatcher) {
+        val repo = FakeMediaRepository()
+        val store = FakeLocalMediaStore(images = listOf(file(1)))
+        val scanState = FakeScanStateStore()
+        val scan = useCase(store, repo, FakeDeviceFolderRepository(), scanState)
+
+        assertEquals(1, scan(fullAccess()).getOrThrow().scanned)
+        assertEquals("1:FULL:FULL:UTC", scanState.signature)
+
+        // Same generation: the added file is not picked up because MediaStore did not change.
+        store.images = listOf(file(1), file(2))
+        assertEquals(0, scan(fullAccess()).getOrThrow().scanned)
+        assertNull(repo.getById("local_2"))
+
+        store.generation = 2L
+        assertEquals(2, scan(fullAccess()).getOrThrow().scanned)
+        assertNotNull(repo.getById("local_2"))
+    }
+
+    @Test
+    fun `partial access always scans and never records a signature`() = runTest(testDispatcher) {
+        val repo = FakeMediaRepository()
+        val store = FakeLocalMediaStore(images = listOf(file(1)))
+        val scanState = FakeScanStateStore()
+        val scan = useCase(store, repo, FakeDeviceFolderRepository(), scanState)
+        val partial = MediaAccessState(MediaAccess.PARTIAL, MediaAccess.PARTIAL)
+
+        assertEquals(1, scan(partial).getOrThrow().scanned)
+        assertNull(scanState.signature)
+        assertEquals(1, scan(partial).getOrThrow().scanned)
     }
 
     private fun fullAccess() = MediaAccessState(MediaAccess.FULL, MediaAccess.FULL)

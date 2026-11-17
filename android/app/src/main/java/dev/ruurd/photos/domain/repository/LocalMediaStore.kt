@@ -6,4 +6,7 @@ import dev.ruurd.photos.domain.model.LocalMediaFile
 interface LocalMediaStore {
     suspend fun queryImages(): List<LocalMediaFile>
     suspend fun queryVideos(): List<LocalMediaFile>
+
+    /** `MediaStore` bumps this whenever the volume's contents change. */
+    suspend fun generation(): Long
 }

@@ -36,6 +36,12 @@ android {
             signingConfig = signingConfigs.getByName("debug")
             matchingFallbacks += listOf("release")
             isDebuggable = false
+            // R8 renames app classes, so a profile recorded from a minified build goes stale on the
+            // next code change. Record with -PbaselineProfileRecording, and R8 rewrites the
+            // committed src/main baseline profile's original names for minified variants.
+            if (providers.gradleProperty("baselineProfileRecording").isPresent) {
+                optimization { enable = false }
+            }
         }
     }
     compileOptions {

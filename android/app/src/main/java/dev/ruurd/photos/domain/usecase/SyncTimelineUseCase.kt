@@ -85,27 +85,31 @@ class SyncTimelineUseCase(
                         }
 
                         // 2. Process upserts in chunked batches (updating canonical, linking
-                        //    matching LOCAL_ONLY rows via Pass 1, and updating duplicate local rows)
+                        //    matching LOCAL_ONLY rows via Pass 1, and updating duplicate local rows).
+                        //    Rows and deduplication candidates are fetched per chunk instead of per
+                        //    item so the transaction does not run thousands of queries.
                         val itemsToUpsert = ArrayList<MediaEntity>(syncResponse.upsertedCount)
                         val matchedLocalIds = HashSet<String>()
 
-                        for (item in syncResponse.upsertedList) {
-                            val existingRows = if (item.id in existingCloudIds) {
-                                mediaRepository.getAllByCloudId(item.id)
-                            } else {
-                                emptyList()
-                            }
+                        for (chunk in syncResponse.upsertedList.chunked(UPSERT_BATCH_SIZE)) {
+                            val rowsByCloudId = mediaRepository
+                                .getAllByCloudIds(chunk.map { it.id })
+                                .groupBy { it.cloudId }
+                            val localBySize = mediaRepository.findBySizesAndStatus(
+                                sizeBytes = chunk.mapTo(HashSet(), { it.sizeBytes }).toList(),
+                                syncStatus = SyncStatus.LOCAL_ONLY
+                            ).groupBy { it.sizeBytes }
 
-                            if (existingRows.isNotEmpty()) {
-                                for (existing in existingRows) {
-                                    itemsToUpsert.add(toMediaEntity(item, existing = existing))
+                            for (item in chunk) {
+                                val existingRows = rowsByCloudId[item.id].orEmpty()
+                                if (existingRows.isNotEmpty()) {
+                                    for (existing in existingRows) {
+                                        itemsToUpsert.add(toMediaEntity(item, existing = existing))
+                                    }
+                                    continue
                                 }
-                                continue
-                            }
 
-                            val localMatch = mediaRepository
-                                .findBySizeAndStatus(item.sizeBytes, SyncStatus.LOCAL_ONLY)
-                                .firstOrNull { candidate ->
+                                val localMatch = localBySize[item.sizeBytes]?.firstOrNull { candidate ->
                                     candidate.id !in matchedLocalIds &&
                                             PassOneDeduplication.isMatch(
                                                 cloudRatio = item.ratio,
@@ -115,11 +119,12 @@ class SyncTimelineUseCase(
                                             )
                                 }
 
-                            if (localMatch != null) {
-                                matchedLocalIds.add(localMatch.id)
-                                itemsToUpsert.add(toSyncedMediaEntity(item, localMatch))
-                            } else {
-                                itemsToUpsert.add(toMediaEntity(item, existing = null))
+                                if (localMatch != null) {
+                                    matchedLocalIds.add(localMatch.id)
+                                    itemsToUpsert.add(toSyncedMediaEntity(item, localMatch))
+                                } else {
+                                    itemsToUpsert.add(toMediaEntity(item, existing = null))
+                                }
                             }
                         }
 
@@ -210,5 +215,10 @@ class SyncTimelineUseCase(
         val instant = Instant.ofEpochMilli(epochWithOffset)
         val zdt = instant.atZone(ZoneOffset.UTC)
         return zdt.year * 100 + zdt.monthValue
+    }
+
+    private companion object {
+        /** Also keeps the `IN (…)` bind count well below SQLite's limit. */
+        const val UPSERT_BATCH_SIZE = 500
     }
 }
