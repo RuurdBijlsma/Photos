@@ -1,6 +1,7 @@
 package dev.ruurd.photos.domain.usecase
 
 import dev.ruurd.photos.core.common.AppDispatchers
+import dev.ruurd.photos.core.database.AppDatabase
 import dev.ruurd.photos.core.database.entity.DeviceFolderEntity
 import dev.ruurd.photos.core.database.entity.MediaEntity
 import dev.ruurd.photos.core.database.entity.SyncStatus
@@ -56,7 +57,8 @@ class ScanLocalMediaUseCase(
                     null
                 } else {
                     val generation = localMediaStore.generation()
-                    "$generation:${access.images}:${access.videos}:${zone.id}"
+                    // A Room version bump drops all tables, so the signature has to change with it.
+                    "${AppDatabase.VERSION}:$generation:${access.images}:${access.videos}:${zone.id}"
                 }
                 if (signature != null && scanStateStore.lastScanSignature() == signature) {
                     return@withContext Result.success(ScanResult())

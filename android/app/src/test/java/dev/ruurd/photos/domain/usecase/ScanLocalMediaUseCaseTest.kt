@@ -1,6 +1,7 @@
 package dev.ruurd.photos.domain.usecase
 
 import dev.ruurd.photos.core.common.AppDispatchers
+import dev.ruurd.photos.core.database.AppDatabase
 import dev.ruurd.photos.core.database.entity.DeviceFolderEntity
 import dev.ruurd.photos.core.database.entity.MediaEntity
 import dev.ruurd.photos.core.database.entity.SyncStatus
@@ -528,7 +529,7 @@ class ScanLocalMediaUseCaseTest {
         val scan = useCase(store, repo, FakeDeviceFolderRepository(), scanState)
 
         assertEquals(1, scan(fullAccess()).getOrThrow().scanned)
-        assertEquals("1:FULL:FULL:UTC", scanState.signature)
+        assertEquals("${AppDatabase.VERSION}:1:FULL:FULL:UTC", scanState.signature)
 
         // Same generation: the added file is not picked up because MediaStore did not change.
         store.images = listOf(file(1), file(2))

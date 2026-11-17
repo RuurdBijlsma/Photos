@@ -30,7 +30,7 @@ class SessionManager(
     private val onClearSessionData: suspend () -> Unit = {}
 ) : SyncTimestampStore, ScanStateStore {
     companion object {
-        const val DEFAULT_SERVER_URL = "http://10.0.2.2:5272"
+        const val DEFAULT_SERVER_URL = "http://192.168.2.2:5272"
 
         private val KEY_SERVER_URL = stringPreferencesKey("server_url")
         private val KEY_USER_ID = intPreferencesKey("user_id")
@@ -166,12 +166,21 @@ class SessionManager(
         }
     }
 
-    override suspend fun lastScanSignature(): String? =
-        context.sessionDataStore.data.first()[KEY_SCAN_SIGNATURE]
+    override suspend fun lastScanSignature(): String? {
+        initJob.join()
+        return sessionMutex.withLock {
+            context.sessionDataStore.data.first()[KEY_SCAN_SIGNATURE]
+        }
+    }
 
     override suspend fun setLastScanSignature(signature: String) {
-        context.sessionDataStore.edit { prefs ->
-            prefs[KEY_SCAN_SIGNATURE] = signature
+        initJob.join()
+        sessionMutex.withLock {
+            // A scan finishing during sign-out must not restore the signature it just cleared.
+            if (_authState.value !is AuthState.Authenticated) return@withLock
+            context.sessionDataStore.edit { prefs ->
+                prefs[KEY_SCAN_SIGNATURE] = signature
+            }
         }
     }
 

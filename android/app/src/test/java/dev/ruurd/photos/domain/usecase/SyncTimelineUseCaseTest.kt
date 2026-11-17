@@ -361,6 +361,29 @@ class SyncTimelineUseCaseTest {
         }
 
     @Test
+    fun `no-op delta sync skips the write transaction`() = runTest(testDispatcher) {
+        val repo = FakeMediaRepository()
+        val store = FakeSyncTimestampStore()
+        repo.upsert(MediaEntity(id = "cloud_existing", cloudId = "existing"))
+        val api = FakePhotosApiService().apply {
+            response = Response.success(
+                TimelineSyncResponse.newBuilder()
+                    .setIsFullSnapshot(false)
+                    .setSyncTimestamp(1_730_000_500_000L)
+                    .build()
+            )
+        }
+
+        val result = useCase(api, repo, store)()
+
+        assertTrue(result.isSuccess)
+        assertEquals(1_730_000_500_000L, store.latestSyncTimestamp.value)
+        // Nothing changed, so neither the transaction nor the full-snapshot cloud id query runs.
+        assertEquals(0, repo.transactionCount)
+        assertEquals(0, repo.getAllCloudIdsCalls)
+    }
+
+    @Test
     fun `server error fails the sync and keeps the stored timestamp`() = runTest(testDispatcher) {
         val repo = FakeMediaRepository()
         val store = FakeSyncTimestampStore()

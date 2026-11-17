@@ -189,7 +189,7 @@ fun AuthScreen(
                             viewModel.onServerUrlChanged(it)
                         },
                         label = { Text("Server URL") },
-                        placeholder = { Text("http://10.0.2.2:5272") },
+                        placeholder = { Text("https://photos.ruurd.dev") },
                         leadingIcon = {
                             Icon(Icons.Default.Dns, contentDescription = null)
                         },

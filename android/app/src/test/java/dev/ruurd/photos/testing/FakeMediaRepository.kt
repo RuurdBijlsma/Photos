@@ -15,6 +15,12 @@ class FakeMediaRepository : MediaRepository {
     /** bucket_id -> show_in_timeline, i.e. what the DAO reads from `device_folder`. */
     val folderVisibility = mutableMapOf<String, Boolean>()
 
+    /** Counters for tests that assert a sync does not touch the database. */
+    var transactionCount = 0
+        private set
+    var getAllCloudIdsCalls = 0
+        private set
+
     private val timelineFlow = MutableStateFlow<List<TimelineMediaProjection>>(emptyList())
 
     override fun getTimelineStage1(limitMonths: Int): Flow<List<TimelineMediaProjection>> =
@@ -45,8 +51,10 @@ class FakeMediaRepository : MediaRepository {
     override suspend fun getLocalRows(isVideo: Boolean): List<MediaEntity> =
         items.values.filter { it.localContentUri != null && it.isVideo == isVideo }
 
-    override suspend fun getAllCloudIds(): List<String> =
-        items.values.mapNotNull { it.cloudId }.distinct()
+    override suspend fun getAllCloudIds(): List<String> {
+        getAllCloudIdsCalls++
+        return items.values.mapNotNull { it.cloudId }.distinct()
+    }
 
     override suspend fun findBySizeAndStatus(
         sizeBytes: Long,
@@ -130,7 +138,10 @@ class FakeMediaRepository : MediaRepository {
         emitTimeline()
     }
 
-    override suspend fun <T> withTransaction(block: suspend () -> T): T = block()
+    override suspend fun <T> withTransaction(block: suspend () -> T): T {
+        transactionCount++
+        return block()
+    }
 
     private fun emitTimeline() {
         timelineFlow.value = items.values

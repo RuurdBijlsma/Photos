@@ -1,6 +1,5 @@
 package dev.ruurd.photos.core.network.api
 
-import dev.ruurd.photos.core.network.dto.LoginRequest
 import dev.ruurd.photos.core.network.proto.TimelineSyncResponse
 import okhttp3.RequestBody
 import okhttp3.ResponseBody

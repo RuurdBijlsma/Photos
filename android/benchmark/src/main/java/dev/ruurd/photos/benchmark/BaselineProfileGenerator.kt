@@ -55,6 +55,17 @@ class BaselineProfileGenerator {
             device.swipe(x, topY, x, bottomY, 14)
             SystemClock.sleep(80)
         }
+
+        // The scrubber draws through its own Canvas/TextMeasurer path. Absent on short libraries.
+        device.findObject(By.res("timeline_scrubber"))?.let { scrubber ->
+            val scrubBounds = scrubber.visibleBounds
+            val scrubX = scrubBounds.centerX()
+            val scrubTop = (scrubBounds.top + scrubBounds.height() * 0.15f).toInt()
+            val scrubBottom = (scrubBounds.bottom - scrubBounds.height() * 0.15f).toInt()
+            device.swipe(scrubX, scrubTop, scrubX, scrubBottom, 45)
+            SystemClock.sleep(100)
+            device.swipe(scrubX, scrubBottom, scrubX, scrubTop, 45)
+        }
         device.waitForIdle()
     }
 

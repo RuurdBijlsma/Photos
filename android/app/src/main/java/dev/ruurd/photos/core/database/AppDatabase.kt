@@ -14,7 +14,7 @@ import dev.ruurd.photos.core.database.entity.MediaEntity
         MediaEntity::class,
         DeviceFolderEntity::class
     ],
-    version = 2,
+    version = AppDatabase.VERSION,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -23,6 +23,9 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun deviceFolderDao(): DeviceFolderDao
 
     companion object {
+        /** Bumping this drops every table, so callers caching derived state include it. */
+        const val VERSION = 2
+
         private const val DATABASE_NAME = "photos.db"
 
         fun create(context: Context): AppDatabase {

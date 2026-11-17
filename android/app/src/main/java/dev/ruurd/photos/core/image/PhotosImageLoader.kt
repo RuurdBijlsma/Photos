@@ -2,12 +2,9 @@ package dev.ruurd.photos.core.image
 
 import android.content.Context
 import coil3.ImageLoader
-import coil3.bitmapFactoryMaxParallelism
 import coil3.disk.DiskCache
 import coil3.memory.MemoryCache
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
-import coil3.util.DebugLogger
-import coil3.util.Logger
 import okhttp3.OkHttpClient
 import okio.Path.Companion.toOkioPath
 

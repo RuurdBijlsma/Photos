@@ -221,9 +221,10 @@ private fun FloatingDatePillOverlay(
         // Layout-offset only: `.padding()` would relayout this subtree on every animation frame.
         modifier = modifier.offset { IntOffset(0, datePillTopOffset.value.roundToPx()) }
     ) {
-        datePillLabel?.let { label ->
-            FloatingDatePill(label = label)
-        }
+        // The label turns null before the exit animation runs, so keep the last one to animate out.
+        var lastLabel by remember { mutableStateOf("") }
+        datePillLabel?.let { lastLabel = it }
+        FloatingDatePill(label = lastLabel)
     }
 }
 
