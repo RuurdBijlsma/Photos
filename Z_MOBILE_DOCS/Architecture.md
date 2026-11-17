@@ -53,7 +53,7 @@ Adopt **Clean Architecture + MVI/MVVM** with **Unidirectional Data Flow (UDF)**.
       observing screen.
     * A lightweight **`MediaRefreshCoordinator`** in `AppContainer` handles side-effect refreshes after async server
       mutations (like `POST /api/photos/{id}/reprocess` or `PUT /api/photos/{id}/item`): invalidating the in-memory
-      `/item` details cache + Coil caches for that ID and running `SyncTimelineUseCase`.
+      `/item` details cache (plus Coil caches when an asset actually changed) and running `SyncTimelineUseCase`.
 3. **Local vs Cloud Identity, Permissions & Two-Pass Deduplication:**
     * Media items in Room contain:
         * `localContentUri`: `content://media/external/images/media/1234` (nullable, `UNIQUE`)
@@ -77,6 +77,8 @@ Adopt **Clean Architecture + MVI/MVVM** with **Unidirectional Data Flow (UDF)**.
     * **Permissions:** Request `READ_MEDIA_IMAGES` and `READ_MEDIA_VIDEO`, and handle Android 14+ partial access
       (`READ_MEDIA_VISUAL_USER_SELECTED`) cleanly so granting partial access does not break or loop permission prompts;
       track full vs. partial access per media type so cursor-omission deletion only runs when full access is granted.
+      Also declare `ACCESS_MEDIA_LOCATION` (using `MediaStore.setRequireOriginal(uri)`) so offline `ExifInterface`
+      reads retain GPS coordinates on local photos.
     * **Matching Pipeline:**
         * *Fast Pass:* On startup/scan, query `CLOUD_ONLY` rows by `size_bytes` and match in Kotlin on `ratio` + exact
           or 15-minute timezone-aligned timestamp (`±2s` within `±24h`). Matched items flip to `SYNCED` with zero disk
@@ -105,17 +107,25 @@ Adopt **Clean Architecture + MVI/MVVM** with **Unidirectional Data Flow (UDF)**.
           `1440p` in viewer)
         * `hasThumbnails == false`: `"${BASE_URL}/api/photos/${cloudId}/thumbnail?size=${targetHeightPx}"` (requires
           auth; `1440p` in viewer)
-    * **Viewer Full-Res File Cache (`cacheDir/full_res_cache/`, ~250–300 MB LRU):**
+    * **Viewer Full-Res File Cache (`cacheDir/full_res_cache/`, ~500 MB LRU):**
         * Coil 3 does not support multiple disk-cache budgets inside one `ImageLoader`. Keeping `PhotosImageLoader`'s 1
           GB `image_cache` strictly for thumbnails prevents large 20–50 MB `/api/photos/{cloudId}/download` originals
           from evicting timeline thumbnails.
-        * For `CLOUD_ONLY` photos (when MIME is natively decodable: JPEG, PNG, WebP, GIF, AVIF, HEIC/HEIF — skip
+        * For `CLOUD_ONLY` photos, wait for `GET /api/photos/{cloudId}/item` so `mime_type` and `missing_since` are
+          known. When `!missingSince` and MIME is natively decodable (JPEG, PNG, WebP, GIF, AVIF, HEIC/HEIF — skip
           TIFF/TGA), the viewer displays `1440p` immediately and fetches `/api/photos/{cloudId}/download` after a short
-          delay (or immediately on zoom) into `full_res_cache`, passing the local `File` (
-          `SubSamplingImageSource.file` / `file://` with `diskCachePolicy(CachePolicy.DISABLED)`) to
-          `ZoomableAsyncImage` (preserving Ultra HDR gainmaps).
+          delay (or immediately on zoom) into `full_res_cache`, deduplicating concurrent downloads per `cloudId` via a
+          temp-file atomic rename.
+        * Pass the cached `file://` URI (with `diskCachePolicy(CachePolicy.DISABLED)`) to `ZoomableAsyncImage` (rather
+          than bare `SubSamplingImageSource.file(...)`) so Telephoto subsamples JPEG/PNG/WebP with Ultra HDR gainmaps
+          and automatically falls back to Coil (`LibavifDecoder` / `ImageDecoder`) for full-res AVIF/HEIC originals. Key
+          `rememberZoomableState` on `mediaId` and pass `placeholderMemoryCacheKey` so upgrading `1440p` → full-res
+          never flickers or resets zoom.
         * **Share**, **Copy**, and **Download to `Downloads`** reuse the exact same `full_res_cache` file without
-          downloading twice.
+          downloading twice (staging Share/Copy via `share_cache/{id}/{filename}` + `FileProvider` so receiving apps
+          get the real filename and extension; saving Downloads into `MediaStore.Images.Media.EXTERNAL_CONTENT_URI` /
+          `MediaStore.Video.Media.EXTERNAL_CONTENT_URI` with `RELATIVE_PATH = Environment.DIRECTORY_DOWNLOADS` so the
+          resulting `Uri` matches `MediaStoreDataSource`).
     * **Grid ImageLoader tuning:**
         * Always pass exact pixel `.size(widthPx, heightPx)` on `ImageRequest`.
         * Keep hardware bitmaps enabled (`allowHardware(true)`).
@@ -126,10 +136,14 @@ Adopt **Clean Architecture + MVI/MVVM** with **Unidirectional Data Flow (UDF)**.
     * **Shared `OkHttpClient` DataSource:** Media3's `DefaultHttpDataSource` does **not** use OkHttp or your
       `CookieJar`. Configure `ExoPlayer` with `media3-datasource-okhttp` (`OkHttpDataSource.Factory(okHttpClient)`) so
       authenticated remote video streams automatically carry session cookies and trigger transparent 401 token refresh.
+      Configure `AudioAttributes` (`USAGE_MEDIA`, `CONTENT_TYPE_MOVIE`) with `handleAudioFocus = true` and
+      `setHandleAudioBecomingNoisy(true)`.
     * **Surface ownership in `HorizontalPager`:** Because `HorizontalPager` composes adjacent offscreen pages, attach
-      the single shared `ExoPlayer`'s `PlayerSurface` only to the **currently settled page**
+      the single shared `ExoPlayer`'s `PlayerSurface` / `ContentFrame` only to the **currently settled page**
       (`pagerState.settledPage == pageIndex`), rendering the photo thumbnail underneath until the first video frame
-      renders (`onRenderedFirstFrame`) so adjacent pages don't fight over the `Surface`. Pause on `ON_STOP`.
+      renders (`onRenderedFirstFrame`) so adjacent pages don't fight over the `Surface`. Use
+      `SURFACE_TYPE_TEXTURE_VIEW` (or hide the surface to reveal the thumbnail during active swipe-down / pager drags)
+      because `SurfaceView` ignores Compose `graphicsLayer` transforms during swipe-down dismiss. Pause on `ON_STOP`.
     * **Source selection in `MediaViewerScreen`:**
         * **Local / Synced (`localContentUri != null`):** Play directly from `localContentUri` (instant, zero
           bandwidth, full quality), falling back to cloud playback if `ExoPlayer` encounters `SecurityException` or
@@ -137,44 +151,56 @@ Adopt **Clean Architecture + MVI/MVVM** with **Unidirectional Data Flow (UDF)**.
         * **Cloud-only (`CLOUD_ONLY`):**
             * **`hasThumbnails == false`:** Thumbnails and WebM transcodes have not been generated yet, so **only** the
               on-demand original-quality endpoint (`/api/photos/{id}/video`, HTTP `Range`-enabled, requires auth) can be
-              used.
+              used. If `Original` fails with a codec error here, show a clear unsupported/processing error state.
             * **`hasThumbnails == true`:** Default to **Original** (`/api/photos/{id}/video`) when on unmetered Wi-Fi
               without Data Saver (`ConnectivityManager.isActiveNetworkMetered` + `restrictBackgroundStatus`), and
               default to **`480p.webm`** otherwise. Offer a quality picker (`Original`, `480p`, `144p`, reading
-              `sourceHeight` from `GET /api/photos/{id}/item` once loaded), and automatically fall back to `480p.webm`
-              if `Original` fails with a codec/container `PlaybackException`. Note `/thumbnails/...` does **not**
-              require authentication.
-    * **Video menu preferences:** Persist **Loop video** (`REPEAT_MODE_ONE` vs `REPEAT_MODE_OFF`) and **Playback speed
-      ** (`0.25x`–`3.0x`) in DataStore, controlled from the viewer's top-right overflow menu.
+              `sourceHeight = min(width, height)` from `GET /api/photos/{id}/item` once loaded), and fall back
+              transiently (without overwriting the persisted preference) to `480p.webm` only if `Original` fails with a
+              codec/container/extractor `PlaybackException` (never on network/auth errors, and never loop if already
+              on `480p.webm`). Note `/thumbnails/...` does **not** require authentication.
+    * **Video menu preferences:** Persist **Loop video** (`REPEAT_MODE_ONE` vs `REPEAT_MODE_OFF`) and **Playback speed**
+      (`0.25x`–`3.0x`) in DataStore, controlled from the viewer's top-right overflow menu.
 6. **Rotation & Reprocess Architecture:**
+    * **Eligibility:** Only allow rotation for still, non-panorama, non-missing photos (
+      `!isVideo && !usePanoramaViewer && !missingSince`) with supported MIME types (`jpeg/jpg/tiff/png/webp` on server;
+      `jpeg/png/webp` on `LOCAL_ONLY`), and wait until `orientation` is loaded from `/item` for cloud/synced items.
     * **Server rotation side effects (`PUT /api/photos/{oldId}/item`):** `apply_orientation_update` rewrites the file
       with `exiftool`, wipes thumbnails (`has_thumbnails = false`), and calls `MediaItemStore::change_media_item_id`,
       generating a brand-new `newId` (which inserts `newId` and deletes `oldId`, emitting a `deleted_media_item`
-      tombstone for `oldId`).
-    * **Debounce & flush:** Rotating taps increment visual rotation immediately (`0° → 90° → 180° → 270°`) with a 2.5s
-      debounce before committing; if the user swipes to another item or exits the viewer before the timer fires, flush
-      the pending rotation immediately.
+      tombstone for `oldId`). Note `PUT` uses `camelCase` (`mediaItemId`) unlike `GET /item` (`snake_case`).
+    * **Debounce, scope & `createWriteRequest`:** Rotating taps increment visual rotation immediately
+      (`0° → 90° → 180° → 270°`) with a 2.5s debounce before committing; if the user swipes to another item or exits
+      the viewer before the timer fires, flush the pending rotation immediately (skipping if net rotation is `0°`).
+      Execute the commit in `applicationScope` (inside `MediaRefreshCoordinator` / `RotateMediaUseCase`) so exiting
+      `MediaViewerScreen` doesn't cancel an in-flight server mutation. For `SYNCED`/`LOCAL_ONLY`, request
+      `MediaStore.createWriteRequest` on the **first Rotate tap** (or host the launcher above `MediaViewerScreen`) so
+      exiting the viewer mid-debounce doesn't lose the `ActivityResultLauncher`.
     * **Upload guard:** Block/disable Rotate while an upload is active for that item in Phase 3's `upload_queue`.
     * **Handling per `SyncStatus`:**
         * **`CLOUD_ONLY`:** Call `PUT /api/photos/{oldId}/item` → in one Room `@Transaction`, delete `"cloud_$oldId"`
           and upsert `"cloud_$newId"` (`cloudId = newId`, swapped `ratio`, `hasThumbnails = false`), update
-          `MediaViewerViewModel`'s active `mediaId` (`oldId → newId`), evict `oldId` from `MediaDetailsRepository` +
-          caches, and fetch `GET /api/photos/{newId}/download` into `full_res_cache`.
-        * **`SYNCED`:** Request OS write permission via `MediaStore.createWriteRequest` **before** calling
-          `PUT /api/photos/{oldId}/item` (aborting cleanly if denied). When `PUT` returns `newId`, immediately update
-          the Room row (`cloudId = newId`, swapped `ratio`, `hasThumbnails = false`) so any concurrent
-          `SyncTimelineUseCase` sees `oldId` gone and ignores its tombstone. Then download
-          `GET /api/photos/{newId}/download` into `full_res_cache` and overwrite `localContentUri` via
-          `ContentResolver.openFileDescriptor(uri, "wt")`, updating `sizeBytes` in Room—keeping the phone's file
-          byte-for-byte identical to the server without setting `autoBackupSuppressed`.
-        * **`LOCAL_ONLY` (JPEG, PNG, WebP):** Request `MediaStore.createWriteRequest`, update
-          `ExifInterface.TAG_ORIENTATION` + `saveAttributes()`, and update `ratio` & `sizeBytes` in Room.
-    * **Coil cache eviction:** Because `MediaStoreThumbnailFetcher.ThumbnailKeyer` keys on `"mediastore:$uri"` (and
-      Coil's default `UriKeyer` keys on `"$uri"`), explicitly remove both keys from `imageLoader.memoryCache` after
-      rotating a local/synced file so the grid updates immediately.
+          `MediaViewerScreen` / `MediaViewerViewModel`'s active `mediaId` (`oldId → newId`) cleanly without pager jump,
+          evict `oldId` from `MediaDetailsRepository` + caches, and fetch `GET /api/photos/{newId}/download` into
+          `full_res_cache`.
+        * **`SYNCED`:** After obtaining `MediaStore.createWriteRequest` consent, call `PUT /api/photos/{oldId}/item` →
+          immediately update that Room row (`cloudId = newId`, swapped `ratio`, `hasThumbnails = false`; keeping its
+          existing surrogate `id`, whether `"cloud_$oldId"` or `"local_<mediaStoreId>"`, and leaving any un-rotated
+          sibling copies on `oldId` to detach on next sync) so any concurrent `SyncTimelineUseCase` sees `oldId` gone
+          and ignores its tombstone. Then download `GET /api/photos/{newId}/download` into `full_res_cache` and
+          overwrite `localContentUri` via `ContentResolver.openFileDescriptor(uri, "wt")`, updating `sizeBytes` in
+          Room—keeping the phone's file byte-for-byte identical to the server without setting `autoBackupSuppressed`.
+        * **`LOCAL_ONLY` (JPEG, PNG, WebP):** After obtaining `MediaStore.createWriteRequest`, update
+          `ExifInterface.TAG_ORIENTATION` + `saveAttributes()`, trigger `MediaScannerConnection.scanFile` so
+          `MediaStore`'s `ORIENTATION` column updates promptly, and update `ratio` & `sizeBytes` in Room.
+    * **Coil cache eviction:** Because Coil 3 `MemoryCache.Key` can carry `extras`, iterate
+      `imageLoader.memoryCache?.keys` matching `it.key == "mediastore:$uri" || it.key == uri` to remove all variants,
+      and also call `imageLoader.diskCache?.remove(uri)` after rotating a local/synced file so the grid updates
+      immediately.
     * **Reprocess (`POST /api/photos/{id}/reprocess`):** Enqueues full worker reprocessing (
       `thumbnails_status = 'pending'`, `updated_at = now()`) without changing `id`. Invalidate `MediaDetailsRepository`
-      cache and trigger `MediaRefreshCoordinator` delta sync.
+      cache and trigger `MediaRefreshCoordinator` delta sync. Because reprocess isn't meant to change visual
+      appearance, leaving Coil's `immutable` cached thumbnails intact is intentional.
 7. **Resumable Uploads via WorkManager:**
     * `UploadWorker` executes TUS resumable uploads in 5 MB chunks. The JWT upload ticket (`upload_token_expiry_minutes:
       5`) is only verified at upload creation, after which TUS uses a persistent upload UUID for `HEAD`/`PATCH` chunks.
@@ -210,5 +236,3 @@ Adopt **Clean Architecture + MVI/MVVM** with **Unidirectional Data Flow (UDF)**.
 | **`DeviceFoldersScreen`**                | • "On this device" folder grid (`Screenshots`, `Download`, 3rd-party cameras, etc.)<br>• Per-folder **Back up** & **Show in timeline** toggles<br>• Justified row grid for folder contents                                                                                                                                                                                                                                          | • Browse non-camera folders without cluttering main timeline<br>• Toggle backup on for a folder (auto-enables timeline visibility) or manually upload individual items                                                                                  |
 | **`BackupSettingsScreen`**               | • Discovered device folder checklist (defaults to `DCIM/*` excluding Screenshots)<br>• Constraint switches (Wi-Fi only, while charging)<br>• Live upload queue progress bar                                                                                                                                                                                                                                                         | • Toggle auto-backup globally or per folder<br>• "Sync Now" manual trigger                                                                                                                                                                              |
 | **`AuthScreen`**                         | • Server URL input + LAN discovery scanner<br>• Email & password inputs                                                                                                                                                                                                                                                                                                                                                             | • Validates connection via `GET /api/health`<br>• Stores session cookies in persistent `CookieJar` across app launches                                                                                                                                  |
-
-

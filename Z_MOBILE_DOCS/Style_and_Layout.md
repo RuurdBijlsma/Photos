@@ -105,8 +105,8 @@ fun concentricRadius(outer: Dp, padding: Dp, min: Dp = 8.dp): Dp =
       minimal overshoot).
 * **Restrained Haptics:** Use `LocalHapticFeedback` sparingly on meaningful tactile moments only:
     * **Long-press to enter drag-select** on the timeline grid (`LongPress`).
-    * **Year boundary crossings** while dragging the right-edge `TimelineScrubber` (`TextHandleMove` / clock tick—at *
-      *year** granularity, not every month, to avoid buzz fatigue).
+    * **Year boundary crossings** while dragging the right-edge `TimelineScrubber` (`TextHandleMove` / clock tick—at
+      **year** granularity, not every month, to avoid buzz fatigue).
 
 ---
 
@@ -210,30 +210,35 @@ fun concentricRadius(outer: Dp, padding: Dp, min: Dp = 8.dp): Dp =
 
 ### 6.7 Media Viewer (`MediaViewerScreen`)
 
-* **Canvas:** Always `#000000` background, full edge-to-edge behind translucent system bars.
+* **Canvas:** Always `#000000` background, full edge-to-edge behind translucent system bars (forcing light status/nav
+  bar icons with `isAppearanceLightStatusBars = false` even in light mode, and hiding system bars when chrome is
+  toggled off).
 * **Top Floating Bar & Overflow Menu:**
     * Compact `CircleShape` `Back` pill, title/date/counter pill, and top-right `⋮` overflow menu button using dark
       translucent scrims (`Color.Black.copy(alpha = 0.45f)`) with optional subtle `RenderEffect` backdrop blur on API
-      37.
+        37.
     * **Top-right overflow menu items:** `Download` (visible only for `CLOUD_ONLY`), `About` (fallback trigger for the
-      info sheet), `Copy` (photos only; hidden on videos), `Rotate clockwise`, `Reprocess`, plus video-only
-      `Playback speed` (opens speed selector UI) and `Loop video` toggle.
+      info sheet), `Copy` (photos only; hidden on videos), `Rotate clockwise` (photos only; hidden on videos,
+      panoramas, missing items, and unsupported MIME types), `Reprocess`, plus video-only `Playback speed` (opens speed
+      selector UI) and `Loop video` toggle.
 * **Bottom Floating Pill:**
-    * Compact `CircleShape` pill hosting **Share**, **Add to** (album), and **Bin**—no Info button in the bottom pill (
-      Info is accessed via swipe-up or `About` in the top-right menu).
+    * Compact `CircleShape` pill hosting **Share**, **Add to** (album), and **Bin**—no Info button in the bottom pill
+      (Info is accessed via swipe-up or `About` in the top-right menu).
     * For videos, floating playback controls (seek bar, play/pause, mute, quality selector) sit cleanly above the bottom
-      action pill and fade together on tap.
+      action pill and fade together on tap. Video rendering uses `SURFACE_TYPE_TEXTURE_VIEW` (or hides the surface to
+      reveal the thumbnail during active swipe-down / pager drags) so scale/clip/translation transforms animate cleanly.
 * **Gestures:**
     * Swipe horizontally (`HorizontalPager`) between items; paging is locked (`userScrollEnabled = false`) while zoomed
       in.
     * Pinch / double-tap to zoom (`Telephoto`).
     * Tap photo/video to toggle chrome visibility smoothly.
-    * **Swipe down** (when unzoomed) to dismiss back to the timeline (container-transform / shrink transition back
-      toward the item's position, syncing timeline scroll on dismiss if needed).
-    * **Swipe up** (when unzoomed) to reveal the **Media Info Sheet** (`28.dp`–`32.dp` top-rounded dark
-      `surfaceContainerHigh` modal sheet showing capture date/time in Roboto/Montserrat, weather summary,
-      camera/lens/exposure pills, albums list, and a location card with resolved place name + coordinates +
-      `"Open in Maps"` action—embedded mini-map deferred until MapLibre is added).
+    * **Swipe down** (when unzoomed, `(zoomableState.zoomFraction ?: 0f) <= 0.01f`) to dismiss back to the timeline
+      (container-transform / shrink transition back toward the item's position, syncing timeline scroll on dismiss if
+      needed).
+    * **Swipe up** (when unzoomed, `(zoomableState.zoomFraction ?: 0f) <= 0.01f`) to reveal the **Media Info Sheet**
+      (`28.dp`–`32.dp` top-rounded dark `surfaceContainerHigh` modal sheet showing capture date/time in
+      Roboto/Montserrat, weather summary, camera/lens/exposure pills, albums list, and a location card with resolved
+      place name + coordinates + `"Open in Maps"` action—embedded mini-map deferred until MapLibre is added).
 
 ---
 

@@ -8,12 +8,13 @@
 * **Zoom Gestures in Viewer:** `me.saket.telephoto:zoomable-image-coil3:0.19.0` (Coil 3 integration for Compose zoomable
   images with subsampling, Ultra HDR gainmaps, fling, inertia, and `HorizontalPager` cooperation).
 * **Video Playback:** `androidx.media3:media3-exoplayer:1.11.1`,
-  `androidx.media3:media3-ui-compose-material3:1.11.1` (or `media3-ui:1.11.1`), &
+  `androidx.media3:media3-ui-compose:1.11.1` (plus optionally `media3-ui-compose-material3:1.11.1`), &
   `androidx.media3:media3-datasource-okhttp:1.11.1` (Required so `ExoPlayer` shares `OkHttpClient` cookies and 401
-  refresh).
-* **JSON Serialization & Local EXIF:** `org.jetbrains.kotlinx:kotlinx-serialization-json` + Retrofit
-  `converter-kotlinx-serialization` (`2.11.0`) for JSON endpoints (`/api/photos/{id}/item`, Phase 3–5 APIs), and
-  `androidx.exifinterface:exifinterface:1.4.2` for offline local EXIF reading and `LOCAL_ONLY` rotation.
+  refresh; use `PlayerSurface` / `ContentFrame` rather than legacy `media3-ui` Views).
+* **JSON Serialization & Local EXIF:** `org.jetbrains.kotlin.plugin.serialization` +
+  `org.jetbrains.kotlinx:kotlinx-serialization-json` + Retrofit `converter-kotlinx-serialization` (`2.11.0`) for
+  type-safe `@Serializable` Navigation Compose routes and JSON endpoints (`/api/photos/{id}/item`, Phase 3–5 APIs),
+  and `androidx.exifinterface:exifinterface:1.4.2` for offline local EXIF reading and `LOCAL_ONLY` rotation.
 * **Protobuf Compilation:** `com.google.protobuf:protobuf-javalite` with the Gradle Protobuf plugin to compile
   the `.proto` schemas.
 * **Navigation:** `androidx.navigation:navigation-compose:2.10.2` (Type-safe Compose navigation routes via
