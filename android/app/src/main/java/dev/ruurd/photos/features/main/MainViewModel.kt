@@ -25,6 +25,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.io.IOException
 
@@ -266,7 +267,11 @@ class MainViewModel(
                 if (scanJob === launchedJob) {
                     scanJob = null
                 }
-                if (nextAccess != null && nextAccess.hasAnyAccess) {
+                if (isActive &&
+                    authRepository.authState.value is AuthState.Authenticated &&
+                    nextAccess != null &&
+                    nextAccess.hasAnyAccess
+                ) {
                     scanLocalMedia(nextAccess)
                 }
             }

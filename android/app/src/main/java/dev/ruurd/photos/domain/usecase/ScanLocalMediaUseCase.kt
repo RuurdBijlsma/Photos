@@ -145,22 +145,44 @@ class ScanLocalMediaUseCase(
         }
 
         val missingIds = ArrayList<String>()
+        var liveImageUris: Set<String>? = null
+        var liveVideoUris: Set<String>? = null
+
         if (access.isFull(images = true)) {
             val imageRefs = mediaRepository.getLocalRowRefs(isVideo = false)
-            if (imageRefs.isNotEmpty()) {
+            if (imageRefs.isNotEmpty() || modifiedImages.isNotEmpty()) {
                 val liveUris = localMediaStore.queryImageUris()
-                collectMissingIds(imageRefs, liveUris, missingIds)
+                liveImageUris = liveUris
+                if (imageRefs.isNotEmpty()) {
+                    collectMissingIds(imageRefs, liveUris, missingIds)
+                }
             }
         }
         if (access.isFull(images = false)) {
             val videoRefs = mediaRepository.getLocalRowRefs(isVideo = true)
-            if (videoRefs.isNotEmpty()) {
+            if (videoRefs.isNotEmpty() || modifiedVideos.isNotEmpty()) {
                 val liveUris = localMediaStore.queryVideoUris()
-                collectMissingIds(videoRefs, liveUris, missingIds)
+                liveVideoUris = liveUris
+                if (videoRefs.isNotEmpty()) {
+                    collectMissingIds(videoRefs, liveUris, missingIds)
+                }
             }
         }
 
-        val modifiedFiles = modifiedImages + modifiedVideos
+        // Filter out items that were deleted or reverted to IS_PENDING between the delta query
+        // and the live URI check so they are not inserted as ghost rows.
+        val filteredImages = if (liveImageUris != null && modifiedImages.isNotEmpty()) {
+            modifiedImages.filter { it.contentUri in liveImageUris }
+        } else {
+            modifiedImages
+        }
+        val filteredVideos = if (liveVideoUris != null && modifiedVideos.isNotEmpty()) {
+            modifiedVideos.filter { it.contentUri in liveVideoUris }
+        } else {
+            modifiedVideos
+        }
+
+        val modifiedFiles = filteredImages + filteredVideos
         if (modifiedFiles.isEmpty() && missingIds.isEmpty()) {
             // Generation bumped for something outside our visible scope (e.g. IS_PENDING = 1).
             return ScanResult()
@@ -320,6 +342,7 @@ class ScanLocalMediaUseCase(
             sizeBytes = if (linked) existing.sizeBytes else local.sizeBytes,
             ratio = if (linked) existing.ratio else local.ratio,
             sortTimestamp = if (linked) existing.sortTimestamp else local.sortTimestamp,
+            timezoneOffsetMinutes = if (linked) existing.timezoneOffsetMinutes else local.timezoneOffsetMinutes,
             yearMonth = if (linked) existing.yearMonth else local.yearMonth,
             durationMs = if (linked) existing.durationMs else local.durationMs
         )

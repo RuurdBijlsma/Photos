@@ -42,7 +42,8 @@ class ScanLocalMediaUseCaseTest {
         var images: List<Pair<Long, LocalMediaFile>> = emptyList(),
         var videos: List<Pair<Long, LocalMediaFile>> = emptyList(),
         var generation: Long = 1L,
-        var version: String = "v1"
+        var version: String = "v1",
+        var liveImageUrisOverride: Set<String>? = null
     ) : LocalMediaStore {
         val lastModifiedAfterRequests = mutableListOf<Long?>()
 
@@ -68,7 +69,7 @@ class ScanLocalMediaUseCaseTest {
         }
 
         override suspend fun queryImageUris(): Set<String> =
-            images.mapTo(HashSet()) { it.second.contentUri }
+            liveImageUrisOverride ?: images.mapTo(HashSet()) { it.second.contentUri }
 
         override suspend fun queryVideoUris(): Set<String> =
             videos.mapTo(HashSet()) { it.second.contentUri }
@@ -402,25 +403,34 @@ class ScanLocalMediaUseCaseTest {
         }
 
     @Test
-    fun `rescanning a local row keeps auto backup suppression`() = runTest(testDispatcher) {
-        val repo = FakeMediaRepository()
-        repo.upsert(
-            MediaEntity(
-                id = "local_1",
-                localContentUri = "content://media/external/media/1",
-                autoBackupSuppressed = true,
-                sortTimestamp = 1_600_000_000_000L,
-                syncStatus = SyncStatus.LOCAL_ONLY
+    fun `rescanning a local row keeps auto backup suppression and refreshes timezone offset`() =
+        runTest(testDispatcher) {
+            val repo = FakeMediaRepository()
+            repo.upsert(
+                MediaEntity(
+                    id = "local_1",
+                    localContentUri = "content://media/external/media/1",
+                    autoBackupSuppressed = true,
+                    sortTimestamp = 1_600_000_000_000L,
+                    timezoneOffsetMinutes = 0,
+                    syncStatus = SyncStatus.LOCAL_ONLY
+                )
             )
-        )
-        val store = FakeLocalMediaStore().apply { setImageFiles(listOf(file(1))) }
+            val store = FakeLocalMediaStore().apply { setImageFiles(listOf(file(1))) }
 
-        useCase(store, repo, FakeDeviceFolderRepository())(fullAccess()).getOrThrow()
+            useCase(
+                store = store,
+                repo = repo,
+                folders = FakeDeviceFolderRepository(),
+                zoneProvider = { ZoneId.of("Europe/Amsterdam") }
+            )(fullAccess()).getOrThrow()
 
-        val row = repo.getById("local_1")!!
-        assertTrue(row.autoBackupSuppressed)
-        assertEquals(1_730_000_000_000L, row.sortTimestamp)
-    }
+            val row = repo.getById("local_1")!!
+            assertTrue(row.autoBackupSuppressed)
+            assertEquals(1_730_000_000_000L, row.sortTimestamp)
+            // 1_730_000_000_000L is Oct 27 2024 (CEST -> UTC+2, 120 minutes).
+            assertEquals(120, row.timezoneOffsetMinutes)
+        }
 
     @Test
     fun `zone provider is read on each scan instead of being cached at construction`() =
@@ -591,6 +601,67 @@ class ScanLocalMediaUseCaseTest {
         assertEquals(listOf(null, 1L), store.lastModifiedAfterRequests)
         assertNotNull(repo.getById("local_2"))
     }
+
+    @Test
+    fun `incremental scan picks up a photo after IS_PENDING clears across generation bumps`() =
+        runTest(testDispatcher) {
+            val repo = FakeMediaRepository()
+            val store = FakeLocalMediaStore().apply {
+                setImageFiles(listOf(file(1)), itemGeneration = 1L)
+                generation = 1L
+            }
+            val scanState = FakeScanStateStore()
+            val scan = useCase(store, repo, FakeDeviceFolderRepository(), scanState)
+
+            // Initial scan at generation 1.
+            assertEquals(1, scan(fullAccess()).getOrThrow().scanned)
+            assertEquals("${AppDatabase.VERSION}|v1|FULL|FULL|UTC|1", scanState.signature)
+
+            // Camera inserts file 2 with IS_PENDING = 1: generation bumps to 2, no visible delta.
+            store.generation = 2L
+            val pendingResult = scan(fullAccess()).getOrThrow()
+            assertEquals(0, pendingResult.scanned)
+            assertNull(repo.getById("local_2"))
+            assertEquals("${AppDatabase.VERSION}|v1|FULL|FULL|UTC|2", scanState.signature)
+
+            // Camera finishes writing and sets IS_PENDING = 0: generation bumps to 3.
+            store.generation = 3L
+            store.images = listOf(1L to file(1), 3L to file(2))
+            val publishedResult = scan(fullAccess()).getOrThrow()
+
+            assertEquals(1, publishedResult.scanned)
+            assertEquals(listOf(null, 1L, 2L), store.lastModifiedAfterRequests)
+            val added = repo.getById("local_2")
+            assertNotNull(added)
+            assertTrue(added!!.isVisibleInTimeline)
+            assertEquals("${AppDatabase.VERSION}|v1|FULL|FULL|UTC|3", scanState.signature)
+        }
+
+    @Test
+    fun `incremental scan skips a modified file that disappears before the live uri check`() =
+        runTest(testDispatcher) {
+            val repo = FakeMediaRepository()
+            val store = FakeLocalMediaStore().apply {
+                setImageFiles(listOf(file(1)), itemGeneration = 1L)
+                generation = 1L
+            }
+            val scanState = FakeScanStateStore()
+            val scan = useCase(store, repo, FakeDeviceFolderRepository(), scanState)
+
+            assertEquals(1, scan(fullAccess()).getOrThrow().scanned)
+
+            // queryImages sees file(2), but by the time queryImageUris runs only file(1) is live.
+            store.generation = 2L
+            store.images = listOf(1L to file(1), 2L to file(2))
+            store.liveImageUrisOverride = setOf(file(1).contentUri)
+
+            val result = scan(fullAccess()).getOrThrow()
+
+            assertEquals(0, result.scanned)
+            assertEquals(0, result.removed)
+            assertNotNull(repo.getById("local_1"))
+            assertNull(repo.getById("local_2"))
+        }
 
     @Test
     fun `incremental scan detects deleted local files via live uri check`() = runTest(testDispatcher) {

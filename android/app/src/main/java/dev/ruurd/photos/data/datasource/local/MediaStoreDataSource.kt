@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.buffer
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.debounce
+import java.io.IOException
 
 /**
  * Reads every non-pending, non-trashed, non-empty image/video from `MediaStore`.
@@ -84,26 +85,31 @@ class MediaStoreDataSource(private val context: Context) : LocalMediaStore {
         }
         val selectionArgs = modifiedAfterGeneration?.let { arrayOf(it.toString()) }
 
-        return contentResolver.query(collection, projection, selection, selectionArgs, null)
-            ?.use { cursor ->
-                val files = ArrayList<LocalMediaFile>(cursor.count)
-                while (cursor.moveToNext()) {
-                    files.add(cursor.toLocalMediaFile(collection, isVideo))
-                }
-                files
-            } ?: emptyList()
+        val cursor = contentResolver.query(collection, projection, selection, selectionArgs, null)
+            ?: throw IOException("MediaStore query returned null for $collection")
+
+        return cursor.use {
+            val files = ArrayList<LocalMediaFile>(it.count)
+            while (it.moveToNext()) {
+                files.add(it.toLocalMediaFile(collection, isVideo))
+            }
+            files
+        }
     }
 
     private fun queryUris(collection: Uri): Set<String> {
         val projection = arrayOf(MediaStore.MediaColumns._ID)
-        return contentResolver.query(collection, projection, SELECTION, null, null)?.use { cursor ->
-            val idColumn = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns._ID)
-            val uris = HashSet<String>(cursor.count.coerceAtLeast(16))
-            while (cursor.moveToNext()) {
-                uris.add(ContentUris.withAppendedId(collection, cursor.getLong(idColumn)).toString())
+        val cursor = contentResolver.query(collection, projection, SELECTION, null, null)
+            ?: throw IOException("MediaStore URI query returned null for $collection")
+
+        return cursor.use {
+            val idColumn = it.getColumnIndexOrThrow(MediaStore.MediaColumns._ID)
+            val uris = HashSet<String>(it.count.coerceAtLeast(16))
+            while (it.moveToNext()) {
+                uris.add(ContentUris.withAppendedId(collection, it.getLong(idColumn)).toString())
             }
             uris
-        } ?: emptySet()
+        }
     }
 
     private fun Cursor.toLocalMediaFile(collection: Uri, isVideo: Boolean): LocalMediaFile {
