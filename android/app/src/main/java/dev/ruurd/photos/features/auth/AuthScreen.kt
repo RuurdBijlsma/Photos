@@ -5,6 +5,7 @@ import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -19,6 +20,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -27,18 +29,22 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.filled.WifiFind
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -64,11 +70,13 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import dev.ruurd.photos.R
 import dev.ruurd.photos.core.network.SessionManager
+import dev.ruurd.photos.domain.model.DiscoveredServer
 import dev.ruurd.photos.ui.theme.PhotosRadii
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 
@@ -104,11 +112,14 @@ fun AuthScreen(
             action?.invoke()
         } else {
             localNetworkError =
-                "Local network permission is required to connect to a server on your Wi-Fi/LAN."
+                "Local network permission is required to find or connect to a server on your Wi-Fi/LAN."
         }
     }
 
-    fun runWithLocalNetworkCheck(action: () -> Unit) {
+    fun runWithLocalNetworkCheck(
+        requirePermissionAlways: Boolean = false,
+        action: () -> Unit
+    ) {
         localNetworkError = null
         if (Build.VERSION.SDK_INT >= 37) {
             val granted = ContextCompat.checkSelfPermission(
@@ -117,7 +128,7 @@ fun AuthScreen(
             ) == PackageManager.PERMISSION_GRANTED
             hasLocalNetworkPermission = granted
 
-            if (!granted && isLikelyLocalServerUrl(uiState.serverUrl)) {
+            if (!granted && (requirePermissionAlways || isLikelyLocalServerUrl(uiState.serverUrl))) {
                 pendingAction = action
                 localNetworkPermissionLauncher.launch(PERMISSION_ACCESS_LOCAL_NETWORK)
                 return
@@ -181,49 +192,81 @@ fun AuthScreen(
                     modifier = Modifier.padding(20.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    // Server URL Field
-                    OutlinedTextField(
-                        value = uiState.serverUrl,
-                        onValueChange = {
-                            localNetworkError = null
-                            viewModel.onServerUrlChanged(it)
-                        },
-                        label = { Text("Server URL") },
-                        placeholder = { Text("https://photos.ruurd.dev") },
-                        leadingIcon = {
-                            Icon(Icons.Default.Dns, contentDescription = null)
-                        },
-                        trailingIcon = {
-                            if (uiState.isTestingServer) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(20.dp),
-                                    strokeWidth = 2.dp
-                                )
-                            } else if (uiState.serverTestSuccess == true) {
-                                Icon(
-                                    Icons.Default.CheckCircle,
-                                    contentDescription = "Online",
-                                    tint = MaterialTheme.colorScheme.primary
-                                )
-                            } else if (uiState.serverTestSuccess == false) {
-                                Icon(
-                                    Icons.Default.Error,
-                                    contentDescription = "Error",
-                                    tint = MaterialTheme.colorScheme.error
-                                )
-                            }
-                        },
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(
-                            keyboardType = KeyboardType.Uri,
-                            imeAction = ImeAction.Next
-                        ),
-                        keyboardActions = KeyboardActions(
-                            onNext = { focusManager.moveFocus(FocusDirection.Down) }
-                        ),
-                        shape = RoundedCornerShape(PhotosRadii.NestedCard),
-                        modifier = Modifier.fillMaxWidth()
-                    )
+                    // Server URL Field + Scan LAN Trigger
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = uiState.serverUrl,
+                            onValueChange = {
+                                localNetworkError = null
+                                viewModel.onServerUrlChanged(it)
+                            },
+                            label = { Text("Server URL") },
+                            placeholder = { Text("https://photos.ruurd.dev") },
+                            leadingIcon = {
+                                Icon(Icons.Default.Dns, contentDescription = null)
+                            },
+                            trailingIcon = {
+                                if (uiState.isTestingServer) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(20.dp),
+                                        strokeWidth = 2.dp
+                                    )
+                                } else if (uiState.serverTestSuccess == true) {
+                                    Icon(
+                                        Icons.Default.CheckCircle,
+                                        contentDescription = "Online",
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                } else if (uiState.serverTestSuccess == false) {
+                                    Icon(
+                                        Icons.Default.Error,
+                                        contentDescription = "Error",
+                                        tint = MaterialTheme.colorScheme.error
+                                    )
+                                }
+                            },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(
+                                keyboardType = KeyboardType.Uri,
+                                imeAction = ImeAction.Next
+                            ),
+                            keyboardActions = KeyboardActions(
+                                onNext = { focusManager.moveFocus(FocusDirection.Down) }
+                            ),
+                            shape = RoundedCornerShape(PhotosRadii.NestedCard),
+                            modifier = Modifier.weight(1f)
+                        )
+
+                        FilledTonalIconButton(
+                            onClick = {
+                                focusManager.clearFocus()
+                                if (uiState.isScanningLan) {
+                                    viewModel.cancelLanScan()
+                                } else {
+                                    runWithLocalNetworkCheck(requirePermissionAlways = true) {
+                                        viewModel.scanLocalNetwork()
+                                    }
+                                }
+                            },
+                            enabled = !uiState.isLoading,
+                            modifier = Modifier
+                                .padding(top = 6.dp)
+                                .size(50.dp)
+                        ) {
+                            Icon(
+                                imageVector = if (uiState.isScanningLan) Icons.Default.Close else Icons.Default.WifiFind,
+                                contentDescription = if (uiState.isScanningLan) {
+                                    "Cancel local network scan"
+                                } else {
+                                    "Scan Wi-Fi for servers"
+                                }
+                            )
+                        }
+                    }
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -252,7 +295,7 @@ fun AuthScreen(
                                 if (uiState.isTestingServer) {
                                     viewModel.cancelServerTest()
                                 } else {
-                                    runWithLocalNetworkCheck(viewModel::testServerConnection)
+                                    runWithLocalNetworkCheck(action = viewModel::testServerConnection)
                                 }
                             },
                             shape = CircleShape,
@@ -262,6 +305,71 @@ fun AuthScreen(
                                 text = if (uiState.isTestingServer) "Cancel" else "Test Connection",
                                 style = MaterialTheme.typography.labelMedium
                             )
+                        }
+                    }
+
+                    // LAN Discovery Progress & Results
+                    AnimatedVisibility(
+                        visible = uiState.isScanningLan ||
+                                uiState.discoveredServers.isNotEmpty() ||
+                                (uiState.hasScannedLan && displayedError == null)
+                    ) {
+                        Surface(
+                            shape = RoundedCornerShape(PhotosRadii.NestedCard),
+                            color = MaterialTheme.colorScheme.surfaceContainer,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(12.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                if (uiState.isScanningLan) {
+                                    Text(
+                                        text = "Scanning Wi-Fi for Ruurd Photos servers…",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    val progress = uiState.scanProgress
+                                    if (progress != null) {
+                                        LinearProgressIndicator(
+                                            progress = { progress },
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clip(CircleShape)
+                                        )
+                                    } else {
+                                        LinearProgressIndicator(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clip(CircleShape)
+                                        )
+                                    }
+                                }
+
+                                if (uiState.discoveredServers.isNotEmpty()) {
+                                    Text(
+                                        text = "Discovered on local network",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    uiState.discoveredServers.forEach { server ->
+                                        DiscoveredServerRow(
+                                            server = server,
+                                            selected = SessionManager.normalizeUrl(uiState.serverUrl) == server.url,
+                                            onClick = {
+                                                localNetworkError = null
+                                                viewModel.selectDiscoveredServer(server)
+                                            }
+                                        )
+                                    }
+                                } else if (!uiState.isScanningLan && uiState.hasScannedLan) {
+                                    Text(
+                                        text = "No Ruurd Photos servers found on this Wi-Fi network.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
                         }
                     }
 
@@ -316,7 +424,7 @@ fun AuthScreen(
                         keyboardActions = KeyboardActions(
                             onDone = {
                                 focusManager.clearFocus()
-                                runWithLocalNetworkCheck(viewModel::login)
+                                runWithLocalNetworkCheck(action = viewModel::login)
                             }
                         ),
                         shape = RoundedCornerShape(PhotosRadii.NestedCard),
@@ -359,7 +467,7 @@ fun AuthScreen(
                     Button(
                         onClick = {
                             focusManager.clearFocus()
-                            runWithLocalNetworkCheck(viewModel::login)
+                            runWithLocalNetworkCheck(action = viewModel::login)
                         },
                         shape = CircleShape,
                         enabled = !uiState.isLoading,
@@ -381,6 +489,66 @@ fun AuthScreen(
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DiscoveredServerRow(
+    server: DiscoveredServer,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = if (selected) {
+            MaterialTheme.colorScheme.secondaryContainer
+        } else {
+            MaterialTheme.colorScheme.surfaceContainerHigh
+        },
+        border = if (selected) {
+            BorderStroke(1.dp, MaterialTheme.colorScheme.primary)
+        } else {
+            null
+        },
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = if (selected) Icons.Default.CheckCircle else Icons.Default.Dns,
+                contentDescription = null,
+                tint = if (selected) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(modifier = Modifier.width(10.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = server.url,
+                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                val badge = buildString {
+                    if (server.isEmulatorHost) append("Emulator host • ")
+                    append("${server.latencyMs} ms")
+                }
+                Text(
+                    text = badge,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
     }

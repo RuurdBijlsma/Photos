@@ -15,6 +15,7 @@ import dev.ruurd.photos.core.network.SessionManager
 import dev.ruurd.photos.core.network.api.PhotosApiService
 import dev.ruurd.photos.core.network.auth.AuthAuthenticator
 import dev.ruurd.photos.core.network.cookie.PersistentCookieJar
+import dev.ruurd.photos.core.network.discovery.LanServerScanner
 import dev.ruurd.photos.core.network.interceptor.DynamicBaseUrlInterceptor
 import dev.ruurd.photos.data.datasource.local.MediaStoreDataSource
 import dev.ruurd.photos.data.repository.AuthRepositoryImpl
@@ -58,6 +59,7 @@ interface AppContainer {
     val observeTimelineUseCase: ObserveTimelineUseCase
     val calculateTimelineLayoutUseCase: CalculateTimelineLayoutUseCase
     val networkMonitor: NetworkMonitor
+    val lanServerScanner: LanServerScanner
     val imageLoader: ImageLoader
 }
 
@@ -147,12 +149,25 @@ class DefaultAppContainer(private val context: Context) : AppContainer {
             .create(PhotosApiService::class.java)
     }
 
+    override val networkMonitor: NetworkMonitor by lazy {
+        NetworkMonitor(context)
+    }
+
+    override val lanServerScanner: LanServerScanner by lazy {
+        LanServerScanner(
+            networkMonitor = networkMonitor,
+            directClient = directClient,
+            dispatchers = dispatchers
+        )
+    }
+
     override val authRepository: AuthRepository by lazy {
         AuthRepositoryImpl(
             apiService = photosApiService,
             sessionManager = sessionManager,
             cookieJar = cookieJar,
             directClient = directClient,
+            lanServerScanner = lanServerScanner,
             dispatchers = dispatchers,
             applicationScope = applicationScope
         )
@@ -202,10 +217,6 @@ class DefaultAppContainer(private val context: Context) : AppContainer {
         CalculateTimelineLayoutUseCase(
             maxThumbnailHeightPx = if (activityManager?.isLowRamDevice == true) 480 else 720
         )
-    }
-
-    override val networkMonitor: NetworkMonitor by lazy {
-        NetworkMonitor(context)
     }
 
     private fun isDebuggable(): Boolean =

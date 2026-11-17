@@ -3,35 +3,33 @@ package dev.ruurd.photos.data.repository
 import dev.ruurd.photos.core.common.AppDispatchers
 import dev.ruurd.photos.core.network.SessionManager
 import dev.ruurd.photos.core.network.api.PhotosApiService
+import dev.ruurd.photos.core.network.await
 import dev.ruurd.photos.core.network.cookie.PersistentCookieJar
+import dev.ruurd.photos.core.network.discovery.LanScanEvent
+import dev.ruurd.photos.core.network.discovery.LanServerScanner
 import dev.ruurd.photos.domain.model.AuthState
 import dev.ruurd.photos.domain.model.User
 import dev.ruurd.photos.domain.repository.AuthRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
-import okhttp3.Call
-import okhttp3.Callback
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
-import okhttp3.Response
 import org.json.JSONObject
-import java.io.IOException
 import java.util.concurrent.TimeUnit
-import kotlin.coroutines.resume
-import kotlin.coroutines.resumeWithException
 
 class AuthRepositoryImpl(
     private val apiService: PhotosApiService,
     private val sessionManager: SessionManager,
     private val cookieJar: PersistentCookieJar,
     private val directClient: OkHttpClient,
+    private val lanServerScanner: LanServerScanner,
     private val dispatchers: AppDispatchers,
     private val applicationScope: CoroutineScope
 ) : AuthRepository {
@@ -51,6 +49,9 @@ class AuthRepositoryImpl(
     override suspend fun setServerUrl(url: String) {
         sessionManager.setServerUrl(url)
     }
+
+    override fun scanLocalServers(prioritizedHost: String?): Flow<LanScanEvent> =
+        lanServerScanner.scan(prioritizedHost)
 
     override suspend fun testServerConnection(url: String): Result<Unit> =
         withContext(dispatchers.io) {
@@ -186,20 +187,4 @@ class AuthRepositoryImpl(
             Result.failure(e)
         }
     }
-}
-
-/** Suspends on an enqueued call so cancellation cancels the request itself. */
-private suspend fun Call.await(): Response = suspendCancellableCoroutine { continuation ->
-    continuation.invokeOnCancellation { cancel() }
-    enqueue(
-        object : Callback {
-            override fun onFailure(call: Call, e: IOException) {
-                continuation.resumeWithException(e)
-            }
-
-            override fun onResponse(call: Call, response: Response) {
-                continuation.resume(response)
-            }
-        }
-    )
 }

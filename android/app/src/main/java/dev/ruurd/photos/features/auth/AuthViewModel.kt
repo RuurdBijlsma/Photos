@@ -4,6 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import dev.ruurd.photos.core.network.SessionManager
+import dev.ruurd.photos.core.network.discovery.LanScanEvent
+import dev.ruurd.photos.domain.model.DiscoveredServer
 import dev.ruurd.photos.domain.repository.AuthRepository
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -11,6 +13,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 
 data class AuthUiState(
     val serverUrl: String = "",
@@ -19,6 +22,10 @@ data class AuthUiState(
     val isLoading: Boolean = false,
     val isTestingServer: Boolean = false,
     val serverTestSuccess: Boolean? = null,
+    val isScanningLan: Boolean = false,
+    val scanProgress: Float? = null,
+    val hasScannedLan: Boolean = false,
+    val discoveredServers: List<DiscoveredServer> = emptyList(),
     val errorMessage: String? = null
 )
 
@@ -31,6 +38,7 @@ class AuthViewModel(
 
     private var hasUserEditedServerUrl = false
     private var serverTestJob: Job? = null
+    private var lanScanJob: Job? = null
 
     init {
         viewModelScope.launch {
@@ -64,6 +72,95 @@ class AuthViewModel(
         serverTestJob = null
         _uiState.update {
             it.copy(isTestingServer = false, serverTestSuccess = null, errorMessage = null)
+        }
+    }
+
+    fun scanLocalNetwork() {
+        val currentState = _uiState.value
+        if (currentState.isScanningLan || currentState.isLoading) return
+
+        cancelServerTest()
+        val prioritizedHost = SessionManager.normalizeUrl(currentState.serverUrl)
+            .toHttpUrlOrNull()
+            ?.host
+
+        lanScanJob = viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    isScanningLan = true,
+                    scanProgress = 0f,
+                    hasScannedLan = false,
+                    discoveredServers = emptyList(),
+                    errorMessage = null
+                )
+            }
+
+            try {
+                authRepository.scanLocalServers(prioritizedHost).collect { event ->
+                    when (event) {
+                        is LanScanEvent.Found -> {
+                            _uiState.update { state ->
+                                val merged = (state.discoveredServers + event.server)
+                                    .distinctBy { it.url }
+                                    .sortedWith(
+                                        compareByDescending<DiscoveredServer> { it.isEmulatorHost }
+                                            .thenBy { it.latencyMs }
+                                    )
+                                state.copy(discoveredServers = merged)
+                            }
+                        }
+                        is LanScanEvent.Progress -> {
+                            val fraction = event.completed.toFloat() / event.total.coerceAtLeast(1)
+                            _uiState.update { it.copy(scanProgress = fraction.coerceIn(0f, 1f)) }
+                        }
+                        LanScanEvent.NoLocalNetwork -> {
+                            _uiState.update {
+                                it.copy(
+                                    isScanningLan = false,
+                                    scanProgress = null,
+                                    hasScannedLan = false,
+                                    errorMessage = "Connect to Wi-Fi to scan your local network."
+                                )
+                            }
+                        }
+                    }
+                }
+            } finally {
+                _uiState.update { state ->
+                    if (state.isScanningLan) {
+                        state.copy(
+                            isScanningLan = false,
+                            scanProgress = null,
+                            hasScannedLan = true
+                        )
+                    } else {
+                        state
+                    }
+                }
+                lanScanJob = null
+            }
+        }
+    }
+
+    fun cancelLanScan() {
+        lanScanJob?.cancel()
+        lanScanJob = null
+        _uiState.update {
+            it.copy(isScanningLan = false, scanProgress = null)
+        }
+    }
+
+    fun selectDiscoveredServer(server: DiscoveredServer) {
+        hasUserEditedServerUrl = true
+        _uiState.update {
+            it.copy(
+                serverUrl = server.url,
+                serverTestSuccess = true,
+                errorMessage = null
+            )
+        }
+        viewModelScope.launch {
+            authRepository.setServerUrl(server.url)
         }
     }
 
@@ -150,6 +247,8 @@ class AuthViewModel(
             _uiState.update { it.copy(errorMessage = "Please enter password") }
             return
         }
+
+        cancelLanScan()
 
         viewModelScope.launch {
             _uiState.update {
