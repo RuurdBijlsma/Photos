@@ -1,5 +1,3 @@
-# MOBILE_STYLE_GUIDE.md
-
 ## Purpose
 
 Visual and interaction style guide for the native Android app (Jetpack Compose + Material 3, Android 17 / API 37+).
@@ -99,7 +97,7 @@ fun concentricRadius(outer: Dp, padding: Dp, min: Dp = 8.dp): Dp =
 
 * **Shared-Element Photo Transitions:** Tapping a photo/video in the timeline grid transitions smoothly via
   shared-bounds / container transform into `MediaViewerScreen`, and reverses back to the exact grid tile on swipe-down
-  dismiss (syncing scroll position first if the user swiped to a different item in the viewer).
+  dismiss (syncing scroll position on dismiss if the user swiped to a different item in the viewer).
 * **Spring Physics:** Use snappy, natural Material 3 Expressive springs (avoid sluggish linear/ease curves):
     * Spatial changes (shared photo bounds, bottom sheet expand, viewer swipe-to-dismiss): lightly damped spring (
       `DampingRatioNoBouncy` or very slight `0.85f` with `StiffnessMediumLow` / `StiffnessMedium`).
@@ -213,19 +211,29 @@ fun concentricRadius(outer: Dp, padding: Dp, min: Dp = 8.dp): Dp =
 ### 6.7 Media Viewer (`MediaViewerScreen`)
 
 * **Canvas:** Always `#000000` background, full edge-to-edge behind translucent system bars.
-* **Top & Bottom Floating Pills:**
-    * Compact `CircleShape` icon buttons / action pills (`Back`, `Info`, `Share`, `Add to Album`, `Delete`) using dark
+* **Top Floating Bar & Overflow Menu:**
+    * Compact `CircleShape` `Back` pill, title/date/counter pill, and top-right `⋮` overflow menu button using dark
       translucent scrims (`Color.Black.copy(alpha = 0.45f)`) with optional subtle `RenderEffect` backdrop blur on API
-        37.
-    * Tap the photo/video to toggle chrome visibility smoothly.
+      37.
+    * **Top-right overflow menu items:** `Download` (visible only for `CLOUD_ONLY`), `About` (fallback trigger for the
+      info sheet), `Copy` (photos only; hidden on videos), `Rotate clockwise`, `Reprocess`, plus video-only
+      `Playback speed` (opens speed selector UI) and `Loop video` toggle.
+* **Bottom Floating Pill:**
+    * Compact `CircleShape` pill hosting **Share**, **Add to** (album), and **Bin**—no Info button in the bottom pill (
+      Info is accessed via swipe-up or `About` in the top-right menu).
+    * For videos, floating playback controls (seek bar, play/pause, mute, quality selector) sit cleanly above the bottom
+      action pill and fade together on tap.
 * **Gestures:**
-    * Swipe horizontally (`HorizontalPager`) between items.
+    * Swipe horizontally (`HorizontalPager`) between items; paging is locked (`userScrollEnabled = false`) while zoomed
+      in.
     * Pinch / double-tap to zoom (`Telephoto`).
-    * **Swipe down** to dismiss back to the timeline (container-transform / shrink transition back toward the item's
-      position).
-    * **Swipe up** to reveal the **Media Info Sheet** (`28.dp`–`32.dp` top-rounded dark `surfaceContainerHigh` modal
-      sheet showing capture date/time in Roboto/Montserrat, camera settings, weather summary, and mini location map card
-      with concentric `16.dp`–`20.dp` rounded corners).
+    * Tap photo/video to toggle chrome visibility smoothly.
+    * **Swipe down** (when unzoomed) to dismiss back to the timeline (container-transform / shrink transition back
+      toward the item's position, syncing timeline scroll on dismiss if needed).
+    * **Swipe up** (when unzoomed) to reveal the **Media Info Sheet** (`28.dp`–`32.dp` top-rounded dark
+      `surfaceContainerHigh` modal sheet showing capture date/time in Roboto/Montserrat, weather summary,
+      camera/lens/exposure pills, albums list, and a location card with resolved place name + coordinates +
+      `"Open in Maps"` action—embedded mini-map deferred until MapLibre is added).
 
 ---
 
