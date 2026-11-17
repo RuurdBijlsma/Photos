@@ -45,7 +45,9 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -54,6 +56,9 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
@@ -73,9 +78,6 @@ import dev.ruurd.photos.features.timeline.components.TimelineScrubber
 import dev.ruurd.photos.ui.theme.MontserratFontFamily
 import dev.ruurd.photos.ui.theme.PhotosRadii
 import kotlin.math.roundToInt
-import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.testTagsAsResourceId
 
 /**
  * Read-only justified timeline: a `LazyColumn` of typed month headers and precomputed photo rows, plus
@@ -96,6 +98,7 @@ fun TimelineScreen(
     topBarHeight: Dp = 0.dp,
     topBarVisible: Boolean = true,
     isSyncing: Boolean = false,
+    isBootstrapping: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -104,6 +107,46 @@ fun TimelineScreen(
 
     var isScrubbing by remember { mutableStateOf(false) }
     var viewportHeightDp by remember { mutableFloatStateOf(0f) }
+
+    LaunchedEffect(isBootstrapping) {
+        viewModel.setBootstrapping(isBootstrapping)
+    }
+
+    // Keep the viewport pinned to index 0 when newer months are prepended while already at the top;
+    // otherwise LazyColumn key-anchoring shifts the scroll position down to the previous top header.
+    val currentLayout by rememberUpdatedState(layout)
+    LaunchedEffect(listState) {
+        var lastTopRowId: String? = null
+        var atTopBeforeUpdate = true
+        var pinnedTopRowId: String? = null
+
+        snapshotFlow {
+            Triple(
+                currentLayout,
+                listState.firstVisibleItemIndex,
+                listState.firstVisibleItemScrollOffset
+            )
+        }.collect { (activeLayout, firstIndex, firstOffset) ->
+            val topRowId = activeLayout.rows.firstOrNull()?.id
+            val topChanged = topRowId != null && lastTopRowId != null && topRowId != lastTopRowId
+            if (topChanged) {
+                pinnedTopRowId = if (atTopBeforeUpdate) topRowId else null
+            }
+            if (listState.isScrollInProgress) {
+                pinnedTopRowId = null
+            }
+            if (pinnedTopRowId != null && pinnedTopRowId == topRowId &&
+                !listState.isScrollInProgress && (firstIndex != 0 || firstOffset != 0)
+            ) {
+                listState.scrollToItem(0)
+                pinnedTopRowId = null
+                atTopBeforeUpdate = true
+            } else {
+                atTopBeforeUpdate = firstIndex == 0 && firstOffset == 0
+            }
+            lastTopRowId = topRowId
+        }
+    }
 
     // Rows scroll under the floating top bar and bottom nav; the padding only offsets the content
     // edges so the first and last rows are reachable.
@@ -120,7 +163,7 @@ fun TimelineScreen(
             }
     ) {
         when {
-            uiState.isLoading || (layout.isEmpty && isSyncing) -> {
+            uiState.isLoading || isBootstrapping || (layout.isEmpty && isSyncing) -> {
                 CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
             }
 

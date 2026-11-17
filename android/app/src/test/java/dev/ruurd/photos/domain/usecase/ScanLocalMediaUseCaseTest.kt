@@ -14,6 +14,7 @@ import dev.ruurd.photos.domain.repository.ScanStateStore
 import dev.ruurd.photos.testing.FakeMediaRepository
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -47,10 +48,12 @@ class ScanLocalMediaUseCaseTest {
 
     private class FakeScanStateStore : ScanStateStore {
         var signature: String? = null
+        override val hasScanSignature = MutableStateFlow(false)
 
         override suspend fun lastScanSignature(): String? = signature
         override suspend fun setLastScanSignature(signature: String) {
             this.signature = signature
+            hasScanSignature.value = true
         }
     }
 

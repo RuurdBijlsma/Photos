@@ -45,6 +45,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -91,11 +92,19 @@ fun MainScreen(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     var mediaAccess: MediaAccessState by remember { mutableStateOf(MediaPermissions.read(context)) }
+    var hasRequestedPermissions by rememberSaveable { mutableStateOf(false) }
+    var isPermissionDialogPending by rememberSaveable { mutableStateOf(false) }
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) {
-        // ON_RESUME fires when the permission dialog closes and triggers the scan once.
-        mediaAccess = MediaPermissions.read(context)
+        isPermissionDialogPending = false
+        val currentAccess = MediaPermissions.read(context)
+        mediaAccess = currentAccess
+        if (currentAccess.hasAnyAccess) {
+            viewModel.scanLocalMedia(currentAccess)
+        } else {
+            viewModel.onMediaAccessDenied()
+        }
     }
 
     BackHandler(enabled = uiState.destination == MainDestination.SEARCH) {
@@ -103,7 +112,9 @@ fun MainScreen(
     }
 
     LaunchedEffect(Unit) {
-        if (!mediaAccess.hasAnyAccess) {
+        if (!mediaAccess.hasAnyAccess && !hasRequestedPermissions) {
+            hasRequestedPermissions = true
+            isPermissionDialogPending = true
             permissionLauncher.launch(MediaPermissions.requestedPermissions)
         }
     }
@@ -129,6 +140,8 @@ fun MainScreen(
                 mediaAccess = currentAccess
                 if (currentAccess.hasAnyAccess) {
                     viewModel.scanLocalMedia(currentAccess)
+                } else if (hasRequestedPermissions && !isPermissionDialogPending) {
+                    viewModel.onMediaAccessDenied()
                 }
             }
         }
@@ -199,7 +212,8 @@ fun MainScreen(
                     contentPadding = PaddingValues(top = topInset, bottom = bottomInset),
                     topBarHeight = PhotosTopBarHeight,
                     topBarVisible = !hideTopBar,
-                    isSyncing = uiState.syncState == SyncState.SYNCING
+                    isSyncing = uiState.syncState == SyncState.SYNCING,
+                    isBootstrapping = uiState.isBootstrapping
                 )
             }
             MainDestination.COLLECTIONS -> {

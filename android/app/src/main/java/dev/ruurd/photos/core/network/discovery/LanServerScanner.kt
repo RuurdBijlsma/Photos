@@ -129,7 +129,7 @@ class LanServerScanner(
         val startNanos = System.nanoTime()
         return try {
             probeClient.newCall(request).await().use { response ->
-                if (!isRuurdPhotosHealthResponse(response, target.port)) return@use null
+                if (!isRuurdPhotosHealthResponse(response)) return@use null
                 val latencyMs = ((System.nanoTime() - startNanos) / 1_000_000L).coerceAtLeast(1L)
                 DiscoveredServer(
                     url = url,
@@ -146,18 +146,8 @@ class LanServerScanner(
         }
     }
 
-    private fun isRuurdPhotosHealthResponse(response: Response, port: Int): Boolean {
-        if (!response.isSuccessful) return false
-        if (response.header(RUURD_PHOTOS_HEADER).equals("1", ignoreCase = true)) return true
-
-        // Fallback for servers that don't yet emit X-Ruurd-Photos: only accept the default
-        // Ruurd Photos ports and reject HTML responses (e.g. generic nginx SPA catch-alls).
-        if (PRIMARY_PORTS.none { it.port == port }) return false
-        val contentType = response.header("Content-Type")?.lowercase().orEmpty()
-        if (contentType.contains("text/html")) return false
-        val body = response.peekBody(128).string().trim()
-        return body.isNotEmpty() && !body.startsWith("<")
-    }
+    private fun isRuurdPhotosHealthResponse(response: Response): Boolean =
+        response.isSuccessful && response.header(RUURD_PHOTOS_HEADER).equals("1", ignoreCase = true)
 
     private fun buildTargets(
         localIp: Inet4Address?,

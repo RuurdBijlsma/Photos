@@ -5,11 +5,13 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import dev.ruurd.photos.core.network.NetworkMonitor
+import dev.ruurd.photos.core.network.SyncTimestampStore
 import dev.ruurd.photos.domain.model.AuthState
 import dev.ruurd.photos.domain.model.MediaAccessState
 import dev.ruurd.photos.domain.model.SyncState
 import dev.ruurd.photos.domain.model.User
 import dev.ruurd.photos.domain.repository.AuthRepository
+import dev.ruurd.photos.domain.repository.ScanStateStore
 import dev.ruurd.photos.domain.usecase.ScanLocalMediaUseCase
 import dev.ruurd.photos.domain.usecase.SyncTimelineUseCase
 import dev.ruurd.photos.features.main.components.MainNavTab
@@ -20,6 +22,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.io.IOException
@@ -45,13 +48,16 @@ data class MainUiState(
     val syncState: SyncState = SyncState.IDLE,
     val destination: MainDestination = MainDestination.PHOTOS,
     val isAvatarMenuOpen: Boolean = false,
-    val syncErrorMessage: String? = null
+    val syncErrorMessage: String? = null,
+    val isBootstrapping: Boolean = false
 )
 
 class MainViewModel(
     private val authRepository: AuthRepository,
     private val syncTimelineUseCase: SyncTimelineUseCase,
     private val scanLocalMediaUseCase: ScanLocalMediaUseCase,
+    syncTimestampStore: SyncTimestampStore,
+    scanStateStore: ScanStateStore,
     networkMonitor: NetworkMonitor
 ) : ViewModel() {
 
@@ -60,8 +66,16 @@ class MainViewModel(
     private val _isAvatarMenuOpen = MutableStateFlow(false)
     private val _syncErrorMessage = MutableStateFlow<String?>(null)
 
+    private val needsInitialBootstrap =
+        syncTimestampStore.latestSyncTimestamp.value <= 0L && !scanStateStore.hasScanSignature.value
+
+    private val _initialSyncSettled = MutableStateFlow(!needsInitialBootstrap)
+    private val _initialScanSettled = MutableStateFlow(!needsInitialBootstrap)
+
     private var hasRefreshedProfile = false
+    private var syncJob: Job? = null
     private var scanJob: Job? = null
+    private var activeScanAccess: MediaAccessState? = null
     private var pendingScanAccess: MediaAccessState? = null
 
     private val connectionInfoFlow = combine(
@@ -76,11 +90,17 @@ class MainViewModel(
         _syncErrorMessage
     ) { destination, menuOpen, error -> Triple(destination, menuOpen, error) }
 
+    private val isBootstrappingFlow = combine(
+        _initialSyncSettled,
+        _initialScanSettled
+    ) { syncDone, scanDone -> !syncDone || !scanDone }
+
     val uiState: StateFlow<MainUiState> = combine(
         authRepository.authState,
         connectionInfoFlow,
-        uiControlsFlow
-    ) { authState, conn, controls ->
+        uiControlsFlow,
+        isBootstrappingFlow
+    ) { authState, conn, controls, isBootstrapping ->
         val (serverUrl, isOnline, syncState) = conn
         val (destination, menuOpen, error) = controls
         val user = (authState as? AuthState.Authenticated)?.user
@@ -92,12 +112,13 @@ class MainViewModel(
             syncState = syncState,
             destination = destination,
             isAvatarMenuOpen = menuOpen,
-            syncErrorMessage = error
+            syncErrorMessage = error,
+            isBootstrapping = isBootstrapping
         )
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
-        initialValue = MainUiState()
+        initialValue = MainUiState(isBootstrapping = needsInitialBootstrap)
     )
 
     init {
@@ -112,6 +133,9 @@ class MainViewModel(
                         // Reset per-session UI so a later login does not inherit stale state.
                         hasRefreshedProfile = false
                         pendingScanAccess = null
+                        activeScanAccess = null
+                        syncJob?.cancel()
+                        syncJob = null
                         scanJob?.cancel()
                         scanJob = null
                         lastNonSearchTab = MainNavTab.PHOTOS
@@ -130,9 +154,9 @@ class MainViewModel(
                             }
                         }
 
-                        if (syncTimelineUseCase.syncState.value != SyncState.SYNCING) {
-                            syncNow(forceFullSnapshot = false)
-                        }
+                        syncNow(forceFullSnapshot = false)
+                    } else {
+                        _initialSyncSettled.value = true
                     }
                 }
         }
@@ -166,14 +190,23 @@ class MainViewModel(
     }
 
     fun syncNow(forceFullSnapshot: Boolean = false) {
-        if (syncTimelineUseCase.syncState.value == SyncState.SYNCING) return
+        if (syncJob?.isActive == true || syncTimelineUseCase.syncState.value == SyncState.SYNCING) {
+            if (!_initialSyncSettled.value && syncJob?.isActive != true) {
+                viewModelScope.launch {
+                    syncTimelineUseCase.syncState.first { it != SyncState.SYNCING }
+                    _initialSyncSettled.value = true
+                }
+            }
+            return
+        }
 
-        viewModelScope.launch {
+        syncJob = viewModelScope.launch {
             _syncErrorMessage.value = null
             val result = syncTimelineUseCase(forceFullSnapshot = forceFullSnapshot)
             result.onFailure { error ->
                 _syncErrorMessage.value = formatSyncError(error)
             }
+            _initialSyncSettled.value = true
         }
     }
 
@@ -185,27 +218,42 @@ class MainViewModel(
         }
     }
 
+    fun onMediaAccessDenied() {
+        _initialScanSettled.value = true
+    }
+
     fun scanLocalMedia(access: MediaAccessState) {
-        if (!access.hasAnyAccess) return
+        if (!access.hasAnyAccess) {
+            _initialScanSettled.value = true
+            return
+        }
         if (scanJob?.isActive == true) {
-            pendingScanAccess = access
+            if (access != activeScanAccess) {
+                pendingScanAccess = access
+            }
             return
         }
 
+        activeScanAccess = access
+        val shouldDelayStartupScan = _initialScanSettled.value
         lateinit var launchedJob: Job
         launchedJob = viewModelScope.launch {
             try {
-                // Let the first timeline frame and its visible thumbnails land before competing for
-                // SQLite and MediaStore; the scan result only affects later frames.
-                delay(STARTUP_SCAN_DELAY_MS)
+                if (shouldDelayStartupScan) {
+                    // Let the first timeline frame and its visible thumbnails land before competing for
+                    // SQLite and MediaStore; the scan result only affects later frames.
+                    delay(STARTUP_SCAN_DELAY_MS)
+                }
                 scanLocalMediaUseCase(access).onFailure { error ->
                     Log.w(TAG, "Local media scan failed", error)
                 }
+                _initialScanSettled.value = true
             } finally {
                 val nextAccess = pendingScanAccess
                 pendingScanAccess = null
                 if (scanJob === launchedJob) {
                     scanJob = null
+                    activeScanAccess = null
                 }
                 if (nextAccess != null && nextAccess.hasAnyAccess) {
                     scanLocalMedia(nextAccess)
@@ -229,6 +277,8 @@ class MainViewModel(
             authRepository: AuthRepository,
             syncTimelineUseCase: SyncTimelineUseCase,
             scanLocalMediaUseCase: ScanLocalMediaUseCase,
+            syncTimestampStore: SyncTimestampStore,
+            scanStateStore: ScanStateStore,
             networkMonitor: NetworkMonitor
         ): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
@@ -237,6 +287,8 @@ class MainViewModel(
                     authRepository = authRepository,
                     syncTimelineUseCase = syncTimelineUseCase,
                     scanLocalMediaUseCase = scanLocalMediaUseCase,
+                    syncTimestampStore = syncTimestampStore,
+                    scanStateStore = scanStateStore,
                     networkMonitor = networkMonitor
                 ) as T
             }

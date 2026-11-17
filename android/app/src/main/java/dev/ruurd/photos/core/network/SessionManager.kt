@@ -66,12 +66,16 @@ class SessionManager(
     private val _latestSyncTimestamp = MutableStateFlow(0L)
     override val latestSyncTimestamp: StateFlow<Long> = _latestSyncTimestamp.asStateFlow()
 
+    private val _hasScanSignature = MutableStateFlow(false)
+    override val hasScanSignature: StateFlow<Boolean> = _hasScanSignature.asStateFlow()
+
     private val initJob: Job = scope.launch {
         try {
             val prefs = context.sessionDataStore.data.first()
             val url = prefs[KEY_SERVER_URL] ?: DEFAULT_SERVER_URL
             _serverUrl.value = normalizeUrl(url).ifEmpty { DEFAULT_SERVER_URL }
             _latestSyncTimestamp.value = prefs[KEY_LATEST_SYNC_TIMESTAMP] ?: 0L
+            _hasScanSignature.value = prefs[KEY_SCAN_SIGNATURE] != null
 
             val userId = prefs[KEY_USER_ID]
             val email = prefs[KEY_USER_EMAIL]
@@ -142,8 +146,9 @@ class SessionManager(
             } catch (_: Exception) {
                 // Best-effort local cleanup; never block signing out.
             }
-            _authState.value = AuthState.Unauthenticated
             _latestSyncTimestamp.value = 0L
+            _hasScanSignature.value = false
+            _authState.value = AuthState.Unauthenticated
             context.sessionDataStore.edit { prefs ->
                 prefs.remove(KEY_USER_ID)
                 prefs.remove(KEY_USER_EMAIL)
@@ -178,6 +183,7 @@ class SessionManager(
         sessionMutex.withLock {
             // A scan finishing during sign-out must not restore the signature it just cleared.
             if (_authState.value !is AuthState.Authenticated) return@withLock
+            _hasScanSignature.value = true
             context.sessionDataStore.edit { prefs ->
                 prefs[KEY_SCAN_SIGNATURE] = signature
             }
