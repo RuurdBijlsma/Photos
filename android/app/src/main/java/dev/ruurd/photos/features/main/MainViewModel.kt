@@ -11,6 +11,7 @@ import dev.ruurd.photos.domain.model.MediaAccessState
 import dev.ruurd.photos.domain.model.SyncState
 import dev.ruurd.photos.domain.model.User
 import dev.ruurd.photos.domain.repository.AuthRepository
+import dev.ruurd.photos.domain.repository.LocalMediaStore
 import dev.ruurd.photos.domain.repository.ScanStateStore
 import dev.ruurd.photos.domain.usecase.ScanLocalMediaUseCase
 import dev.ruurd.photos.domain.usecase.SyncTimelineUseCase
@@ -56,6 +57,7 @@ class MainViewModel(
     private val authRepository: AuthRepository,
     private val syncTimelineUseCase: SyncTimelineUseCase,
     private val scanLocalMediaUseCase: ScanLocalMediaUseCase,
+    private val localMediaStore: LocalMediaStore,
     syncTimestampStore: SyncTimestampStore,
     scanStateStore: ScanStateStore,
     networkMonitor: NetworkMonitor
@@ -73,9 +75,9 @@ class MainViewModel(
     private val _initialScanSettled = MutableStateFlow(!needsInitialBootstrap)
 
     private var hasRefreshedProfile = false
+    private var isFirstLaunchScan = true
     private var syncJob: Job? = null
     private var scanJob: Job? = null
-    private var activeScanAccess: MediaAccessState? = null
     private var pendingScanAccess: MediaAccessState? = null
 
     private val connectionInfoFlow = combine(
@@ -132,8 +134,8 @@ class MainViewModel(
                     if (!isAuthenticated) {
                         // Reset per-session UI so a later login does not inherit stale state.
                         hasRefreshedProfile = false
+                        isFirstLaunchScan = true
                         pendingScanAccess = null
-                        activeScanAccess = null
                         syncJob?.cancel()
                         syncJob = null
                         scanJob?.cancel()
@@ -222,20 +224,30 @@ class MainViewModel(
         _initialScanSettled.value = true
     }
 
+    suspend fun observeLocalMediaChanges(accessProvider: () -> MediaAccessState) {
+        localMediaStore.observeChanges().collect {
+            val currentAccess = accessProvider()
+            if (currentAccess.hasAnyAccess) {
+                scanLocalMedia(currentAccess)
+            }
+        }
+    }
+
     fun scanLocalMedia(access: MediaAccessState) {
         if (!access.hasAnyAccess) {
             _initialScanSettled.value = true
             return
         }
         if (scanJob?.isActive == true) {
-            if (access != activeScanAccess) {
-                pendingScanAccess = access
-            }
+            // Always queue a follow-up scan if a change/resume arrived mid-scan, even with the
+            // same access state (e.g., IS_PENDING = 0 published while the current scan is running).
+            pendingScanAccess = access
             return
         }
 
-        activeScanAccess = access
-        val shouldDelayStartupScan = _initialScanSettled.value
+        val shouldDelayStartupScan = isFirstLaunchScan && _initialScanSettled.value
+        isFirstLaunchScan = false
+
         lateinit var launchedJob: Job
         launchedJob = viewModelScope.launch {
             try {
@@ -253,7 +265,6 @@ class MainViewModel(
                 pendingScanAccess = null
                 if (scanJob === launchedJob) {
                     scanJob = null
-                    activeScanAccess = null
                 }
                 if (nextAccess != null && nextAccess.hasAnyAccess) {
                     scanLocalMedia(nextAccess)
@@ -277,6 +288,7 @@ class MainViewModel(
             authRepository: AuthRepository,
             syncTimelineUseCase: SyncTimelineUseCase,
             scanLocalMediaUseCase: ScanLocalMediaUseCase,
+            localMediaStore: LocalMediaStore,
             syncTimestampStore: SyncTimestampStore,
             scanStateStore: ScanStateStore,
             networkMonitor: NetworkMonitor
@@ -287,6 +299,7 @@ class MainViewModel(
                     authRepository = authRepository,
                     syncTimelineUseCase = syncTimelineUseCase,
                     scanLocalMediaUseCase = scanLocalMediaUseCase,
+                    localMediaStore = localMediaStore,
                     syncTimestampStore = syncTimestampStore,
                     scanStateStore = scanStateStore,
                     networkMonitor = networkMonitor

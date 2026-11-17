@@ -3,6 +3,7 @@ package dev.ruurd.photos.data.repository
 import androidx.room.withTransaction
 import dev.ruurd.photos.core.common.AppDispatchers
 import dev.ruurd.photos.core.database.AppDatabase
+import dev.ruurd.photos.core.database.dao.LocalRowRef
 import dev.ruurd.photos.core.database.dao.MediaDao
 import dev.ruurd.photos.core.database.entity.MediaEntity
 import dev.ruurd.photos.core.database.entity.SyncStatus
@@ -25,6 +26,16 @@ class MediaRepositoryImpl(
 
     override suspend fun getById(id: String): MediaEntity? = mediaDao.getById(id)
 
+    override suspend fun getByIds(ids: List<String>): List<MediaEntity> {
+        if (ids.isEmpty()) return emptyList()
+        return ids.chunked(BATCH_SIZE).flatMap { chunk -> mediaDao.getByIds(chunk) }
+    }
+
+    override suspend fun getByLocalContentUris(uris: List<String>): List<MediaEntity> {
+        if (uris.isEmpty()) return emptyList()
+        return uris.chunked(BATCH_SIZE).flatMap { chunk -> mediaDao.getByLocalContentUris(chunk) }
+    }
+
     override suspend fun getByCloudId(cloudId: String): MediaEntity? =
         mediaDao.getByCloudId(cloudId)
 
@@ -38,6 +49,9 @@ class MediaRepositoryImpl(
 
     override suspend fun getLocalRows(isVideo: Boolean): List<MediaEntity> =
         mediaDao.getLocalRows(isVideo)
+
+    override suspend fun getLocalRowRefs(isVideo: Boolean): List<LocalRowRef> =
+        mediaDao.getLocalRowRefs(isVideo)
 
     override suspend fun findBySizeAndStatus(
         sizeBytes: Long,

@@ -82,6 +82,7 @@ class MainActivity : ComponentActivity() {
                                     authRepository = container.authRepository,
                                     syncTimelineUseCase = container.syncTimelineUseCase,
                                     scanLocalMediaUseCase = container.scanLocalMediaUseCase,
+                                    localMediaStore = container.localMediaStore,
                                     syncTimestampStore = container.sessionManager,
                                     scanStateStore = container.sessionManager,
                                     networkMonitor = container.networkMonitor

@@ -14,7 +14,9 @@ import dev.ruurd.photos.domain.repository.ScanStateStore
 import dev.ruurd.photos.testing.FakeMediaRepository
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -37,13 +39,45 @@ class ScanLocalMediaUseCaseTest {
     }
 
     private class FakeLocalMediaStore(
-        var images: List<LocalMediaFile> = emptyList(),
-        var videos: List<LocalMediaFile> = emptyList(),
-        var generation: Long = 1L
+        var images: List<Pair<Long, LocalMediaFile>> = emptyList(),
+        var videos: List<Pair<Long, LocalMediaFile>> = emptyList(),
+        var generation: Long = 1L,
+        var version: String = "v1"
     ) : LocalMediaStore {
-        override suspend fun queryImages(): List<LocalMediaFile> = images
-        override suspend fun queryVideos(): List<LocalMediaFile> = videos
+        val lastModifiedAfterRequests = mutableListOf<Long?>()
+
+        fun setImageFiles(files: List<LocalMediaFile>, itemGeneration: Long = generation) {
+            images = files.map { itemGeneration to it }
+        }
+
+        override suspend fun queryImages(modifiedAfterGeneration: Long?): List<LocalMediaFile> {
+            lastModifiedAfterRequests.add(modifiedAfterGeneration)
+            return if (modifiedAfterGeneration == null) {
+                images.map { it.second }
+            } else {
+                images.filter { it.first > modifiedAfterGeneration }.map { it.second }
+            }
+        }
+
+        override suspend fun queryVideos(modifiedAfterGeneration: Long?): List<LocalMediaFile> {
+            return if (modifiedAfterGeneration == null) {
+                videos.map { it.second }
+            } else {
+                videos.filter { it.first > modifiedAfterGeneration }.map { it.second }
+            }
+        }
+
+        override suspend fun queryImageUris(): Set<String> =
+            images.mapTo(HashSet()) { it.second.contentUri }
+
+        override suspend fun queryVideoUris(): Set<String> =
+            videos.mapTo(HashSet()) { it.second.contentUri }
+
         override suspend fun generation(): Long = generation
+
+        override suspend fun version(): String = version
+
+        override fun observeChanges(): Flow<Unit> = emptyFlow()
     }
 
     private class FakeScanStateStore : ScanStateStore {
@@ -125,7 +159,7 @@ class ScanLocalMediaUseCaseTest {
         runTest(testDispatcher) {
             val repo = FakeMediaRepository()
             val folders = FakeDeviceFolderRepository()
-            val store = FakeLocalMediaStore(images = listOf(file(1)))
+            val store = FakeLocalMediaStore().apply { setImageFiles(listOf(file(1))) }
 
             val result = useCase(store, repo, folders)(fullAccess()).getOrThrow()
 
@@ -147,9 +181,9 @@ class ScanLocalMediaUseCaseTest {
     fun `screenshot folder is registered but hidden from the timeline`() = runTest(testDispatcher) {
         val repo = FakeMediaRepository()
         val folders = FakeDeviceFolderRepository()
-        val store = FakeLocalMediaStore(
-            images = listOf(file(2, relativePath = "DCIM/Screenshots/", bucketId = "shots"))
-        )
+        val store = FakeLocalMediaStore().apply {
+            setImageFiles(listOf(file(2, relativePath = "DCIM/Screenshots/", bucketId = "shots")))
+        }
 
         useCase(store, repo, folders)(fullAccess()).getOrThrow()
 
@@ -169,7 +203,7 @@ class ScanLocalMediaUseCaseTest {
                 backupEnabled = false
             )
         }
-        val store = FakeLocalMediaStore(images = listOf(file(3)))
+        val store = FakeLocalMediaStore().apply { setImageFiles(listOf(file(3))) }
 
         useCase(store, repo, folders)(fullAccess()).getOrThrow()
 
@@ -181,7 +215,7 @@ class ScanLocalMediaUseCaseTest {
     fun `pass 1 links a matching cloud row without hashing`() = runTest(testDispatcher) {
         val repo = FakeMediaRepository()
         repo.upsert(cloudOnly("a1B2c3D4e5", sizeBytes = 1_001L))
-        val store = FakeLocalMediaStore(images = listOf(file(1)))
+        val store = FakeLocalMediaStore().apply { setImageFiles(listOf(file(1))) }
 
         val result = useCase(store, repo, FakeDeviceFolderRepository())(fullAccess()).getOrThrow()
 
@@ -205,7 +239,9 @@ class ScanLocalMediaUseCaseTest {
             val cameraCopy = file(2, relativePath = "DCIM/Camera/", bucketId = "camera")
                 .copy(sizeBytes = 1_001L)
             // Download appears before Camera in the cursor
-            val store = FakeLocalMediaStore(images = listOf(hiddenCopy, cameraCopy))
+            val store = FakeLocalMediaStore().apply {
+                setImageFiles(listOf(hiddenCopy, cameraCopy))
+            }
 
             val result = useCase(store, repo, FakeDeviceFolderRepository())(fullAccess()).getOrThrow()
 
@@ -228,7 +264,7 @@ class ScanLocalMediaUseCaseTest {
         repo.upsert(
             cloudOnly("tz", sizeBytes = 1_001L, sortTimestamp = 1_730_000_000_000L + 2 * 3_600_000L)
         )
-        val store = FakeLocalMediaStore(images = listOf(file(1)))
+        val store = FakeLocalMediaStore().apply { setImageFiles(listOf(file(1))) }
 
         val result = useCase(store, repo, FakeDeviceFolderRepository())(fullAccess()).getOrThrow()
 
@@ -240,7 +276,7 @@ class ScanLocalMediaUseCaseTest {
     fun `pass 1 ignores a size collision with a different aspect ratio`() = runTest(testDispatcher) {
         val repo = FakeMediaRepository()
         repo.upsert(cloudOnly("other", sizeBytes = 1_001L, ratio = 0.75f))
-        val store = FakeLocalMediaStore(images = listOf(file(1)))
+        val store = FakeLocalMediaStore().apply { setImageFiles(listOf(file(1))) }
 
         val result = useCase(store, repo, FakeDeviceFolderRepository())(fullAccess()).getOrThrow()
 
@@ -268,17 +304,19 @@ class ScanLocalMediaUseCaseTest {
                     syncStatus = SyncStatus.SYNCED
                 )
             )
-            val store = FakeLocalMediaStore(
-                images = listOf(
-                    file(
-                        id = 1,
-                        relativePath = "DCIM/Screenshots/",
-                        bucketId = "shots",
-                        width = 0,
-                        height = 0
+            val store = FakeLocalMediaStore().apply {
+                setImageFiles(
+                    listOf(
+                        file(
+                            id = 1,
+                            relativePath = "DCIM/Screenshots/",
+                            bucketId = "shots",
+                            width = 0,
+                            height = 0
+                        )
                     )
                 )
-            )
+            }
 
             useCase(store, repo, FakeDeviceFolderRepository())(fullAccess()).getOrThrow()
 
@@ -313,7 +351,7 @@ class ScanLocalMediaUseCaseTest {
             )
             // Old URI 1 is gone; same file now lives at URI 2 with matching size/ratio/timestamp.
             val movedFile = file(2).copy(sizeBytes = 1_002L)
-            val store = FakeLocalMediaStore(images = listOf(movedFile))
+            val store = FakeLocalMediaStore().apply { setImageFiles(listOf(movedFile)) }
 
             val result = useCase(store, repo, FakeDeviceFolderRepository())(fullAccess()).getOrThrow()
 
@@ -351,9 +389,9 @@ class ScanLocalMediaUseCaseTest {
                     syncStatus = SyncStatus.SYNCED
                 )
             )
-            val store = FakeLocalMediaStore(
-                images = listOf(file(1, relativePath = "DCIM/NewFolder/", bucketId = "new_bucket"))
-            )
+            val store = FakeLocalMediaStore().apply {
+                setImageFiles(listOf(file(1, relativePath = "DCIM/NewFolder/", bucketId = "new_bucket")))
+            }
 
             useCase(store, repo, FakeDeviceFolderRepository())(fullAccess()).getOrThrow()
 
@@ -375,7 +413,7 @@ class ScanLocalMediaUseCaseTest {
                 syncStatus = SyncStatus.LOCAL_ONLY
             )
         )
-        val store = FakeLocalMediaStore(images = listOf(file(1)))
+        val store = FakeLocalMediaStore().apply { setImageFiles(listOf(file(1))) }
 
         useCase(store, repo, FakeDeviceFolderRepository())(fullAccess()).getOrThrow()
 
@@ -392,14 +430,20 @@ class ScanLocalMediaUseCaseTest {
             // 2024-10-31T23:23Z is October in UTC, November in Europe/Amsterdam (UTC+1).
             val timestamp = 1_730_417_000_000L
             var currentZone = ZoneId.of("UTC")
-            val store = FakeLocalMediaStore(images = listOf(file(1, dateTakenMs = timestamp)))
+            val store = FakeLocalMediaStore().apply {
+                setImageFiles(listOf(file(1, dateTakenMs = timestamp)))
+            }
             val scan = useCase(store, repo, folders) { currentZone }
 
             scan(fullAccess()).getOrThrow()
             assertEquals(202410, repo.getById("local_1")!!.yearMonth)
 
             currentZone = ZoneId.of("Europe/Amsterdam")
-            store.images = listOf(file(1, dateTakenMs = timestamp), file(2, dateTakenMs = timestamp))
+            store.setImageFiles(
+                listOf(file(1, dateTakenMs = timestamp), file(2, dateTakenMs = timestamp)),
+                itemGeneration = 2L
+            )
+            store.generation = 2L
             scan(fullAccess()).getOrThrow()
 
             assertEquals(202411, repo.getById("local_2")!!.yearMonth)
@@ -415,7 +459,7 @@ class ScanLocalMediaUseCaseTest {
                 syncStatus = SyncStatus.LOCAL_ONLY
             )
         )
-        val store = FakeLocalMediaStore(images = listOf(file(1)))
+        val store = FakeLocalMediaStore().apply { setImageFiles(listOf(file(1))) }
 
         val result = useCase(store, repo, FakeDeviceFolderRepository())(
             MediaAccessState(images = MediaAccess.PARTIAL, videos = MediaAccess.PARTIAL)
@@ -453,7 +497,7 @@ class ScanLocalMediaUseCaseTest {
                 syncStatus = SyncStatus.LOCAL_ONLY
             )
         )
-        val store = FakeLocalMediaStore(images = listOf(file(1)))
+        val store = FakeLocalMediaStore().apply { setImageFiles(listOf(file(1))) }
 
         val result = useCase(store, repo, FakeDeviceFolderRepository())(fullAccess()).getOrThrow()
 
@@ -473,7 +517,7 @@ class ScanLocalMediaUseCaseTest {
                     syncStatus = SyncStatus.SYNCED
                 )
             )
-            val store = FakeLocalMediaStore(images = listOf(file(1)))
+            val store = FakeLocalMediaStore().apply { setImageFiles(listOf(file(1))) }
 
             useCase(store, repo, FakeDeviceFolderRepository())(fullAccess()).getOrThrow()
 
@@ -504,7 +548,7 @@ class ScanLocalMediaUseCaseTest {
                 isVisibleInTimeline = false
             )
         )
-        val store = FakeLocalMediaStore(images = listOf(file(1)))
+        val store = FakeLocalMediaStore().apply { setImageFiles(listOf(file(1))) }
 
         useCase(store, repo, FakeDeviceFolderRepository())(fullAccess()).getOrThrow()
 
@@ -516,7 +560,7 @@ class ScanLocalMediaUseCaseTest {
     @Test
     fun `no access does nothing at all`() = runTest(testDispatcher) {
         val repo = FakeMediaRepository()
-        val store = FakeLocalMediaStore(images = listOf(file(1)))
+        val store = FakeLocalMediaStore().apply { setImageFiles(listOf(file(1))) }
 
         val result = useCase(store, repo, FakeDeviceFolderRepository())(MediaAccessState()).getOrThrow()
 
@@ -527,27 +571,73 @@ class ScanLocalMediaUseCaseTest {
     @Test
     fun `unchanged media store generation skips the scan`() = runTest(testDispatcher) {
         val repo = FakeMediaRepository()
-        val store = FakeLocalMediaStore(images = listOf(file(1)))
+        val store = FakeLocalMediaStore().apply { setImageFiles(listOf(file(1)), itemGeneration = 1L) }
         val scanState = FakeScanStateStore()
         val scan = useCase(store, repo, FakeDeviceFolderRepository(), scanState)
 
         assertEquals(1, scan(fullAccess()).getOrThrow().scanned)
-        assertEquals("${AppDatabase.VERSION}:1:FULL:FULL:UTC", scanState.signature)
+        assertEquals("${AppDatabase.VERSION}|v1|FULL|FULL|UTC|1", scanState.signature)
 
         // Same generation: the added file is not picked up because MediaStore did not change.
-        store.images = listOf(file(1), file(2))
+        store.setImageFiles(listOf(file(1), file(2)), itemGeneration = 1L)
         assertEquals(0, scan(fullAccess()).getOrThrow().scanned)
         assertNull(repo.getById("local_2"))
 
+        // Generation bumps: incremental scan queries only items modified after generation 1.
         store.generation = 2L
-        assertEquals(2, scan(fullAccess()).getOrThrow().scanned)
+        store.images = listOf(1L to file(1), 2L to file(2))
+        val incrementalResult = scan(fullAccess()).getOrThrow()
+        assertEquals(1, incrementalResult.scanned)
+        assertEquals(listOf(null, 1L), store.lastModifiedAfterRequests)
         assertNotNull(repo.getById("local_2"))
+    }
+
+    @Test
+    fun `incremental scan detects deleted local files via live uri check`() = runTest(testDispatcher) {
+        val repo = FakeMediaRepository()
+        val store = FakeLocalMediaStore().apply {
+            images = listOf(1L to file(1), 1L to file(2))
+        }
+        val scanState = FakeScanStateStore()
+        val scan = useCase(store, repo, FakeDeviceFolderRepository(), scanState)
+
+        assertEquals(2, scan(fullAccess()).getOrThrow().scanned)
+
+        // File 2 is deleted and generation bumps to 2 with no new additions.
+        store.images = listOf(1L to file(1))
+        store.generation = 2L
+        val result = scan(fullAccess()).getOrThrow()
+
+        assertEquals(0, result.scanned)
+        assertEquals(1, result.removed)
+        assertNotNull(repo.getById("local_1"))
+        assertNull(repo.getById("local_2"))
+    }
+
+    @Test
+    fun `media store version change forces a full scan`() = runTest(testDispatcher) {
+        val repo = FakeMediaRepository()
+        val store = FakeLocalMediaStore().apply {
+            images = listOf(1L to file(1))
+        }
+        val scanState = FakeScanStateStore()
+        val scan = useCase(store, repo, FakeDeviceFolderRepository(), scanState)
+
+        scan(fullAccess()).getOrThrow()
+
+        store.version = "v2"
+        store.generation = 2L
+        store.images = listOf(1L to file(1), 2L to file(2))
+        val result = scan(fullAccess()).getOrThrow()
+
+        assertEquals(2, result.scanned)
+        assertEquals(listOf(null, null), store.lastModifiedAfterRequests)
     }
 
     @Test
     fun `partial access always scans and never records a signature`() = runTest(testDispatcher) {
         val repo = FakeMediaRepository()
-        val store = FakeLocalMediaStore(images = listOf(file(1)))
+        val store = FakeLocalMediaStore().apply { setImageFiles(listOf(file(1))) }
         val scanState = FakeScanStateStore()
         val scan = useCase(store, repo, FakeDeviceFolderRepository(), scanState)
         val partial = MediaAccessState(MediaAccess.PARTIAL, MediaAccess.PARTIAL)

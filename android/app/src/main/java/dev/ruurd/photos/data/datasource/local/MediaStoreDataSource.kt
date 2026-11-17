@@ -3,11 +3,21 @@ package dev.ruurd.photos.data.datasource.local
 import android.content.ContentResolver
 import android.content.ContentUris
 import android.content.Context
+import android.database.ContentObserver
 import android.database.Cursor
 import android.net.Uri
+import android.os.Handler
+import android.os.Looper
 import android.provider.MediaStore
 import dev.ruurd.photos.domain.model.LocalMediaFile
 import dev.ruurd.photos.domain.repository.LocalMediaStore
+import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.buffer
+import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.debounce
 
 /**
  * Reads every non-pending, non-trashed, non-empty image/video from `MediaStore`.
@@ -18,25 +28,82 @@ class MediaStoreDataSource(private val context: Context) : LocalMediaStore {
 
     private val contentResolver: ContentResolver = context.contentResolver
 
-    override suspend fun queryImages(): List<LocalMediaFile> =
-        query(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, isVideo = false)
+    override suspend fun queryImages(modifiedAfterGeneration: Long?): List<LocalMediaFile> =
+        query(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, isVideo = false, modifiedAfterGeneration)
 
-    override suspend fun queryVideos(): List<LocalMediaFile> =
-        query(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, isVideo = true)
+    override suspend fun queryVideos(modifiedAfterGeneration: Long?): List<LocalMediaFile> =
+        query(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, isVideo = true, modifiedAfterGeneration)
+
+    override suspend fun queryImageUris(): Set<String> =
+        queryUris(MediaStore.Images.Media.EXTERNAL_CONTENT_URI)
+
+    override suspend fun queryVideoUris(): Set<String> =
+        queryUris(MediaStore.Video.Media.EXTERNAL_CONTENT_URI)
 
     override suspend fun generation(): Long =
         MediaStore.getGeneration(context, MediaStore.VOLUME_EXTERNAL)
 
-    private fun query(collection: Uri, isVideo: Boolean): List<LocalMediaFile> {
-        val projection = BASE_PROJECTION + if (isVideo) arrayOf(MediaStore.Video.Media.DURATION) else emptyArray<String>()
+    override suspend fun version(): String =
+        MediaStore.getVersion(context, MediaStore.VOLUME_EXTERNAL)
 
-        return contentResolver.query(collection, projection, SELECTION, null, null)?.use { cursor ->
-            val files = ArrayList<LocalMediaFile>(cursor.count)
-            while (cursor.moveToNext()) {
-                files.add(cursor.toLocalMediaFile(collection, isVideo))
+    @OptIn(FlowPreview::class)
+    override fun observeChanges(): Flow<Unit> = callbackFlow {
+        val observer = object : ContentObserver(Handler(Looper.getMainLooper())) {
+            override fun onChange(selfChange: Boolean, uri: Uri?) {
+                trySend(Unit)
             }
-            files
-        } ?: emptyList()
+        }
+        contentResolver.registerContentObserver(
+            MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+            true,
+            observer
+        )
+        contentResolver.registerContentObserver(
+            MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
+            true,
+            observer
+        )
+        awaitClose {
+            contentResolver.unregisterContentObserver(observer)
+        }
+    }
+        .buffer(Channel.CONFLATED)
+        .debounce(CHANGE_DEBOUNCE_MS)
+
+    private fun query(
+        collection: Uri,
+        isVideo: Boolean,
+        modifiedAfterGeneration: Long?
+    ): List<LocalMediaFile> {
+        val projection =
+            BASE_PROJECTION + if (isVideo) arrayOf(MediaStore.Video.Media.DURATION) else emptyArray<String>()
+        val selection = if (modifiedAfterGeneration != null) {
+            "$SELECTION AND ${MediaStore.MediaColumns.GENERATION_MODIFIED} > ?"
+        } else {
+            SELECTION
+        }
+        val selectionArgs = modifiedAfterGeneration?.let { arrayOf(it.toString()) }
+
+        return contentResolver.query(collection, projection, selection, selectionArgs, null)
+            ?.use { cursor ->
+                val files = ArrayList<LocalMediaFile>(cursor.count)
+                while (cursor.moveToNext()) {
+                    files.add(cursor.toLocalMediaFile(collection, isVideo))
+                }
+                files
+            } ?: emptyList()
+    }
+
+    private fun queryUris(collection: Uri): Set<String> {
+        val projection = arrayOf(MediaStore.MediaColumns._ID)
+        return contentResolver.query(collection, projection, SELECTION, null, null)?.use { cursor ->
+            val idColumn = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns._ID)
+            val uris = HashSet<String>(cursor.count.coerceAtLeast(16))
+            while (cursor.moveToNext()) {
+                uris.add(ContentUris.withAppendedId(collection, cursor.getLong(idColumn)).toString())
+            }
+            uris
+        } ?: emptySet()
     }
 
     private fun Cursor.toLocalMediaFile(collection: Uri, isVideo: Boolean): LocalMediaFile {
@@ -74,6 +141,7 @@ class MediaStoreDataSource(private val context: Context) : LocalMediaStore {
     private companion object {
         // Column ids only: `MediaStore.MediaColumns.ORIENTATION` is deprecated and may be removed.
         const val COLUMN_ORIENTATION = "orientation"
+        const val CHANGE_DEBOUNCE_MS = 300L
 
         val BASE_PROJECTION = arrayOf(
             MediaStore.MediaColumns._ID,
@@ -90,7 +158,7 @@ class MediaStoreDataSource(private val context: Context) : LocalMediaStore {
         )
 
         val SELECTION = "${MediaStore.MediaColumns.IS_PENDING} = 0" +
-            " AND ${MediaStore.MediaColumns.IS_TRASHED} = 0" +
-            " AND ${MediaStore.MediaColumns.SIZE} > 0"
+                " AND ${MediaStore.MediaColumns.IS_TRASHED} = 0" +
+                " AND ${MediaStore.MediaColumns.SIZE} > 0"
     }
 }

@@ -1,5 +1,6 @@
 package dev.ruurd.photos.testing
 
+import dev.ruurd.photos.core.database.dao.LocalRowRef
 import dev.ruurd.photos.core.database.entity.MediaEntity
 import dev.ruurd.photos.core.database.entity.SyncStatus
 import dev.ruurd.photos.core.database.entity.TimelineMediaProjection
@@ -37,6 +38,14 @@ class FakeMediaRepository : MediaRepository {
 
     override suspend fun getById(id: String): MediaEntity? = items[id]
 
+    override suspend fun getByIds(ids: List<String>): List<MediaEntity> =
+        ids.mapNotNull { items[it] }
+
+    override suspend fun getByLocalContentUris(uris: List<String>): List<MediaEntity> {
+        val uriSet = uris.toHashSet()
+        return items.values.filter { it.localContentUri in uriSet }
+    }
+
     override suspend fun getByCloudId(cloudId: String): MediaEntity? =
         items.values.firstOrNull { it.cloudId == cloudId }
 
@@ -50,6 +59,12 @@ class FakeMediaRepository : MediaRepository {
 
     override suspend fun getLocalRows(isVideo: Boolean): List<MediaEntity> =
         items.values.filter { it.localContentUri != null && it.isVideo == isVideo }
+
+    override suspend fun getLocalRowRefs(isVideo: Boolean): List<LocalRowRef> =
+        items.values.mapNotNull { row ->
+            val uri = row.localContentUri ?: return@mapNotNull null
+            if (row.isVideo == isVideo) LocalRowRef(row.id, uri) else null
+        }
 
     override suspend fun getAllCloudIds(): List<String> {
         getAllCloudIdsCalls++

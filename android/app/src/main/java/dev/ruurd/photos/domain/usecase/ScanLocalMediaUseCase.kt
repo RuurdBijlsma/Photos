@@ -2,6 +2,7 @@ package dev.ruurd.photos.domain.usecase
 
 import dev.ruurd.photos.core.common.AppDispatchers
 import dev.ruurd.photos.core.database.AppDatabase
+import dev.ruurd.photos.core.database.dao.LocalRowRef
 import dev.ruurd.photos.core.database.entity.DeviceFolderEntity
 import dev.ruurd.photos.core.database.entity.MediaEntity
 import dev.ruurd.photos.core.database.entity.SyncStatus
@@ -32,8 +33,9 @@ data class ScanResult(
  * upserts changed local rows in batches, and links unmatched files to known cloud rows via
  * Pass 1 zero-hash deduplication.
  *
- * Returns early without scanning when the `MediaStore` volume generation, the grants and the
- * timezone are unchanged since the last completed scan.
+ * Uses `(AppDatabase.VERSION, MediaStore.getVersion, access, zone, generation)` to skip unchanged
+ * scans completely, or query only rows with `GENERATION_MODIFIED > lastGeneration` plus a slim
+ * URI diff for deletions when only recent captures/edits occurred.
  */
 class ScanLocalMediaUseCase(
     private val localMediaStore: LocalMediaStore,
@@ -48,106 +50,39 @@ class ScanLocalMediaUseCase(
             try {
                 if (!access.hasAnyAccess) return@withContext Result.success(ScanResult())
 
-                // `MediaStore` bumps its volume generation on every insert/delete, so an unchanged
-                // generation means Room already matches the device. The signature also covers the
-                // inputs the scan derives rows from (grants, and the zone that sets `year_month`).
-                // A partial selection is not tracked by the generation, so those scans always run.
                 val zone = zoneProvider()
-                val signature = if (access.hasPartialAccess) {
-                    null
-                } else {
-                    val generation = localMediaStore.generation()
-                    // A Room version bump drops all tables, so the signature has to change with it.
-                    "${AppDatabase.VERSION}:$generation:${access.images}:${access.videos}:${zone.id}"
-                }
-                if (signature != null && scanStateStore.lastScanSignature() == signature) {
-                    return@withContext Result.success(ScanResult())
+                if (access.hasPartialAccess) {
+                    // Partial selection isn't tracked by volume generation; always run full scan.
+                    return@withContext Result.success(runFullScan(access, zone))
                 }
 
-                val images =
-                    if (access.images != MediaAccess.NONE) localMediaStore.queryImages() else emptyList()
-                val videos =
-                    if (access.videos != MediaAccess.NONE) localMediaStore.queryVideos() else emptyList()
+                // Read generation & version *before* querying so any concurrent MediaStore write
+                // during the query bumps generation above what we persist, triggering a rescan.
+                val currentGeneration = localMediaStore.generation()
+                val currentVersion = localMediaStore.version()
+                val previous = ScanWatermark.parse(scanStateStore.lastScanSignature())
+                val currentWatermark = ScanWatermark(
+                    dbVersion = AppDatabase.VERSION,
+                    mediaStoreVersion = currentVersion,
+                    imageAccess = access.images,
+                    videoAccess = access.videos,
+                    zoneId = zone.id,
+                    generation = currentGeneration
+                )
 
-                val result = mediaRepository.withTransaction {
-                    val initialImageRows = mediaRepository.getLocalRows(isVideo = false)
-                    val initialVideoRows = mediaRepository.getLocalRows(isVideo = true)
-
-                    // Reconcile missing local files first so moved/renamed SYNCED files revert
-                    // to CLOUD_ONLY before Pass 1 links the replacement MediaStore URI.
-                    val removed =
-                        reconcileRemovals(access.isFull(images = true), images, initialImageRows) +
-                                reconcileRemovals(access.isFull(images = false), videos, initialVideoRows)
-
-                    val currentLocalRows = if (removed > 0) {
-                        mediaRepository.getLocalRows(isVideo = false) +
-                                mediaRepository.getLocalRows(isVideo = true)
-                    } else {
-                        initialImageRows + initialVideoRows
-                    }
-
-                    val knownByUri = HashMap<String, MediaEntity>(currentLocalRows.size)
-                    currentLocalRows.forEach { row ->
-                        row.localContentUri?.let { knownByUri[it] = row }
-                    }
-
-                    val folders = mutableMapOf<String, DeviceFolderEntity>()
-                    val newFolders = mutableListOf<DeviceFolderEntity>()
-                    val allFiles = images + videos
-                    val visibleFiles = ArrayList<Pair<LocalMediaFile, DeviceFolderEntity>>(allFiles.size)
-                    val hiddenFiles = ArrayList<Pair<LocalMediaFile, DeviceFolderEntity>>()
-
-                    for (file in allFiles) {
-                        val folder = folderFor(file, folders, newFolders)
-                        if (folder.showInTimeline) {
-                            visibleFiles.add(file to folder)
-                        } else {
-                            hiddenFiles.add(file to folder)
+                val result = when {
+                    previous != null && previous.matchesContext(currentWatermark) -> {
+                        when {
+                            currentGeneration == previous.generation -> return@withContext Result.success(ScanResult())
+                            currentGeneration > previous.generation ->
+                                runIncrementalScan(access, zone, sinceGeneration = previous.generation)
+                            else -> runFullScan(access, zone)
                         }
                     }
-
-                    // Process timeline-visible folders before hidden ones so Pass 1 links
-                    // e.g. DCIM/Camera copies to CLOUD_ONLY rows ahead of Download duplicates.
-                    val orderedFiles = visibleFiles.apply { addAll(hiddenFiles) }
-
-                    val toUpsert = mutableListOf<MediaEntity>()
-                    val matchedCloudRowIds = HashSet<String>()
-                    var deduplicated = 0
-
-                    for ((file, folder) in orderedFiles) {
-                        val existing = knownByUri[file.contentUri]
-                        if (collectUpsertForFile(
-                                file = file,
-                                existing = existing,
-                                folder = folder,
-                                zone = zone,
-                                matchedCloudRowIds = matchedCloudRowIds,
-                                toUpsert = toUpsert
-                            )
-                        ) {
-                            deduplicated++
-                        }
-                    }
-
-                    if (newFolders.isNotEmpty()) {
-                        deviceFolderRepository.upsertAll(newFolders)
-                    }
-                    if (toUpsert.isNotEmpty()) {
-                        toUpsert.chunked(500).forEach { chunk ->
-                            mediaRepository.upsertAll(chunk)
-                        }
-                    }
-
-                    ScanResult(
-                        scanned = images.size + videos.size,
-                        deduplicated = deduplicated,
-                        removed = removed
-                    )
+                    else -> runFullScan(access, zone)
                 }
 
-                if (signature != null) {
-                    scanStateStore.setLastScanSignature(signature)
-                }
+                scanStateStore.setLastScanSignature(currentWatermark.serialize())
                 Result.success(result)
             } catch (e: CancellationException) {
                 throw e
@@ -155,6 +90,184 @@ class ScanLocalMediaUseCase(
                 Result.failure(e)
             }
         }
+
+    private suspend fun runFullScan(access: MediaAccessState, zone: ZoneId): ScanResult {
+        val images =
+            if (access.images != MediaAccess.NONE) localMediaStore.queryImages() else emptyList()
+        val videos =
+            if (access.videos != MediaAccess.NONE) localMediaStore.queryVideos() else emptyList()
+
+        return mediaRepository.withTransaction {
+            val initialImageRows = mediaRepository.getLocalRows(isVideo = false)
+            val initialVideoRows = mediaRepository.getLocalRows(isVideo = true)
+
+            // Reconcile missing local files first so moved/renamed SYNCED files revert
+            // to CLOUD_ONLY before Pass 1 links the replacement MediaStore URI.
+            val removed =
+                reconcileRemovalsFromFiles(access.isFull(images = true), images, initialImageRows) +
+                        reconcileRemovalsFromFiles(access.isFull(images = false), videos, initialVideoRows)
+
+            val currentLocalRows = if (removed > 0) {
+                mediaRepository.getLocalRows(isVideo = false) +
+                        mediaRepository.getLocalRows(isVideo = true)
+            } else {
+                initialImageRows + initialVideoRows
+            }
+
+            val knownByUri = HashMap<String, MediaEntity>(currentLocalRows.size)
+            currentLocalRows.forEach { row ->
+                row.localContentUri?.let { knownByUri[it] = row }
+            }
+
+            applyFiles(
+                files = images + videos,
+                knownByUri = knownByUri,
+                zone = zone,
+                removed = removed
+            )
+        }
+    }
+
+    private suspend fun runIncrementalScan(
+        access: MediaAccessState,
+        zone: ZoneId,
+        sinceGeneration: Long
+    ): ScanResult {
+        val modifiedImages = if (access.images != MediaAccess.NONE) {
+            localMediaStore.queryImages(modifiedAfterGeneration = sinceGeneration)
+        } else {
+            emptyList()
+        }
+        val modifiedVideos = if (access.videos != MediaAccess.NONE) {
+            localMediaStore.queryVideos(modifiedAfterGeneration = sinceGeneration)
+        } else {
+            emptyList()
+        }
+
+        val missingIds = ArrayList<String>()
+        if (access.isFull(images = true)) {
+            val imageRefs = mediaRepository.getLocalRowRefs(isVideo = false)
+            if (imageRefs.isNotEmpty()) {
+                val liveUris = localMediaStore.queryImageUris()
+                collectMissingIds(imageRefs, liveUris, missingIds)
+            }
+        }
+        if (access.isFull(images = false)) {
+            val videoRefs = mediaRepository.getLocalRowRefs(isVideo = true)
+            if (videoRefs.isNotEmpty()) {
+                val liveUris = localMediaStore.queryVideoUris()
+                collectMissingIds(videoRefs, liveUris, missingIds)
+            }
+        }
+
+        val modifiedFiles = modifiedImages + modifiedVideos
+        if (modifiedFiles.isEmpty() && missingIds.isEmpty()) {
+            // Generation bumped for something outside our visible scope (e.g. IS_PENDING = 1).
+            return ScanResult()
+        }
+
+        return mediaRepository.withTransaction {
+            var removed = 0
+            if (missingIds.isNotEmpty()) {
+                val missingRows = mediaRepository.getByIds(missingIds)
+                for (row in missingRows) {
+                    removeLocalFile(row)
+                    removed++
+                }
+            }
+
+            val knownByUri = if (modifiedFiles.isNotEmpty()) {
+                mediaRepository.getByLocalContentUris(modifiedFiles.map { it.contentUri })
+                    .mapNotNull { row -> row.localContentUri?.let { it to row } }
+                    .toMap()
+            } else {
+                emptyMap()
+            }
+
+            applyFiles(
+                files = modifiedFiles,
+                knownByUri = knownByUri,
+                zone = zone,
+                removed = removed
+            )
+        }
+    }
+
+    private suspend fun applyFiles(
+        files: List<LocalMediaFile>,
+        knownByUri: Map<String, MediaEntity>,
+        zone: ZoneId,
+        removed: Int
+    ): ScanResult {
+        if (files.isEmpty()) {
+            return ScanResult(scanned = 0, deduplicated = 0, removed = removed)
+        }
+
+        val folders = mutableMapOf<String, DeviceFolderEntity>()
+        val newFolders = mutableListOf<DeviceFolderEntity>()
+        val visibleFiles = ArrayList<Pair<LocalMediaFile, DeviceFolderEntity>>(files.size)
+        val hiddenFiles = ArrayList<Pair<LocalMediaFile, DeviceFolderEntity>>()
+
+        for (file in files) {
+            val folder = folderFor(file, folders, newFolders)
+            if (folder.showInTimeline) {
+                visibleFiles.add(file to folder)
+            } else {
+                hiddenFiles.add(file to folder)
+            }
+        }
+
+        // Process timeline-visible folders before hidden ones so Pass 1 links
+        // e.g. DCIM/Camera copies to CLOUD_ONLY rows ahead of Download duplicates.
+        val orderedFiles = visibleFiles.apply { addAll(hiddenFiles) }
+
+        val toUpsert = mutableListOf<MediaEntity>()
+        val matchedCloudRowIds = HashSet<String>()
+        var deduplicated = 0
+
+        for ((file, folder) in orderedFiles) {
+            val existing = knownByUri[file.contentUri]
+            if (collectUpsertForFile(
+                    file = file,
+                    existing = existing,
+                    folder = folder,
+                    zone = zone,
+                    matchedCloudRowIds = matchedCloudRowIds,
+                    toUpsert = toUpsert
+                )
+            ) {
+                deduplicated++
+            }
+        }
+
+        if (newFolders.isNotEmpty()) {
+            deviceFolderRepository.upsertAll(newFolders)
+        }
+        if (toUpsert.isNotEmpty()) {
+            toUpsert.chunked(500).forEach { chunk ->
+                mediaRepository.upsertAll(chunk)
+            }
+        }
+
+        return ScanResult(
+            scanned = files.size,
+            deduplicated = deduplicated,
+            removed = removed
+        )
+    }
+
+    private fun collectMissingIds(
+        localRefs: List<LocalRowRef>,
+        liveUris: Set<String>,
+        outMissingIds: MutableList<String>
+    ) {
+        if (!ScanGuards.shouldReconcileRemovals(true, liveUris.size, localRefs.size)) return
+        for (ref in localRefs) {
+            if (ref.localContentUri !in liveUris) {
+                outMissingIds.add(ref.id)
+            }
+        }
+    }
 
     private suspend fun folderFor(
         file: LocalMediaFile,
@@ -255,7 +368,7 @@ class ScanLocalMediaUseCase(
         return true
     }
 
-    private suspend fun reconcileRemovals(
+    private suspend fun reconcileRemovalsFromFiles(
         fullAccess: Boolean,
         scanned: List<LocalMediaFile>,
         localRows: List<MediaEntity>
@@ -297,6 +410,45 @@ class ScanLocalMediaUseCase(
                     isVisibleInTimeline = true
                 )
             )
+        }
+    }
+
+    internal data class ScanWatermark(
+        val dbVersion: Int,
+        val mediaStoreVersion: String,
+        val imageAccess: MediaAccess,
+        val videoAccess: MediaAccess,
+        val zoneId: String,
+        val generation: Long
+    ) {
+        fun matchesContext(other: ScanWatermark): Boolean =
+            dbVersion == other.dbVersion &&
+                    mediaStoreVersion == other.mediaStoreVersion &&
+                    imageAccess == other.imageAccess &&
+                    videoAccess == other.videoAccess &&
+                    zoneId == other.zoneId
+
+        fun serialize(): String =
+            "$dbVersion|$mediaStoreVersion|$imageAccess|$videoAccess|$zoneId|$generation"
+
+        companion object {
+            fun parse(raw: String?): ScanWatermark? {
+                if (raw.isNullOrBlank()) return null
+                val parts = raw.split('|')
+                if (parts.size != 6) return null
+                val dbVersion = parts[0].toIntOrNull() ?: return null
+                val imageAccess = runCatching { MediaAccess.valueOf(parts[2]) }.getOrNull() ?: return null
+                val videoAccess = runCatching { MediaAccess.valueOf(parts[3]) }.getOrNull() ?: return null
+                val generation = parts[5].toLongOrNull() ?: return null
+                return ScanWatermark(
+                    dbVersion = dbVersion,
+                    mediaStoreVersion = parts[1],
+                    imageAccess = imageAccess,
+                    videoAccess = videoAccess,
+                    zoneId = parts[4],
+                    generation = generation
+                )
+            }
         }
     }
 }

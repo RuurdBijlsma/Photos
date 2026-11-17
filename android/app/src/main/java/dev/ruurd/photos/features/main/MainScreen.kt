@@ -61,6 +61,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
 import dev.ruurd.photos.core.permissions.MediaPermissions
 import dev.ruurd.photos.domain.model.MediaAccessState
 import dev.ruurd.photos.domain.model.SyncState
@@ -116,6 +117,15 @@ fun MainScreen(
             hasRequestedPermissions = true
             isPermissionDialogPending = true
             permissionLauncher.launch(MediaPermissions.requestedPermissions)
+        }
+    }
+
+    // Observe MediaStore changes while foregrounded (STARTED -> STOPPED) so late IS_PENDING = 0
+    // reveals after returning from the camera appear automatically.
+    LaunchedEffect(lifecycleOwner, mediaAccess.hasAnyAccess) {
+        if (!mediaAccess.hasAnyAccess) return@LaunchedEffect
+        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            viewModel.observeLocalMediaChanges { MediaPermissions.read(context) }
         }
     }
 

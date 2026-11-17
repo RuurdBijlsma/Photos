@@ -1,5 +1,6 @@
 package dev.ruurd.photos.domain.repository
 
+import dev.ruurd.photos.core.database.dao.LocalRowRef
 import dev.ruurd.photos.core.database.entity.MediaEntity
 import dev.ruurd.photos.core.database.entity.SyncStatus
 import dev.ruurd.photos.core.database.entity.TimelineMediaProjection
@@ -10,10 +11,13 @@ interface MediaRepository {
     fun getTimelineStage2(): Flow<List<TimelineMediaProjection>>
 
     suspend fun getById(id: String): MediaEntity?
+    suspend fun getByIds(ids: List<String>): List<MediaEntity>
+    suspend fun getByLocalContentUris(uris: List<String>): List<MediaEntity>
     suspend fun getByCloudId(cloudId: String): MediaEntity?
     suspend fun getAllByCloudId(cloudId: String): List<MediaEntity>
     suspend fun getAllByCloudIds(cloudIds: List<String>): List<MediaEntity>
     suspend fun getLocalRows(isVideo: Boolean): List<MediaEntity>
+    suspend fun getLocalRowRefs(isVideo: Boolean): List<LocalRowRef>
     suspend fun findBySizeAndStatus(sizeBytes: Long, syncStatus: SyncStatus): List<MediaEntity>
     suspend fun findBySizesAndStatus(sizeBytes: List<Long>, syncStatus: SyncStatus): List<MediaEntity>
     suspend fun getAllCloudIds(): List<String>

@@ -1,5 +1,6 @@
 package dev.ruurd.photos.core.database.dao
 
+import androidx.room.ColumnInfo
 import androidx.room.Dao
 import androidx.room.Query
 import androidx.room.Update
@@ -8,6 +9,14 @@ import dev.ruurd.photos.core.database.entity.MediaEntity
 import dev.ruurd.photos.core.database.entity.SyncStatus
 import dev.ruurd.photos.core.database.entity.TimelineMediaProjection
 import kotlinx.coroutines.flow.Flow
+
+data class LocalRowRef(
+    @ColumnInfo(name = "id")
+    val id: String,
+
+    @ColumnInfo(name = "local_content_uri")
+    val localContentUri: String
+)
 
 @Dao
 interface MediaDao {
@@ -46,6 +55,12 @@ interface MediaDao {
     @Query("SELECT * FROM media_item WHERE id = :id LIMIT 1")
     suspend fun getById(id: String): MediaEntity?
 
+    @Query("SELECT * FROM media_item WHERE id IN (:ids)")
+    suspend fun getByIds(ids: List<String>): List<MediaEntity>
+
+    @Query("SELECT * FROM media_item WHERE local_content_uri IN (:uris)")
+    suspend fun getByLocalContentUris(uris: List<String>): List<MediaEntity>
+
     @Query("SELECT * FROM media_item WHERE cloud_id = :cloudId LIMIT 1")
     suspend fun getByCloudId(cloudId: String): MediaEntity?
 
@@ -57,6 +72,14 @@ interface MediaDao {
 
     @Query("SELECT * FROM media_item WHERE local_content_uri IS NOT NULL AND is_video = :isVideo")
     suspend fun getLocalRows(isVideo: Boolean): List<MediaEntity>
+
+    @Query(
+        """
+        SELECT id, local_content_uri FROM media_item
+        WHERE local_content_uri IS NOT NULL AND is_video = :isVideo
+        """
+    )
+    suspend fun getLocalRowRefs(isVideo: Boolean): List<LocalRowRef>
 
     @Query("SELECT DISTINCT cloud_id FROM media_item WHERE cloud_id IS NOT NULL")
     suspend fun getAllCloudIds(): List<String>
