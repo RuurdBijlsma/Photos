@@ -15,7 +15,7 @@ app/src/main/java/dev/ruurd/photos/
 │   │   ├── dto/            # JSON DTOs (AuthDtos, MediaItemDtos)
 │   │   └── tus/            # Resumable TUS upload client
 │   ├── image/              # Coil ImageLoader, LibavifDecoder, MediaStoreThumbnailFetcher, FullResFileCache
-│   ├── navigation/         # NavHost routes & ViewerSource contract
+│   ├── navigation/         # NavHost routes, ViewerOverlay & ViewerSource contract
 │   └── ui/                 # Shared UI components, Theme (M3 Dynamic Color)
 │
 ├── data/                   # Repositories & Data Sources
@@ -38,7 +38,6 @@ app/src/main/java/dev/ruurd/photos/
 │       ├── SyncTimelineUseCase.kt
 │       ├── ScanLocalMediaUseCase.kt
 │       ├── RotateMediaUseCase.kt
-│       ├── DownloadMediaUseCase.kt
 │       └── EnqueueBackupUseCase.kt
 │
 ├── work/                   # WorkManager background workers
