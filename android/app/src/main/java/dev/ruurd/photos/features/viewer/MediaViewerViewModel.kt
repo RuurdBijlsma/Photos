@@ -24,7 +24,8 @@ data class MediaViewerUiState(
     val activeMediaId: String,
     val initialIndex: Int = 0,
     val isChromeVisible: Boolean = true,
-    val isActiveItemMissing: Boolean = false
+    val isActiveItemMissing: Boolean = false,
+    val isProjectionLoading: Boolean = false
 )
 
 class MediaViewerViewModel(
@@ -48,9 +49,14 @@ class MediaViewerViewModel(
                 items = currentStore.items,
                 activeMediaId = initialMediaId,
                 initialIndex = idx.coerceAtLeast(0),
-                isActiveItemMissing = currentStore.items.isEmpty() || idx < 0
+                isActiveItemMissing = currentStore.items.isEmpty() || idx < 0,
+                isProjectionLoading = false
             )
         } else {
+            _uiState.value = MediaViewerUiState(
+                activeMediaId = initialMediaId,
+                isProjectionLoading = true
+            )
             // Fallback while store is Loading: fetch single item from repository
             viewModelScope.launch(dispatchers.io) {
                 val entity = mediaRepository.getById(initialMediaId)
@@ -75,7 +81,8 @@ class MediaViewerViewModel(
                             current.copy(
                                 items = persistentListOf(fallbackProjection),
                                 initialIndex = 0,
-                                isActiveItemMissing = false
+                                isActiveItemMissing = false,
+                                isProjectionLoading = true
                             )
                         } else {
                             current
@@ -94,7 +101,8 @@ class MediaViewerViewModel(
                             return@update current.copy(
                                 items = state.items,
                                 initialIndex = 0,
-                                isActiveItemMissing = true
+                                isActiveItemMissing = true,
+                                isProjectionLoading = false
                             )
                         }
 
@@ -103,7 +111,8 @@ class MediaViewerViewModel(
                             current.copy(
                                 items = state.items,
                                 initialIndex = activeIdx,
-                                isActiveItemMissing = false
+                                isActiveItemMissing = false,
+                                isProjectionLoading = false
                             )
                         } else {
                             // Active item was deleted from Room while open: clamp to nearest index
@@ -112,7 +121,8 @@ class MediaViewerViewModel(
                                 items = state.items,
                                 activeMediaId = state.items[clampedIdx].id,
                                 initialIndex = clampedIdx,
-                                isActiveItemMissing = false
+                                isActiveItemMissing = false,
+                                isProjectionLoading = false
                             )
                         }
                     }

@@ -143,11 +143,17 @@ fun MediaViewerScreen(
     val currentOnDismissFinished by rememberUpdatedState(onDismissFinished)
 
     var viewerSize by remember { mutableStateOf(containerSize) }
-    val initialIndex = remember { uiState.initialIndex.coerceIn(0, (items.size - 1).coerceAtLeast(0)) }
-    val pagerState = rememberPagerState(
-        initialPage = initialIndex,
-        pageCount = { currentItems.size }
-    )
+    val pagerState = key(uiState.isProjectionLoading) {
+        val targetInitialIndex = if (uiState.isProjectionLoading) {
+            0
+        } else {
+            uiState.initialIndex.coerceIn(0, (items.size - 1).coerceAtLeast(0))
+        }
+        rememberPagerState(
+            initialPage = targetInitialIndex,
+            pageCount = { currentItems.size }
+        )
+    }
 
     // Opening hero animation state
     val hasValidOpenSource = openSourceRect != null && viewerSize.width > 0 && viewerSize.height > 0
@@ -347,7 +353,7 @@ fun MediaViewerScreen(
         }
     }
 
-    // Anchor HorizontalPager by mediaId across Loading -> Loaded transitions and live Room updates
+    // Anchor HorizontalPager by mediaId across live Room updates
     LaunchedEffect(pagerState) {
         snapshotFlow {
             if (pagerState.isScrollInProgress) null else currentItems to currentActiveId
@@ -632,8 +638,8 @@ fun MediaViewerScreen(
 
         // Opening Hero Overlay: animates smoothly from tile's boundsInRoot to centered fitted rect
         if (isOpeningHero && openSourceRect != null) {
-            val openingItem = items.getOrNull(pagerState.currentPage)
-                ?: items.firstOrNull { it.id == uiState.activeMediaId }
+            val openingItem = items.firstOrNull { it.id == uiState.activeMediaId }
+                ?: items.getOrNull(pagerState.currentPage)
             if (openingItem != null) {
                 val targetRect = computeFittedRect(
                     containerWidth = viewerSize.width.toFloat(),
@@ -711,26 +717,25 @@ fun MediaViewerScreen(
 
                     Spacer(modifier = Modifier.width(8.dp))
 
-                    Surface(
-                        shape = CircleShape,
-                        color = ViewerPillColor,
-                        border = ViewerPillBorder
-                    ) {
-                        val counterText = if (items.isNotEmpty()) {
-                            val displayIndex = (pagerState.currentPage + 1).coerceIn(1, items.size)
-                            "$displayIndex of ${items.size}"
-                        } else {
-                            ""
+                    if (!uiState.isProjectionLoading && items.isNotEmpty()) {
+                        Surface(
+                            shape = CircleShape,
+                            color = ViewerPillColor,
+                            border = ViewerPillBorder
+                        ) {
+                            val activeIndex = items.indexOfFirst { it.id == uiState.activeMediaId }
+                            val displayIndex = ((if (activeIndex >= 0) activeIndex else pagerState.currentPage) + 1)
+                                .coerceIn(1, items.size)
+                            Text(
+                                text = "$displayIndex of ${items.size}",
+                                style = MaterialTheme.typography.titleSmall.copy(
+                                    fontFamily = MontserratFontFamily,
+                                    fontWeight = FontWeight.SemiBold
+                                ),
+                                color = Color.White,
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp)
+                            )
                         }
-                        Text(
-                            text = counterText,
-                            style = MaterialTheme.typography.titleSmall.copy(
-                                fontFamily = MontserratFontFamily,
-                                fontWeight = FontWeight.SemiBold
-                            ),
-                            color = Color.White,
-                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp)
-                        )
                     }
 
                     Spacer(modifier = Modifier.weight(1f))
@@ -743,7 +748,8 @@ fun MediaViewerScreen(
                             onClick = { isMenuExpanded = true }
                         )
 
-                        val currentItem = items.getOrNull(pagerState.currentPage)
+                        val currentItem = items.firstOrNull { it.id == uiState.activeMediaId }
+                            ?: items.getOrNull(pagerState.currentPage)
                         DropdownMenu(
                             expanded = isMenuExpanded,
                             onDismissRequest = { isMenuExpanded = false }
@@ -781,16 +787,17 @@ fun MediaViewerScreen(
                                 )
                             }
                             if (currentItem?.cloudId != null) {
-                            DropdownMenuItem(
-                                text = { Text("Reprocess") },
-                                leadingIcon = {
-                                    Icon(
-                                        imageVector = Icons.Outlined.Refresh,
-                                        contentDescription = null
-                                    )
-                                },
-                                onClick = { isMenuExpanded = false }
-                            )}
+                                DropdownMenuItem(
+                                    text = { Text("Reprocess") },
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = Icons.Outlined.Refresh,
+                                            contentDescription = null
+                                        )
+                                    },
+                                    onClick = { isMenuExpanded = false }
+                                )
+                            }
                         }
                     }
                 }

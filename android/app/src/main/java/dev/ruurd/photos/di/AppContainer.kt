@@ -215,7 +215,11 @@ class DefaultAppContainer(private val context: Context) : AppContainer {
     }
 
     override val observeTimelineUseCase: ObserveTimelineUseCase by lazy {
-        ObserveTimelineUseCase(mediaRepository = mediaRepository, dispatchers = dispatchers)
+        ObserveTimelineUseCase(
+            mediaRepository = mediaRepository,
+            dispatchers = dispatchers,
+            timelineProjectionStore = timelineProjectionStore
+        )
     }
 
     override val calculateTimelineLayoutUseCase: CalculateTimelineLayoutUseCase by lazy {
