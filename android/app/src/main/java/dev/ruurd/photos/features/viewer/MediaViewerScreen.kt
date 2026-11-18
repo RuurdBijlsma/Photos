@@ -35,9 +35,13 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.outlined.ContentCopy
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material.icons.outlined.RotateRight
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -746,24 +750,47 @@ fun MediaViewerScreen(
                         ) {
                             DropdownMenuItem(
                                 text = { Text("About") },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Outlined.Info,
+                                        contentDescription = null
+                                    )
+                                },
                                 onClick = { isMenuExpanded = false }
                             )
                             if (currentItem != null && !currentItem.isVideo) {
                                 DropdownMenuItem(
                                     text = { Text("Copy") },
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = Icons.Outlined.ContentCopy,
+                                            contentDescription = null
+                                        )
+                                    },
                                     onClick = { isMenuExpanded = false }
                                 )
                                 DropdownMenuItem(
                                     text = { Text("Rotate clockwise") },
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = Icons.Outlined.RotateRight,
+                                            contentDescription = null
+                                        )
+                                    },
                                     onClick = { isMenuExpanded = false }
                                 )
                             }
                             if (currentItem?.cloudId != null) {
-                                DropdownMenuItem(
-                                    text = { Text("Reprocess") },
-                                    onClick = { isMenuExpanded = false }
-                                )
-                            }
+                            DropdownMenuItem(
+                                text = { Text("Reprocess") },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Outlined.Refresh,
+                                        contentDescription = null
+                                    )
+                                },
+                                onClick = { isMenuExpanded = false }
+                            )}
                         }
                     }
                 }
@@ -777,13 +804,13 @@ fun MediaViewerScreen(
                         .padding(bottom = navBarPadding + 14.dp)
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(2.dp),
+                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 5.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         ViewerPillAction(imageVector = Icons.Default.Share, label = "Share")
                         ViewerPillAction(imageVector = Icons.Default.Add, label = "Add to")
-                        ViewerPillAction(imageVector = Icons.Default.Delete, label = "Bin")
+                        ViewerPillAction(imageVector = Icons.Outlined.Delete, label = "Bin")
                     }
                 }
             }
@@ -944,19 +971,19 @@ private fun ViewerPillAction(imageVector: ImageVector, label: String) {
     Row(
         modifier = Modifier
             .clip(CircleShape)
-            .padding(horizontal = 10.dp, vertical = 8.dp),
+            .padding(horizontal = 12.dp, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
             imageVector = imageVector,
             contentDescription = label,
             tint = Color.White,
-            modifier = Modifier.size(18.dp)
+            modifier = Modifier.size(21.dp)
         )
-        Spacer(modifier = Modifier.width(6.dp))
+        Spacer(modifier = Modifier.width(7.dp))
         Text(
             text = label,
-            style = MaterialTheme.typography.labelMedium,
+            style = MaterialTheme.typography.labelLarge,
             color = Color.White
         )
     }
