@@ -15,7 +15,7 @@ app/src/main/java/dev/ruurd/photos/
 │   │   ├── dto/            # JSON DTOs (AuthDtos, MediaItemDtos incl. PatchField)
 │   │   ├── interceptor/    # DynamicBaseUrlInterceptor
 │   │   └── tus/            # Resumable TUS upload client
-│   ├── image/              # Coil ImageLoader, LibavifDecoder, MediaStoreThumbnailFetcher, FullResFileCache, ShareCache
+│   ├── image/              # Coil ImageLoader, LibavifDecoder, MediaStoreThumbnailFetcher, MemoryCacheKeyRegistry, FullResFileCache, ShareCache
 │   ├── permissions/        # MediaPermissions (full vs. partial access + ACCESS_MEDIA_LOCATION)
 │   ├── navigation/         # NavHost routes (MainScreen root + pushed detail/settings routes), ViewerOverlay & ViewerSource contract
 │   └── ui/                 # Shared UI components (Theme lives in ui/theme/)
@@ -23,6 +23,7 @@ app/src/main/java/dev/ruurd/photos/
 ├── data/                   # Repositories & Data Sources
 │   ├── repository/
 │   │   ├── MediaRepositoryImpl.kt
+│   │   ├── TimelineProjectionStore.kt
 │   │   ├── MediaDetailsRepositoryImpl.kt
 │   │   ├── DeviceFolderRepositoryImpl.kt
 │   │   ├── AlbumRepositoryImpl.kt

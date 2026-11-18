@@ -48,7 +48,7 @@ Initial thoughts on libraries. not set in stone. Change if something better is a
     * swipe up for info/gps/date pane (also reachable via "About" in top-right menu; edit date/time & timezone from the
       info pane)
     * swipe down to return back to timeline (timeline stays visible underneath during drag; syncs timeline scroll
-      position to viewed item on dismiss)
+      position to viewed item cleanly without frame-1 hitches)
     * bottom pill actions: "Share" (always shares actual file), "Add to" (album), "Bin"
     * top-right menu: About, Copy (photos only), Rotate clockwise, Reprocess, video Playback speed & video loop toggle
 * initially, theming based on dynamic color (built into Android): `dynamicLightColorScheme` / `dynamicDarkColorScheme`
@@ -222,25 +222,24 @@ still photos.)*
   with pushed routes (`DeviceFolders`, `AlbumDetail`, `BackupSettings`) and a generic `ViewerSource` contract (
   `Timeline`
   in Phase 2, reusable for `DeviceFolder` in Phase 3 and `Album` in Phase 5).
-* Host `MediaViewerScreen` in a `SharedTransitionLayout` / translucent overlay above `NavHost` (rather than an opaque
-  `NavHost` `composable` replacement) so `TimelineScreen` stays live and visible underneath during shared-element
+* Host `MediaViewerScreen` in a `SharedTransitionLayout` / translucent overlay above `NavHost` rather than an opaque
+  `NavHost` `composable` replacement so `TimelineScreen` stays live and visible underneath during shared-element
   transitions and interactive swipe-down dismiss:
     * Use `sharedElementWithCallerManagedVisibility` (or explicit bounds capture) since `MainScreen` inside `NavHost`
-      and `MediaViewerScreen` above `NavHost` belong to separate visibility scopes, and hoist a scroll-sync
+      and `MediaViewerScreen` above `NavHost` belong to separate visibility scopes, bypass shared-element modifiers on
+      `TimelineTile` while `isScrubbing` is true (or attach only for the active viewer item), and hoist a scroll-sync
       bridge/callback to `MainScreen`'s `timelineListState`.
     * Layer `BackHandler` precedence cleanly (`MediaInfoBottomSheet` / `DateTimeEditDialog` > `MediaViewerScreen` >
       `MainScreen` Search).
-* Wire `TimelineScreen` grid tile clicks (passing surrogate `MediaEntity.id`, not `cloudId`) to open fullscreen
-  `MediaViewerScreen` on a `#000000` edge-to-edge canvas (forcing light system bar icons via
-  `isAppearanceLightStatusBars = false` / `isAppearanceLightNavigationBars = false`) with `HorizontalPager` anchored by
-  `mediaId` (so live Room loads, sync prepends, rotations, or date edits never jump `currentPage` to a different item):
-    * Observe `mediaRepository.getTimelineStage2()` directly inside `MediaViewerViewModel`—do **not** use
-      `ObserveTimelineUseCase` (its Stage 1 top-2-months emission would miss older photos, causing false deletions or a
-      1-frame jump to page `0`).
-    * Load `mediaRepository.getById(initialMediaId)` directly for frame-1 render while Stage 2 loads; wait for the
-      first Stage 2 emission before instantiating `PagerState(initialPage = resolvedIndex)` (rendering the single
-      `initialMediaId` seamlessly underneath until ready), and only run the deleted-item guard against Stage 2
-      emissions.
+* Share Stage 2's `ImmutableList<TimelineMediaProjection>` (with `@Immutable` on `TimelineMediaProjection`) via a hot
+  `TimelineProjectionStore` across `TimelineViewModel` and `MediaViewerViewModel`, rather than re-opening and
+  re-reading 50k SQLite rows in `MediaViewerViewModel` on every tap:
+    * Open `MediaViewerScreen` on frame 1 in `0 ms` from the shared Stage 2 list (loading
+      `mediaRepository.getById(initialMediaId)` directly only as fallback if the store hasn't emitted yet) and anchor
+      `HorizontalPager(beyondViewportPageCount = 1)` by `mediaId` so live Room updates, sync prepends, rotations, or
+      date edits never jump `currentPage` to a different item.
+    * Never run the Stage 1 top-2-months query in the viewer (which would miss older photos and trigger false deletions
+      or page `0` jumps).
 * Integrate `me.saket.telephoto:zoomable-image-coil3` (`ZoomableAsyncImage`) with double-tap, pinch-to-zoom, and
   pan/Ultra HDR support:
     * Key the surrounding page via `HorizontalPager(key = ...)` / `key(mediaId)` (since `rememberZoomableState()` does
@@ -248,32 +247,42 @@ still photos.)*
       page's** `zoomFraction <= 0.01f`) when zoomed in, and reset zoom when swiping off-page.
     * Wire tap-to-toggle chrome via `ZoomableAsyncImage`'s `onClick` / `onLongClick` parameters (never
       `Modifier.clickable`, which Telephoto overrides for double-tap zoom).
-    * Resolve/capture the actual `MemoryCache.Key` (from `imageLoader.memoryCache?.keys` matching `"mediastore:$uri"` /
-      `1440p` URL, or via `onSuccess`) for `placeholderMemoryCacheKey` instead of passing a bare `String` (since Coil 3
-      includes `coil#size` in `extras` when `isSampled = true`).
-    * For `localContentUri != null`: pass the raw `content://` `Uri` with the resolved `MemoryCache.Key` placeholder,
-      falling back to cloud `1440p` on `SecurityException` (revoked partial access) or `FileNotFoundException`.
-    * For `CLOUD_ONLY` **photos** (`!isVideo`, including panoramas): render cached grid thumbnail → `1440p` (
-      `hasThumbnails ? /thumbnails/{cloudId}/1440p.avif : /api/photos/{cloudId}/thumbnail?size=1440`), and prefetch
-      `1440p` Coil thumbnails for `currentPage ± 1` photo neighbors. *(Full-res `/download` upgrade wires in 2B once
-      `/item` is available.)*
+    * **O(1) `MemoryCache.Key` handoff (`MemoryCacheKeyRegistry`):** Capture `result.memoryCacheKey` inside `onSuccess`
+      on `TimelineTile` and `ZoomableAsyncImage` into a small `LruCache<String, MemoryCache.Key>` rather than scanning
+      `imageLoader.memoryCache?.keys` under lock on every swipe.
+    * **Two-tier preview-first loading for fast swipes (`localContentUri != null` & `CLOUD_ONLY`):**
+        * Never decode/subsample full-res (`content://` `BitmapRegionDecoder` / full-res `HEIC`/`AVIF`) on adjacent
+          `beyondViewportPageCount = 1` neighbors or during active pager drags (avoiding `saket/telephoto#165` OOMs and
+          starving `LibavifDecoder`'s 4-permit pool).
+        * Render `MediaStoreThumbnail` (at screen-capped height, falling back to `1440p` on `SecurityException` /
+          `FileNotFoundException`) on frame 1 and on `N ± 1` offscreen pages for local/synced items, upgrading to the raw
+          `content://` `Uri` (with the captured `MemoryCache.Key` placeholder) only ~150–250ms after `settledPage ==
+          pageIndex` or immediately when zoom starts, and cancelling on swipe away.
+        * For `CLOUD_ONLY` **photos** (`!isVideo`, including panoramas): render cached grid thumbnail → `1440p` (
+          `hasThumbnails ? /thumbnails/{cloudId}/1440p.avif : /api/photos/{cloudId}/thumbnail?size=1440`), and run
+          `currentPage ± 1` `1440p` Coil prefetch inside `snapshotFlow { pagerState.settledPage }.collectLatest` after a
+          ~120–150ms settle delay (cancelling superseded prefetches so rapid swiping doesn't saturate OkHttp's
+          `maxRequestsPerHost = 16` or `LibavifDecoder`). Tune `LibavifDecoder` `threads = 2` (or benchmark hero `1440p`
+          decodes vs. grid decodes) and verify `1440p.avif` Coil disk-cache snapshot closure (`saket/telephoto#181`).
+          *(Full-res `/download` upgrade wires in 2B once `/item` is available.)*
 * Build viewer chrome & gestures:
-    * Tap to toggle floating chrome (using dark translucent scrims without `Modifier.blur` on pills, and
-      hiding/restoring
-      system bars cleanly—restoring both `systemBars()` visibility and `isAppearanceLightStatusBars` /
-      `isAppearanceLightNavigationBars` inside `DisposableEffect` on viewer exit): `Back` button + title/counter pill,
-      bottom floating pill with placeholder/disabled `Share`, `Add to`, and `Bin` buttons (wired in 2B and Phases 4–5),
-      and top-right overflow `⋮` menu.
-    * Single-pointer swipe down / swipe up arbitration (`pointerCount == 1`, `zoomFraction <= 0.01f`, `|dy| > |dx|`
-      after
+    * Tap to toggle floating chrome (using dark translucent scrims without `Modifier.blur` on pills, updating top bar
+      title/counter text directly without `animateContentSize()` during pager drags so counter width changes don't
+      cause spring relayouts mid-swipe, and hiding/restoring both `systemBars()` visibility and
+      `isAppearanceLightStatusBars` / `isAppearanceLightNavigationBars` inside `DisposableEffect` on viewer exit):
+      `Back` button + title/counter pill, bottom floating pill with placeholder/disabled `Share`, `Add to`, and `Bin`
+      buttons (wired in 2B and Phases 4–5), and top-right overflow `⋮` menu.
+    * Single-pointer swipe down / swipe up arbitration (`pointerCount == 1`, `zoomFraction <= 0.01f`, `|dy| > |dx|` after
       touch slop so horizontal/diagonal swipes go cleanly to `HorizontalPager` and pinch gestures aren't stolen): swipe
       down interactively drags/shrinks the viewer over the visible timeline and dismisses (swipe up connects to the
-      Info sheet in 2B). If `activeMediaId` is currently offscreen in `TimelineScreen`'s `LazyColumn`, either jump
-      `listState.scrollToItem(index)` when swipe-down dismiss starts (so shared-element bounds exist) or fall back to a
-      scale-to-center + fade dismiss and sync `listState.scrollToItem(index)` on settle.
-* Verify `assembleRelease` / `assembleBenchmark` with R8 `optimization { enable = true }` and update
+      Info sheet in 2B). Instead of scrolling `TimelineScreen` on every fast swipe or on frame 1 of dismiss (which
+      forces synchronous `LazyColumn` composition under the drag finger), silently pre-sync `timelineListState` ~250ms
+      after `settledPage` pauses if `activeMediaId` is offscreen (falling back to scale-to-center + fade + settle scroll
+      sync if dismissed mid-fling before settle).
+* Verify `assembleRelease` / `assembleBenchmark` with R8 `optimization { enable = true }`, update
   `app/src/main/keepRules/rules.keep` if `kotlinx-serialization`, `Telephoto`, or `Media3` require additional keep
-  rules.
+  rules, benchmark `TimelineScrollBenchmark.kt` with `SharedTransitionLayout` attached, and extend
+  `BaselineProfileGenerator.kt` to cover viewer open, fast swiping, zoom, and swipe-down dismiss.
 
 ### 2B: Media Details, Full-Res Photo Cache, Info Sheet, Share & Copy
 
@@ -284,18 +293,21 @@ still photos.)*
   `ACCESS_MEDIA_LOCATION`, request `ACCESS_MEDIA_LOCATION` once when needed or rely cleanly on the `try/catch` fallback
   around `MediaStore.setRequireOriginal(uri)`.
 * Implement `GET /api/photos/{cloudId}/item` (`MediaItemWithAlbums` `snake_case` DTOs with nullable `panorama_config`,
-  noting that every server photo endpoint takes `cloudId`) and `MediaDetailsRepository` (in-memory LRU cache +
-  `currentPage ± 1` neighbor prefetch alongside 2A's `1440p` thumbnail prefetch). Hook `SyncTimelineUseCase` (via
+  noting that every server photo endpoint takes `cloudId`) and `MediaDetailsRepository` (in-memory LRU cache, loading
+  `currentPage` immediately while running `currentPage ± 1` neighbor prefetch inside the debounced/cancellable
+  `settledPage` `collectLatest` alongside 2A's `1440p` thumbnail prefetch). Hook `SyncTimelineUseCase` (via
   `MediaRefreshCoordinator`) to evict `upserted` and `deleted_ids` `cloudId`s from `MediaDetailsRepository` so edits
   made on the web client never leave stale metadata in the Info sheet.
 * Add `full_res_cache/` (~500 MB LRU) and `share_cache/`, and extend `SessionManager`'s `onClearSessionData` to clear
-  `full_res_cache/`, `share_cache/`, and `MediaDetailsRepository` on sign-out / 401 token revocation.
+  `TimelineProjectionStore`, `MemoryCacheKeyRegistry`, `full_res_cache/`, `share_cache/`, and `MediaDetailsRepository`
+  on sign-out / 401 token revocation.
 * Upgrade `ZoomableAsyncImage` for `CLOUD_ONLY` **photos** (`!isVideo`, including panoramas): wait for `/item` so
-  `mime_type` and `missing_since == null` are known, then fetch `/api/photos/{cloudId}/download` on a short delay (or
-  immediately on zoom) into `full_res_cache` (deduplicated per `cloudId` with temp-file atomic rename) and pass the
-  `file://` URI (with `diskCachePolicy(CachePolicy.DISABLED)` and `1440p` `MemoryCache.Key` placeholder) so
-  JPEGs/PNGs/WebPs subsample with gainmaps while full-res AVIF/HEIC fall back to Coil without `BitmapRegionDecoder`
-  failing; skip `/download` for videos, TIFF/TGA, or `missing_since != null`.
+  `mime_type` and `missing_since == null` are known, then—only after `settledPage == pageIndex` settles for ~150–250ms
+  (or immediately on zoom), cancelling on swipe away—fetch `/api/photos/{cloudId}/download` into `full_res_cache`
+  (deduplicated per `cloudId` with temp-file atomic rename) and pass the `file://` URI (with
+  `diskCachePolicy(CachePolicy.DISABLED)` and the captured `1440p` `MemoryCache.Key` placeholder) so JPEGs/PNGs/WebPs
+  subsample with gainmaps while full-res AVIF/HEIC fall back to Coil without `BitmapRegionDecoder` failing; skip
+  `/download` for videos, TIFF/TGA, or `missing_since != null`.
 * Build the swipe-up **Media Info Bottom Sheet** (`30.dp` rounded `surfaceContainerHigh`, gated on single-pointer
   `zoomFraction <= 0.01f` on both photo and video pages and also opened via **About** in the top-right overflow menu):
     * Display capture date/time in photo's local timezone (parse naive `taken_at_local` via `LocalDateTime.parse(...)`
@@ -326,16 +338,16 @@ still photos.)*
 * Add `androidx.media3:media3-exoplayer`, `media3-datasource-okhttp`, and `media3-ui-compose` (plus optionally
   `media3-ui-compose-material3`).
 * Configure a single shared `ExoPlayer` wired with `OkHttpDataSource.Factory(okHttpClient)` (preserving session
-  cookies & 401 refresh), `AudioAttributes` (`handleAudioFocus = true`) + `setHandleAudioBecomingNoisy(true)`,
-  lifecycle pause on `ON_STOP`, and persisted **Loop** (`REPEAT_MODE_ONE` / `REPEAT_MODE_OFF`) + **Playback speed**
-  preferences.
+  cookies & 401 refresh), tuned `DefaultLoadControl` (e.g., `bufferForPlaybackMs = 1_000`, `minBufferMs = 15_000`,
+  `maxBufferMs = 30_000`) for snappy remote start, `AudioAttributes` (`handleAudioFocus = true`) +
+  `setHandleAudioBecomingNoisy(true)`, lifecycle pause on `ON_STOP`, and persisted **Loop** (`REPEAT_MODE_ONE` /
+  `REPEAT_MODE_OFF`) + **Playback speed** preferences.
 * Attach `ContentFrame` (with `SURFACE_TYPE_TEXTURE_VIEW`) only to `pagerState.settledPage` (without wrapping it in a
-  mid-playback changing `key(...)`), using `rememberPresentationState(player, keepContentOnReset = true)` and
-  `ContentFrame`'s `shutter` slot so quality switches don't flash black and the photo thumbnail stays rendered
-  underneath
-  until the first video frame renders. Call `exoPlayer.stop()` and `exoPlayer.clearMediaItems()` synchronously when
-  leaving a video page / changing `activeMediaId` (distinct from quality switches on the same `mediaId`) so switching
-  directly between two videos never briefly treats the previous video's frame as ready.
+  mid-playback changing `key(...)`), using `rememberPresentationState(player, keepContentOnReset = isQualitySwitch)`
+  and `ContentFrame`'s `shutter` slot—keeping the shutter visible on `mediaId` changes until
+  `Player.Listener.onRenderedFirstFrame` fires so quality switches on the same item don't flash black while swiping
+  Video A → Video B always shows Video B's thumbnail shutter instead of Video A's last frame. Call `exoPlayer.stop()`
+  and `exoPlayer.clearMediaItems()` synchronously when leaving a video page / changing `activeMediaId`.
 * Implement source selection + fallbacks:
     * Play `localContentUri` directly when `LOCAL_ONLY` or `SYNCED` (falling back to cloud on `SecurityException` /
       `FileNotFoundException`).
@@ -353,7 +365,8 @@ still photos.)*
       `404`/`415`/`500` (`InvalidResponseCodeException` when the source file is missing on server disk). Never fall back
       on offline/network/timeout errors (`ERROR_CODE_IO_NETWORK_CONNECTION_*`, etc.) or `401`/`403` auth errors.
 * Build floating video controls integrated with tap-to-toggle chrome (play/pause overlay, seek bar + buffered
-  indicator + `tnum` duration/position, mute toggle, quality selector) and expose **Playback speed** (`0.25x`–`3.0x`
+  indicator + `tnum` duration/position driven via isolated state-read lambdas so 10–60Hz polling never recomposes
+  `HorizontalPager` or `ContentFrame`, mute toggle, quality selector) and expose **Playback speed** (`0.25x`–`3.0x`
   selector) and **Loop video** toggle in the top-right overflow menu.
 
 ### 2D: Mutation Infrastructure, Rotate & Reprocess
@@ -379,17 +392,15 @@ still photos.)*
     * Request `MediaStore.createWriteRequest` on the **first Rotate tap** for `SYNCED`/`LOCAL_ONLY` and gate commit on
       *both* the debounce finishing and write consent succeeding (never committing while the OS confirmation dialog is
       open, reverting visual rotation if denied).
-    * Evict Coil caches by scanning `imageLoader.memoryCache?.keys` where
-      `it.key == "mediastore:$uri" || it.key == uri` and calling `imageLoader.diskCache?.remove(uri)`.
+    * Evict Coil caches by clearing matching entries in `MemoryCacheKeyRegistry` / `imageLoader.memoryCache` and
+      calling `imageLoader.diskCache?.remove(uri)`.
     * `CLOUD_ONLY`: `PUT /api/photos/{oldCloudId}/item` (via `PatchField`) → fetch
-      `GET /api/photos/{newCloudId}/download`
-      into `full_res_cache` *before* clearing visual rotation (because `try_extract_exif_thumbnail` returns raw `IFD1`
-      bytes while `IngestThumbnails` is pending) → atomically swap `"cloud_$oldCloudId"` → `"cloud_$newCloudId"` in
-      Room,
-      immediately replace `"cloud_$oldCloudId"` → `"cloud_$newCloudId"` in `MediaViewerViewModel`'s in-memory pager list
-      alongside updating `activeMediaId` + `redirectedIds` (and sync timeline scroll to `"cloud_$newCloudId"` on
-      dismiss),
-      and evict `oldCloudId` from `MediaDetailsRepository`.
+      `GET /api/photos/{newCloudId}/download` into `full_res_cache` *before* clearing visual rotation (because
+      `try_extract_exif_thumbnail` returns raw `IFD1` bytes while `IngestThumbnails` is pending) → atomically swap
+      `"cloud_$oldCloudId"` → `"cloud_$newCloudId"` in Room, immediately replace `"cloud_$oldCloudId"` →
+      `"cloud_$newCloudId"` in `MediaViewerViewModel`'s in-memory pager list alongside updating `activeMediaId` +
+      `redirectedIds` (and sync timeline scroll to `"cloud_$newCloudId"` on idle/dismiss), and evict `oldCloudId` from
+      `MediaDetailsRepository`.
     * `SYNCED`: `PUT /api/photos/{oldCloudId}/item` → in one Room `@Transaction`, immediately persist
       `cloudId = newCloudId` + adjusted `ratio` + `hasThumbnails = false` + `autoBackupSuppressed = false` on that
       Room row **and** `deleteById("cloud_$newCloudId")` (preventing duplicate visible rows if `SyncTimelineUseCase`
@@ -421,15 +432,14 @@ still photos.)*
     * **`CLOUD_ONLY`:** Call `PUT /api/photos/{cloudId}/item` → evict `full_res_cache` and `share_cache` for `cloudId`
       (because `cloudId` stays unchanged while the file's EXIF bytes change) and invalidate `MediaDetailsRepository` →
       trigger `MediaRefreshCoordinator` delta sync so Room updates `sortTimestamp`, `timezoneOffsetMinutes`,
-      `yearMonth`,
-      and `sizeBytes`.
+      `yearMonth`, and `sizeBytes`.
     * **`SYNCED` (requires online):**
         * *Photos (`!isVideo`):* Obtain `MediaStore.createWriteRequest` consent → call
-          `PUT /api/photos/{cloudId}/item` →
-          evict `full_res_cache`, `share_cache`, and `MediaDetailsRepository` → run `LocalFileOverwriteHelper`
-          (`GET /api/photos/{cloudId}/download` → `full_res_cache` → overwrite `localContentUri` → await
-          `MediaScannerConnection.scanFile`) so phone `size_bytes` and BLAKE3 stay identical to the server (handling any
-          post-`PUT` overwrite failure with a clear retry/error state) → trigger `MediaRefreshCoordinator` delta sync.
+          `PUT /api/photos/{cloudId}/item` → evict `full_res_cache`, `share_cache`, and `MediaDetailsRepository` → run
+          `LocalFileOverwriteHelper` (`GET /api/photos/{cloudId}/download` → `full_res_cache` → overwrite
+          `localContentUri` → await `MediaScannerConnection.scanFile`) so phone `size_bytes` and BLAKE3 stay identical
+          to the server (handling any post-`PUT` overwrite failure with a clear retry/error state) → trigger
+          `MediaRefreshCoordinator` delta sync.
         * *Videos (`isVideo`):* Call `PUT /api/photos/{cloudId}/item` → evict `share_cache` and `MediaDetailsRepository`
           → trigger `MediaRefreshCoordinator` delta sync, skipping local file overwrite to avoid re-downloading multi-GB
           videos (`ScanLocalMediaUseCase` preserves server metadata on `cloudId != null` rows).
@@ -437,19 +447,18 @@ still photos.)*
       Restrict edits to wall-clock date/time in the device's current timezone (disable timezone-offset editing for
       `LOCAL_ONLY` so subsequent incremental `MediaStore` scans using `ZoneId.systemDefault()` do not overwrite custom
       offsets). Obtain `MediaStore.createWriteRequest` → `openFileDescriptor(uri, "rw")` → write
-      `TAG_DATETIME_ORIGINAL`,
-      `TAG_DATETIME_DIGITIZED`, `TAG_DATETIME` (`"yyyy:MM:dd HH:mm:ss"`) **plus** `TAG_OFFSET_TIME_ORIGINAL`,
-      `TAG_OFFSET_TIME`, and `TAG_OFFSET_TIME_DIGITIZED` (`±HH:MM` for `ZoneId.systemDefault()` at that instant,
-      normalizing `"Z"` to `"+00:00"`, so any existing travel offset in EXIF doesn't shift `MediaStore.DATE_TAKEN`) via
-      `ExifInterface.saveAttributes()` → await `MediaScannerConnection.scanFile` on `DATA` → update `sortTimestamp`,
-      `timezoneOffsetMinutes`, `yearMonth`, `sizeBytes`, and reset `blake3Hash = null` in Room.
+      `TAG_DATETIME_ORIGINAL`, `TAG_DATETIME_DIGITIZED`, `TAG_DATETIME` (`"yyyy:MM:dd HH:mm:ss"`) **plus**
+      `TAG_OFFSET_TIME_ORIGINAL`, `TAG_OFFSET_TIME`, and `TAG_OFFSET_TIME_DIGITIZED` (`±HH:MM` for
+      `ZoneId.systemDefault()` at that instant, normalizing `"Z"` to `"+00:00"`, so any existing travel offset in EXIF
+      doesn't shift `MediaStore.DATE_TAKEN`) via `ExifInterface.saveAttributes()` → await
+      `MediaScannerConnection.scanFile` on `DATA` → update `sortTimestamp`, `timezoneOffsetMinutes`, `yearMonth`,
+      `sizeBytes`, and reset `blake3Hash = null` in Room.
 * Verify live `HorizontalPager` & `TimelineScreen` reordering:
-    * When `mediaRepository.getTimelineStage2()` emits the reordered list after editing a date across months,
+    * When `TimelineProjectionStore` emits the reordered Stage 2 list after editing a date across months,
       `MediaViewerViewModel` keeps `activeMediaId` anchored and snaps `HorizontalPager` (`scrollToPage(newIndex)`)
-      without firing the deleted-item guard, prefetching the new adjacent neighbors (`newIndex ± 1`).
+      without firing the deleted-item guard, prefetching the new adjacent neighbors (`newIndex ± 1`) once settled.
     * On swipe-down dismiss, verify `TimelineScreen` syncs `listState.scrollToItem(newRowIndex)` to the edited item's
-      new
-      month/position.
+      new month/position (via the settled-idle sync or dismiss settle fallback).
 
 ---
 

@@ -99,13 +99,20 @@ fun concentricRadius(outer: Dp, padding: Dp, min: Dp = 8.dp): Dp =
   `SharedTransitionLayout` / translucent overlay above `NavHost` rather than an opaque `NavHost` `composable`
   destination (which hides/unmounts the previous destination once entered). Because `MainScreen` stays mounted inside
   `NavHost` while the overlay renders above it, coordinate shared-bounds visibility with
-  `sharedElementWithCallerManagedVisibility` (or explicit rect/bounds capture) and expose a hoisted scroll-sync
-  bridge to `TimelineScreen`'s `timelineListState`. Tapping a photo/video in the timeline grid transitions via
-  shared-bounds / container transform into `MediaViewerScreen`, and dragging down interactively shrinks the viewer over
-  the live, visible timeline behind it. If the user swipes to a different item that is currently offscreen in
-  `TimelineScreen`'s `LazyColumn`, either jump `listState.scrollToItem(index)` as swipe-down dismiss begins so
-  shared-element bounds exist, or fall back to a scale-to-center + fade dismiss and sync `TimelineScreen`'s scroll
-  position when dismiss settles.
+  `sharedElementWithCallerManagedVisibility` (or explicit rect/bounds capture) and expose a hoisted scroll-sync bridge
+  to `TimelineScreen`'s `timelineListState`:
+    * Keep `sharedElement` modifiers inactive/bypassed during `isScrubbing` (or attach only for the active viewer item)
+      so fast timeline scrubbing incurs zero shared-element registration overhead (verify against
+      `TimelineScrollBenchmark.kt`).
+    * Tapping a photo/video in the timeline grid transitions via shared-bounds / container transform into
+      `MediaViewerScreen`, and dragging down interactively shrinks the viewer over the live, visible timeline behind it.
+    * Rather than scrolling `TimelineScreen` on every fast swipe *or* calling `listState.scrollToItem(index)` on frame 1
+      of swipe-down dismiss (which forces synchronous row/tile composition and thumbnail IPC right under the drag
+      finger), silently scroll `timelineListState` ~250ms after `settledPage` pauses whenever `activeMediaId` is
+      offscreen. If the user swipes and immediately dismisses mid-fling before the settle sync fires, fall back to a
+      scale-to-center + fade dismiss and sync `TimelineScreen`'s scroll position as dismiss settles.
+    * Extend `BaselineProfileGenerator` to exercise viewer open, fast `HorizontalPager` swiping, pinch/double-tap zoom,
+      and swipe-down dismiss so those hot paths are AOT-compiled in release builds.
 * **Spring Physics:** Use snappy, natural Material 3 Expressive springs (avoid sluggish linear/ease curves):
     * Spatial changes (shared photo bounds, bottom sheet expand, viewer swipe-to-dismiss): lightly damped spring (
       `DampingRatioNoBouncy` or very slight `0.85f` with `StiffnessMediumLow` / `StiffnessMedium`).
@@ -142,8 +149,7 @@ fun concentricRadius(outer: Dp, padding: Dp, min: Dp = 8.dp): Dp =
 
 * **Visibility:** Always anchored at the bottom above `WindowInsets.navigationBars` (with ~`12.dp`–`16.dp` margin).
   **Does not hide on scroll down.** List content scrolls behind it (add bottom `contentPadding` to lists so the final
-  row
-  can scroll above the bar).
+  row can scroll above the bar).
 * **Main Nav Pill:**
     * Shape: `CircleShape` (stadium pill), opaque `surfaceContainerHigh` with subtle tonal elevation/shadow (`6.dp`–
       `8.dp`).
@@ -151,8 +157,7 @@ fun concentricRadius(outer: Dp, padding: Dp, min: Dp = 8.dp): Dp =
       screens).
     * **Tab Styling (Web Parity):**
         * **Active tab:** Nested concentric `CircleShape` pill (`primaryContainer` fill) containing **Icon + Text label
-          **
-          (`onPrimaryContainer`).
+          ** (`onPrimaryContainer`).
         * **Inactive tabs:** **Text label only** (`onSurfaceVariant`), no icon—preserving the clean, airy proportions of
           the screenshot.
 * **Detached Search Button:**
@@ -231,8 +236,9 @@ fun concentricRadius(outer: Dp, padding: Dp, min: Dp = 8.dp): Dp =
   precedence layers cleanly (`DateTimeEditDialog` / `MediaInfoBottomSheet` > `MediaViewerScreen` > `MainScreen`
   Search).
 * **Top Floating Bar & Overflow Menu:**
-    * Compact `CircleShape` `Back` pill, title/date/counter pill, and top-right `⋮` overflow menu button using dark
-      translucent scrims (`Color.Black.copy(alpha = 0.45f)`–`0.6f`).
+    * Compact `CircleShape` `Back` pill, title/date/counter pill (update counter/title text directly without
+      `animateContentSize()` during pager drags so changing label widths never trigger spring relayouts mid-swipe), and
+      top-right `⋮` overflow menu button using dark translucent scrims (`Color.Black.copy(alpha = 0.45f)`–`0.6f`).
     * **Top-right overflow menu items:** `About` (fallback trigger for the info sheet), `Copy` (photos only; hidden on
       videos and missing items), `Rotate clockwise` (JPEG/PNG/WebP photos only; hidden on videos, panoramas, missing
       items, offline `SYNCED` items, and unsupported MIME types), `Reprocess`, plus video-only `Playback speed` (opens
@@ -240,19 +246,23 @@ fun concentricRadius(outer: Dp, padding: Dp, min: Dp = 8.dp): Dp =
 * **Bottom Floating Pill:**
     * Compact `CircleShape` pill hosting **Share**, **Add to** (album), and **Bin**—no Info button in the bottom pill
       (Info is accessed via swipe-up or `About` in the top-right menu).
-    * For videos, floating playback controls (seek bar, play/pause, mute, quality selector) sit cleanly above the bottom
-      action pill and fade together on tap. Video rendering uses `ContentFrame` +
-      `rememberPresentationState(player, keepContentOnReset = true)` with `SURFACE_TYPE_TEXTURE_VIEW` so
-      scale/clip/translation transforms animate cleanly and the thumbnail shutter stays visible until the first frame
-      renders (`exoPlayer.stop()` + `clearMediaItems()` synchronously on page change so switching videos never flashes
-      the previous video's frame).
+    * For videos, floating playback controls (seek bar driven by isolated position state-reads, play/pause, mute,
+      quality
+      selector) sit cleanly above the bottom action pill and fade together on tap. Video rendering uses `ContentFrame` +
+      `rememberPresentationState(player, keepContentOnReset = isQualitySwitch)` (resetting the shutter on `mediaId`
+      change until `onRenderedFirstFrame`) with `SURFACE_TYPE_TEXTURE_VIEW` so scale/clip/translation transforms animate
+      cleanly and switching directly between videos always shows the incoming video's thumbnail shutter (
+      `exoPlayer.stop()`
+        + `clearMediaItems()` synchronously on page change).
 * **Gestures:**
-    * Swipe horizontally (`HorizontalPager`) between items; paging is locked (`userScrollEnabled = false`) while the
+    * Swipe horizontally (`HorizontalPager(beyondViewportPageCount = 1)`) between items, staying on fast previews while
+      swiping and upgrading to full-res once settled or zoomed; paging is locked (`userScrollEnabled = false`) while the
       active page is zoomed in.
     * Pinch / double-tap to zoom (`Telephoto`).
     * Tap photo/video to toggle chrome visibility smoothly (wired via `ZoomableAsyncImage`'s `onClick`).
     * **Swipe down** (single-pointer, unzoomed `(zoomableState.zoomFraction ?: 0f) <= 0.01f`, `|dy| > |dx|`) to
-      interactively drag/shrink over the visible timeline and dismiss (syncing timeline scroll on dismiss if needed).
+      interactively drag/shrink over the visible timeline and dismiss (using the idle-synced timeline position, or
+      falling back to scale-to-center + fade + settle sync if dismissed mid-fling).
     * **Swipe up** (single-pointer, unzoomed `(zoomableState.zoomFraction ?: 0f) <= 0.01f`, `|dy| > |dx|`) to reveal
       the **Media Info Sheet** (`30.dp` top-rounded dark `surfaceContainerHigh` modal sheet showing capture date/time in
       Roboto/Montserrat with an edit trigger/row, timezone label—tappable on server-backed items to edit `±HH:MM`

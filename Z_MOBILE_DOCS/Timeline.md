@@ -38,8 +38,10 @@ LazyColumn (contentType = Header | PhotoRow)
 
 Just like the web app's `calculateLayout` in `TimelineContainer.vue`, the math runs strictly off the UI thread (
 `Dispatchers.Default`) when the window width, orientation, or density changes. Because Room acts as the Single Source of
-Truth, the layout calculator receives slim, fully resolved projections directly—with `yearMonth` precomputed on write so
-month boundary detection is a simple integer comparison with zero date parsing during layout.
+Truth, the layout calculator receives slim, fully resolved projections directly (`TimelineMediaProjection`, marked
+`@Immutable` and shared via `ImmutableList` across `TimelineViewModel` and `MediaViewerViewModel` so opening the viewer
+never re-reads 50k rows from SQLite)—with `yearMonth` precomputed on write so month boundary detection is a simple
+integer comparison with zero date parsing during layout.
 
 To maximize Compose skipping and avoid recompositions during scroll or background syncs, mark UI models `@Immutable` and
 back row item lists with `ImmutableList`:
@@ -506,19 +508,22 @@ class TimelineLayoutIndex(
 
 * **Instant jumps & smooth thumb tracking:** Always use `lazyListState.requestScrollToItem(index, withinRowOffsetPx)`
   while dragging the `TimelineScrubber`—never `animateScrollToItem`. When the user scrolls the `LazyColumn` normally,
-  compute the scrubber thumb fraction from `(rows[firstVisibleItemIndex].estimatedOffsetTopDp + itemScrollDp) / maxScrollDp`
+  compute the scrubber thumb fraction from
+  `(rows[firstVisibleItemIndex].estimatedOffsetTopDp + itemScrollDp) / maxScrollDp`
   rather than `firstVisibleItemIndex / rows.size` so variable row heights don't make the thumb jitter.
 * **Image request gating while scrubbing (`isScrubbing`):** Mirroring `isScrollingFast` in `TimelineContainer.vue`,
   while the user is actively dragging the scrubber rapidly, restrict Coil to `memoryCache`/`diskCache` `READ_ONLY`
   (with `networkCachePolicy(CachePolicy.DISABLED)`) and resume full loading once scrubbing pauses (~80ms) or lifts.
   This prevents transient rows from flooding OkHttp, `MediaStore`, and `LibavifDecoder` with dozens of cancelled
   requests per second.
-* **Viewer-to-Timeline Scroll Sync (on dismiss):** Do **not** scroll `TimelineScreen`'s `LazyColumn` on every swipe
-  while `MediaViewerScreen` is fullscreen (which would force offscreen grid composition and thumbnail fetches behind the
-  viewer). Instead, track the active `mediaId` in the viewer and, when dismissing back to `TimelineScreen`, check
-  whether `layoutIndex.findRowIndexForMedia(mediaId)` is outside `listState.layoutInfo.visibleItemsInfo`. If it is
-  offscreen when swipe-down dismiss begins, either jump via `listState.scrollToItem(index)` right as the dismiss starts
-  (so shared-element bounds exist) or fall back to a scale-to-center + fade dismiss and jump `listState.scrollToItem(index)`
+* **Viewer-to-Timeline Scroll Sync (on idle settle, avoiding dismiss frame hitches):** Do **not** scroll `TimelineScreen`'s
+  `LazyColumn` on every swipe while rapidly flicking through `MediaViewerScreen` (which would force offscreen grid
+  composition and thumbnail fetches behind the viewer), and do **not** trigger `listState.scrollToItem(index)` on frame 1
+  of a swipe-down dismiss (which forces synchronous `LazyColumn` layout and `MediaStore` IPC right under the user's
+  drag finger). Instead, check `layoutIndex.findRowIndexForMedia(activeMediaId)` ~250ms after `settledPage` pauses and,
+  if offscreen, silently `listState.scrollToItem(index)` while the viewer is idle—so `LazyLayoutCacheWindow` and
+  shared-element bounds are already prepared before dismiss starts. If the user swipes and immediately dismisses
+  mid-fling before the settle sync ran, fall back to a scale-to-center + fade dismiss and jump `listState.scrollToItem(index)`
   as dismiss settles.
 * **Edge-to-edge & gesture navigation safety (API 37):** Apply `Modifier.systemGestureExclusion()` on the right-edge
   scrubber handle so vertical scrubbing doesn't trigger Android's predictive back gesture, and pass
