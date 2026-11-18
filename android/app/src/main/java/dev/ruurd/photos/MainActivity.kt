@@ -4,8 +4,6 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.animation.ExperimentalSharedTransitionApi
-import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -28,8 +26,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.IntSize
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelStore
@@ -39,6 +40,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import dev.ruurd.photos.core.image.TimelineTileBoundsRegistry
 import dev.ruurd.photos.core.navigation.AlbumDetailRoute
 import dev.ruurd.photos.core.navigation.BackupSettingsRoute
 import dev.ruurd.photos.core.navigation.DeviceFoldersRoute
@@ -57,7 +59,6 @@ import kotlinx.coroutines.launch
 class MainActivity : ComponentActivity() {
 
     @OptIn(
-        ExperimentalSharedTransitionApi::class,
         ExperimentalComposeUiApi::class,
         ExperimentalFoundationApi::class
     )
@@ -139,130 +140,116 @@ class MainActivity : ComponentActivity() {
                             val currentLayout by rememberUpdatedState(timelineUiState.layout)
                             val coroutineScope = rememberCoroutineScope()
 
+                            val boundsRegistry = remember(state.user.id) { TimelineTileBoundsRegistry() }
+                            var rootContainerSize by remember { mutableStateOf(IntSize.Zero) }
+
                             var activeViewerMediaId by rememberSaveable(state.user.id) {
                                 mutableStateOf<String?>(null)
                             }
-                            var currentViewerMediaId by rememberSaveable(state.user.id) {
-                                mutableStateOf<String?>(null)
-                            }
-                            var isViewerVisible by rememberSaveable(state.user.id) {
-                                mutableStateOf(false)
-                            }
-                            var allowSharedBoundsAnimation by remember { mutableStateOf(false) }
+                            var viewerOpenSourceRect by remember { mutableStateOf<Rect?>(null) }
+                            var hiddenTimelineMediaId by remember { mutableStateOf<String?>(null) }
 
                             fun syncTimelineToMedia(mediaId: String) {
                                 val rowIndex = currentLayout.findRowIndexForMedia(mediaId) ?: return
-                                val visibleIndices =
-                                    timelineListState.layoutInfo.visibleItemsInfo.map { it.index }
-                                if (rowIndex !in visibleIndices) {
+                                val isVisible = timelineListState.layoutInfo.visibleItemsInfo
+                                    .any { it.index == rowIndex }
+                                if (!isVisible) {
                                     coroutineScope.launch {
                                         timelineListState.scrollToItem(rowIndex)
                                     }
                                 }
                             }
 
-                            SharedTransitionLayout {
-                                Box(modifier = Modifier.fillMaxSize()) {
-                                    // NavHost container (MainScreen root + pushed routes)
-                                    // Suppress accessibility and focus while viewer overlay is open
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxSize()
-                                            .then(
-                                                if (activeViewerMediaId != null) {
-                                                    Modifier
-                                                        .semantics { hideFromAccessibility() }
-                                                        .focusProperties { canFocus = false }
-                                                } else {
-                                                    Modifier
-                                                }
-                                            )
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .onSizeChanged { rootContainerSize = it }
+                            ) {
+                                // NavHost container (MainScreen root + pushed routes)
+                                // Suppress accessibility and focus while viewer overlay is open
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .then(
+                                            if (activeViewerMediaId != null) {
+                                                Modifier
+                                                    .semantics { hideFromAccessibility() }
+                                                    .focusProperties { canFocus = false }
+                                            } else {
+                                                Modifier
+                                            }
+                                        )
+                                ) {
+                                    NavHost(
+                                        navController = navController,
+                                        startDestination = MainRoute,
+                                        modifier = Modifier.fillMaxSize()
                                     ) {
-                                        NavHost(
-                                            navController = navController,
-                                            startDestination = MainRoute,
-                                            modifier = Modifier.fillMaxSize()
-                                        ) {
-                                            composable<MainRoute> {
-                                                MainScreen(
-                                                    viewModel = mainViewModel,
-                                                    timelineViewModel = timelineViewModel,
-                                                    timelineListState = timelineListState,
-                                                    memoryCacheKeyRegistry = container.memoryCacheKeyRegistry,
-                                                    sharedTransitionScope = this@SharedTransitionLayout,
-                                                    activeSharedMediaId = currentViewerMediaId,
-                                                    isViewerVisible = isViewerVisible,
-                                                    allowSharedBoundsAnimation = allowSharedBoundsAnimation,
-                                                    onMediaClick = { mediaId ->
+                                        composable<MainRoute> {
+                                            MainScreen(
+                                                viewModel = mainViewModel,
+                                                timelineViewModel = timelineViewModel,
+                                                timelineListState = timelineListState,
+                                                memoryCacheKeyRegistry = container.memoryCacheKeyRegistry,
+                                                boundsRegistry = boundsRegistry,
+                                                hiddenTimelineMediaId = hiddenTimelineMediaId,
+                                                onMediaClick = { mediaId, sourceRect ->
+                                                    if (activeViewerMediaId == null) {
+                                                        viewerOpenSourceRect = sourceRect
                                                         activeViewerMediaId = mediaId
-                                                        currentViewerMediaId = mediaId
-                                                        allowSharedBoundsAnimation = true
-                                                        isViewerVisible = true
                                                     }
-                                                )
-                                            }
-                                            composable<DeviceFoldersRoute> {
-                                                // Pushed destination for Phase 3
-                                            }
-                                            composable<AlbumDetailRoute> {
-                                                // Pushed destination for Phase 5
-                                            }
-                                            composable<BackupSettingsRoute> {
-                                                // Pushed destination for Phase 3
-                                            }
-                                        }
-                                    }
-
-                                    // MediaViewerScreen translucent overlay above NavHost
-                                    val viewerMediaId = activeViewerMediaId
-                                    if (viewerMediaId != null) {
-                                        val viewerOwner = remember(state.user.id, sessionHolder) {
-                                            object : ViewModelStoreOwner {
-                                                override val viewModelStore: ViewModelStore =
-                                                    sessionHolder.viewerStoreForUser(state.user.id)
-                                            }
-                                        }
-                                        val viewerViewModel: MediaViewerViewModel = viewModel(
-                                            viewModelStoreOwner = viewerOwner,
-                                            key = "${userKey}_viewer",
-                                            factory = MediaViewerViewModel.factory(
-                                                initialMediaId = viewerMediaId,
-                                                timelineProjectionStore = container.timelineProjectionStore,
-                                                mediaRepository = container.mediaRepository,
-                                                dispatchers = container.dispatchers
+                                                }
                                             )
-                                        )
-
-                                        MediaViewerScreen(
-                                            viewModel = viewerViewModel,
-                                            baseUrl = mainUiState.serverUrl,
-                                            imageLoader = container.imageLoader,
-                                            memoryCacheKeyRegistry = container.memoryCacheKeyRegistry,
-                                            isViewerVisible = isViewerVisible,
-                                            allowSharedBoundsAnimation = allowSharedBoundsAnimation,
-                                            sharedTransitionScope = this@SharedTransitionLayout,
-                                            onActiveMediaChanged = { activeId ->
-                                                if (currentViewerMediaId != activeId) {
-                                                    allowSharedBoundsAnimation = false
-                                                    currentViewerMediaId = activeId
-                                                }
-                                            },
-                                            onPreSyncScroll = ::syncTimelineToMedia,
-                                            onRequestDismiss = { activeId ->
-                                                if (isViewerVisible) {
-                                                    syncTimelineToMedia(activeId)
-                                                    allowSharedBoundsAnimation = true
-                                                    isViewerVisible = false
-                                                }
-                                            },
-                                            onDismissFinished = {
-                                                activeViewerMediaId = null
-                                                currentViewerMediaId = null
-                                                allowSharedBoundsAnimation = false
-                                                sessionHolder.clearViewerStore()
-                                            }
-                                        )
+                                        }
+                                        composable<DeviceFoldersRoute> {
+                                            // Pushed destination for Phase 3
+                                        }
+                                        composable<AlbumDetailRoute> {
+                                            // Pushed destination for Phase 5
+                                        }
+                                        composable<BackupSettingsRoute> {
+                                            // Pushed destination for Phase 3
+                                        }
                                     }
+                                }
+
+                                // MediaViewerScreen translucent overlay above NavHost
+                                val viewerMediaId = activeViewerMediaId
+                                if (viewerMediaId != null) {
+                                    val viewerOwner = remember(state.user.id, sessionHolder) {
+                                        object : ViewModelStoreOwner {
+                                            override val viewModelStore: ViewModelStore =
+                                                sessionHolder.viewerStoreForUser(state.user.id)
+                                        }
+                                    }
+                                    val viewerViewModel: MediaViewerViewModel = viewModel(
+                                        viewModelStoreOwner = viewerOwner,
+                                        key = "${userKey}_viewer",
+                                        factory = MediaViewerViewModel.factory(
+                                            initialMediaId = viewerMediaId,
+                                            timelineProjectionStore = container.timelineProjectionStore,
+                                            mediaRepository = container.mediaRepository,
+                                            dispatchers = container.dispatchers
+                                        )
+                                    )
+
+                                    MediaViewerScreen(
+                                        viewModel = viewerViewModel,
+                                        baseUrl = mainUiState.serverUrl,
+                                        imageLoader = container.imageLoader,
+                                        memoryCacheKeyRegistry = container.memoryCacheKeyRegistry,
+                                        boundsRegistry = boundsRegistry,
+                                        openSourceRect = viewerOpenSourceRect,
+                                        containerSize = rootContainerSize,
+                                        onHiddenTimelineMediaChanged = { hiddenTimelineMediaId = it },
+                                        onPreSyncScroll = ::syncTimelineToMedia,
+                                        onDismissFinished = {
+                                            hiddenTimelineMediaId = null
+                                            viewerOpenSourceRect = null
+                                            activeViewerMediaId = null
+                                            sessionHolder.clearViewerStore()
+                                        }
+                                    )
                                 }
                             }
                         }

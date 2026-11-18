@@ -2,12 +2,7 @@ package dev.ruurd.photos.features.timeline
 
 import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.ExperimentalSharedTransitionApi
-import androidx.compose.animation.SharedTransitionScope
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.snap
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -59,12 +54,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -83,6 +82,7 @@ import coil3.request.ImageRequest
 import dev.ruurd.photos.core.database.entity.SyncStatus
 import dev.ruurd.photos.core.image.MediaStoreThumbnail
 import dev.ruurd.photos.core.image.MemoryCacheKeyRegistry
+import dev.ruurd.photos.core.image.TimelineTileBoundsRegistry
 import dev.ruurd.photos.domain.model.MonthHeaderUiItem
 import dev.ruurd.photos.domain.model.TimelineGridItemUiModel
 import dev.ruurd.photos.domain.model.TimelineLayoutIndex
@@ -116,11 +116,9 @@ fun TimelineScreen(
     isBootstrapping: Boolean = false,
     pullToRefreshState: PullToRefreshState? = null,
     memoryCacheKeyRegistry: MemoryCacheKeyRegistry? = null,
-    sharedTransitionScope: SharedTransitionScope? = null,
-    activeSharedMediaId: String? = null,
-    isViewerVisible: Boolean = false,
-    allowSharedBoundsAnimation: Boolean = false,
-    onMediaClick: (mediaId: String) -> Unit = {},
+    boundsRegistry: TimelineTileBoundsRegistry? = null,
+    hiddenMediaId: String? = null,
+    onMediaClick: (mediaId: String, sourceRect: Rect?) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -296,10 +294,8 @@ fun TimelineScreen(
                                 baseUrl = baseUrl,
                                 isScrubbing = isScrubbing,
                                 memoryCacheKeyRegistry = memoryCacheKeyRegistry,
-                                sharedTransitionScope = sharedTransitionScope,
-                                activeSharedMediaId = activeSharedMediaId,
-                                isViewerVisible = isViewerVisible,
-                                allowSharedBoundsAnimation = allowSharedBoundsAnimation,
+                                boundsRegistry = boundsRegistry,
+                                hiddenMediaId = hiddenMediaId,
                                 onMediaClick = onMediaClick,
                                 modifier = cascadeModifier
                             )
@@ -456,18 +452,15 @@ private fun MonthHeader(
     }
 }
 
-@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 private fun TimelineRow(
     item: TimelineRowUiItem,
     baseUrl: String,
     isScrubbing: Boolean,
     memoryCacheKeyRegistry: MemoryCacheKeyRegistry?,
-    sharedTransitionScope: SharedTransitionScope?,
-    activeSharedMediaId: String?,
-    isViewerVisible: Boolean,
-    allowSharedBoundsAnimation: Boolean,
-    onMediaClick: (mediaId: String) -> Unit,
+    boundsRegistry: TimelineTileBoundsRegistry?,
+    hiddenMediaId: String?,
+    onMediaClick: (mediaId: String, sourceRect: Rect?) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val shape = RoundedCornerShape(
@@ -497,18 +490,15 @@ private fun TimelineRow(
                     baseUrl = baseUrl,
                     isScrubbing = isScrubbing,
                     memoryCacheKeyRegistry = memoryCacheKeyRegistry,
-                    sharedTransitionScope = sharedTransitionScope,
-                    activeSharedMediaId = activeSharedMediaId,
-                    isViewerVisible = isViewerVisible,
-                    allowSharedBoundsAnimation = allowSharedBoundsAnimation,
-                    onClick = { onMediaClick(gridItem.id) }
+                    boundsRegistry = boundsRegistry,
+                    isHidden = hiddenMediaId == gridItem.id,
+                    onClick = { rect -> onMediaClick(gridItem.id, rect) }
                 )
             }
         }
     }
 }
 
-@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 private fun TimelineTile(
     item: TimelineGridItemUiModel,
@@ -517,21 +507,28 @@ private fun TimelineTile(
     baseUrl: String,
     isScrubbing: Boolean,
     memoryCacheKeyRegistry: MemoryCacheKeyRegistry?,
-    sharedTransitionScope: SharedTransitionScope?,
-    activeSharedMediaId: String?,
-    isViewerVisible: Boolean,
-    allowSharedBoundsAnimation: Boolean,
-    onClick: () -> Unit
+    boundsRegistry: TimelineTileBoundsRegistry?,
+    isHidden: Boolean,
+    onClick: (sourceRect: Rect?) -> Unit
 ) {
     val context = LocalContext.current
     val density = LocalDensity.current.density
     val widthPx = (item.widthDp * density).roundToInt().coerceAtLeast(1)
     val heightPx = (heightDp * density).roundToInt().coerceAtLeast(1)
 
-    // Plain holder, not state: setting this from `onSuccess` must not recompose the tile.
+    // Plain holders, not state: updating these must not recompose the tile during scroll.
     val loadState = remember(item, thumbnailTargetHeightPx, baseUrl, widthPx, heightPx) {
         TileLoadState()
     }
+    val coordsHolder = remember { arrayOfNulls<LayoutCoordinates>(1) }
+
+    DisposableEffect(item.id, boundsRegistry) {
+        onDispose {
+            boundsRegistry?.unregister(item.id, coordsHolder[0])
+            coordsHolder[0] = null
+        }
+    }
+
     var gateLoads by remember(item, thumbnailTargetHeightPx, baseUrl, widthPx, heightPx) {
         mutableStateOf(isScrubbing)
     }
@@ -565,34 +562,19 @@ private fun TimelineTile(
             .build()
     }
 
-    val imageSharedModifier = if (sharedTransitionScope != null && !isScrubbing) {
-        with(sharedTransitionScope) {
-            val isTileVisible = !(isViewerVisible && activeSharedMediaId == item.id)
-            Modifier.sharedElementWithCallerManagedVisibility(
-                sharedContentState = rememberSharedContentState(key = "media_${item.id}"),
-                visible = isTileVisible,
-                boundsTransform = { _, _ ->
-                    if (allowSharedBoundsAnimation) {
-                        spring(
-                            dampingRatio = 0.85f,
-                            stiffness = Spring.StiffnessMediumLow
-                        )
-                    } else {
-                        snap()
-                    }
-                }
-            )
-        }
-    } else {
-        Modifier
-    }
-
     Box(
         modifier = Modifier
             .width(item.widthDp.dp)
             .height(heightDp.dp)
             .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-            .clickable(onClick = onClick)
+            .onPlaced { coords ->
+                coordsHolder[0] = coords
+                boundsRegistry?.register(item.id, coords)
+            }
+            .clickable {
+                val rect = coordsHolder[0]?.takeIf { it.isAttached }?.boundsInRoot()
+                onClick(rect)
+            }
     ) {
         // Coil 3's default model equality ignores CachePolicy changes, so uncached tiles that were
         // skipped during scrubbing must re-mount once scrubbing stops.
@@ -609,11 +591,11 @@ private fun TimelineTile(
                 },
                 modifier = Modifier
                     .fillMaxSize()
-                    .then(imageSharedModifier)
+                    .graphicsLayer { alpha = if (isHidden) 0f else 1f }
             )
         }
 
-        if (item.isVideo) {
+        if (item.isVideo && !isHidden) {
             Row(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
@@ -642,7 +624,7 @@ private fun TimelineTile(
             }
         }
 
-        if (item.syncStatus == SyncStatus.LOCAL_ONLY) {
+        if (item.syncStatus == SyncStatus.LOCAL_ONLY && !isHidden) {
             Icon(
                 imageVector = Icons.Default.CloudOff,
                 contentDescription = "Not backed up",

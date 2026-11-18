@@ -4,8 +4,6 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.ExperimentalSharedTransitionApi
-import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -53,6 +51,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -66,6 +65,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
 import dev.ruurd.photos.core.image.MemoryCacheKeyRegistry
+import dev.ruurd.photos.core.image.TimelineTileBoundsRegistry
 import dev.ruurd.photos.core.permissions.MediaPermissions
 import dev.ruurd.photos.domain.model.MediaAccessState
 import dev.ruurd.photos.domain.model.SyncState
@@ -80,7 +80,7 @@ import dev.ruurd.photos.features.timeline.TimelineScreen
 import dev.ruurd.photos.features.timeline.TimelineViewModel
 import kotlinx.coroutines.launch
 
-@OptIn(ExperimentalFoundationApi::class, ExperimentalSharedTransitionApi::class)
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun MainScreen(
     viewModel: MainViewModel,
@@ -90,11 +90,9 @@ fun MainScreen(
         cacheWindow = remember { LazyLayoutCacheWindow(aheadFraction = 0.75f, behindFraction = 0.4f) }
     ),
     memoryCacheKeyRegistry: MemoryCacheKeyRegistry? = null,
-    sharedTransitionScope: SharedTransitionScope? = null,
-    activeSharedMediaId: String? = null,
-    isViewerVisible: Boolean = false,
-    allowSharedBoundsAnimation: Boolean = false,
-    onMediaClick: (mediaId: String) -> Unit = {}
+    boundsRegistry: TimelineTileBoundsRegistry? = null,
+    hiddenTimelineMediaId: String? = null,
+    onMediaClick: (mediaId: String, sourceRect: Rect?) -> Unit = { _, _ -> }
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val coroutineScope = rememberCoroutineScope()
@@ -243,10 +241,8 @@ fun MainScreen(
                     isBootstrapping = uiState.isBootstrapping,
                     pullToRefreshState = pullToRefreshState,
                     memoryCacheKeyRegistry = memoryCacheKeyRegistry,
-                    sharedTransitionScope = sharedTransitionScope,
-                    activeSharedMediaId = activeSharedMediaId,
-                    isViewerVisible = isViewerVisible,
-                    allowSharedBoundsAnimation = allowSharedBoundsAnimation,
+                    boundsRegistry = boundsRegistry,
+                    hiddenMediaId = hiddenTimelineMediaId,
                     onMediaClick = onMediaClick
                 )
             }

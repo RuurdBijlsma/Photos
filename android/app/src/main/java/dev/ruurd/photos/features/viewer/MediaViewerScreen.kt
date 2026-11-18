@@ -3,18 +3,13 @@
 import android.app.Activity
 import android.net.Uri
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.ExperimentalSharedTransitionApi
-import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.VectorConverter
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -29,6 +24,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
@@ -61,49 +57,69 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.lerp
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.util.VelocityTracker
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import coil3.ImageLoader
+import coil3.compose.AsyncImage
+import coil3.compose.asPainter
 import coil3.request.ImageRequest
 import coil3.size.Dimension
 import coil3.size.Size as CoilSize
+import dev.ruurd.photos.core.database.entity.TimelineMediaProjection
 import dev.ruurd.photos.core.image.MediaStoreThumbnail
 import dev.ruurd.photos.core.image.MemoryCacheKeyRegistry
+import dev.ruurd.photos.core.image.TimelineTileBoundsRegistry
 import dev.ruurd.photos.features.viewer.components.ZoomablePhotoPage
 import dev.ruurd.photos.ui.theme.MontserratFontFamily
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.filterNotNull
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlin.math.abs
+import kotlin.math.roundToInt
 
-@OptIn(ExperimentalSharedTransitionApi::class)
+private data class ClosingHeroState(
+    val item: TimelineMediaProjection,
+    val startRect: Rect,
+    val targetRect: Rect?,
+    val startBackdropAlpha: Float
+)
+
 @Composable
 fun MediaViewerScreen(
     viewModel: MediaViewerViewModel,
     baseUrl: String,
     imageLoader: ImageLoader,
     memoryCacheKeyRegistry: MemoryCacheKeyRegistry,
-    isViewerVisible: Boolean,
-    allowSharedBoundsAnimation: Boolean,
-    sharedTransitionScope: SharedTransitionScope?,
-    onActiveMediaChanged: (mediaId: String) -> Unit,
+    boundsRegistry: TimelineTileBoundsRegistry,
+    openSourceRect: Rect?,
+    containerSize: IntSize,
+    onHiddenTimelineMediaChanged: (String?) -> Unit,
     onPreSyncScroll: (mediaId: String) -> Unit,
-    onRequestDismiss: (activeMediaId: String) -> Unit,
     onDismissFinished: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -113,25 +129,211 @@ fun MediaViewerScreen(
     val context = LocalContext.current
     val viewConfig = LocalViewConfiguration.current
     val coroutineScope = rememberCoroutineScope()
+    val density = LocalDensity.current
 
     val currentItems by rememberUpdatedState(items)
     val currentActiveId by rememberUpdatedState(uiState.activeMediaId)
-    val currentIsViewerVisible by rememberUpdatedState(isViewerVisible)
-    val currentOnActiveMediaChanged by rememberUpdatedState(onActiveMediaChanged)
+    val currentOnHiddenChanged by rememberUpdatedState(onHiddenTimelineMediaChanged)
     val currentOnPreSyncScroll by rememberUpdatedState(onPreSyncScroll)
-    val currentOnRequestDismiss by rememberUpdatedState(onRequestDismiss)
     val currentOnDismissFinished by rememberUpdatedState(onDismissFinished)
 
+    var viewerSize by remember { mutableStateOf(containerSize) }
     val initialIndex = remember { uiState.initialIndex.coerceIn(0, (items.size - 1).coerceAtLeast(0)) }
     val pagerState = rememberPagerState(
         initialPage = initialIndex,
         pageCount = { currentItems.size }
     )
 
+    // Opening hero animation state
+    val hasValidOpenSource = openSourceRect != null && viewerSize.width > 0 && viewerSize.height > 0
+    var hasFinishedOpening by remember { mutableStateOf(!hasValidOpenSource) }
+    val openProgress = remember { Animatable(if (hasValidOpenSource) 0f else 1f) }
+    val fallbackFadeIn = remember { Animatable(if (hasValidOpenSource) 1f else 0f) }
+    var openingHeroImageReady by remember { mutableStateOf(false) }
+
+    // Closing hero animation state
+    var closingState by remember { mutableStateOf<ClosingHeroState?>(null) }
+    val closeProgress = remember { Animatable(0f) }
+
+    // 2D finger drag-to-dismiss state
+    var isActivelyDragging by remember { mutableStateOf(false) }
+    var rawDragOffset by remember { mutableStateOf(Offset.Zero) }
+    val settleDragOffset = remember { Animatable(Offset.Zero, Offset.VectorConverter) }
+    val currentDragOffset = if (isActivelyDragging) rawDragOffset else settleDragOffset.value
+
+    var activePageZoomFraction by remember { mutableFloatStateOf(0f) }
+    val isZoomed = activePageZoomFraction > 0.01f
+    val currentIsZoomed by rememberUpdatedState(isZoomed)
+
+    val isOpeningHero = hasValidOpenSource && !hasFinishedOpening && closingState == null
+    val isClosing = closingState != null
+    val currentIsOpeningHero by rememberUpdatedState(isOpeningHero)
+    val currentIsClosing by rememberUpdatedState(isClosing)
+
+    // System bar appearance management (keep navigation bar transparent edge-to-edge for predictive back)
+    val activity = context as? Activity
+    val window = activity?.window
+    val insetsController = remember(window) {
+        window?.let { WindowCompat.getInsetsController(it, it.decorView) }
+    }
+
+    DisposableEffect(window, isDarkTheme) {
+        insetsController?.apply {
+            isAppearanceLightStatusBars = false
+            isAppearanceLightNavigationBars = false
+        }
+        onDispose {
+            insetsController?.apply {
+                isAppearanceLightStatusBars = !isDarkTheme
+                isAppearanceLightNavigationBars = !isDarkTheme
+                show(WindowInsetsCompat.Type.statusBars())
+            }
+        }
+    }
+
+    LaunchedEffect(uiState.isChromeVisible, isClosing) {
+        if (isClosing) {
+            insetsController?.show(WindowInsetsCompat.Type.statusBars())
+        } else if (uiState.isChromeVisible) {
+            insetsController?.show(WindowInsetsCompat.Type.statusBars())
+        } else {
+            insetsController?.hide(WindowInsetsCompat.Type.statusBars())
+        }
+    }
+
+    fun restoreSystemBarsForTimeline() {
+        if (!isDarkTheme) {
+            insetsController?.isAppearanceLightStatusBars = true
+            insetsController?.isAppearanceLightNavigationBars = true
+        }
+        insetsController?.show(WindowInsetsCompat.Type.statusBars())
+    }
+
+    fun resolvePhotoRatio(item: TimelineMediaProjection): Float {
+        val baseRatio = item.ratio
+        if (baseRatio.isFinite() && baseRatio > 0f && baseRatio != 1f) return baseRatio
+        val cached = memoryCacheKeyRegistry.get(item.id)
+            ?.let { key -> imageLoader.memoryCache?.get(key)?.image }
+        if (cached != null && cached.width > 0 && cached.height > 0) {
+            return cached.width.toFloat() / cached.height.toFloat()
+        }
+        return if (baseRatio.isFinite() && baseRatio > 0f) baseRatio else 1f
+    }
+
+    fun startClosing(
+        releaseOffset: Offset,
+        releaseScale: Float,
+        releaseBackdropAlpha: Float
+    ) {
+        if (currentIsClosing) return
+        val latestItems = currentItems
+        val activeId = currentActiveId
+        val activeItem = latestItems.getOrNull(pagerState.currentPage)?.takeIf { it.id == activeId }
+            ?: latestItems.firstOrNull { it.id == activeId }
+            ?: latestItems.getOrNull(pagerState.currentPage)
+
+        if (activeItem == null || viewerSize.width <= 0 || viewerSize.height <= 0) {
+            restoreSystemBarsForTimeline()
+            currentOnHiddenChanged(null)
+            currentOnDismissFinished()
+            return
+        }
+
+        val w = viewerSize.width.toFloat()
+        val h = viewerSize.height.toFloat()
+        val fittedRect = computeFittedRect(w, h, resolvePhotoRatio(activeItem))
+
+        val startRect: Rect
+        val startAlpha: Float
+        if (isOpeningHero && openSourceRect != null) {
+            // Reversing mid-open starts right from the current interpolated hero rect.
+            val t = openProgress.value
+            startRect = lerp(openSourceRect, fittedRect, t)
+            startAlpha = t.coerceIn(0f, 1f)
+        } else {
+            val centerX = w / 2f + releaseOffset.x
+            val centerY = h / 2f + releaseOffset.y
+            val startW = fittedRect.width * releaseScale
+            val startH = fittedRect.height * releaseScale
+            startRect = Rect(
+                left = centerX - startW / 2f,
+                top = centerY - startH / 2f,
+                right = centerX + startW / 2f,
+                bottom = centerY + startH / 2f
+            )
+            startAlpha = releaseBackdropAlpha
+        }
+
+        val targetRect = boundsRegistry.boundsInRoot(activeItem.id)
+        currentOnPreSyncScroll(activeItem.id)
+        if (targetRect != null) {
+            currentOnHiddenChanged(activeItem.id)
+        } else {
+            currentOnHiddenChanged(null)
+        }
+
+        restoreSystemBarsForTimeline()
+        isActivelyDragging = false
+        closingState = ClosingHeroState(
+            item = activeItem,
+            startRect = startRect,
+            targetRect = targetRect,
+            startBackdropAlpha = startAlpha
+        )
+    }
+
+    // Drive opening hero animation (or fade-in when opened without source bounds)
+    LaunchedEffect(hasValidOpenSource) {
+        if (hasValidOpenSource) {
+            openProgress.animateTo(
+                targetValue = 1f,
+                animationSpec = spring(
+                    dampingRatio = 0.85f,
+                    stiffness = Spring.StiffnessMediumLow
+                )
+            )
+            if (!currentIsClosing) {
+                hasFinishedOpening = true
+                currentOnHiddenChanged(null)
+            }
+        } else {
+            fallbackFadeIn.animateTo(1f, tween(durationMillis = FALLBACK_FADE_MS))
+        }
+    }
+
+    // Hide the origin tile only once the opening hero actually has pixels to paint over it
+    LaunchedEffect(isOpeningHero, openingHeroImageReady, items) {
+        if (isOpeningHero && openingHeroImageReady && items.isNotEmpty()) {
+            currentOnHiddenChanged(uiState.activeMediaId)
+        }
+    }
+
+    // Drive closing hero animation
+    LaunchedEffect(closingState) {
+        val activeClosing = closingState ?: return@LaunchedEffect
+        closeProgress.snapTo(0f)
+        if (activeClosing.targetRect != null) {
+            closeProgress.animateTo(
+                targetValue = 1f,
+                animationSpec = spring(
+                    dampingRatio = 0.88f,
+                    stiffness = Spring.StiffnessMediumLow
+                )
+            )
+        } else {
+            closeProgress.animateTo(
+                targetValue = 1f,
+                animationSpec = tween(durationMillis = FALLBACK_FADE_MS)
+            )
+        }
+        currentOnHiddenChanged(null)
+        currentOnDismissFinished()
+    }
+
     // Dismiss automatically if the library becomes empty or active item no longer exists
     LaunchedEffect(uiState.isActiveItemMissing) {
-        if (uiState.isActiveItemMissing && currentIsViewerVisible) {
-            currentOnRequestDismiss(currentActiveId)
+        if (uiState.isActiveItemMissing && !currentIsClosing) {
+            startClosing(Offset.Zero, 1f, 1f)
         }
     }
 
@@ -150,41 +352,13 @@ fun MediaViewerScreen(
             }
     }
 
-    // Track drag Y synchronously during touch, then hand off to Animatable on release
-    var isActivelyDragging by remember { mutableStateOf(false) }
-    var rawDragY by remember { mutableFloatStateOf(0f) }
-    val settleDragY = remember { Animatable(0f) }
-    val currentDragY = if (isActivelyDragging) rawDragY else settleDragY.value
-
-    var activePageZoomFraction by remember { mutableFloatStateOf(0f) }
-    val isZoomed = activePageZoomFraction > 0.01f
-    val currentIsZoomed by rememberUpdatedState(isZoomed)
-
-    // Backdrop fade for enter and exit transitions
-    val backdropReveal = remember { Animatable(if (isViewerVisible) 0f else 1f) }
-    LaunchedEffect(isViewerVisible) {
-        if (isViewerVisible) {
-            backdropReveal.animateTo(1f, tween(durationMillis = BACKDROP_FADE_MS))
-        } else {
-            // Let the visible=false frame commit before checking SharedTransitionScope.isTransitionActive
-            withFrameNanos { }
-            backdropReveal.animateTo(0f, tween(durationMillis = BACKDROP_FADE_MS))
-            if (sharedTransitionScope != null) {
-                snapshotFlow { !sharedTransitionScope.isTransitionActive }.first { it }
-            }
-            currentOnDismissFinished()
-        }
-    }
-
-    // Synchronize page changes with ViewModel activeMediaId and host shared-element key
+    // Synchronize page changes with ViewModel activeMediaId
     LaunchedEffect(pagerState) {
         snapshotFlow { pagerState.currentPage }.collect { page ->
             activePageZoomFraction = 0f
             val latestItems = currentItems
             if (page in latestItems.indices) {
-                val activeId = latestItems[page].id
-                viewModel.onPageChanged(activeId)
-                currentOnActiveMediaChanged(activeId)
+                viewModel.onPageChanged(latestItems[page].id)
             }
         }
     }
@@ -198,7 +372,7 @@ fun MediaViewerScreen(
             .collectLatest { settledIndex ->
                 delay(250L)
                 val latestItems = currentItems
-                if (settledIndex in latestItems.indices) {
+                if (settledIndex in latestItems.indices && !currentIsClosing) {
                     currentOnPreSyncScroll(latestItems[settledIndex].id)
                 }
             }
@@ -250,112 +424,117 @@ fun MediaViewerScreen(
             }
     }
 
-    // System bar appearance management:
-    // Keep navigation bar transparent edge-to-edge so predictive back stays active.
-    val activity = context as? Activity
-    val window = activity?.window
-    val insetsController = remember(window) {
-        window?.let { WindowCompat.getInsetsController(it, it.decorView) }
-    }
+    val dragDistanceY = currentDragOffset.y.coerceAtLeast(0f)
+    val viewerScale = (1f - (dragDistanceY / 1400f)).coerceIn(0.55f, 1f)
+    val dragBackdropAlpha = (1f - (dragDistanceY / 500f)).coerceIn(0f, 1f)
+    val chromeDragAlpha = (1f - (dragDistanceY / 90f)).coerceIn(0f, 1f)
 
-    DisposableEffect(window, isDarkTheme) {
-        insetsController?.apply {
-            isAppearanceLightStatusBars = false
-            isAppearanceLightNavigationBars = false
+    val effectiveBackdropAlpha = when {
+        closingState != null -> {
+            val closing = closingState!!
+            (closing.startBackdropAlpha * (1f - closeProgress.value)).coerceIn(0f, 1f)
         }
-        onDispose {
-            insetsController?.apply {
-                isAppearanceLightStatusBars = !isDarkTheme
-                isAppearanceLightNavigationBars = !isDarkTheme
-                show(WindowInsetsCompat.Type.statusBars())
-            }
-        }
+        isOpeningHero -> openProgress.value.coerceIn(0f, 1f)
+        hasValidOpenSource -> dragBackdropAlpha
+        else -> (fallbackFadeIn.value * dragBackdropAlpha).coerceIn(0f, 1f)
     }
 
-    LaunchedEffect(uiState.isChromeVisible, isViewerVisible) {
-        if (!isViewerVisible) {
-            insetsController?.show(WindowInsetsCompat.Type.statusBars())
-        } else if (uiState.isChromeVisible) {
-            insetsController?.show(WindowInsetsCompat.Type.statusBars())
-        } else {
-            insetsController?.hide(WindowInsetsCompat.Type.statusBars())
-        }
+    val effectiveChromeAlpha = when {
+        closingState != null -> 0f
+        !uiState.isChromeVisible -> 0f
+        isOpeningHero -> ((openProgress.value * 1.4f) - 0.2f).coerceIn(0f, 1f)
+        hasValidOpenSource -> chromeDragAlpha
+        else -> (fallbackFadeIn.value * chromeDragAlpha).coerceIn(0f, 1f)
     }
 
-    fun triggerDismiss() {
-        if (!isDarkTheme) {
-            insetsController?.isAppearanceLightStatusBars = true
-            insetsController?.isAppearanceLightNavigationBars = true
-        }
-        currentOnRequestDismiss(currentActiveId)
+    BackHandler(enabled = !isClosing) {
+        startClosing(Offset.Zero, 1f, effectiveBackdropAlpha)
     }
 
-    BackHandler(enabled = isViewerVisible) {
-        triggerDismiss()
-    }
+    val dismissThresholdPx = with(density) { 110.dp.toPx() }
+    val fastFlickMinDistancePx = with(density) { 40.dp.toPx() }
 
-    val dragBackdropFactor = (1f - (currentDragY / 600f)).coerceIn(0f, 1f)
-    val effectiveBackdropAlpha = (backdropReveal.value * dragBackdropFactor).coerceIn(0f, 1f)
-    val viewerScale = (1f - (currentDragY / 1800f)).coerceIn(0.85f, 1f)
-
-    val dismissThresholdPx = with(LocalDensity.current) { 120.dp.toPx() }
-
-    // Outer Box stays untransformed so pointerInput reads stable screen coordinates during drag
+    // Outer Box stays untransformed so pointerInput reads stable screen coordinates during 2D drag
     Box(
         modifier = modifier
             .fillMaxSize()
+            .onSizeChanged { viewerSize = it }
             .pointerInput(Unit) {
                 val touchSlop = viewConfig.touchSlop
+                val velocityTracker = VelocityTracker()
 
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
-                    if (!currentIsViewerVisible || currentIsZoomed) return@awaitEachGesture
+                    if (currentIsClosing || currentIsOpeningHero || currentIsZoomed) {
+                        return@awaitEachGesture
+                    }
                     val pointerId = down.id
                     var totalDx = 0f
                     var totalDy = 0f
-                    var isDraggingDown = false
+                    var isDraggingToDismiss = false
+                    velocityTracker.resetTracking()
+                    velocityTracker.addPosition(down.uptimeMillis, down.position)
 
                     try {
                         while (true) {
-                            val event = awaitPointerEvent()
+                            val pass = if (isDraggingToDismiss) {
+                                PointerEventPass.Initial
+                            } else {
+                                PointerEventPass.Main
+                            }
+                            val event = awaitPointerEvent(pass)
                             val change = event.changes.firstOrNull { it.id == pointerId } ?: break
 
-                            if (change.isConsumed || event.changes.size > 1) break
+                            val multiTouch = event.changes.count { it.pressed } > 1
+                            if (multiTouch) break
+                            if (!isDraggingToDismiss && change.isConsumed) break
 
                             val dx = change.position.x - change.previousPosition.x
                             val dy = change.position.y - change.previousPosition.y
                             totalDx += dx
                             totalDy += dy
 
-                            if (!isDraggingDown) {
+                            if (!isDraggingToDismiss) {
                                 if (abs(totalDy) > touchSlop &&
-                                    abs(totalDy) > abs(totalDx) * 1.5f &&
+                                    abs(totalDy) > abs(totalDx) * 1.25f &&
                                     totalDy > 0f
                                 ) {
-                                    isDraggingDown = true
-                                    rawDragY = settleDragY.value
+                                    isDraggingToDismiss = true
+                                    rawDragOffset = settleDragOffset.value + Offset(totalDx, totalDy)
                                     isActivelyDragging = true
-                                    coroutineScope.launch { settleDragY.stop() }
+                                    coroutineScope.launch { settleDragOffset.stop() }
+                                    velocityTracker.addPosition(change.uptimeMillis, change.position)
                                     change.consume()
+                                } else if (abs(totalDx) > touchSlop || (abs(totalDy) > touchSlop && totalDy < 0f)) {
+                                    // Horizontal swipe belongs to HorizontalPager; upward swipe is not dismiss.
+                                    break
                                 }
-                            } else if (dy != 0f) {
+                            } else {
+                                velocityTracker.addPosition(change.uptimeMillis, change.position)
                                 change.consume()
-                                rawDragY = (rawDragY + dy).coerceAtLeast(0f)
+                                rawDragOffset += Offset(dx, dy)
                             }
 
                             if (!change.pressed) break
                         }
                     } finally {
-                        if (isDraggingDown) {
-                            val releaseY = rawDragY
-                            coroutineScope.launch {
-                                settleDragY.snapTo(releaseY)
-                                isActivelyDragging = false
-                                if (releaseY > dismissThresholdPx) {
-                                    triggerDismiss()
-                                } else {
-                                    settleDragY.animateTo(
-                                        targetValue = 0f,
+                        if (isDraggingToDismiss && !currentIsClosing) {
+                            val releaseOffset = rawDragOffset
+                            val releaseY = releaseOffset.y.coerceAtLeast(0f)
+                            val velocityY = velocityTracker.calculateVelocity().y
+                            val shouldDismiss = releaseY > dismissThresholdPx ||
+                                    (velocityY > 1000f && releaseY > fastFlickMinDistancePx)
+
+                            if (shouldDismiss) {
+                                val releaseScale = (1f - (releaseY / 1400f)).coerceIn(0.55f, 1f)
+                                val releaseAlpha = (1f - (releaseY / 500f)).coerceIn(0f, 1f)
+                                startClosing(releaseOffset, releaseScale, releaseAlpha)
+                            } else {
+                                coroutineScope.launch {
+                                    settleDragOffset.snapTo(releaseOffset)
+                                    isActivelyDragging = false
+                                    settleDragOffset.animateTo(
+                                        targetValue = Offset.Zero,
                                         animationSpec = spring(
                                             dampingRatio = Spring.DampingRatioNoBouncy,
                                             stiffness = Spring.StiffnessMedium
@@ -375,19 +554,25 @@ fun MediaViewerScreen(
                 .background(Color.Black.copy(alpha = effectiveBackdropAlpha))
         )
 
-        // Interactive transformed viewer container
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .graphicsLayer {
-                    translationY = currentDragY
-                    scaleX = viewerScale
-                    scaleY = viewerScale
-                }
-        ) {
-            val isPagerScrollEnabled = isViewerVisible && !isZoomed
+        // Interactive Pager Layer (hidden only while ClosingHeroOverlay is flying back to the tile)
+        if (closingState == null && items.isNotEmpty()) {
+            val isPagerScrollEnabled = !isZoomed && !isActivelyDragging && !isOpeningHero
 
-            if (items.isNotEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        translationX = currentDragOffset.x
+                        translationY = currentDragOffset.y
+                        scaleX = viewerScale
+                        scaleY = viewerScale
+                        alpha = when {
+                            isOpeningHero -> 0f
+                            hasValidOpenSource -> 1f
+                            else -> fallbackFadeIn.value
+                        }
+                    }
+            ) {
                 HorizontalPager(
                     state = pagerState,
                     key = { page -> if (page in items.indices) items[page].id else page },
@@ -403,14 +588,15 @@ fun MediaViewerScreen(
                             ZoomablePhotoPage(
                                 item = item,
                                 baseUrl = baseUrl,
+                                imageLoader = imageLoader,
+                                memoryCacheKeyRegistry = memoryCacheKeyRegistry,
                                 isActivePage = isCurrentPage,
                                 isSettledPage = isSettledPage,
-                                isViewerVisible = isViewerVisible,
-                                allowSharedBoundsAnimation = allowSharedBoundsAnimation,
-                                sharedTransitionScope = sharedTransitionScope,
-                                memoryCacheKeyRegistry = memoryCacheKeyRegistry,
+                                isOpeningTransition = isOpeningHero,
                                 onTap = {
-                                    if (currentIsViewerVisible) viewModel.toggleChrome()
+                                    if (!isOpeningHero && !isClosing) {
+                                        viewModel.toggleChrome()
+                                    }
                                 },
                                 onZoomFractionChanged = { fraction ->
                                     if (page == pagerState.currentPage) {
@@ -423,29 +609,89 @@ fun MediaViewerScreen(
                     }
                 }
             }
+        }
 
+        // Opening Hero Overlay: animates smoothly from tile's boundsInRoot to centered fitted rect
+        if (isOpeningHero && openSourceRect != null) {
+            val openingItem = items.getOrNull(pagerState.currentPage)
+                ?: items.firstOrNull { it.id == uiState.activeMediaId }
+            if (openingItem != null) {
+                val targetRect = computeFittedRect(
+                    containerWidth = viewerSize.width.toFloat(),
+                    containerHeight = viewerSize.height.toFloat(),
+                    ratio = resolvePhotoRatio(openingItem)
+                )
+                val animatedRect = lerp(openSourceRect, targetRect, openProgress.value)
+                HeroImageOverlay(
+                    item = openingItem,
+                    baseUrl = baseUrl,
+                    rect = animatedRect,
+                    alpha = 1f,
+                    imageLoader = imageLoader,
+                    memoryCacheKeyRegistry = memoryCacheKeyRegistry,
+                    onImageReady = { openingHeroImageReady = true }
+                )
+            }
+        }
+
+        // Closing Hero Overlay: starts from exact dragged/released rect and lands directly on tile
+        val activeClosing = closingState
+        if (activeClosing != null) {
+            val progress = closeProgress.value
+            val currentRect: Rect
+            val heroAlpha: Float
+            if (activeClosing.targetRect != null) {
+                currentRect = lerp(activeClosing.startRect, activeClosing.targetRect, progress)
+                heroAlpha = 1f
+            } else {
+                val shrinkScale = 1f - 0.15f * progress
+                val cx = activeClosing.startRect.center.x
+                val cy = activeClosing.startRect.center.y
+                val w = activeClosing.startRect.width * shrinkScale
+                val h = activeClosing.startRect.height * shrinkScale
+                currentRect = Rect(
+                    left = cx - w / 2f,
+                    top = cy - h / 2f,
+                    right = cx + w / 2f,
+                    bottom = cy + h / 2f
+                )
+                heroAlpha = (1f - progress).coerceIn(0f, 1f)
+            }
+
+            HeroImageOverlay(
+                item = activeClosing.item,
+                baseUrl = baseUrl,
+                rect = currentRect,
+                alpha = heroAlpha,
+                imageLoader = imageLoader,
+                memoryCacheKeyRegistry = memoryCacheKeyRegistry
+            )
+        }
+
+        // Floating Viewer Chrome (anchored to screen edges, fades cleanly during open & drag)
+        if (effectiveChromeAlpha > 0.01f) {
             val statusBarPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
             val navBarPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-            val showChrome = isViewerVisible && uiState.isChromeVisible
 
-            AnimatedVisibility(
-                visible = showChrome,
-                enter = fadeIn() + slideInVertically { -it },
-                exit = fadeOut() + slideOutVertically { -it },
+            Box(
                 modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = statusBarPadding + 6.dp, start = 8.dp, end = 8.dp)
+                    .fillMaxSize()
+                    .graphicsLayer { alpha = effectiveChromeAlpha }
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(top = statusBarPadding + 6.dp, start = 8.dp, end = 8.dp)
+                ) {
                     ViewerCircleButton(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = "Back",
-                        onClick = { triggerDismiss() }
+                        onClick = { startClosing(Offset.Zero, 1f, effectiveBackdropAlpha) }
                     )
 
                     Spacer(modifier = Modifier.width(8.dp))
 
-                    // Updated directly without animateContentSize() to prevent mid-swipe relayouts
                     Surface(
                         shape = CircleShape,
                         color = ViewerPillColor,
@@ -506,21 +752,14 @@ fun MediaViewerScreen(
                         }
                     }
                 }
-            }
 
-            // Bottom Floating Pill: Share, Add to, Bin (placeholders until 2B / Phases 4-5)
-            AnimatedVisibility(
-                visible = showChrome,
-                enter = fadeIn() + slideInVertically { it },
-                exit = fadeOut() + slideOutVertically { it },
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = navBarPadding + 14.dp)
-            ) {
                 Surface(
                     shape = CircleShape,
                     color = ViewerPillColor,
-                    border = ViewerPillBorder
+                    border = ViewerPillBorder,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = navBarPadding + 14.dp)
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
@@ -537,7 +776,124 @@ fun MediaViewerScreen(
     }
 }
 
-private const val BACKDROP_FADE_MS = 180
+@Composable
+private fun HeroImageOverlay(
+    item: TimelineMediaProjection,
+    baseUrl: String,
+    rect: Rect,
+    alpha: Float,
+    imageLoader: ImageLoader,
+    memoryCacheKeyRegistry: MemoryCacheKeyRegistry,
+    onImageReady: () -> Unit = {}
+) {
+    val context = LocalContext.current
+
+    val cachedPainter = remember(item.id, memoryCacheKeyRegistry, imageLoader, context) {
+        memoryCacheKeyRegistry.get(item.id)
+            ?.let { key -> imageLoader.memoryCache?.get(key)?.image }
+            ?.asPainter(context)
+    }
+
+    LaunchedEffect(item.id, cachedPainter) {
+        if (cachedPainter != null) {
+            onImageReady()
+        }
+    }
+
+    val previewModel = remember(item, baseUrl) {
+        val localUri = item.localContentUri?.let(Uri::parse)
+        val targetHeight = if (item.isVideo) 720 else 1440
+        val cloudUrl = item.cloudId?.takeIf { it.isNotBlank() }?.let { cloudId ->
+            if (baseUrl.isBlank()) {
+                null
+            } else if (item.hasThumbnails) {
+                "$baseUrl/thumbnails/$cloudId/${targetHeight}p.avif"
+            } else {
+                "$baseUrl/api/photos/$cloudId/thumbnail?size=$targetHeight"
+            }
+        }
+        if (localUri != null) {
+            MediaStoreThumbnail(
+                uri = localUri,
+                cloudId = item.cloudId,
+                cloudFallbackUrl = cloudUrl,
+                isVideo = item.isVideo
+            )
+        } else {
+            cloudUrl
+        }
+    }
+
+    Box(
+        modifier = Modifier
+            .offset { IntOffset(rect.left.roundToInt(), rect.top.roundToInt()) }
+            .layout { measurable, _ ->
+                val w = rect.width.roundToInt().coerceAtLeast(1)
+                val h = rect.height.roundToInt().coerceAtLeast(1)
+                val placeable = measurable.measure(Constraints.fixed(w, h))
+                layout(w, h) {
+                    placeable.place(0, 0)
+                }
+            }
+            .graphicsLayer { this.alpha = alpha }
+            .clip(RectangleShape)
+    ) {
+        if (cachedPainter != null) {
+            Image(
+                painter = cachedPainter,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+        } else if (previewModel != null) {
+            val targetHeight = if (item.isVideo) 720 else 1440
+            val request = remember(item.id, previewModel, targetHeight) {
+                ImageRequest.Builder(context)
+                    .data(previewModel)
+                    .apply {
+                        if (previewModel is MediaStoreThumbnail) {
+                            size(targetHeight, targetHeight)
+                        } else {
+                            size(CoilSize(Dimension.Undefined, Dimension.Pixels(targetHeight)))
+                        }
+                    }
+                    .build()
+            }
+            AsyncImage(
+                model = request,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                onSuccess = { result ->
+                    result.result.memoryCacheKey?.let { key ->
+                        memoryCacheKeyRegistry.put(item.id, key)
+                    }
+                    onImageReady()
+                },
+                modifier = Modifier.fillMaxSize()
+            )
+        }
+    }
+}
+
+private fun computeFittedRect(containerWidth: Float, containerHeight: Float, ratio: Float): Rect {
+    if (containerWidth <= 0f || containerHeight <= 0f) return Rect.Zero
+    val safeRatio = if (ratio.isFinite() && ratio > 0f) ratio else 1f
+    val containerRatio = containerWidth / containerHeight
+    val fittedWidth: Float
+    val fittedHeight: Float
+    if (safeRatio > containerRatio) {
+        fittedWidth = containerWidth
+        fittedHeight = containerWidth / safeRatio
+    } else {
+        fittedHeight = containerHeight
+        fittedWidth = containerHeight * safeRatio
+    }
+    val left = (containerWidth - fittedWidth) / 2f
+    val top = (containerHeight - fittedHeight) / 2f
+    return Rect(left, top, left + fittedWidth, top + fittedHeight)
+}
+
+private const val FALLBACK_FADE_MS = 180
 
 /** Dark translucent scrim with a hairline highlight, matching the web viewer's pills. */
 private val ViewerPillColor = Color.Black.copy(alpha = 0.55f)

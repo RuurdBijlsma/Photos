@@ -1,11 +1,7 @@
 package dev.ruurd.photos.features.viewer.components
 
 import android.net.Uri
-import androidx.compose.animation.ExperimentalSharedTransitionApi
-import androidx.compose.animation.SharedTransitionScope
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.snap
-import androidx.compose.animation.core.spring
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -33,8 +29,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import coil3.ImageLoader
+import coil3.compose.asPainter
 import coil3.request.ImageRequest
-import coil3.request.crossfade
 import coil3.size.Dimension
 import coil3.size.Size as CoilSize
 import dev.ruurd.photos.core.database.entity.TimelineMediaProjection
@@ -46,17 +43,15 @@ import me.saket.telephoto.zoomable.coil3.ZoomableAsyncImage
 import me.saket.telephoto.zoomable.rememberZoomableImageState
 import me.saket.telephoto.zoomable.rememberZoomableState
 
-@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun ZoomablePhotoPage(
     item: TimelineMediaProjection,
     baseUrl: String,
+    imageLoader: ImageLoader,
+    memoryCacheKeyRegistry: MemoryCacheKeyRegistry,
     isActivePage: Boolean,
     isSettledPage: Boolean,
-    isViewerVisible: Boolean,
-    allowSharedBoundsAnimation: Boolean,
-    sharedTransitionScope: SharedTransitionScope?,
-    memoryCacheKeyRegistry: MemoryCacheKeyRegistry,
+    isOpeningTransition: Boolean,
     onTap: () -> Unit,
     modifier: Modifier = Modifier,
     onZoomFractionChanged: (Float) -> Unit = {}
@@ -83,14 +78,24 @@ fun ZoomablePhotoPage(
         }
     }
 
-    // Two-tier loading: keep N ± 1 offscreen neighbors and mid-swipe pages on lightweight
-    // previews, upgrading local/synced photos to raw full-res only after settling or on zoom.
+    // Two-tier loading: keep N ± 1 offscreen neighbors, opening transitions, and mid-swipe pages
+    // on lightweight previews, upgrading local/synced photos to raw full-res only after settling or on zoom.
     val canUpgradeLocal = item.localContentUri != null && !item.isVideo
     var isUpgradedToFullRes by remember(item.id) { mutableStateOf(false) }
 
-    LaunchedEffect(item.id, canUpgradeLocal, isSettledPage, isZoomed, isActivePage) {
+    LaunchedEffect(
+        item.id,
+        canUpgradeLocal,
+        isSettledPage,
+        isZoomed,
+        isActivePage,
+        isOpeningTransition
+    ) {
         if (!canUpgradeLocal) {
             isUpgradedToFullRes = false
+            return@LaunchedEffect
+        }
+        if (isOpeningTransition) {
             return@LaunchedEffect
         }
         if (isZoomed && isActivePage) {
@@ -101,6 +106,13 @@ fun ZoomablePhotoPage(
         } else {
             isUpgradedToFullRes = false
         }
+    }
+
+    // Synchronous O(1) memory-cache painter so frame 1 is never blank while ZoomableAsyncImage resolves.
+    val syncFallbackPainter = remember(item.id, memoryCacheKeyRegistry, imageLoader, context) {
+        memoryCacheKeyRegistry.get(item.id)
+            ?.let { key -> imageLoader.memoryCache?.get(key)?.image }
+            ?.asPainter(context)
     }
 
     val localUri = remember(item.localContentUri) { item.localContentUri?.let(Uri::parse) }
@@ -145,7 +157,6 @@ fun ZoomablePhotoPage(
                 }
                 memoryCacheKeyRegistry.get(item.id)?.let(::placeholderMemoryCacheKey)
             }
-            .crossfade(CROSSFADE_MS)
             .listener(
                 onSuccess = { _, result ->
                     result.memoryCacheKey?.let { key ->
@@ -156,42 +167,28 @@ fun ZoomablePhotoPage(
             .build()
     }
 
-    val sharedElementModifier = if (sharedTransitionScope != null && isActivePage) {
-        with(sharedTransitionScope) {
-            Modifier.sharedElementWithCallerManagedVisibility(
-                sharedContentState = rememberSharedContentState(key = "media_${item.id}"),
-                visible = isViewerVisible,
-                boundsTransform = { _, _ ->
-                    if (allowSharedBoundsAnimation && !isZoomed) {
-                        spring(
-                            dampingRatio = 0.85f,
-                            stiffness = Spring.StiffnessMediumLow
-                        )
-                    } else {
-                        snap()
-                    }
-                }
-            )
-        }
-    } else {
-        Modifier
-    }
-
     val zoomableImageState = rememberZoomableImageState(zoomableState)
 
     Box(
         modifier = modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
     ) {
+        if (syncFallbackPainter != null && !zoomableImageState.isImageDisplayed) {
+            Image(
+                painter = syncFallbackPainter,
+                contentDescription = null,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
+
         ZoomableAsyncImage(
             model = request,
             contentDescription = null,
             state = zoomableImageState,
             onClick = { onTap() },
             contentScale = ContentScale.Fit,
-            modifier = Modifier
-                .fillMaxSize()
-                .then(sharedElementModifier)
+            modifier = Modifier.fillMaxSize()
         )
 
         if (item.isVideo) {
@@ -228,4 +225,3 @@ fun ZoomablePhotoPage(
 }
 
 private const val FULL_RES_SETTLE_DELAY_MS = 180L
-private const val CROSSFADE_MS = 180
