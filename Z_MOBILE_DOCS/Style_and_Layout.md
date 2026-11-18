@@ -247,8 +247,13 @@ fun concentricRadius(outer: Dp, padding: Dp, min: Dp = 8.dp): Dp =
       interactively drag/shrink over the visible timeline and dismiss (syncing timeline scroll on dismiss if needed).
     * **Swipe up** (single-pointer, unzoomed `(zoomableState.zoomFraction ?: 0f) <= 0.01f`, `|dy| > |dx|`) to reveal
       the **Media Info Sheet** (`30.dp` top-rounded dark `surfaceContainerHigh` modal sheet showing capture date/time in
-      Roboto/Montserrat, weather summary, camera/lens/exposure pills, albums list, and a location card with resolved
-      place name + coordinates + `"Open in Maps"` action—embedded mini-map deferred until MapLibre is added).
+      Roboto/Montserrat with an edit trigger/row, timezone label—tappable on server-backed items to edit `±HH:MM`
+      offset, matching web's `EditDateTimeCard.vue`—weather summary, camera/lens/exposure pills, albums list, and a
+      location card with resolved place name + coordinates + `"Open in Maps"` action; embedded mini-map deferred until
+      MapLibre is added).
+    * **Date/Time & Timezone Edit Dialog (`28.dp` dialog):** Opens from the Info sheet's date/time or timezone row with
+      Material 3 `DatePicker` + `TimePicker` and `±HH:MM` offset controls, showing an inline saving spinner while
+      updating and keeping the viewer anchored on the item even if its date moves it to another month.
 
 ---
 

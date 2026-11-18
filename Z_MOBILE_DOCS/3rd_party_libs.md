@@ -16,7 +16,8 @@
 * **JSON Serialization & Local EXIF:** `org.jetbrains.kotlin.plugin.serialization` +
   `org.jetbrains.kotlinx:kotlinx-serialization-json` + Retrofit `converter-kotlinx-serialization` (`2.11.0`) for
   type-safe `@Serializable` Navigation Compose routes and JSON endpoints (`/api/photos/{id}/item`, Phase 3–5 APIs),
-  and `androidx.exifinterface:exifinterface:1.4.2` for offline local EXIF reading and `LOCAL_ONLY` rotation.
+  and `androidx.exifinterface:exifinterface:1.4.2` for offline local EXIF reading plus `LOCAL_ONLY` rotation and
+  datetime editing.
 * **Protobuf Compilation:** `com.google.protobuf:protobuf-javalite` with the Gradle Protobuf plugin to compile
   the `.proto` schemas.
 * **Navigation:** `androidx.navigation:navigation-compose:2.10.2` (Type-safe Compose navigation routes via

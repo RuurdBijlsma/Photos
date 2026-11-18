@@ -3,7 +3,7 @@
 ```text
 app/src/main/java/dev/ruurd/photos/
 ├── core/
-│   ├── common/             # AppDispatchers, MediaRefreshCoordinator, Extensions
+│   ├── common/             # AppDispatchers, MediaRefreshCoordinator, LocalFileOverwriteHelper, Extensions
 │   ├── database/           # Room Database, TypeConverters
 │   │   ├── dao/            # MediaDao, DeviceFolderDao, AlbumDao, UploadQueueDao
 │   │   └── entity/         # MediaEntity, DeviceFolderEntity, SyncStatus, TimelineMediaProjection, AlbumEntity, UploadQueueEntity
@@ -12,7 +12,7 @@ app/src/main/java/dev/ruurd/photos/
 │   │   ├── auth/           # AuthAuthenticator
 │   │   ├── cookie/         # PersistentCookieJar implementation
 │   │   ├── discovery/      # LanServerScanner
-│   │   ├── dto/            # JSON DTOs (AuthDtos, MediaItemDtos)
+│   │   ├── dto/            # JSON DTOs (AuthDtos, MediaItemDtos incl. PatchField)
 │   │   ├── interceptor/    # DynamicBaseUrlInterceptor
 │   │   └── tus/            # Resumable TUS upload client
 │   ├── image/              # Coil ImageLoader, LibavifDecoder, MediaStoreThumbnailFetcher, FullResFileCache, ShareCache
@@ -40,6 +40,7 @@ app/src/main/java/dev/ruurd/photos/
 │       ├── SyncTimelineUseCase.kt
 │       ├── ScanLocalMediaUseCase.kt
 │       ├── RotateMediaUseCase.kt
+│       ├── EditMediaDateTimeUseCase.kt
 │       └── EnqueueBackupUseCase.kt
 │
 ├── work/                   # WorkManager background workers
@@ -55,7 +56,7 @@ app/src/main/java/dev/ruurd/photos/
     ├── timeline/           # Justified row gallery view
     │   └── components/     # TimelineScrubber
     ├── viewer/             # Media viewer (HorizontalPager, Telephoto, Media3, Info Sheet)
-    │   └── components/     # ZoomablePhotoPage, VideoPlayerPage, MediaInfoBottomSheet, PlaybackSpeedDialog
+    │   └── components/     # ZoomablePhotoPage, VideoPlayerPage, MediaInfoBottomSheet, DateTimeEditDialog, PlaybackSpeedDialog
     ├── albums/             # Albums listing, Device Folders ("On this device"), & album detail views
     └── backup/             # Backup settings & status
 ```
