@@ -67,6 +67,47 @@ class BaselineProfileGenerator {
             device.swipe(scrubX, scrubBottom, scrubX, scrubTop, 45)
         }
         device.waitForIdle()
+
+        // Exercise MediaViewer: tap photo to open viewer overlay, horizontal fast swiping, zoom, and swipe-down dismiss
+        val photoItem = device.findObject(By.clazz("android.view.View").clickable(true))
+        if (photoItem != null) {
+            photoItem.click()
+            SystemClock.sleep(500)
+            device.waitForIdle()
+
+            // Horizontal fast swipes between items
+            val screenWidth = device.displayWidth
+            val screenHeight = device.displayHeight
+            val midY = screenHeight / 2
+            val startX = (screenWidth * 0.85f).toInt()
+            val endX = (screenWidth * 0.15f).toInt()
+
+            repeat(2) {
+                device.swipe(startX, midY, endX, midY, 15)
+                SystemClock.sleep(150)
+            }
+            repeat(2) {
+                device.swipe(endX, midY, startX, midY, 15)
+                SystemClock.sleep(150)
+            }
+            device.waitForIdle()
+
+            // Double tap to zoom in and out
+            val centerX = screenWidth / 2
+            val centerY = screenHeight / 2
+            device.click(centerX, centerY)
+            device.click(centerX, centerY)
+            SystemClock.sleep(300)
+            device.click(centerX, centerY)
+            device.click(centerX, centerY)
+            SystemClock.sleep(300)
+            device.waitForIdle()
+
+            // Single-pointer swipe down to dismiss
+            device.swipe(centerX, (screenHeight * 0.3f).toInt(), centerX, (screenHeight * 0.85f).toInt(), 20)
+            SystemClock.sleep(300)
+            device.waitForIdle()
+        }
     }
 
     private fun mainActivityIntent(): Intent = Intent().apply {

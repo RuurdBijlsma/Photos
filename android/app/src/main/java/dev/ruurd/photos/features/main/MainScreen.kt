@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.layout.LazyLayoutCacheWindow
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
@@ -62,6 +63,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
+import dev.ruurd.photos.core.image.MemoryCacheKeyRegistry
 import dev.ruurd.photos.core.permissions.MediaPermissions
 import dev.ruurd.photos.domain.model.MediaAccessState
 import dev.ruurd.photos.domain.model.SyncState
@@ -81,13 +83,14 @@ import kotlinx.coroutines.launch
 fun MainScreen(
     viewModel: MainViewModel,
     timelineViewModel: TimelineViewModel,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    timelineListState: LazyListState = rememberLazyListState(
+        cacheWindow = remember { LazyLayoutCacheWindow(aheadFraction = 0.75f, behindFraction = 0.4f) }
+    ),
+    memoryCacheKeyRegistry: MemoryCacheKeyRegistry? = null,
+    onMediaClick: (mediaId: String) -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val timelineCacheWindow = remember {
-        LazyLayoutCacheWindow(aheadFraction = 0.75f, behindFraction = 0.4f)
-    }
-    val timelineListState = rememberLazyListState(cacheWindow = timelineCacheWindow)
     val coroutineScope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -232,7 +235,9 @@ fun MainScreen(
                     topBarVisible = !hideTopBar,
                     isSyncing = uiState.syncState == SyncState.SYNCING,
                     isBootstrapping = uiState.isBootstrapping,
-                    pullToRefreshState = pullToRefreshState
+                    pullToRefreshState = pullToRefreshState,
+                    memoryCacheKeyRegistry = memoryCacheKeyRegistry,
+                    onMediaClick = onMediaClick
                 )
             }
             MainDestination.COLLECTIONS -> {

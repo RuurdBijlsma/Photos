@@ -4,34 +4,62 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionLayout
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.lazy.layout.LazyLayoutCacheWindow
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.semantics.hideFromAccessibility
+import androidx.compose.ui.semantics.semantics
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.ViewModelStoreOwner
 import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import dev.ruurd.photos.core.navigation.AlbumDetailRoute
+import dev.ruurd.photos.core.navigation.BackupSettingsRoute
+import dev.ruurd.photos.core.navigation.DeviceFoldersRoute
+import dev.ruurd.photos.core.navigation.MainRoute
 import dev.ruurd.photos.domain.model.AuthState
 import dev.ruurd.photos.features.auth.AuthScreen
 import dev.ruurd.photos.features.auth.AuthViewModel
 import dev.ruurd.photos.features.main.MainScreen
 import dev.ruurd.photos.features.main.MainViewModel
 import dev.ruurd.photos.features.timeline.TimelineViewModel
+import dev.ruurd.photos.features.viewer.MediaViewerScreen
+import dev.ruurd.photos.features.viewer.MediaViewerViewModel
 import dev.ruurd.photos.ui.theme.RuurdPhotosTheme
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
 
+    @OptIn(
+        ExperimentalSharedTransitionApi::class,
+        ExperimentalComposeUiApi::class,
+        ExperimentalFoundationApi::class
+    )
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -98,10 +126,103 @@ class MainActivity : ComponentActivity() {
                                     scanStateStore = container.sessionManager
                                 )
                             )
-                            MainScreen(
-                                viewModel = mainViewModel,
-                                timelineViewModel = timelineViewModel
+
+                            val navController = rememberNavController()
+                            val timelineListState = rememberLazyListState(
+                                cacheWindow = remember {
+                                    LazyLayoutCacheWindow(aheadFraction = 0.75f, behindFraction = 0.4f)
+                                }
                             )
+                            var activeViewerMediaId by rememberSaveable(state.user.id) {
+                                mutableStateOf<String?>(null)
+                            }
+                            val isViewerOpen = activeViewerMediaId != null
+
+                            SharedTransitionLayout {
+                                Box(modifier = Modifier.fillMaxSize()) {
+                                    // NavHost container (MainScreen root + pushed routes)
+                                    // Suppress accessibility and focus while viewer overlay is open
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .then(
+                                                if (isViewerOpen) {
+                                                    Modifier
+                                                        .semantics { hideFromAccessibility() }
+                                                        .focusProperties { canFocus = false }
+                                                } else {
+                                                    Modifier
+                                                }
+                                            )
+                                    ) {
+                                        NavHost(
+                                            navController = navController,
+                                            startDestination = MainRoute,
+                                            modifier = Modifier.fillMaxSize()
+                                        ) {
+                                            composable<MainRoute> {
+                                                MainScreen(
+                                                    viewModel = mainViewModel,
+                                                    timelineViewModel = timelineViewModel,
+                                                    timelineListState = timelineListState,
+                                                    memoryCacheKeyRegistry = container.memoryCacheKeyRegistry,
+                                                    onMediaClick = { mediaId ->
+                                                        activeViewerMediaId = mediaId
+                                                    }
+                                                )
+                                            }
+                                            composable<DeviceFoldersRoute> {
+                                                // Pushed destination for Phase 3
+                                            }
+                                            composable<AlbumDetailRoute> {
+                                                // Pushed destination for Phase 5
+                                            }
+                                            composable<BackupSettingsRoute> {
+                                                // Pushed destination for Phase 3
+                                            }
+                                        }
+                                    }
+
+                                    // MediaViewerScreen translucent overlay above NavHost
+                                    if (activeViewerMediaId != null) {
+                                        val viewerMediaId = activeViewerMediaId!!
+                                        val viewerViewModel: MediaViewerViewModel = viewModel(
+                                            key = "${userKey}_viewer_$viewerMediaId",
+                                            factory = MediaViewerViewModel.factory(
+                                                initialMediaId = viewerMediaId,
+                                                timelineProjectionStore = container.timelineProjectionStore,
+                                                mediaRepository = container.mediaRepository,
+                                                dispatchers = container.dispatchers
+                                            )
+                                        )
+
+                                        val timelineUiState by timelineViewModel.uiState.collectAsState()
+                                        val layout = timelineUiState.layout
+                                        val coroutineScope = rememberCoroutineScope()
+
+                                        MediaViewerScreen(
+                                            viewModel = viewerViewModel,
+                                            baseUrl = mainViewModel.uiState.collectAsState().value.serverUrl,
+                                            imageLoader = container.imageLoader,
+                                            memoryCacheKeyRegistry = container.memoryCacheKeyRegistry,
+                                            onDismiss = {
+                                                activeViewerMediaId = null
+                                            },
+                                            onPreSyncScroll = { mediaId ->
+                                                val rowIndex = layout.findRowIndexForMedia(mediaId)
+                                                if (rowIndex != null) {
+                                                    val visibleIndices = timelineListState.layoutInfo.visibleItemsInfo.map { it.index }
+                                                    if (rowIndex !in visibleIndices) {
+                                                        coroutineScope.launch {
+                                                            timelineListState.scrollToItem(rowIndex)
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
                 }

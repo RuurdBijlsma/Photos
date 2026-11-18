@@ -1,7 +1,9 @@
 package dev.ruurd.photos.core.database.entity
 
+import androidx.compose.runtime.Immutable
 import androidx.room.ColumnInfo
 
+@Immutable
 data class TimelineMediaProjection(
     @ColumnInfo(name = "id")
     val id: String,

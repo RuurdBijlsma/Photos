@@ -1,6 +1,7 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
     alias(libs.plugins.protobuf)
 }
@@ -107,9 +108,14 @@ dependencies {
     implementation(libs.coil.network.okhttp)
 
     // Kotlinx
+    implementation(libs.kotlinx.serialization.json)
     implementation(libs.kotlinx.collections.immutable)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.androidx.profileinstaller)
+
+    // Telephoto
+    implementation(libs.telephoto.zoomable.image.coil3)
+    implementation(libs.telephoto.zoomable)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

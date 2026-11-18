@@ -9,6 +9,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -76,6 +77,7 @@ import coil3.request.CachePolicy
 import coil3.request.ImageRequest
 import dev.ruurd.photos.core.database.entity.SyncStatus
 import dev.ruurd.photos.core.image.MediaStoreThumbnail
+import dev.ruurd.photos.core.image.MemoryCacheKeyRegistry
 import dev.ruurd.photos.domain.model.MonthHeaderUiItem
 import dev.ruurd.photos.domain.model.TimelineGridItemUiModel
 import dev.ruurd.photos.domain.model.TimelineLayoutIndex
@@ -108,6 +110,8 @@ fun TimelineScreen(
     isSyncing: Boolean = false,
     isBootstrapping: Boolean = false,
     pullToRefreshState: PullToRefreshState? = null,
+    memoryCacheKeyRegistry: MemoryCacheKeyRegistry? = null,
+    onMediaClick: (mediaId: String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -282,6 +286,8 @@ fun TimelineScreen(
                                 item = item,
                                 baseUrl = baseUrl,
                                 isScrubbing = isScrubbing,
+                                memoryCacheKeyRegistry = memoryCacheKeyRegistry,
+                                onMediaClick = onMediaClick,
                                 modifier = cascadeModifier
                             )
                         }
@@ -442,6 +448,8 @@ private fun TimelineRow(
     item: TimelineRowUiItem,
     baseUrl: String,
     isScrubbing: Boolean,
+    memoryCacheKeyRegistry: MemoryCacheKeyRegistry?,
+    onMediaClick: (mediaId: String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val shape = RoundedCornerShape(
@@ -469,7 +477,9 @@ private fun TimelineRow(
                     heightDp = item.heightDp,
                     thumbnailTargetHeightPx = item.thumbnailTargetHeightPx,
                     baseUrl = baseUrl,
-                    isScrubbing = isScrubbing
+                    isScrubbing = isScrubbing,
+                    memoryCacheKeyRegistry = memoryCacheKeyRegistry,
+                    onClick = { onMediaClick(gridItem.id) }
                 )
             }
         }
@@ -482,7 +492,9 @@ private fun TimelineTile(
     heightDp: Float,
     thumbnailTargetHeightPx: Int,
     baseUrl: String,
-    isScrubbing: Boolean
+    isScrubbing: Boolean,
+    memoryCacheKeyRegistry: MemoryCacheKeyRegistry?,
+    onClick: () -> Unit
 ) {
     val context = LocalContext.current
     val density = LocalDensity.current.density
@@ -531,6 +543,7 @@ private fun TimelineTile(
             .width(item.widthDp.dp)
             .height(heightDp.dp)
             .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            .clickable(onClick = onClick)
     ) {
         // Coil 3's default model equality ignores CachePolicy changes, so uncached tiles that were
         // skipped during scrubbing must re-mount once scrubbing stops.
@@ -539,7 +552,12 @@ private fun TimelineTile(
                 model = request,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
-                onSuccess = { loadState.succeeded = true },
+                onSuccess = { result ->
+                    loadState.succeeded = true
+                    result.result.memoryCacheKey?.let { key ->
+                        memoryCacheKeyRegistry?.put(item.id, key)
+                    }
+                },
                 modifier = Modifier.fillMaxSize()
             )
         }

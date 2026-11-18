@@ -20,7 +20,7 @@ object PhotosImageLoader {
             .components {
                 add(MediaStoreThumbnailFetcher.Factory())
                 add(MediaStoreThumbnailFetcher.ThumbnailKeyer())
-                add(LibavifDecoder.Factory())
+                add(LibavifDecoder.Factory(threads = 2))
                 add(
                     OkHttpNetworkFetcherFactory(
                         callFactory = { okHttpClient }

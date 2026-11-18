@@ -204,14 +204,14 @@ still photos.)*
 
 ### 2A: Navigation Shell, Photo Viewer & Dismiss Gestures (`Telephoto`)
 
-* Add `org.jetbrains.kotlin.plugin.serialization` + `kotlinx-serialization-json` (for type-safe `@Serializable` routes;
+* [✅ Done] Add `org.jetbrains.kotlin.plugin.serialization` + `kotlinx-serialization-json` (for type-safe `@Serializable` routes;
   `androidx.navigation:navigation-compose` is already in `gradle/libs.versions.toml`) and set up `NavHost` inside
   `SessionViewModelStoreHolder`: keep `MainScreen` mounted as the root destination (preserving `timelineListState`,
   tab state across `Photos`/`Collections`/`Explore`/`Search`, and `timeline_list` / `timeline_scrubber` test tags),
   with pushed routes (`DeviceFolders`, `AlbumDetail`, `BackupSettings`) and a generic `ViewerSource` contract (
   `Timeline`
   in Phase 2, reusable for `DeviceFolder` in Phase 3 and `Album` in Phase 5).
-* Host `MediaViewerScreen` in a `SharedTransitionLayout` / translucent overlay above `NavHost` rather than an opaque
+* [✅ Done] Host `MediaViewerScreen` in a `SharedTransitionLayout` / translucent overlay above `NavHost` rather than an opaque
   `NavHost` `composable` replacement so `TimelineScreen` stays live and visible underneath during shared-element
   transitions and interactive swipe-down dismiss:
     * Use `sharedElementWithCallerManagedVisibility` (or explicit bounds capture) since `MainScreen` inside `NavHost`
@@ -221,7 +221,7 @@ still photos.)*
       viewer item), and hoist a scroll-sync bridge/callback to `MainScreen`'s `timelineListState`.
     * Layer `BackHandler` precedence cleanly (`MediaInfoBottomSheet` / `DateTimeEditDialog` > `MediaViewerScreen` >
       `MainScreen` Search).
-* Share Stage 2's `ImmutableList<TimelineMediaProjection>` (with `@Immutable` on `TimelineMediaProjection`) via a hot
+* [✅ Done] Share Stage 2's `ImmutableList<TimelineMediaProjection>` (with `@Immutable` on `TimelineMediaProjection`) via a hot
   `TimelineProjectionStore` across `TimelineViewModel` and `MediaViewerViewModel`—modeled as `Loading` vs.
   `Loaded(items)` (never initialized to `persistentListOf()`) so `MediaViewerViewModel` doesn't mistake an uninitialized
   store for a deleted library—while keeping `ObserveTimelineUseCase` compatible with `MediaRepository` (preserving
@@ -232,7 +232,7 @@ still photos.)*
       date edits never jump `currentPage` to a different item.
     * Never run the Stage 1 top-2-months query in the viewer (which would miss older photos and trigger false deletions
       or page `0` jumps).
-* Integrate `me.saket.telephoto:zoomable-image-coil3` (`ZoomableAsyncImage`) with double-tap, pinch-to-zoom, and
+* [✅ Done] Integrate `me.saket.telephoto:zoomable-image-coil3` (`ZoomableAsyncImage`) with double-tap, pinch-to-zoom, and
   pan/Ultra HDR support:
     * Key the surrounding page via `HorizontalPager(key = ...)` / `key(mediaId)` (since `rememberZoomableState()` does
       not accept a `key` parameter directly), lock `HorizontalPager` (`userScrollEnabled` checks only the **active
@@ -263,7 +263,7 @@ still photos.)*
           AVIF/GIF previews with `AsyncImage` + `Modifier.zoomable(...)` (from `me.saket.telephoto:zoomable`) until
           upgrading to `ZoomableAsyncImage` on the local `content://` or `full_res_cache` `file://` URI. *(Full-res
           `/download` upgrade wires in 2B once `/item` is available.)*
-* Build viewer chrome & gestures:
+* [✅ Done] Build viewer chrome & gestures:
     * Tap to toggle floating chrome (using dark translucent scrims without `Modifier.blur` on pills, updating top bar
       title/counter text directly without `animateContentSize()` during pager drags so counter width changes don't
       cause spring relayouts mid-swipe, hiding/restoring `systemBars()` visibility and `isAppearanceLightStatusBars` /
@@ -279,7 +279,7 @@ still photos.)*
       forces synchronous `LazyColumn` composition under the drag finger), silently pre-sync `timelineListState` ~250ms
       after `settledPage` pauses if `activeMediaId` is offscreen (falling back to scale-to-center + fade + settle scroll
       sync if dismissed mid-fling before settle).
-* Verify `assembleRelease` / `assembleBenchmark` with R8 `optimization { enable = true }`, update
+* [✅ Done] Verify `assembleRelease` / `assembleBenchmark` with R8 `optimization { enable = true }`, update
   `app/src/main/keepRules/rules.keep` if `kotlinx-serialization`, `Telephoto`, or `Media3` require additional keep
   rules, benchmark `TimelineScrollBenchmark.kt` with `SharedTransitionLayout` attached, and extend
   `BaselineProfileGenerator.kt` to cover viewer open, fast swiping, zoom, and swipe-down dismiss.

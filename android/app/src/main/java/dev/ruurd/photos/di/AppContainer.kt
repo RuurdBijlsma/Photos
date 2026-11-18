@@ -9,6 +9,7 @@ import dev.ruurd.photos.core.common.DefaultAppDispatchers
 import dev.ruurd.photos.core.database.AppDatabase
 import dev.ruurd.photos.core.database.dao.DeviceFolderDao
 import dev.ruurd.photos.core.database.dao.MediaDao
+import dev.ruurd.photos.core.image.MemoryCacheKeyRegistry
 import dev.ruurd.photos.core.image.PhotosImageLoader
 import dev.ruurd.photos.core.network.NetworkMonitor
 import dev.ruurd.photos.core.network.SessionManager
@@ -21,6 +22,7 @@ import dev.ruurd.photos.data.datasource.local.MediaStoreDataSource
 import dev.ruurd.photos.data.repository.AuthRepositoryImpl
 import dev.ruurd.photos.data.repository.DeviceFolderRepositoryImpl
 import dev.ruurd.photos.data.repository.MediaRepositoryImpl
+import dev.ruurd.photos.data.repository.TimelineProjectionStore
 import dev.ruurd.photos.domain.repository.AuthRepository
 import dev.ruurd.photos.domain.repository.DeviceFolderRepository
 import dev.ruurd.photos.domain.repository.LocalMediaStore
@@ -61,6 +63,8 @@ interface AppContainer {
     val networkMonitor: NetworkMonitor
     val lanServerScanner: LanServerScanner
     val imageLoader: ImageLoader
+    val memoryCacheKeyRegistry: MemoryCacheKeyRegistry
+    val timelineProjectionStore: TimelineProjectionStore
 }
 
 class DefaultAppContainer(private val context: Context) : AppContainer {
@@ -92,6 +96,8 @@ class DefaultAppContainer(private val context: Context) : AppContainer {
                     mediaRepository.clearAll()
                     imageLoader.memoryCache?.clear()
                     imageLoader.diskCache?.clear()
+                    timelineProjectionStore.clear()
+                    memoryCacheKeyRegistry.clear()
                 }
             }
         )
@@ -221,6 +227,18 @@ class DefaultAppContainer(private val context: Context) : AppContainer {
 
     private fun isDebuggable(): Boolean =
         (context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
+
+    override val memoryCacheKeyRegistry: MemoryCacheKeyRegistry by lazy {
+        MemoryCacheKeyRegistry()
+    }
+
+    override val timelineProjectionStore: TimelineProjectionStore by lazy {
+        TimelineProjectionStore(
+            mediaRepository = mediaRepository,
+            scope = applicationScope,
+            dispatchers = dispatchers
+        )
+    }
 
     override val imageLoader: ImageLoader by lazy {
         PhotosImageLoader.create(context, okHttpClient)
