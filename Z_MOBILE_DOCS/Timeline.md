@@ -19,15 +19,14 @@ Instead, the cleanest and most performant pattern in Jetpack Compose is **a `Laz
 * In Compose, a row item is a `Row` containing photo composables with **explicit pixel-snapped `.width(item.widthDp)`
   and `.height(row.heightDp)`** (never `Modifier.weight(aspectRatio)`, which forces extra intrinsic/weighted measure
   passes).
-* Measure the timeline container width **once** at the screen level (`onSizeChanged` / outer `BoxWithConstraints`),
-  never inside `LazyColumn` items.
+* Measure the timeline container width **once** at the screen level (`onSizeChanged`), never inside `LazyColumn` items.
 * **Why this is fast:** Compose treats each row as a single virtualized element with uniform slot structure. Measurement
   overhead is virtually zero during scroll because row heights, item widths, and pixel target sizes are precomputed on
   background threads.
 
 ```
 LazyColumn (contentType = Header | PhotoRow)
-├── Item 0: MonthHeaderUiItem("October 2026")
+├── Item 0: MonthHeaderUiItem("October")
 ├── Item 1: TimelineRowUiItem(height = 180.dp, items = [PhotoA, PhotoB, PhotoC])
 ├── Item 2: TimelineRowUiItem(height = 195.dp, items = [PhotoD, PhotoE])
 └── ...
@@ -35,7 +34,7 @@ LazyColumn (contentType = Header | PhotoRow)
 
 ---
 
-#### 2. Layout Calculation Engine (`TimelineLayoutCalculator`)
+#### 2. Layout Calculation Engine (`CalculateTimelineLayoutUseCase`)
 
 Just like the web app's `calculateLayout` in `TimelineContainer.vue`, the math runs strictly off the UI thread (
 `Dispatchers.Default`) when the window width, orientation, or density changes. Because Room acts as the Single Source of
@@ -46,29 +45,33 @@ To maximize Compose skipping and avoid recompositions during scroll or backgroun
 back row item lists with `ImmutableList`:
 
 ```kotlin
+@Immutable
 sealed interface TimelineListItem {
     val id: String
+    val yearMonth: Int
     val estimatedOffsetTopDp: Float
 }
 
 @Immutable
 data class MonthHeaderUiItem(
-    override val id: String, // e.g. "header_202610"
-    val yearMonth: Int,
-    val title: String,       // Pre-formatted off main thread, e.g. "October 2026"
+    override val id: String,       // e.g. "header_202610"
+    override val yearMonth: Int,
+    val title: String,             // Pre-formatted off main thread, e.g. "October"
+    val yearLabel: String?,        // null for the current year, matching web
     override val estimatedOffsetTopDp: Float
 ) : TimelineListItem
 
 @Immutable
 data class TimelineRowUiItem(
-    override val id: String, // Stable key from first item, e.g. "row_${items.first().id}"
+    override val id: String,       // Stable key from first item, e.g. "row_${items.first().id}"
+    override val yearMonth: Int,   // Precomputed e.g. 202610
     val heightDp: Float,
     val items: ImmutableList<TimelineGridItemUiModel>,
-    val yearMonth: Int,      // Precomputed e.g. 202610
     val isFirstOfMonth: Boolean,
     val isLastOfMonth: Boolean,
-    override val estimatedOffsetTopDp: Float,
-    val thumbnailTargetHeightPx: Int // Ladder height selected in px (e.g. 240, 360, 480, 720)
+    val thumbnailTargetHeightPx: Int, // Ladder height selected in px (e.g. 240, 360, 480, 720)
+    val dateLabel: String = "",    // Pre-formatted capture date of first item ("Today", "Sat, 24 Oct")
+    override val estimatedOffsetTopDp: Float
 ) : TimelineListItem
 
 @Immutable
@@ -77,10 +80,9 @@ data class TimelineGridItemUiModel(
     val localContentUri: String?,
     val cloudId: String?,
     val isVideo: Boolean,
-    val durationMs: Int,
+    val durationLabel: String?,    // Pre-formatted duration, e.g. "0:14"
     val hasThumbnails: Boolean,
-    val widthDp: Float,      // Precomputed, pixel-snapped to prevent 1–2px right-edge gaps
-    val ratio: Float,
+    val widthDp: Float,            // Precomputed, pixel-snapped to prevent 1–2px right-edge gaps
     val syncStatus: SyncStatus
 )
 ```
@@ -91,7 +93,8 @@ never re-triggers `CalculateTimelineLayoutUseCase` across 50k items.*
 
 **Row Partitioning Algorithm:**
 
-1. Target desired row height: `180.dp` on phone portrait, `240.dp` on tablet/landscape, scaled by user zoom settings.
+1. Target desired row height: `180.dp` on phone portrait, `240.dp` on tablet/landscape (`>= 600.dp` wide), scaled by
+   user zoom settings.
 2. Accumulate items into the current row:
    $$\text{targetWidth} = \sum (\text{aspectRatio}_i \times \text{desiredHeight}) + (N - 1) \times \text{gap}$$
 3. When $\text{targetWidth} \ge \text{containerWidth}$:
@@ -113,26 +116,25 @@ never re-triggers `CalculateTimelineLayoutUseCase` across 50k items.*
 #### 3. Unifying Local MediaStore + Cloud Protobuf: Dedicated Compact Sync & Room SSOT
 
 Instead of the web app's anonymous ratio arrays and multi-stage month hydration, the mobile client uses a **Dedicated
-Compact Protobuf Sync Endpoint** (to be implemented) paired with **Room as the Single Source of Truth (SSOT)**. This
-guarantees full offline capability and instant local-to-cloud reconciliation without UI placeholders.
+Compact Protobuf Sync Endpoint** paired with **Room as the Single Source of Truth (SSOT)**. This guarantees full offline
+capability and instant local-to-cloud reconciliation without UI placeholders.
 
 **Tombstone Deletion Tracking & Backend Indexing:**
 
 * Permanent deletions are recorded in a lightweight `deleted_media_item` (tombstone, populated by an `AFTER DELETE` db
-  trigger, to be implemented) table with the purged IDs, `user_id`, and deletion timestamp. **Do not** add a foreign key
-  with `ON DELETE CASCADE` on `deleted_media_item.user_id` referencing `app_user(id)`, because deleting a user cascades
-  into `media_item` deletes whose `AFTER DELETE` trigger would try to insert rows for the deleted user (failing FK
-  checks or causing unnecessary churn). Periodically prune old tombstones (e.g., >30–90 days) and fall back to a full
-  sync if `since` is older than retention.
+  trigger) table with the purged IDs, `user_id`, and deletion timestamp. **Do not** add a foreign key with
+  `ON DELETE CASCADE` on `deleted_media_item.user_id` referencing `app_user(id)`, because deleting a user cascades into
+  `media_item` deletes whose `AFTER DELETE` trigger would try to insert rows for the deleted user (failing FK checks or
+  causing unnecessary churn). Periodically prune old tombstones (e.g., >30–90 days) and fall back to a full sync if
+  `since` is older than retention.
 * Every backend write/update to `media_item` (including metadata re-ingest and bin/restore operations) explicitly sets
   `updated_at = now()`, so no `UPDATE` trigger is needed.
-* Add a composite index on `media_item (user_id, updated_at)` on Postgres so delta sync queries (`updated_at > since`)
-  remain fast at 50k+ rows.
-* Note that `size_bytes` lives on `media_features` (`JOIN media_features mf ON mf.media_item_id = m.id`), and
-  `POST /api/upload/check-hashes` still needs to be implemented on the backend (using `media_item.hash`, which already
-  stores the full-file BLAKE3 lowercase hex digest and is indexed by `idx_media_item_user_hash`; because
-  `media_item.hash` is not `UNIQUE` on the server, `check-hashes` should return all non-deleted matching `cloud_id`s
-  per hash:
+* Composite index `media_item (user_id, updated_at)` on Postgres keeps delta sync queries (`updated_at > since`) fast
+  at 50k+ rows.
+* `size_bytes` lives on `media_features` (`JOIN media_features mf ON mf.media_item_id = mi.id`), and
+  `POST /api/upload/check-hashes` queries `media_item.hash` (which stores the full-file BLAKE3 lowercase hex digest and
+  is indexed by `idx_media_item_user_hash`; because `media_item.hash` is not `UNIQUE` on the server, `check-hashes`
+  returns all non-deleted matching `cloud_id`s per hash:
   `SELECT hash, array_agg(id ORDER BY created_at ASC) AS cloud_ids FROM media_item WHERE user_id = $1 AND deleted = false AND hash = ANY($2) GROUP BY hash`).
 
 ```
@@ -164,8 +166,6 @@ If an `IngestMetadata` transaction starts at `T = 100` (setting `updated_at = no
 ingests.
 
 ##### Sync Protocol & Data Transfer
-
-We'll have to refactor the `timeline.proto` into `common.proto`, `web.proto`, and `mobile.proto`.
 
 1. **Compact Timeline Protobuf (`mobile.proto` / `common.proto`):**
    ```protobuf
@@ -214,7 +214,7 @@ We'll have to refactor the `timeline.proto` into `common.proto`, `web.proto`, an
 3. **Fast Timeline Room Query (Denormalized Visibility + Slim Projection + Composite Index):**
     * Avoid `OR` across `media_item LEFT JOIN device_folder` in the hot timeline query—at 50k rows, SQLite falls back to
       a full-table scan and a temporary B-tree sort (`USE TEMP B-TREE FOR ORDER BY`), and `SELECT m.*` pulls unused
-      strings (`relative_path`, `bucket_name`, `file_hash`, etc.) across the `CursorWindow`.
+      strings (`relative_path`, `bucket_name`, `blake3_hash`, etc.) across the `CursorWindow`.
     * **Fix:**
         1. Store `is_visible_in_timeline: Boolean` (0/1) directly on `media_item`: `1` for all `CLOUD_ONLY` items and
            the **canonical** `SYNCED` row per `cloudId` (`0` for secondary local duplicates of the same `cloudId`);
@@ -224,11 +224,11 @@ We'll have to refactor the `timeline.proto` into `common.proto`, `web.proto`, an
            `(is_visible_in_timeline, year_month DESC, sort_timestamp DESC, id DESC)` so SQLite reads in exact timeline
            order with zero temp B-tree sort step (note: SQLite does not support PostgreSQL's `INCLUDE (...)` syntax;
            avoid bloating the index key with wide string columns like `local_content_uri`).
-        3. Query a slim `TimelineGridProjection` (`id`, `cloud_id`, `local_content_uri`, `year_month`, `ratio`,
-           `is_video`, `duration_ms`, `has_thumbnails`, `sync_status`):
+        3. Query a slim `TimelineMediaProjection`:
            ```sql
            -- Stage 1 (Viewport fast path on cold start: top 2 months)
-           SELECT id, cloud_id, local_content_uri, year_month, ratio, is_video, duration_ms, has_thumbnails, sync_status
+           SELECT id, cloud_id, local_content_uri, year_month, ratio, is_video, duration_ms,
+                  has_thumbnails, sync_status, sort_timestamp, timezone_offset_minutes
            FROM media_item
            WHERE is_visible_in_timeline = 1
              AND year_month >= COALESCE(
@@ -243,9 +243,10 @@ We'll have to refactor the `timeline.proto` into `common.proto`, `web.proto`, an
                0
              )
            ORDER BY year_month DESC, sort_timestamp DESC, id DESC;
-   
+
            -- Stage 2 (Full library layout)
-           SELECT id, cloud_id, local_content_uri, year_month, ratio, is_video, duration_ms, has_thumbnails, sync_status
+           SELECT id, cloud_id, local_content_uri, year_month, ratio, is_video, duration_ms,
+                  has_thumbnails, sync_status, sort_timestamp, timezone_offset_minutes
            FROM media_item
            WHERE is_visible_in_timeline = 1
            ORDER BY year_month DESC, sort_timestamp DESC, id DESC;
@@ -254,10 +255,13 @@ We'll have to refactor the `timeline.proto` into `common.proto`, `web.proto`, an
            backend—so cross-timezone travel around midnight on the 1st of a month never splits a month header into two
            sections.
 4. **Local Folder Scope & Google Photos-Style "On This Device" Filtering:**
-    * **Scan everything, filter via `is_visible_in_timeline`:** `LocalMediaScanner` queries **all** non-pending,
+    * **Scan everything, filter via `is_visible_in_timeline`:** `ScanLocalMediaUseCase` queries **all** non-pending,
       non-trashed `MediaStore` images and videos (`IS_PENDING = 0 AND IS_TRASHED = 0 AND SIZE > 0`) and records
-      `bucketId`, `bucketName`, and `relativePath` on `MediaEntity`. A lightweight `device_folder` Room table
-      (`bucket_id`, `display_name`, `relative_path`, `show_in_timeline`, `backup_enabled`) stores folder preferences.
+      `bucketId`, `bucketName`, and `relativePath` on `MediaEntity`. On subsequent scans, `ScanWatermark` (keyed by
+      `(dbVersion, mediaStoreVersion, access, zoneId, generation)`) skips unchanged scans completely or queries only
+      rows with `GENERATION_MODIFIED > lastGeneration` plus a slim URI set diff for deletions. A lightweight
+      `device_folder` Room table (`bucket_id`, `display_name`, `relative_path`, `show_in_timeline`, `backup_enabled`)
+      stores folder preferences.
     * **Default folder rules (on first discovery of a `bucketId`):**
         * **Camera folders (`showInTimeline = true`, `backupEnabled = true`):**
           `relativePath.startsWith("DCIM/", ignoreCase = true)` **excluding** screenshot/screen-recording folders
@@ -294,7 +298,7 @@ We'll have to refactor the `timeline.proto` into `common.proto`, `web.proto`, an
 6. **Room Invalidation & Coalescing:**
     * Always wrap sync and `MediaStore` batch updates in a single Room `@Transaction` (`withTransaction { ... }`) so
       Room emits one `Flow` invalidation per batch rather than per row.
-    * Apply `.debounce(150)` on background Room timeline `Flow` emissions (after the initial Stage 1/Stage 2 emission)
+    * Apply `.debounce(150)` on background Room timeline `Flow` emissions (after the initial Stage 1 emission)
       so overlapping `MediaStore` scans and sync batches coalesce into a single `CalculateTimelineLayoutUseCase` pass.
 
 ##### Two-Pass Local/Cloud Deduplication Strategy
@@ -310,7 +314,7 @@ To prevent cold-start battery drain and disk thrashing, **the mobile app never h
       **Swap `WIDTH` and `HEIGHT` when `ORIENTATION` is `90` or `270`** (backend `media_item` dimensions are already
       orientation-adjusted; `MediaStore` often reports raw sensor dimensions), and guard against `width <= 0` or
       `height <= 0` (falling back to `1f` so malformed metadata never produces `NaN`/`Infinity` aspect ratios).
-    * Index `size_bytes` in Room (`@Index(value = ["sizeBytes"])`) and query `CLOUD_ONLY` candidates by exact byte size:
+    * Index `size_bytes` in Room (`@Index(value = ["size_bytes"])`) and query `CLOUD_ONLY` candidates by exact byte size:
       ```sql
       SELECT * FROM media_item
       WHERE size_bytes = :localFileSize
@@ -338,11 +342,10 @@ To prevent cold-start battery drain and disk thrashing, **the mobile app never h
       rare cases where `size_bytes` + `ratio` matched a `CLOUD_ONLY` item whose timestamp differed by >24h due to a web
       date edit or missing `DATE_TAKEN`), the BLAKE3 hash (lowercase hex) is calculated **only when staged for backup**
       (or lazily for those rare size-collision candidates), matching `media_item.hash` on the backend.
-    * Before streaming bytes, a pre-upload check (`POST /api/upload/check-hashes`, to be implemented on the backend)
-      queries the backend with the BLAKE3 hash and receives all non-deleted matching `cloud_id`s (`cloud_ids`). If
-      non-empty, the upload is skipped, and Room prefers merging into an unlinked `CLOUD_ONLY` row matching one of the
-      returned `cloud_ids` or otherwise links the local row to the first `cloud_id` as `SYNCED` (respecting the
-      canonical visibility rule below).
+    * Before streaming bytes, a pre-upload check (`POST /api/upload/check-hashes`) queries the backend with the BLAKE3
+      hash and receives all non-deleted matching `cloud_id`s (`cloud_ids`). If non-empty, the upload is skipped, and Room
+      prefers merging into an unlinked `CLOUD_ONLY` row matching one of the returned `cloud_ids` or otherwise links the
+      local row to the first `cloud_id` as `SYNCED` (respecting the canonical visibility rule below).
 
 ##### TIPS
 
@@ -357,8 +360,8 @@ Keep a **single `media_item` table** (preserving the fast composite-index query 
 * An immutable surrogate primary key `id` (e.g., `"local_<mediaStoreId>"` for local rows, `"cloud_<cloudId>"` for
   `CLOUD_ONLY` rows) so Compose keys and `ORDER BY year_month DESC, sort_timestamp DESC, id DESC` tie-breakers never
   jump during status transitions.
-* `@Index(value = ["localContentUri"], unique = true)` — one row per local file URI.
-* `@Index(value = ["cloudId"], unique = false)` — **non-unique** so secondary local copies (e.g., the same photo in
+* `@Index(value = ["local_content_uri"], unique = true)` — one row per local file URI.
+* `@Index(value = ["cloud_id"], unique = false)` — **non-unique** so secondary local copies (e.g., the same photo in
   `DCIM/Camera/` and `Download/`) resolved via Pass 2 `check-hashes` can also store `cloudId` and `syncStatus = SYNCED`
   without throwing `SQLiteConstraintException`, preventing infinite re-hash/re-upload loops while letting
   `DeviceFoldersScreen` and `"Free up space"` recognize all local copies as backed up.
@@ -392,8 +395,9 @@ Handle all state transitions inside Room `@Transaction`s:
           hidden from main timeline, still visible in its `DeviceFolder` and eligible for `"Free up space"`).
         * If `false`, link `cloudId`, set `syncStatus = SYNCED`, and set `is_visible_in_timeline = 1`.
 3. **Server updates a cloud item (`SyncTimelineUseCase`):**
-   `UPDATE media_item SET has_thumbnails = ..., sort_timestamp = ..., timezone_offset_minutes = ..., year_month = ... WHERE cloud_id = :cloudId`
-   (updates the canonical row and any linked secondary copies).
+   Update `has_thumbnails`, `sort_timestamp`, `timezone_offset_minutes`, `year_month`, `ratio`, `is_video`, `duration_ms`,
+   and `size_bytes` across all rows matching `cloud_id = :cloudId` (updates the canonical row and any linked secondary
+   copies).
 4. **Cloud item deleted (`deleted_ids` or full-snapshot `staleCloudIds` contains `a1B2c3D4e5`, or user selects "Delete
    from Server"):**
    Do **not** blindly `DELETE FROM media_item WHERE cloud_id IN (:deletedIds)`! For every row
@@ -443,14 +447,14 @@ Handle all state transitions inside Room `@Transaction`s:
   Raise OkHttp's `dispatcher.maxRequestsPerHost` from the default `5` to `12–16` so visible cloud thumbnails load in
   parallel rather than queuing in batches of 5 (`/thumbnails` is static and not rate-limited by `auth_public_router`).
 * **Dynamic Server URL & API 37 Cleartext Policy:**
-  Since `AuthScreen` lets the user input a server URL, don't hardcode Retrofit's `baseUrl` at DI graph creation time.
-  Either swap/recreate the Retrofit instance on URL change or rewrite `request.url` in an OkHttp interceptor from the
-  persisted server URL. Because Android 17 (API 37) deprecates `android:usesCleartextTraffic`, add an explicit
-  `network_security_config.xml` (or debug-only config) if testing against `http://10.0.2.2:5272` or LAN HTTP.
+  Since `AuthScreen` lets the user input a server URL, rewrite `request.url` in `DynamicBaseUrlInterceptor` from the
+  persisted server URL rather than hardcoding Retrofit's `baseUrl`. Because Android 17 (API 37) deprecates
+  `android:usesCleartextTraffic`, keep an explicit `network_security_config.xml` for local `http://` LAN/emulator dev
+  testing.
 * **Connectivity & Sync Status Indicator (`NetworkMonitor`):**
-  Observe connectivity via `ConnectivityManager.NetworkCallback` alongside a `SyncState` (`Idle`, `Syncing`, `Offline`,
-  `ServerUnreachable`). Do not surface transient network errors as fatal errors when offline; display a subtle status
-  indicator in the UI instead, since local Room + `MediaStore` items remain fully browsable offline.
+  Observe connectivity via `ConnectivityManager.NetworkCallback` alongside a `SyncState` (`IDLE`, `SYNCING`, `OFFLINE`,
+  `SERVER_UNREACHABLE`, `ERROR`). Do not surface transient network errors as fatal errors when offline; display a
+  subtle status indicator in the UI instead, since local Room + `MediaStore` items remain fully browsable offline.
 
 ##### Non-Initial App Launch Flow (Optimized for LCP):
 
@@ -459,13 +463,13 @@ Handle all state transitions inside Room `@Transaction`s:
   `LazyColumn` renders the first screenful and Coil starts decoding visible thumbnails right away—never block launch on
   `/api/auth/me` or network sync.
 * **T + ~20ms (Stage 2 — Full Timeline):** Read the slim projection for the full library from Room, partition all rows +
-  build `TimelineLayoutIndex` on `Dispatchers.Default`, and emit. Because Stage 1 ended on a clean `year_month`
-  boundary, the visible rows remain identical with zero layout jump.
-* **T + 50ms:** `MediaStore` scan reconciles new (and, when full permissions are granted, deleted) local photos across
-  all folders via the zero-hash fast pass and registers any newly seen `bucketId`s in `device_folder` with default
-  visibility/backup flags.
-* **T + 150ms:** Background delta sync calls `GET /api/timeline/sync?since=...` (if online). Any cloud changes
-  are committed to Room in a single transaction, triggering a debounced layout update.
+  build `TimelineLayoutIndex` on `Dispatchers.Default`, and emit (debounced after Stage 1). Because Stage 1 ended on a
+  clean `year_month` boundary, the visible rows remain identical with zero layout jump.
+* **T + ~150ms:** Background delta sync calls `GET /api/timeline/sync?since=...` (if online). Any cloud changes are
+  committed to Room in a single transaction, triggering a debounced layout update.
+* **T + 500ms (`STARTUP_SCAN_DELAY_MS` on bootstrapped launches):** `MediaStore` scan reconciles new (and, when full
+  permissions are granted, deleted) local photos via `ScanWatermark` (skipping unchanged generations or running an
+  incremental `GENERATION_MODIFIED` scan) without competing with the first rendered frame and initial thumbnail decodes.
 
 ---
 
@@ -474,17 +478,22 @@ Handle all state transitions inside Room `@Transaction`s:
 Because each row has a slightly different height, native scroll thumbs can jitter. Solve this with a **Layout Index**:
 
 ```kotlin
+@Immutable
 class TimelineLayoutIndex(
-    val rows: List<TimelineListItem>,
-    val totalHeightDp: Float,
-    val monthOffsets: Map<Int, Int>, // yearMonth (e.g. 202610) -> LazyColumn item index
-    val itemOffsets: Map<String, Int> // mediaId -> LazyColumn item index
+    val rows: ImmutableList<TimelineListItem> = persistentListOf(),
+    val totalHeightDp: Float = 0f,
+    val headerHeightDp: Float = 0f,
+    val monthOffsets: Map<Int, Int> = emptyMap(), // yearMonth (e.g. 202610) -> LazyColumn item index
+    val monthLabels: Map<Int, String> = emptyMap(),
+    val itemOffsets: Map<String, Int> = emptyMap(), // mediaId -> LazyColumn item index
+    val yearFractions: ImmutableList<TimelineYearMark> = persistentListOf()
 ) {
-    fun findRowIndexAtPercentage(fraction: Float): Int {
-        val targetOffset = fraction * totalHeightDp
+    fun findRowIndexAtPercentage(fraction: Float): Int =
+        findRowIndexAtOffsetDp(fraction.coerceIn(0f, 1f) * totalHeightDp)
+
+    fun findRowIndexAtOffsetDp(offsetDp: Float): Int {
         // Binary search rows and headers by estimatedOffsetTopDp: O(log N)
-        val idx = rows.binarySearchBy(targetOffset) { it.estimatedOffsetTopDp }
-        return if (idx < 0) (-idx - 1).coerceIn(0, rows.lastIndex) else idx
+        ...
     }
 
     fun findIndexForDate(yearMonth: Int): Int = monthOffsets[yearMonth] ?: 0
@@ -495,22 +504,22 @@ class TimelineLayoutIndex(
 
 **Fast-Scrubbing FPS, Viewer Sync & Gesture Rules:**
 
-* **Instant jumps & smooth thumb tracking:** Always use `lazyListState.scrollToItem(index)` while dragging the
-  `TimelineScrubber`—never `animateScrollToItem`. When the user scrolls the `LazyColumn` normally, compute the scrubber
-  thumb fraction from `rows[lazyListState.firstVisibleItemIndex].estimatedOffsetTopDp / totalHeightDp` rather than
-  `firstVisibleItemIndex / rows.size` so variable row heights don't make the thumb jitter.
+* **Instant jumps & smooth thumb tracking:** Always use `lazyListState.requestScrollToItem(index, withinRowOffsetPx)`
+  while dragging the `TimelineScrubber`—never `animateScrollToItem`. When the user scrolls the `LazyColumn` normally,
+  compute the scrubber thumb fraction from `(rows[firstVisibleItemIndex].estimatedOffsetTopDp + itemScrollDp) / maxScrollDp`
+  rather than `firstVisibleItemIndex / rows.size` so variable row heights don't make the thumb jitter.
 * **Image request gating while scrubbing (`isScrubbing`):** Mirroring `isScrollingFast` in `TimelineContainer.vue`,
-  while the user is actively dragging the scrubber rapidly, skip mounting new network/full-decode `AsyncImage` requests
-  (or restrict Coil to `memoryCache`/`diskCache` reads only) and resume full loading once scrubbing pauses (~60ms) or
-  lifts. This prevents transient rows from flooding OkHttp and `ImageDecoder` with dozens of cancelled requests per
-  second.
+  while the user is actively dragging the scrubber rapidly, restrict Coil to `memoryCache`/`diskCache` `READ_ONLY`
+  (with `networkCachePolicy(CachePolicy.DISABLED)`) and resume full loading once scrubbing pauses (~80ms) or lifts.
+  This prevents transient rows from flooding OkHttp, `MediaStore`, and `LibavifDecoder` with dozens of cancelled
+  requests per second.
 * **Viewer-to-Timeline Scroll Sync (on dismiss):** Do **not** scroll `TimelineScreen`'s `LazyColumn` on every swipe
   while `MediaViewerScreen` is fullscreen (which would force offscreen grid composition and thumbnail fetches behind the
-  viewer). Instead, track the active `mediaId` in the viewer and, **when dismissing back to `TimelineScreen`**, check
-  whether `layoutIndex.findRowIndexForMedia(mediaId)` is outside `listState.layoutInfo.visibleItemsInfo` and jump via
-  `listState.scrollToItem(index)` so the user always lands on the item they were viewing.
+  viewer). Instead, track the active `mediaId` in the viewer and, when dismissing back to `TimelineScreen`, check
+  whether `layoutIndex.findRowIndexForMedia(mediaId)` is outside `listState.layoutInfo.visibleItemsInfo`. If it is
+  offscreen when swipe-down dismiss begins, either jump via `listState.scrollToItem(index)` right as the dismiss starts
+  (so shared-element bounds exist) or fall back to a scale-to-center + fade dismiss and jump `listState.scrollToItem(index)`
+  as dismiss settles.
 * **Edge-to-edge & gesture navigation safety (API 37):** Apply `Modifier.systemGestureExclusion()` on the right-edge
   scrubber handle so vertical scrubbing doesn't trigger Android's predictive back gesture, and pass
   `WindowInsets.statusBars` / `navigationBars` into `LazyColumn` `contentPadding` and scrubber vertical bounds.
-
----

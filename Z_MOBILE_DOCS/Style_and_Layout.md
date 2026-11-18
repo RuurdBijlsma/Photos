@@ -1,6 +1,7 @@
 ## Purpose
 
-Visual and interaction style guide for the native Android app (Jetpack Compose + Material 3, Android 17 / API 37+).
+Visual and interaction style guide for the native Android app (Jetpack Compose + Material 3, Android 15+ / API 35+,
+`targetSdk = 37`).
 
 The goal is to preserve the distinctive identity of the mobile web UI—**large concentric border radii, month-rounded
 photo blocks, and the floating pill navigation bar with a detached Search button**—while adapting surfaces, motion, and
@@ -87,9 +88,8 @@ fun concentricRadius(outer: Dp, padding: Dp, min: Dp = 8.dp): Dp =
 * **General UI (Opaque by Default):** Keep navigation bars, cards, sheets, and dialogs **opaque** using Material 3 tonal
   hierarchy (`surfaceContainerLow` → `surfaceContainerHigh`) plus soft ambient shadow where floating. Avoid full-screen
   or nav-bar backdrop blur so the app looks crisp, native, and avoids GPU overdraw.
-* **Media Viewer Floating Pills (Selective Blur):** Inside `MediaViewerScreen`, floating pill action buttons/bars (
-  mirroring the web viewer) may use a subtle `RenderEffect` backdrop blur over dark translucent scrims (
-  `Color.Black.copy(alpha = 0.45f)`), with a slightly higher-opacity dark fallback if needed.
+* **Media Viewer Floating Pills:** Inside `MediaViewerScreen`, use crisp dark translucent scrims
+  (`Color.Black.copy(alpha = 0.45f)`–`0.6f`) with subtle borders for floating pill action bars.
 
 ---
 
@@ -99,8 +99,10 @@ fun concentricRadius(outer: Dp, padding: Dp, min: Dp = 8.dp): Dp =
   `SharedTransitionLayout` / translucent overlay above `NavHost` rather than an opaque `NavHost` `composable`
   destination (which hides/unmounts the previous destination once entered). Tapping a photo/video in the timeline grid
   transitions via shared-bounds / container transform into `MediaViewerScreen`, and dragging down interactively shrinks
-  the viewer over the live, visible timeline behind it (syncing timeline scroll position on dismiss if the user swiped
-  to a different item in the viewer).
+  the viewer over the live, visible timeline behind it. If the user swipes to a different item that is currently
+  offscreen in `TimelineScreen`'s `LazyColumn`, either jump `listState.scrollToItem(index)` as swipe-down dismiss begins
+  so shared-element bounds exist, or fall back to a scale-to-center + fade dismiss and sync `TimelineScreen`'s scroll
+  position when dismiss settles.
 * **Spring Physics:** Use snappy, natural Material 3 Expressive springs (avoid sluggish linear/ease curves):
     * Spatial changes (shared photo bounds, bottom sheet expand, viewer swipe-to-dismiss): lightly damped spring (
       `DampingRatioNoBouncy` or very slight `0.85f` with `StiffnessMediumLow` / `StiffnessMedium`).
@@ -108,7 +110,7 @@ fun concentricRadius(outer: Dp, padding: Dp, min: Dp = 8.dp): Dp =
       minimal overshoot).
 * **Restrained Haptics:** Use `LocalHapticFeedback` sparingly on meaningful tactile moments only:
     * **Long-press to enter drag-select** on the timeline grid (`LongPress`).
-    * **Year boundary crossings** while dragging the right-edge `TimelineScrubber` (`TextHandleMove` / clock tick—at
+    * **Year boundary crossings** while dragging the right-edge `TimelineScrubber` (`ContextClick` / tick at
       **year** granularity, not every month, to avoid buzz fatigue).
 
 ---
@@ -117,40 +119,40 @@ fun concentricRadius(outer: Dp, padding: Dp, min: Dp = 8.dp): Dp =
 
 ### 6.1 Top App Bar, Connectivity Pill & Avatar Menu
 
-* **Layout:** Edge-to-edge transparent/surface-matching header sitting above the timeline content:
-    * **Left:** Colorful flower-petal Ruurd Photos logo mark (`~32.dp`).
-    * **Center:** **Connectivity / Sync Status Pill** (`CircleShape`, compact height `~28.dp`–`32.dp`). Shown subtly
-      when state is `Offline`, `Connecting...`, `Syncing...`, or actively backing up; hidden when idle/up-to-date so the
+* **Layout:** Edge-to-edge header sitting above the timeline content (with a subtle gradient scrim under the status bar
+  when scrolled away):
+    * **Left:** Colorful flower-petal Ruurd Photos logo mark (`32.dp`, rotates with pull-to-refresh and active sync).
+    * **Center:** **Connectivity / Sync Status Pill** (`CircleShape`, height `30.dp`). Shown when pulling to refresh or
+      when state is `Offline`, `Syncing...`, `Server unreachable`, or `Sync failed`; hidden when idle/up-to-date so the
       header stays clean.
-    * **Right:** Circular **User Avatar** (`~36.dp`–`40.dp`, `primaryContainer` background with user initial `"R"` or
-      profile photo).
-* **Scroll Behavior:** The top bar **scrolls away / collapses on scroll down** (`enterAlwaysScrollBehavior` or
-  sticky-release header), letting the photo timeline flow cleanly beneath the status bar.
-* **Avatar Menu:** Tapping the avatar opens a `28.dp`–`32.dp` rounded modal bottom sheet hosting:
-    * User profile & server URL / connection status
-    * Backup status & **Device Folders ("On this device")**
-    * **Free up space**
-    * **Backup Settings**, **App Settings** (theme, grid density), **Trash / Bin** (when implemented)
+    * **Right:** Circular **User Avatar** (`38.dp`, `primaryContainer` background with user initial `"R"` or profile
+      photo).
+* **Scroll Behavior:** The top bar collapses/slides away on scroll down and returns on scroll up, letting the photo
+  timeline flow cleanly beneath the status bar scrim.
+* **Avatar Menu:** Tapping the avatar opens a `30.dp` top-rounded modal bottom sheet hosting:
+    * User profile & server URL / connection status + manual `Sync Library Now` & `Sign Out`
+    * Backup status & **Device Folders ("On this device")** *(Phase 3)*
+    * **Free up space** *(Phase 4)*
+    * **Backup Settings**, **App Settings** (theme, grid density), **Trash / Bin** *(when implemented)*
 
 ### 6.2 Floating Bottom Navigation Bar + Detached Search Button
 
-* **Visibility:** Always anchored at the bottom above `WindowInsets.navigationBars` (with ~`16.dp` bottom/horizontal
-  margin). **Does not hide on scroll down.** List content scrolls behind it (add bottom `contentPadding` to lists so the
-  final row can scroll above the bar).
+* **Visibility:** Always anchored at the bottom above `WindowInsets.navigationBars` (with ~`12.dp`–`16.dp` margin).
+  **Does not hide on scroll down.** List content scrolls behind it (add bottom `contentPadding` to lists so the final row
+  can scroll above the bar).
 * **Main Nav Pill:**
     * Shape: `CircleShape` (stadium pill), opaque `surfaceContainerHigh` with subtle tonal elevation/shadow (`6.dp`–
       `8.dp`).
-    * **Phase 1 Destinations:** `Photos` | `Collections` | `Explore` (unimplemented pages can render clean
-      empty/placeholder screens).
+    * **Phase 1 Destinations:** `Photos` | `Collections` | `Explore` (unimplemented pages render clean placeholder
+      screens).
     * **Tab Styling (Web Parity):**
-        * **Active tab:** Nested concentric `CircleShape` pill (`secondaryContainer` fill) containing **Icon + Text
-          label** (`onSecondaryContainer`).
+        * **Active tab:** Nested concentric `CircleShape` pill (`primaryContainer` fill) containing **Icon + Text label**
+          (`onPrimaryContainer`).
         * **Inactive tabs:** **Text label only** (`onSurfaceVariant`), no icon—preserving the clean, airy proportions of
           the screenshot.
 * **Detached Search Button:**
-    * Shape: `CircleShape`, matching the height of the floating nav pill (`~56.dp`–`64.dp`), opaque
-      `surfaceContainerHigh` (or `primaryContainer` / tonal match) with a search magnifying-glass icon, spaced `8.dp`–
-      `12.dp` to the right of the nav pill.
+    * Shape: `CircleShape`, matching the height of the floating nav pill (`56.dp`), opaque `surfaceContainerHigh` with a
+      search magnifying-glass icon, spaced `10.dp` to the right of the nav pill.
     * **Route Rule:** When navigating into `/search`, the detached Search icon-button **disappears** (animated
       scale/fade out).
 
@@ -168,9 +170,9 @@ fun concentricRadius(outer: Dp, padding: Dp, min: Dp = 8.dp): Dp =
 ### 6.4 Timeline Grid, Month Grouping & Tile Overlays
 
 * **Month Headers:**
-    * Padded generously (`horizontal = 24.dp`, `top = 20.dp`, `bottom = 12.dp`–`16.dp`).
-    * Month name in **Montserrat SemiBold**; if `year != currentYear`, show the year beside it with `16.dp`–`20.dp`
-      spacing in muted `onSurface.copy(alpha = 0.7f)`.
+    * Padded generously (`horizontal = 24.dp`, `top = 16.dp`, `bottom = 10.dp`).
+    * Month name in **Montserrat SemiBold**; if `year != currentYear`, show the year beside it with `16.dp` spacing in
+      muted `onSurface.copy(alpha = 0.7f)`.
 * **Justified Rows & Month-Block Clipping (Web `VirtualRow.vue` Parity):**
     * `2.dp` horizontal and vertical gaps between items/rows (`ITEM_GAP = 2.dp`).
     * **No corner rounding (`0.dp`) on inner photo/video tiles.**
@@ -180,12 +182,12 @@ fun concentricRadius(outer: Dp, padding: Dp, min: Dp = 8.dp): Dp =
         * Single-row month: all four outer corners clipped to `24.dp`.
 * **Tile Corner Overlays (Restrained Photo Wall):**
     * **Top-Right — Video Indicator:** Dark translucent pill (`Color.Black.copy(alpha = 0.6f)`, `6.dp` radius,
-      `horizontal = 6.dp, vertical = 2.dp` padding) with duration text (`0:14`) + play icon (`14.dp`–`16.dp`) in white.
+      `horizontal = 6.dp, vertical = 2.dp` padding) with duration text (`0:14`) + play icon (`12.dp`) in white.
     * **Bottom-Right — Sync Status Badge:** Keep normal browsing clean:
         * `SYNCED`: **No badge** (normal state).
         * `CLOUD_ONLY`: **No badge** (normal state).
         * `LOCAL_ONLY` (not backed up): Subtle compact icon (`cloud_off` / device-only indicator inside a small soft
-          dark/tonal pill).
+          dark pill).
         * `UPLOADING` / `SYNCING`: Small circular progress ring (`16.dp`–`18.dp`).
         * `FAILED`: Compact warning/retry icon in `error`.
     * **Top-Left — Selection Checkmark:** Visible during selection mode (empty circle outline when unselected; filled
@@ -196,13 +198,17 @@ fun concentricRadius(outer: Dp, padding: Dp, min: Dp = 8.dp): Dp =
 
 * Positioned on the right edge with `Modifier.systemGestureExclusion()` so dragging never triggers Android predictive
   back.
-* Vertical track (`4.dp`–`6.dp` subtle pill track) with a draggable `primary` pill thumb (`CircleShape`).
-* While dragging or actively scrolling fast:
-    * Show subtle **year labels** along the track (pill tags on the left of the track).
-    * Show a floating **Montserrat pill tooltip** (`"Nov 2026"`, `primary` container, `CircleShape` or asymmetric
+* Touch strip stays active along the right edge while the visual **`52.dp` circular `surfaceContainerHigh` thumb** (with
+  `UnfoldMore` icon, overhanging ~33% past the right screen edge) slides in smoothly while scrolling/dragging and hides
+  after `1.5s` of inactivity.
+* While dragging:
+    * Show **year pills** (`surfaceContainerHighest`, active year highlighted in `primary`) left of the thumb so the
+      finger never obscures them, always prioritizing the newest and oldest year marks.
+    * Show the floating **Montserrat month tooltip** (`"Nov 2026"`, `primaryContainer`, asymmetric
       `RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp, topEnd = 4.dp, bottomEnd = 4.dp)` matching web)
       anchored to the user's touch Y.
-    * Trigger subtle haptic tick when crossing **year** boundaries.
+    * Trigger subtle haptic tick on drag start (`SegmentFrequentTick`) and when crossing **year** boundaries
+      (`ContextClick`).
 
 ### 6.6 Multi-Selection Mode
 
@@ -215,33 +221,34 @@ fun concentricRadius(outer: Dp, padding: Dp, min: Dp = 8.dp): Dp =
 
 * **Canvas:** `#000000` background at rest (fading backdrop opacity on swipe-down so `TimelineScreen` shows underneath),
   full edge-to-edge behind translucent system bars (forcing light status/nav bar icons with
-  `isAppearanceLightStatusBars = false` even in light mode, hiding system bars when chrome is toggled off, and
-  restoring both on exit).
+  `isAppearanceLightStatusBars = false` and `isAppearanceLightNavigationBars = false` even in light mode, hiding
+  system bars when chrome is toggled off, and restoring both on exit inside `DisposableEffect`).
 * **Top Floating Bar & Overflow Menu:**
     * Compact `CircleShape` `Back` pill, title/date/counter pill, and top-right `⋮` overflow menu button using dark
-      translucent scrims (`Color.Black.copy(alpha = 0.45f)`) with optional subtle `RenderEffect` backdrop blur on API
-        37.
+      translucent scrims (`Color.Black.copy(alpha = 0.45f)`–`0.6f`).
     * **Top-right overflow menu items:** `About` (fallback trigger for the info sheet), `Copy` (photos only; hidden on
-      videos), `Rotate clockwise` (photos only; hidden on videos, panoramas, missing items, and unsupported MIME types),
-      `Reprocess`, plus video-only `Playback speed` (opens speed selector UI) and `Loop video` toggle.
+      videos and missing items), `Rotate clockwise` (photos only; hidden on videos, panoramas, missing items, and
+      unsupported MIME types), `Reprocess`, plus video-only `Playback speed` (opens speed selector UI) and `Loop video`
+      toggle.
 * **Bottom Floating Pill:**
     * Compact `CircleShape` pill hosting **Share**, **Add to** (album), and **Bin**—no Info button in the bottom pill
       (Info is accessed via swipe-up or `About` in the top-right menu).
     * For videos, floating playback controls (seek bar, play/pause, mute, quality selector) sit cleanly above the bottom
-      action pill and fade together on tap. Video rendering uses `ContentFrame` + `rememberPresentationState(player)` with
-      `SURFACE_TYPE_TEXTURE_VIEW` so scale/clip/translation transforms animate cleanly and the thumbnail shutter stays
-      visible until the first frame renders.
+      action pill and fade together on tap. Video rendering uses `ContentFrame` +
+      `rememberPresentationState(player, keepContentOnReset = true)` with `SURFACE_TYPE_TEXTURE_VIEW` so
+      scale/clip/translation transforms animate cleanly and the thumbnail shutter stays visible until the first frame
+      renders.
 * **Gestures:**
     * Swipe horizontally (`HorizontalPager`) between items; paging is locked (`userScrollEnabled = false`) while the
       active page is zoomed in.
     * Pinch / double-tap to zoom (`Telephoto`).
-    * Tap photo/video to toggle chrome visibility smoothly.
+    * Tap photo/video to toggle chrome visibility smoothly (wired via `ZoomableAsyncImage`'s `onClick`).
     * **Swipe down** (single-pointer, unzoomed `(zoomableState.zoomFraction ?: 0f) <= 0.01f`, `|dy| > |dx|`) to
       interactively drag/shrink over the visible timeline and dismiss (syncing timeline scroll on dismiss if needed).
     * **Swipe up** (single-pointer, unzoomed `(zoomableState.zoomFraction ?: 0f) <= 0.01f`, `|dy| > |dx|`) to reveal
-      the **Media Info Sheet** (`28.dp`–`32.dp` top-rounded dark `surfaceContainerHigh` modal sheet showing capture
-      date/time in Roboto/Montserrat, weather summary, camera/lens/exposure pills, albums list, and a location card with
-      resolved place name + coordinates + `"Open in Maps"` action—embedded mini-map deferred until MapLibre is added).
+      the **Media Info Sheet** (`30.dp` top-rounded dark `surfaceContainerHigh` modal sheet showing capture date/time in
+      Roboto/Montserrat, weather summary, camera/lens/exposure pills, albums list, and a location card with resolved
+      place name + coordinates + `"Open in Maps"` action—embedded mini-map deferred until MapLibre is added).
 
 ---
 
