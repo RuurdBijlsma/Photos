@@ -413,7 +413,8 @@ fun MediaViewerScreen(
                             uri = localUri,
                             cloudId = neighbor.cloudId,
                             cloudFallbackUrl = fallbackUrl,
-                            isVideo = neighbor.isVideo
+                            isVideo = neighbor.isVideo,
+                            bypassPlatformThumbnail = !neighbor.isVideo
                         )
                         else -> fallbackUrl
                     }
@@ -831,7 +832,8 @@ private fun HeroImageOverlay(
                 uri = localUri,
                 cloudId = item.cloudId,
                 cloudFallbackUrl = cloudUrl,
-                isVideo = item.isVideo
+                isVideo = item.isVideo,
+                bypassPlatformThumbnail = !item.isVideo
             )
         } else {
             cloudUrl

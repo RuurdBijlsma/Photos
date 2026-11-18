@@ -29,18 +29,20 @@ import java.io.IOException
 import kotlin.coroutines.coroutineContext
 
 /**
- * Grid-only wrapper around a `MediaStore` URI. Using a dedicated type keeps the fast
- * [android.content.ContentResolver.loadThumbnail] path scoped to timeline tiles: the media viewer
- * keeps passing the raw `Uri` so Coil subsamples the full-resolution file for pinch-to-zoom.
+ * Thumbnail wrapper around a `MediaStore` URI. Using a dedicated type keeps grid thumbnail loading
+ * separate from Telephoto's raw `Uri` subsampling pipeline.
  *
  * @param cloudFallbackUrl thumbnail to use when the local URI grant is gone or the local file is missing.
+ * @param bypassPlatformThumbnail skips `ContentResolver.loadThumbnail` (used for viewer still-photo
+ * previews so `MediaProvider` cached/EXIF thumbnails never mismatch the primary image crop or quality).
  */
 @Immutable
 data class MediaStoreThumbnail(
     val uri: Uri,
     val cloudId: String? = null,
     val cloudFallbackUrl: String? = null,
-    val isVideo: Boolean = false
+    val isVideo: Boolean = false,
+    val bypassPlatformThumbnail: Boolean = false
 )
 
 class MediaStoreThumbnailFetcher(
@@ -58,6 +60,10 @@ class MediaStoreThumbnailFetcher(
             options.diskCachePolicy == CachePolicy.DISABLED
         ) {
             return null
+        }
+
+        if (data.bypassPlatformThumbnail && !data.isVideo) {
+            return fetchLocalFallbackOrCloud()
         }
 
         return try {
@@ -173,7 +179,8 @@ class MediaStoreThumbnailFetcher(
         override fun key(data: MediaStoreThumbnail, options: Options): String {
             val width = (options.size.width as? Dimension.Pixels)?.px ?: DEFAULT_SIZE_PX
             val height = (options.size.height as? Dimension.Pixels)?.px ?: DEFAULT_SIZE_PX
-            return "mediastore:${data.uri}?size=${width}x${height}"
+            val prefix = if (data.bypassPlatformThumbnail && !data.isVideo) "mediastore_full" else "mediastore"
+            return "$prefix:${data.uri}?size=${width}x${height}"
         }
     }
 

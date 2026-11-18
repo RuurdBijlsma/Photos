@@ -26,6 +26,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -77,9 +78,18 @@ fun ZoomablePhotoPage(
     }
     val fullResImageState = fullResZoomableState?.let { rememberZoomableImageState(it) }
 
+    // Latch once full quality is reached so zooming in later (which briefly swaps higher-detail
+    // tiles) never tears down fullResImageState or swaps back to previewImageState mid-pinch.
+    var hasDisplayedFullResInFullQuality by remember(item.id, isUpgradedToFullRes) {
+        mutableStateOf(false)
+    }
+    if (isUpgradedToFullRes && fullResImageState?.isImageDisplayedInFullQuality == true) {
+        hasDisplayedFullResInFullQuality = true
+    }
+
     val fullResReady = canUpgradeLocal &&
             isUpgradedToFullRes &&
-            fullResImageState?.isImageDisplayed == true &&
+            hasDisplayedFullResInFullQuality &&
             !isPreviewZoomed
 
     val activeZoomableState = if (fullResReady && fullResZoomableState != null) {
@@ -159,7 +169,8 @@ fun ZoomablePhotoPage(
                 uri = localUri,
                 cloudId = item.cloudId,
                 cloudFallbackUrl = cloudFallbackUrl,
-                isVideo = item.isVideo
+                isVideo = item.isVideo,
+                bypassPlatformThumbnail = !item.isVideo
             )
         } else {
             cloudFallbackUrl
@@ -225,7 +236,9 @@ fun ZoomablePhotoPage(
                 state = fullResImageState,
                 onClick = { onTap() },
                 contentScale = ContentScale.Fit,
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer { alpha = if (fullResReady) 1f else 0f }
             )
         }
 
