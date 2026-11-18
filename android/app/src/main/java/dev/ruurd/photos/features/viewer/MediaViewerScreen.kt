@@ -95,6 +95,7 @@ import dev.ruurd.photos.core.image.MemoryCacheKeyRegistry
 import dev.ruurd.photos.core.image.TimelineTileBoundsRegistry
 import dev.ruurd.photos.features.viewer.components.ZoomablePhotoPage
 import dev.ruurd.photos.ui.theme.MontserratFontFamily
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.filterNotNull
@@ -159,6 +160,7 @@ fun MediaViewerScreen(
     var isActivelyDragging by remember { mutableStateOf(false) }
     var rawDragOffset by remember { mutableStateOf(Offset.Zero) }
     val settleDragOffset = remember { Animatable(Offset.Zero, Offset.VectorConverter) }
+    val settleJobHolder = remember { arrayOfNulls<Job>(1) }
     val currentDragOffset = if (isActivelyDragging) rawDragOffset else settleDragOffset.value
 
     var activePageZoomFraction by remember { mutableFloatStateOf(0f) }
@@ -183,6 +185,7 @@ fun MediaViewerScreen(
             isAppearanceLightNavigationBars = false
         }
         onDispose {
+            currentOnHiddenChanged(null)
             insetsController?.apply {
                 isAppearanceLightStatusBars = !isDarkTheme
                 isAppearanceLightNavigationBars = !isDarkTheme
@@ -226,6 +229,9 @@ fun MediaViewerScreen(
         releaseBackdropAlpha: Float
     ) {
         if (currentIsClosing) return
+        settleJobHolder[0]?.cancel()
+        settleJobHolder[0] = null
+
         val latestItems = currentItems
         val activeId = currentActiveId
         val activeItem = latestItems.getOrNull(pagerState.currentPage)?.takeIf { it.id == activeId }
@@ -500,9 +506,13 @@ fun MediaViewerScreen(
                                     totalDy > 0f
                                 ) {
                                     isDraggingToDismiss = true
+                                    settleJobHolder[0]?.cancel()
+                                    settleJobHolder[0] = null
+                                    val draggedId = currentItems.getOrNull(pagerState.currentPage)?.id
+                                        ?: currentActiveId
+                                    currentOnHiddenChanged(draggedId)
                                     rawDragOffset = settleDragOffset.value + Offset(totalDx, totalDy)
                                     isActivelyDragging = true
-                                    coroutineScope.launch { settleDragOffset.stop() }
                                     velocityTracker.addPosition(change.uptimeMillis, change.position)
                                     change.consume()
                                 } else if (abs(totalDx) > touchSlop || (abs(totalDy) > touchSlop && totalDy < 0f)) {
@@ -530,7 +540,8 @@ fun MediaViewerScreen(
                                 val releaseAlpha = (1f - (releaseY / 500f)).coerceIn(0f, 1f)
                                 startClosing(releaseOffset, releaseScale, releaseAlpha)
                             } else {
-                                coroutineScope.launch {
+                                settleJobHolder[0]?.cancel()
+                                settleJobHolder[0] = coroutineScope.launch {
                                     settleDragOffset.snapTo(releaseOffset)
                                     isActivelyDragging = false
                                     settleDragOffset.animateTo(
@@ -540,6 +551,9 @@ fun MediaViewerScreen(
                                             stiffness = Spring.StiffnessMedium
                                         )
                                     )
+                                    if (!isActivelyDragging && !currentIsClosing) {
+                                        currentOnHiddenChanged(null)
+                                    }
                                 }
                             }
                         }
