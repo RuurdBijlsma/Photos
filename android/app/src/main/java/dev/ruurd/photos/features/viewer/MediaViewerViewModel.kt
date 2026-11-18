@@ -23,7 +23,8 @@ data class MediaViewerUiState(
     val items: ImmutableList<TimelineMediaProjection> = persistentListOf(),
     val activeMediaId: String,
     val initialIndex: Int = 0,
-    val isChromeVisible: Boolean = true
+    val isChromeVisible: Boolean = true,
+    val isActiveItemMissing: Boolean = false
 )
 
 class MediaViewerViewModel(
@@ -42,17 +43,18 @@ class MediaViewerViewModel(
         // Frame 1 in 0ms: check if projection store is already loaded
         val currentStore = timelineProjectionStore.state.value
         if (currentStore is TimelineProjectionState.Loaded) {
-            val idx = currentStore.items.indexOfFirst { it.id == initialMediaId }.coerceAtLeast(0)
+            val idx = currentStore.items.indexOfFirst { it.id == initialMediaId }
             _uiState.value = MediaViewerUiState(
                 items = currentStore.items,
                 activeMediaId = initialMediaId,
-                initialIndex = idx
+                initialIndex = idx.coerceAtLeast(0),
+                isActiveItemMissing = currentStore.items.isEmpty() || idx < 0
             )
         } else {
             // Fallback while store is Loading: fetch single item from repository
             viewModelScope.launch(dispatchers.io) {
                 val entity = mediaRepository.getById(initialMediaId)
-                if (entity != null && _uiState.value.items.isEmpty()) {
+                if (entity != null) {
                     val fallbackProjection = TimelineMediaProjection(
                         id = entity.id,
                         cloudId = entity.cloudId,
@@ -67,10 +69,13 @@ class MediaViewerViewModel(
                         timezoneOffsetMinutes = entity.timezoneOffsetMinutes
                     )
                     _uiState.update { current ->
-                        if (current.items.isEmpty()) {
+                        if (current.items.isEmpty() &&
+                            timelineProjectionStore.state.value is TimelineProjectionState.Loading
+                        ) {
                             current.copy(
                                 items = persistentListOf(fallbackProjection),
-                                initialIndex = 0
+                                initialIndex = 0,
+                                isActiveItemMissing = false
                             )
                         } else {
                             current
@@ -85,17 +90,31 @@ class MediaViewerViewModel(
             timelineProjectionStore.state.collectLatest { state ->
                 if (state is TimelineProjectionState.Loaded) {
                     _uiState.update { current ->
-                        val currentActiveId = current.activeMediaId
-                        val newIndex = state.items.indexOfFirst { it.id == currentActiveId }
-                        val safeIndex = if (newIndex >= 0) {
-                            newIndex
-                        } else {
-                            state.items.indexOfFirst { it.id == initialMediaId }.coerceAtLeast(0)
+                        if (state.items.isEmpty()) {
+                            return@update current.copy(
+                                items = state.items,
+                                initialIndex = 0,
+                                isActiveItemMissing = true
+                            )
                         }
-                        current.copy(
-                            items = state.items,
-                            initialIndex = safeIndex
-                        )
+
+                        val activeIdx = state.items.indexOfFirst { it.id == current.activeMediaId }
+                        if (activeIdx >= 0) {
+                            current.copy(
+                                items = state.items,
+                                initialIndex = activeIdx,
+                                isActiveItemMissing = false
+                            )
+                        } else {
+                            // Active item was deleted from Room while open: clamp to nearest index
+                            val clampedIdx = current.initialIndex.coerceIn(0, state.items.lastIndex)
+                            current.copy(
+                                items = state.items,
+                                activeMediaId = state.items[clampedIdx].id,
+                                initialIndex = clampedIdx,
+                                isActiveItemMissing = false
+                            )
+                        }
                     }
                 }
             }
@@ -105,7 +124,11 @@ class MediaViewerViewModel(
     fun onPageChanged(mediaId: String) {
         _uiState.update { current ->
             if (current.activeMediaId != mediaId) {
-                current.copy(activeMediaId = mediaId)
+                val newIndex = current.items.indexOfFirst { it.id == mediaId }
+                current.copy(
+                    activeMediaId = mediaId,
+                    initialIndex = if (newIndex >= 0) newIndex else current.initialIndex
+                )
             } else {
                 current
             }

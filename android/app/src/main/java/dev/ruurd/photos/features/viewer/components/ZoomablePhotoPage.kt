@@ -1,6 +1,11 @@
 package dev.ruurd.photos.features.viewer.components
 
 import android.net.Uri
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionScope
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -24,27 +29,33 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import coil3.request.ImageRequest
 import coil3.request.crossfade
+import coil3.size.Dimension
+import coil3.size.Size as CoilSize
 import dev.ruurd.photos.core.database.entity.TimelineMediaProjection
 import dev.ruurd.photos.core.image.MediaStoreThumbnail
 import dev.ruurd.photos.core.image.MemoryCacheKeyRegistry
 import dev.ruurd.photos.ui.theme.PhotosRadii
-import me.saket.telephoto.zoomable.ZoomableState
+import kotlinx.coroutines.delay
 import me.saket.telephoto.zoomable.coil3.ZoomableAsyncImage
 import me.saket.telephoto.zoomable.rememberZoomableImageState
 import me.saket.telephoto.zoomable.rememberZoomableState
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun ZoomablePhotoPage(
     item: TimelineMediaProjection,
     baseUrl: String,
     isActivePage: Boolean,
+    isSettledPage: Boolean,
+    isViewerVisible: Boolean,
+    allowSharedBoundsAnimation: Boolean,
+    sharedTransitionScope: SharedTransitionScope?,
     memoryCacheKeyRegistry: MemoryCacheKeyRegistry,
     onTap: () -> Unit,
     modifier: Modifier = Modifier,
@@ -64,8 +75,6 @@ fun ZoomablePhotoPage(
     val zoomFraction = zoomableState.zoomFraction ?: 0f
     val isZoomed = zoomFraction > 0.01f
 
-    // Continuously observe zoom fraction on active page so HorizontalPager userScrollEnabled
-    // is immediately disabled when zoomed in, preventing accidental paging while panning
     LaunchedEffect(zoomableState, isActivePage) {
         if (isActivePage) {
             snapshotFlow { zoomableState.zoomFraction ?: 0f }.collect { fraction ->
@@ -74,65 +83,66 @@ fun ZoomablePhotoPage(
         }
     }
 
-    // Active page upgrades to full-res immediately so opening a photo doesn't flash
-    // a low-res thumbnail before swapping to high-res. Offscreen neighbor pages stay on lightweight preview.
-    var isUpgradedToFullRes by remember(item.id) { mutableStateOf(isActivePage) }
+    // Two-tier loading: keep N ± 1 offscreen neighbors and mid-swipe pages on lightweight
+    // previews, upgrading local/synced photos to raw full-res only after settling or on zoom.
+    val canUpgradeLocal = item.localContentUri != null && !item.isVideo
+    var isUpgradedToFullRes by remember(item.id) { mutableStateOf(false) }
 
-    LaunchedEffect(item.id, isActivePage, isZoomed) {
-        if (item.localContentUri != null && !item.isVideo && !isUpgradedToFullRes) {
-            if (isActivePage || isZoomed) {
-                isUpgradedToFullRes = true
-            }
+    LaunchedEffect(item.id, canUpgradeLocal, isSettledPage, isZoomed, isActivePage) {
+        if (!canUpgradeLocal) {
+            isUpgradedToFullRes = false
+            return@LaunchedEffect
+        }
+        if (isZoomed && isActivePage) {
+            isUpgradedToFullRes = true
+        } else if (isSettledPage) {
+            delay(FULL_RES_SETTLE_DELAY_MS)
+            isUpgradedToFullRes = true
+        } else {
+            isUpgradedToFullRes = false
         }
     }
 
     val localUri = remember(item.localContentUri) { item.localContentUri?.let(Uri::parse) }
     val cloudFallbackUrl = remember(item, baseUrl) {
-        when {
-            !item.isVideo && !item.cloudId.isNullOrEmpty() -> {
-                if (item.hasThumbnails) {
-                    "$baseUrl/thumbnails/${item.cloudId}/1440p.avif"
-                } else {
-                    "$baseUrl/api/photos/${item.cloudId}/thumbnail?size=1440"
-                }
+        val cloudId = item.cloudId?.takeIf { it.isNotBlank() }
+        if (cloudId == null || baseUrl.isBlank()) {
+            null
+        } else {
+            val targetHeight = if (item.isVideo) 720 else 1440
+            if (item.hasThumbnails) {
+                "$baseUrl/thumbnails/$cloudId/${targetHeight}p.avif"
+            } else {
+                "$baseUrl/api/photos/$cloudId/thumbnail?size=$targetHeight"
             }
-            !item.cloudId.isNullOrEmpty() -> {
-                if (item.hasThumbnails) {
-                    "$baseUrl/thumbnails/${item.cloudId}/720p.avif"
-                } else {
-                    "$baseUrl/api/photos/${item.cloudId}/thumbnail?size=720"
-                }
-            }
-            else -> null
         }
     }
 
-    val imageModel = remember(item, isUpgradedToFullRes, localUri, cloudFallbackUrl) {
+    val imageModel = remember(item.id, isUpgradedToFullRes, localUri, cloudFallbackUrl) {
         when {
-            // Local item upgraded to full resolution
             localUri != null && isUpgradedToFullRes -> localUri
-            // Local item preview (1440p thumbnail for photos, 720p for videos)
             localUri != null -> MediaStoreThumbnail(
                 uri = localUri,
                 cloudId = item.cloudId,
                 cloudFallbackUrl = cloudFallbackUrl,
                 isVideo = item.isVideo
             )
-            // Cloud-only preview
             else -> cloudFallbackUrl
         }
     }
 
-    val request = remember(imageModel, isUpgradedToFullRes) {
+    val isLocalPreview = localUri != null && !isUpgradedToFullRes
+    val isCloudOnly = localUri == null
+    val request = remember(item.id, imageModel, isLocalPreview, isCloudOnly, item.isVideo) {
         ImageRequest.Builder(context)
             .data(imageModel)
             .apply {
-                if (!isUpgradedToFullRes) {
-                    val targetHeight = if (item.isVideo) 720 else 1440
-                    size(targetHeight, targetHeight)
+                val targetHeight = if (item.isVideo) 720 else 1440
+                when {
+                    isLocalPreview -> size(targetHeight, targetHeight)
+                    // Preserve full 1440p/720p height on landscape cloud AVIFs instead of bounding width
+                    isCloudOnly -> size(CoilSize(Dimension.Undefined, Dimension.Pixels(targetHeight)))
                 }
-                // Cheap already-decoded bitmap stays on screen until the next tier arrives, so
-                // swapping preview -> full-res fades instead of blinking to black.
                 memoryCacheKeyRegistry.get(item.id)?.let(::placeholderMemoryCacheKey)
             }
             .crossfade(CROSSFADE_MS)
@@ -144,6 +154,27 @@ fun ZoomablePhotoPage(
                 }
             )
             .build()
+    }
+
+    val sharedElementModifier = if (sharedTransitionScope != null && isActivePage) {
+        with(sharedTransitionScope) {
+            Modifier.sharedElementWithCallerManagedVisibility(
+                sharedContentState = rememberSharedContentState(key = "media_${item.id}"),
+                visible = isViewerVisible,
+                boundsTransform = { _, _ ->
+                    if (allowSharedBoundsAnimation && !isZoomed) {
+                        spring(
+                            dampingRatio = 0.85f,
+                            stiffness = Spring.StiffnessMediumLow
+                        )
+                    } else {
+                        snap()
+                    }
+                }
+            )
+        }
+    } else {
+        Modifier
     }
 
     val zoomableImageState = rememberZoomableImageState(zoomableState)
@@ -158,10 +189,11 @@ fun ZoomablePhotoPage(
             state = zoomableImageState,
             onClick = { onTap() },
             contentScale = ContentScale.Fit,
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier
+                .fillMaxSize()
+                .then(sharedElementModifier)
         )
 
-        // Video overlay badge if video
         if (item.isVideo) {
             Row(
                 modifier = Modifier
@@ -195,4 +227,5 @@ fun ZoomablePhotoPage(
     }
 }
 
+private const val FULL_RES_SETTLE_DELAY_MS = 180L
 private const val CROSSFADE_MS = 180

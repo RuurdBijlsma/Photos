@@ -2,7 +2,12 @@ package dev.ruurd.photos.features.timeline
 
 import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionScope
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -111,6 +116,10 @@ fun TimelineScreen(
     isBootstrapping: Boolean = false,
     pullToRefreshState: PullToRefreshState? = null,
     memoryCacheKeyRegistry: MemoryCacheKeyRegistry? = null,
+    sharedTransitionScope: SharedTransitionScope? = null,
+    activeSharedMediaId: String? = null,
+    isViewerVisible: Boolean = false,
+    allowSharedBoundsAnimation: Boolean = false,
     onMediaClick: (mediaId: String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -287,6 +296,10 @@ fun TimelineScreen(
                                 baseUrl = baseUrl,
                                 isScrubbing = isScrubbing,
                                 memoryCacheKeyRegistry = memoryCacheKeyRegistry,
+                                sharedTransitionScope = sharedTransitionScope,
+                                activeSharedMediaId = activeSharedMediaId,
+                                isViewerVisible = isViewerVisible,
+                                allowSharedBoundsAnimation = allowSharedBoundsAnimation,
                                 onMediaClick = onMediaClick,
                                 modifier = cascadeModifier
                             )
@@ -443,12 +456,17 @@ private fun MonthHeader(
     }
 }
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 private fun TimelineRow(
     item: TimelineRowUiItem,
     baseUrl: String,
     isScrubbing: Boolean,
     memoryCacheKeyRegistry: MemoryCacheKeyRegistry?,
+    sharedTransitionScope: SharedTransitionScope?,
+    activeSharedMediaId: String?,
+    isViewerVisible: Boolean,
+    allowSharedBoundsAnimation: Boolean,
     onMediaClick: (mediaId: String) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -479,6 +497,10 @@ private fun TimelineRow(
                     baseUrl = baseUrl,
                     isScrubbing = isScrubbing,
                     memoryCacheKeyRegistry = memoryCacheKeyRegistry,
+                    sharedTransitionScope = sharedTransitionScope,
+                    activeSharedMediaId = activeSharedMediaId,
+                    isViewerVisible = isViewerVisible,
+                    allowSharedBoundsAnimation = allowSharedBoundsAnimation,
                     onClick = { onMediaClick(gridItem.id) }
                 )
             }
@@ -486,6 +508,7 @@ private fun TimelineRow(
     }
 }
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 private fun TimelineTile(
     item: TimelineGridItemUiModel,
@@ -494,6 +517,10 @@ private fun TimelineTile(
     baseUrl: String,
     isScrubbing: Boolean,
     memoryCacheKeyRegistry: MemoryCacheKeyRegistry?,
+    sharedTransitionScope: SharedTransitionScope?,
+    activeSharedMediaId: String?,
+    isViewerVisible: Boolean,
+    allowSharedBoundsAnimation: Boolean,
     onClick: () -> Unit
 ) {
     val context = LocalContext.current
@@ -538,6 +565,28 @@ private fun TimelineTile(
             .build()
     }
 
+    val imageSharedModifier = if (sharedTransitionScope != null && !isScrubbing) {
+        with(sharedTransitionScope) {
+            val isTileVisible = !(isViewerVisible && activeSharedMediaId == item.id)
+            Modifier.sharedElementWithCallerManagedVisibility(
+                sharedContentState = rememberSharedContentState(key = "media_${item.id}"),
+                visible = isTileVisible,
+                boundsTransform = { _, _ ->
+                    if (allowSharedBoundsAnimation) {
+                        spring(
+                            dampingRatio = 0.85f,
+                            stiffness = Spring.StiffnessMediumLow
+                        )
+                    } else {
+                        snap()
+                    }
+                }
+            )
+        }
+    } else {
+        Modifier
+    }
+
     Box(
         modifier = Modifier
             .width(item.widthDp.dp)
@@ -558,7 +607,9 @@ private fun TimelineTile(
                         memoryCacheKeyRegistry?.put(item.id, key)
                     }
                 },
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier
+                    .fillMaxSize()
+                    .then(imageSharedModifier)
             )
         }
 

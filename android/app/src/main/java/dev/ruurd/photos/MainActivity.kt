@@ -21,6 +21,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -133,10 +134,32 @@ class MainActivity : ComponentActivity() {
                                     LazyLayoutCacheWindow(aheadFraction = 0.75f, behindFraction = 0.4f)
                                 }
                             )
+                            val timelineUiState by timelineViewModel.uiState.collectAsState()
+                            val mainUiState by mainViewModel.uiState.collectAsState()
+                            val currentLayout by rememberUpdatedState(timelineUiState.layout)
+                            val coroutineScope = rememberCoroutineScope()
+
                             var activeViewerMediaId by rememberSaveable(state.user.id) {
                                 mutableStateOf<String?>(null)
                             }
-                            val isViewerOpen = activeViewerMediaId != null
+                            var currentViewerMediaId by rememberSaveable(state.user.id) {
+                                mutableStateOf<String?>(null)
+                            }
+                            var isViewerVisible by rememberSaveable(state.user.id) {
+                                mutableStateOf(false)
+                            }
+                            var allowSharedBoundsAnimation by remember { mutableStateOf(false) }
+
+                            fun syncTimelineToMedia(mediaId: String) {
+                                val rowIndex = currentLayout.findRowIndexForMedia(mediaId) ?: return
+                                val visibleIndices =
+                                    timelineListState.layoutInfo.visibleItemsInfo.map { it.index }
+                                if (rowIndex !in visibleIndices) {
+                                    coroutineScope.launch {
+                                        timelineListState.scrollToItem(rowIndex)
+                                    }
+                                }
+                            }
 
                             SharedTransitionLayout {
                                 Box(modifier = Modifier.fillMaxSize()) {
@@ -146,7 +169,7 @@ class MainActivity : ComponentActivity() {
                                         modifier = Modifier
                                             .fillMaxSize()
                                             .then(
-                                                if (isViewerOpen) {
+                                                if (activeViewerMediaId != null) {
                                                     Modifier
                                                         .semantics { hideFromAccessibility() }
                                                         .focusProperties { canFocus = false }
@@ -166,8 +189,15 @@ class MainActivity : ComponentActivity() {
                                                     timelineViewModel = timelineViewModel,
                                                     timelineListState = timelineListState,
                                                     memoryCacheKeyRegistry = container.memoryCacheKeyRegistry,
+                                                    sharedTransitionScope = this@SharedTransitionLayout,
+                                                    activeSharedMediaId = currentViewerMediaId,
+                                                    isViewerVisible = isViewerVisible,
+                                                    allowSharedBoundsAnimation = allowSharedBoundsAnimation,
                                                     onMediaClick = { mediaId ->
                                                         activeViewerMediaId = mediaId
+                                                        currentViewerMediaId = mediaId
+                                                        allowSharedBoundsAnimation = true
+                                                        isViewerVisible = true
                                                     }
                                                 )
                                             }
@@ -184,10 +214,17 @@ class MainActivity : ComponentActivity() {
                                     }
 
                                     // MediaViewerScreen translucent overlay above NavHost
-                                    if (activeViewerMediaId != null) {
-                                        val viewerMediaId = activeViewerMediaId!!
+                                    val viewerMediaId = activeViewerMediaId
+                                    if (viewerMediaId != null) {
+                                        val viewerOwner = remember(state.user.id, sessionHolder) {
+                                            object : ViewModelStoreOwner {
+                                                override val viewModelStore: ViewModelStore =
+                                                    sessionHolder.viewerStoreForUser(state.user.id)
+                                            }
+                                        }
                                         val viewerViewModel: MediaViewerViewModel = viewModel(
-                                            key = "${userKey}_viewer_$viewerMediaId",
+                                            viewModelStoreOwner = viewerOwner,
+                                            key = "${userKey}_viewer",
                                             factory = MediaViewerViewModel.factory(
                                                 initialMediaId = viewerMediaId,
                                                 timelineProjectionStore = container.timelineProjectionStore,
@@ -196,28 +233,33 @@ class MainActivity : ComponentActivity() {
                                             )
                                         )
 
-                                        val timelineUiState by timelineViewModel.uiState.collectAsState()
-                                        val layout = timelineUiState.layout
-                                        val coroutineScope = rememberCoroutineScope()
-
                                         MediaViewerScreen(
                                             viewModel = viewerViewModel,
-                                            baseUrl = mainViewModel.uiState.collectAsState().value.serverUrl,
+                                            baseUrl = mainUiState.serverUrl,
                                             imageLoader = container.imageLoader,
                                             memoryCacheKeyRegistry = container.memoryCacheKeyRegistry,
-                                            onDismiss = {
-                                                activeViewerMediaId = null
-                                            },
-                                            onPreSyncScroll = { mediaId ->
-                                                val rowIndex = layout.findRowIndexForMedia(mediaId)
-                                                if (rowIndex != null) {
-                                                    val visibleIndices = timelineListState.layoutInfo.visibleItemsInfo.map { it.index }
-                                                    if (rowIndex !in visibleIndices) {
-                                                        coroutineScope.launch {
-                                                            timelineListState.scrollToItem(rowIndex)
-                                                        }
-                                                    }
+                                            isViewerVisible = isViewerVisible,
+                                            allowSharedBoundsAnimation = allowSharedBoundsAnimation,
+                                            sharedTransitionScope = this@SharedTransitionLayout,
+                                            onActiveMediaChanged = { activeId ->
+                                                if (currentViewerMediaId != activeId) {
+                                                    allowSharedBoundsAnimation = false
+                                                    currentViewerMediaId = activeId
                                                 }
+                                            },
+                                            onPreSyncScroll = ::syncTimelineToMedia,
+                                            onRequestDismiss = { activeId ->
+                                                if (isViewerVisible) {
+                                                    syncTimelineToMedia(activeId)
+                                                    allowSharedBoundsAnimation = true
+                                                    isViewerVisible = false
+                                                }
+                                            },
+                                            onDismissFinished = {
+                                                activeViewerMediaId = null
+                                                currentViewerMediaId = null
+                                                allowSharedBoundsAnimation = false
+                                                sessionHolder.clearViewerStore()
                                             }
                                         )
                                     }
@@ -234,9 +276,12 @@ class MainActivity : ComponentActivity() {
 internal class SessionViewModelStoreHolder : ViewModel() {
     private var activeUserId: Int? = null
     private var store: ViewModelStore? = null
+    private var viewerStore: ViewModelStore? = null
 
     fun storeForUser(userId: Int): ViewModelStore {
         if (activeUserId != userId) {
+            viewerStore?.clear()
+            viewerStore = null
             store?.clear()
             store = ViewModelStore()
             activeUserId = userId
@@ -244,7 +289,22 @@ internal class SessionViewModelStoreHolder : ViewModel() {
         return store!!
     }
 
+    fun viewerStoreForUser(userId: Int): ViewModelStore {
+        storeForUser(userId)
+        if (viewerStore == null) {
+            viewerStore = ViewModelStore()
+        }
+        return viewerStore!!
+    }
+
+    fun clearViewerStore() {
+        viewerStore?.clear()
+        viewerStore = null
+    }
+
     fun clearStore() {
+        viewerStore?.clear()
+        viewerStore = null
         store?.clear()
         store = null
         activeUserId = null
