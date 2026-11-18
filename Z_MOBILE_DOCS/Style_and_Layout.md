@@ -99,8 +99,9 @@ fun concentricRadius(outer: Dp, padding: Dp, min: Dp = 8.dp): Dp =
   `SharedTransitionLayout` / translucent overlay above `NavHost` rather than an opaque `NavHost` `composable`
   destination (which hides/unmounts the previous destination once entered). Because `MainScreen` stays mounted inside
   `NavHost` while the overlay renders above it, coordinate shared-bounds visibility with
-  `sharedElementWithCallerManagedVisibility` (or explicit rect/bounds capture) and expose a hoisted scroll-sync bridge
-  to `TimelineScreen`'s `timelineListState`:
+  `sharedElementWithCallerManagedVisibility` (or explicit rect/bounds capture), suppress accessibility and focus on the
+  underlying `NavHost` container while the viewer is open, and expose a hoisted scroll-sync bridge to `TimelineScreen`'s
+  `timelineListState`:
     * Keep `sharedElement` modifiers inactive/bypassed during `isScrubbing` (or attach only for the active viewer item)
       so fast timeline scrubbing incurs zero shared-element registration overhead (verify against
       `TimelineScrollBenchmark.kt`).
@@ -232,28 +233,28 @@ fun concentricRadius(outer: Dp, padding: Dp, min: Dp = 8.dp): Dp =
 * **Canvas:** `#000000` background at rest (fading backdrop opacity on swipe-down so `TimelineScreen` shows underneath),
   full edge-to-edge behind translucent system bars (forcing light status/nav bar icons with
   `isAppearanceLightStatusBars = false` and `isAppearanceLightNavigationBars = false` even in light mode, hiding
-  system bars when chrome is toggled off, and restoring both on exit inside `DisposableEffect`). Ensure `BackHandler`
-  precedence layers cleanly (`DateTimeEditDialog` / `MediaInfoBottomSheet` > `MediaViewerScreen` > `MainScreen`
-  Search).
+  system bars when chrome is toggled off, and restoring system bars immediately when swipe-down dismiss commits in Light
+  Mode and in `DisposableEffect` on exit). While the viewer overlay is open above `NavHost`, suppress accessibility and
+  focus (`hideFromAccessibility()` / non-focusable) on the underlying `NavHost` container so TalkBack and keyboard
+  focus stay inside the viewer. Ensure `BackHandler` precedence layers cleanly (`DateTimeEditDialog` /
+  `MediaInfoBottomSheet` > `MediaViewerScreen` > `MainScreen` Search).
 * **Top Floating Bar & Overflow Menu:**
     * Compact `CircleShape` `Back` pill, title/date/counter pill (update counter/title text directly without
       `animateContentSize()` during pager drags so changing label widths never trigger spring relayouts mid-swipe), and
       top-right `⋮` overflow menu button using dark translucent scrims (`Color.Black.copy(alpha = 0.45f)`–`0.6f`).
     * **Top-right overflow menu items:** `About` (fallback trigger for the info sheet), `Copy` (photos only; hidden on
       videos and missing items), `Rotate clockwise` (JPEG/PNG/WebP photos only; hidden on videos, panoramas, missing
-      items, offline `SYNCED` items, and unsupported MIME types), `Reprocess`, plus video-only `Playback speed` (opens
-      speed selector UI) and `Loop video` toggle.
+      items, offline `SYNCED` items, and unsupported MIME types), `Reprocess` (hidden when `missing_since != null`),
+      plus video-only `Playback speed` (opens speed selector UI) and `Loop video` toggle.
 * **Bottom Floating Pill:**
     * Compact `CircleShape` pill hosting **Share**, **Add to** (album), and **Bin**—no Info button in the bottom pill
       (Info is accessed via swipe-up or `About` in the top-right menu).
     * For videos, floating playback controls (seek bar driven by isolated position state-reads, play/pause, mute,
-      quality
-      selector) sit cleanly above the bottom action pill and fade together on tap. Video rendering uses `ContentFrame` +
-      `rememberPresentationState(player, keepContentOnReset = isQualitySwitch)` (resetting the shutter on `mediaId`
-      change until `onRenderedFirstFrame`) with `SURFACE_TYPE_TEXTURE_VIEW` so scale/clip/translation transforms animate
-      cleanly and switching directly between videos always shows the incoming video's thumbnail shutter (
-      `exoPlayer.stop()`
-        + `clearMediaItems()` synchronously on page change).
+      quality selector) sit cleanly above the bottom action pill and fade together on tap. Video rendering uses
+      `ContentFrame` + `rememberPresentationState(player, keepContentOnReset = isQualitySwitch)` (resetting the shutter
+      on `mediaId` change until `onRenderedFirstFrame`) with `SURFACE_TYPE_TEXTURE_VIEW` so scale/clip/translation
+      transforms animate cleanly and switching directly between videos always shows the incoming video's thumbnail
+      shutter (`exoPlayer.stop()` + `clearMediaItems()` synchronously on page change).
 * **Gestures:**
     * Swipe horizontally (`HorizontalPager(beyondViewportPageCount = 1)`) between items, staying on fast previews while
       swiping and upgrading to full-res once settled or zoomed; paging is locked (`userScrollEnabled = false`) while the
@@ -266,12 +267,13 @@ fun concentricRadius(outer: Dp, padding: Dp, min: Dp = 8.dp): Dp =
     * **Swipe up** (single-pointer, unzoomed `(zoomableState.zoomFraction ?: 0f) <= 0.01f`, `|dy| > |dx|`) to reveal
       the **Media Info Sheet** (`30.dp` top-rounded dark `surfaceContainerHigh` modal sheet showing capture date/time in
       Roboto/Montserrat with an edit trigger/row, timezone label—tappable on server-backed items to edit `±HH:MM`
-      offset, matching web's `EditDateTimeCard.vue`—weather summary, camera/lens/exposure pills, albums list, and a
-      location card with resolved place name + coordinates + `"Open in Maps"` action; embedded mini-map deferred until
-      MapLibre is added).
+      offset, matching web's `EditDateTimeCard.vue`—weather summary checking `temperature != null` and rendering night
+      icons when `is_daytime == false`, camera/lens/exposure pills, albums list, and a location card with resolved place
+      name + coordinates + `"Open in Maps"` action; embedded mini-map deferred until MapLibre is added).
     * **Date/Time & Timezone Edit Dialog (`28.dp` dialog):** Opens from the Info sheet's date/time or timezone row with
-      Material 3 `DatePicker` + `TimePicker` and `±HH:MM` offset controls, showing an inline saving spinner while
-      updating and keeping the viewer anchored on the item even if its date moves it to another month.
+      Material 3 `DatePicker` + `TimePicker` (preserving the item's existing `:ss` seconds) and `±HH:MM` offset controls
+      (tracking date/time vs. offset dirtiness independently), showing an inline saving spinner while updating and
+      keeping the viewer anchored on the item even if its date moves it to another month.
 
 ---
 

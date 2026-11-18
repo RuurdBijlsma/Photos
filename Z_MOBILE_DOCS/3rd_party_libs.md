@@ -10,7 +10,9 @@
   images with subsampling, Ultra HDR gainmaps, fling, inertia, and `HorizontalPager` cooperation; handle clicks via
   `ZoomableAsyncImage`'s `onClick`/`onLongClick` rather than `Modifier.clickable`, key the surrounding pager/slot, use
   `HorizontalPager(beyondViewportPageCount = 1)` with `settledPage`/zoom-gated full-res upgrades so fast swipes stay on
-  lightweight previews, and verify Coil 3 `1440p.avif` disk-cache snapshot closure against `saket/telephoto#181`).
+  lightweight previews, and verify Coil 3 `1440p.avif` disk-cache snapshot closure against `saket/telephoto#181`—falling
+  back to `AsyncImage` + `Modifier.zoomable(...)` from `me.saket.telephoto:zoomable` for non-subsamplable AVIF/GIF
+  previews if `#181` reproduces before handing off to `ZoomableAsyncImage` on the local `file://` or `content://` URI).
 * **Video Playback:** `androidx.media3:media3-exoplayer:1.11.1`,
   `androidx.media3:media3-ui-compose:1.11.1` (plus optionally `media3-ui-compose-material3:1.11.1`), &
   `androidx.media3:media3-datasource-okhttp:1.11.1` (Required so `ExoPlayer` shares `OkHttpClient` cookies and 401
