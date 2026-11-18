@@ -40,6 +40,8 @@ import dev.ruurd.photos.core.image.MediaStoreThumbnail
 import dev.ruurd.photos.core.image.MemoryCacheKeyRegistry
 import dev.ruurd.photos.ui.theme.PhotosRadii
 import kotlinx.coroutines.delay
+import me.saket.telephoto.zoomable.DoubleClickToZoomListener
+import me.saket.telephoto.zoomable.ZoomSpec
 import me.saket.telephoto.zoomable.coil3.ZoomableAsyncImage
 import me.saket.telephoto.zoomable.rememberZoomableImageState
 import me.saket.telephoto.zoomable.rememberZoomableState
@@ -58,7 +60,8 @@ fun ZoomablePhotoPage(
     onZoomFractionChanged: (Float) -> Unit = {}
 ) {
     val context = LocalContext.current
-    val previewZoomableState = rememberZoomableState()
+    val zoomSpec = remember { ZoomSpec(maxZoomFactor = MAX_ZOOM_FACTOR) }
+    val previewZoomableState = rememberZoomableState(zoomSpec = zoomSpec)
     val previewImageState = rememberZoomableImageState(previewZoomableState)
 
     val localUri = remember(item.localContentUri) { item.localContentUri?.let(Uri::parse) }
@@ -72,7 +75,7 @@ fun ZoomablePhotoPage(
     // from PainterDelegate (scaledInsideAndCenterAligned) to SubSamplingDelegate
     // (unscaledAndTopLeftAligned), avoiding the 2-frame vertical shift and low-res flash.
     val fullResZoomableState = if (canUpgradeLocal && isUpgradedToFullRes) {
-        rememberZoomableState()
+        rememberZoomableState(zoomSpec = zoomSpec)
     } else {
         null
     }
@@ -235,6 +238,7 @@ fun ZoomablePhotoPage(
                 contentDescription = null,
                 state = fullResImageState,
                 onClick = { onTap() },
+                onDoubleClick = DoubleClickToZoomListener.cycle(DOUBLE_TAP_MAX_ZOOM_FACTOR),
                 contentScale = ContentScale.Fit,
                 modifier = Modifier
                     .fillMaxSize()
@@ -248,6 +252,7 @@ fun ZoomablePhotoPage(
                 contentDescription = null,
                 state = previewImageState,
                 onClick = { onTap() },
+                onDoubleClick = DoubleClickToZoomListener.cycle(DOUBLE_TAP_MAX_ZOOM_FACTOR),
                 contentScale = ContentScale.Fit,
                 modifier = Modifier.fillMaxSize()
             )
@@ -287,3 +292,5 @@ fun ZoomablePhotoPage(
 }
 
 private const val FULL_RES_SETTLE_DELAY_MS = 180L
+private const val MAX_ZOOM_FACTOR = 8f
+private const val DOUBLE_TAP_MAX_ZOOM_FACTOR = 2.5f

@@ -23,6 +23,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -67,6 +69,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.lerp
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.graphicsLayer
@@ -82,6 +85,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
@@ -703,6 +707,11 @@ fun MediaViewerScreen(
                     .fillMaxSize()
                     .graphicsLayer { alpha = effectiveChromeAlpha }
             ) {
+                ViewerStatusBarScrim(
+                    statusBarHeight = statusBarPadding,
+                    modifier = Modifier.align(Alignment.TopCenter)
+                )
+
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
@@ -826,6 +835,26 @@ fun MediaViewerScreen(
 }
 
 @Composable
+private fun ViewerStatusBarScrim(
+    statusBarHeight: Dp,
+    modifier: Modifier = Modifier
+) {
+    if (statusBarHeight <= 0.dp) return
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(statusBarHeight + VIEWER_STATUS_BAR_SCRIM_TAIL)
+            .background(
+                Brush.verticalGradient(
+                    0.0f to Color.Black.copy(alpha = 0.72f),
+                    0.65f to Color.Black.copy(alpha = 0.35f),
+                    1.0f to Color.Transparent
+                )
+            )
+    )
+}
+
+@Composable
 private fun HeroImageOverlay(
     item: TimelineMediaProjection,
     baseUrl: String,
@@ -944,6 +973,7 @@ private fun computeFittedRect(containerWidth: Float, containerHeight: Float, rat
 }
 
 private const val FALLBACK_FADE_MS = 180
+private val VIEWER_STATUS_BAR_SCRIM_TAIL = 14.dp
 
 /** Dark translucent scrim with a hairline highlight, matching the web viewer's pills. */
 private val ViewerPillColor = Color.Black.copy(alpha = 0.55f)

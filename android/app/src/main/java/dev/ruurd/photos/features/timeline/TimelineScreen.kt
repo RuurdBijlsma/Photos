@@ -438,13 +438,14 @@ private fun MonthHeader(
             Text(
                 text = item.title,
                 style = MaterialTheme.typography.headlineMedium,
+                color = MaterialTheme.colorScheme.onBackground,
                 modifier = Modifier.alignByBaseline()
             )
             item.yearLabel?.let { year ->
                 Text(
                     text = year,
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Medium),
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
                     modifier = Modifier.alignByBaseline()
                 )
             }

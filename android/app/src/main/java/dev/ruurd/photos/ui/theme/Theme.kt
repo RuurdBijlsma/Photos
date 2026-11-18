@@ -2,6 +2,7 @@ package dev.ruurd.photos.ui.theme
 
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
@@ -55,7 +56,8 @@ fun RuurdPhotosTheme(
     }
 
     CompositionLocalProvider(
-        LocalSemanticColors provides semanticColors
+        LocalSemanticColors provides semanticColors,
+        LocalContentColor provides colorScheme.onBackground
     ) {
         MaterialTheme(
             colorScheme = colorScheme,
