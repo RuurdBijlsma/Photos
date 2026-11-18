@@ -57,22 +57,49 @@ fun ZoomablePhotoPage(
     onZoomFractionChanged: (Float) -> Unit = {}
 ) {
     val context = LocalContext.current
-    val zoomableState = rememberZoomableState()
+    val previewZoomableState = rememberZoomableState()
+    val previewImageState = rememberZoomableImageState(previewZoomableState)
+
+    val localUri = remember(item.localContentUri) { item.localContentUri?.let(Uri::parse) }
+    val canUpgradeLocal = localUri != null && !item.isVideo
+    var isUpgradedToFullRes by remember(item.id) { mutableStateOf(false) }
+
+    val previewZoomFraction = previewZoomableState.zoomFraction ?: 0f
+    val isPreviewZoomed = previewZoomFraction > 0.01f
+
+    // Use a separate ZoomableState for full-res so Telephoto never transitions one ZoomableState
+    // from PainterDelegate (scaledInsideAndCenterAligned) to SubSamplingDelegate
+    // (unscaledAndTopLeftAligned), avoiding the 2-frame vertical shift and low-res flash.
+    val fullResZoomableState = if (canUpgradeLocal && isUpgradedToFullRes) {
+        rememberZoomableState()
+    } else {
+        null
+    }
+    val fullResImageState = fullResZoomableState?.let { rememberZoomableImageState(it) }
+
+    val fullResReady = canUpgradeLocal &&
+            isUpgradedToFullRes &&
+            fullResImageState?.isImageDisplayed == true &&
+            !isPreviewZoomed
+
+    val activeZoomableState = if (fullResReady && fullResZoomableState != null) {
+        fullResZoomableState
+    } else {
+        previewZoomableState
+    }
 
     // Reset zoom when swiping off-page
     LaunchedEffect(isActivePage) {
         if (!isActivePage) {
-            zoomableState.resetZoom()
+            previewZoomableState.resetZoom()
+            fullResZoomableState?.resetZoom()
             onZoomFractionChanged(0f)
         }
     }
 
-    val zoomFraction = zoomableState.zoomFraction ?: 0f
-    val isZoomed = zoomFraction > 0.01f
-
-    LaunchedEffect(zoomableState, isActivePage) {
+    LaunchedEffect(activeZoomableState, isActivePage) {
         if (isActivePage) {
-            snapshotFlow { zoomableState.zoomFraction ?: 0f }.collect { fraction ->
+            snapshotFlow { activeZoomableState.zoomFraction ?: 0f }.collect { fraction ->
                 onZoomFractionChanged(fraction)
             }
         }
@@ -80,14 +107,11 @@ fun ZoomablePhotoPage(
 
     // Two-tier loading: keep N ± 1 offscreen neighbors, opening transitions, and mid-swipe pages
     // on lightweight previews, upgrading local/synced photos to raw full-res only after settling or on zoom.
-    val canUpgradeLocal = item.localContentUri != null && !item.isVideo
-    var isUpgradedToFullRes by remember(item.id) { mutableStateOf(false) }
-
     LaunchedEffect(
         item.id,
         canUpgradeLocal,
         isSettledPage,
-        isZoomed,
+        isPreviewZoomed,
         isActivePage,
         isOpeningTransition
     ) {
@@ -98,7 +122,7 @@ fun ZoomablePhotoPage(
         if (isOpeningTransition) {
             return@LaunchedEffect
         }
-        if (isZoomed && isActivePage) {
+        if (isPreviewZoomed && isActivePage) {
             isUpgradedToFullRes = true
         } else if (isSettledPage) {
             delay(FULL_RES_SETTLE_DELAY_MS)
@@ -115,7 +139,6 @@ fun ZoomablePhotoPage(
             ?.asPainter(context)
     }
 
-    val localUri = remember(item.localContentUri) { item.localContentUri?.let(Uri::parse) }
     val cloudFallbackUrl = remember(item, baseUrl) {
         val cloudId = item.cloudId?.takeIf { it.isNotBlank() }
         if (cloudId == null || baseUrl.isBlank()) {
@@ -130,24 +153,24 @@ fun ZoomablePhotoPage(
         }
     }
 
-    val imageModel = remember(item.id, isUpgradedToFullRes, localUri, cloudFallbackUrl) {
-        when {
-            localUri != null && isUpgradedToFullRes -> localUri
-            localUri != null -> MediaStoreThumbnail(
+    val previewModel = remember(item.id, localUri, cloudFallbackUrl, item.isVideo) {
+        if (localUri != null) {
+            MediaStoreThumbnail(
                 uri = localUri,
                 cloudId = item.cloudId,
                 cloudFallbackUrl = cloudFallbackUrl,
                 isVideo = item.isVideo
             )
-            else -> cloudFallbackUrl
+        } else {
+            cloudFallbackUrl
         }
     }
 
-    val isLocalPreview = localUri != null && !isUpgradedToFullRes
+    val isLocalPreview = localUri != null
     val isCloudOnly = localUri == null
-    val request = remember(item.id, imageModel, isLocalPreview, isCloudOnly, item.isVideo) {
+    val previewRequest = remember(item.id, previewModel, isLocalPreview, isCloudOnly, item.isVideo) {
         ImageRequest.Builder(context)
-            .data(imageModel)
+            .data(previewModel)
             .apply {
                 val targetHeight = if (item.isVideo) 720 else 1440
                 when {
@@ -167,13 +190,26 @@ fun ZoomablePhotoPage(
             .build()
     }
 
-    val zoomableImageState = rememberZoomableImageState(zoomableState)
+    val fullResRequest = remember(item.id, localUri) {
+        ImageRequest.Builder(context)
+            .data(localUri)
+            // Omit placeholderMemoryCacheKey so CoilImageSource doesn't emit a PainterDelegate
+            // before SubSamplingDelegate on fullResZoomableState; the preview layer covers it.
+            .listener(
+                onSuccess = { _, result ->
+                    result.memoryCacheKey?.let { key ->
+                        memoryCacheKeyRegistry.put(item.id, key)
+                    }
+                }
+            )
+            .build()
+    }
 
     Box(
         modifier = modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
     ) {
-        if (syncFallbackPainter != null && !zoomableImageState.isImageDisplayed) {
+        if (syncFallbackPainter != null && !previewImageState.isImageDisplayed && !fullResReady) {
             Image(
                 painter = syncFallbackPainter,
                 contentDescription = null,
@@ -182,14 +218,27 @@ fun ZoomablePhotoPage(
             )
         }
 
-        ZoomableAsyncImage(
-            model = request,
-            contentDescription = null,
-            state = zoomableImageState,
-            onClick = { onTap() },
-            contentScale = ContentScale.Fit,
-            modifier = Modifier.fillMaxSize()
-        )
+        if (canUpgradeLocal && isUpgradedToFullRes && fullResImageState != null) {
+            ZoomableAsyncImage(
+                model = fullResRequest,
+                contentDescription = null,
+                state = fullResImageState,
+                onClick = { onTap() },
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
+
+        if (!fullResReady) {
+            ZoomableAsyncImage(
+                model = previewRequest,
+                contentDescription = null,
+                state = previewImageState,
+                onClick = { onTap() },
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
 
         if (item.isVideo) {
             Row(
