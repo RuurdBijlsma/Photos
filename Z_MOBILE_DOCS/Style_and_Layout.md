@@ -97,11 +97,14 @@ fun concentricRadius(outer: Dp, padding: Dp, min: Dp = 8.dp): Dp =
 
 * **Shared-Element Photo Transitions & Visible Timeline Behind Drag:** Host `MediaViewerScreen` in a
   `SharedTransitionLayout` / translucent overlay above `NavHost` rather than an opaque `NavHost` `composable`
-  destination (which hides/unmounts the previous destination once entered). Tapping a photo/video in the timeline grid
-  transitions via shared-bounds / container transform into `MediaViewerScreen`, and dragging down interactively shrinks
-  the viewer over the live, visible timeline behind it. If the user swipes to a different item that is currently
-  offscreen in `TimelineScreen`'s `LazyColumn`, either jump `listState.scrollToItem(index)` as swipe-down dismiss begins
-  so shared-element bounds exist, or fall back to a scale-to-center + fade dismiss and sync `TimelineScreen`'s scroll
+  destination (which hides/unmounts the previous destination once entered). Because `MainScreen` stays mounted inside
+  `NavHost` while the overlay renders above it, coordinate shared-bounds visibility with
+  `sharedElementWithCallerManagedVisibility` (or explicit rect/bounds capture) and expose a hoisted scroll-sync
+  bridge to `TimelineScreen`'s `timelineListState`. Tapping a photo/video in the timeline grid transitions via
+  shared-bounds / container transform into `MediaViewerScreen`, and dragging down interactively shrinks the viewer over
+  the live, visible timeline behind it. If the user swipes to a different item that is currently offscreen in
+  `TimelineScreen`'s `LazyColumn`, either jump `listState.scrollToItem(index)` as swipe-down dismiss begins so
+  shared-element bounds exist, or fall back to a scale-to-center + fade dismiss and sync `TimelineScreen`'s scroll
   position when dismiss settles.
 * **Spring Physics:** Use snappy, natural Material 3 Expressive springs (avoid sluggish linear/ease curves):
     * Spatial changes (shared photo bounds, bottom sheet expand, viewer swipe-to-dismiss): lightly damped spring (
@@ -138,7 +141,8 @@ fun concentricRadius(outer: Dp, padding: Dp, min: Dp = 8.dp): Dp =
 ### 6.2 Floating Bottom Navigation Bar + Detached Search Button
 
 * **Visibility:** Always anchored at the bottom above `WindowInsets.navigationBars` (with ~`12.dp`–`16.dp` margin).
-  **Does not hide on scroll down.** List content scrolls behind it (add bottom `contentPadding` to lists so the final row
+  **Does not hide on scroll down.** List content scrolls behind it (add bottom `contentPadding` to lists so the final
+  row
   can scroll above the bar).
 * **Main Nav Pill:**
     * Shape: `CircleShape` (stadium pill), opaque `surfaceContainerHigh` with subtle tonal elevation/shadow (`6.dp`–
@@ -146,7 +150,8 @@ fun concentricRadius(outer: Dp, padding: Dp, min: Dp = 8.dp): Dp =
     * **Phase 1 Destinations:** `Photos` | `Collections` | `Explore` (unimplemented pages render clean placeholder
       screens).
     * **Tab Styling (Web Parity):**
-        * **Active tab:** Nested concentric `CircleShape` pill (`primaryContainer` fill) containing **Icon + Text label**
+        * **Active tab:** Nested concentric `CircleShape` pill (`primaryContainer` fill) containing **Icon + Text label
+          **
           (`onPrimaryContainer`).
         * **Inactive tabs:** **Text label only** (`onSurfaceVariant`), no icon—preserving the clean, airy proportions of
           the screenshot.
@@ -222,14 +227,16 @@ fun concentricRadius(outer: Dp, padding: Dp, min: Dp = 8.dp): Dp =
 * **Canvas:** `#000000` background at rest (fading backdrop opacity on swipe-down so `TimelineScreen` shows underneath),
   full edge-to-edge behind translucent system bars (forcing light status/nav bar icons with
   `isAppearanceLightStatusBars = false` and `isAppearanceLightNavigationBars = false` even in light mode, hiding
-  system bars when chrome is toggled off, and restoring both on exit inside `DisposableEffect`).
+  system bars when chrome is toggled off, and restoring both on exit inside `DisposableEffect`). Ensure `BackHandler`
+  precedence layers cleanly (`DateTimeEditDialog` / `MediaInfoBottomSheet` > `MediaViewerScreen` > `MainScreen`
+  Search).
 * **Top Floating Bar & Overflow Menu:**
     * Compact `CircleShape` `Back` pill, title/date/counter pill, and top-right `⋮` overflow menu button using dark
       translucent scrims (`Color.Black.copy(alpha = 0.45f)`–`0.6f`).
     * **Top-right overflow menu items:** `About` (fallback trigger for the info sheet), `Copy` (photos only; hidden on
-      videos and missing items), `Rotate clockwise` (photos only; hidden on videos, panoramas, missing items, and
-      unsupported MIME types), `Reprocess`, plus video-only `Playback speed` (opens speed selector UI) and `Loop video`
-      toggle.
+      videos and missing items), `Rotate clockwise` (JPEG/PNG/WebP photos only; hidden on videos, panoramas, missing
+      items, offline `SYNCED` items, and unsupported MIME types), `Reprocess`, plus video-only `Playback speed` (opens
+      speed selector UI) and `Loop video` toggle.
 * **Bottom Floating Pill:**
     * Compact `CircleShape` pill hosting **Share**, **Add to** (album), and **Bin**—no Info button in the bottom pill
       (Info is accessed via swipe-up or `About` in the top-right menu).
@@ -237,7 +244,8 @@ fun concentricRadius(outer: Dp, padding: Dp, min: Dp = 8.dp): Dp =
       action pill and fade together on tap. Video rendering uses `ContentFrame` +
       `rememberPresentationState(player, keepContentOnReset = true)` with `SURFACE_TYPE_TEXTURE_VIEW` so
       scale/clip/translation transforms animate cleanly and the thumbnail shutter stays visible until the first frame
-      renders.
+      renders (`exoPlayer.stop()` + `clearMediaItems()` synchronously on page change so switching videos never flashes
+      the previous video's frame).
 * **Gestures:**
     * Swipe horizontally (`HorizontalPager`) between items; paging is locked (`userScrollEnabled = false`) while the
       active page is zoomed in.
