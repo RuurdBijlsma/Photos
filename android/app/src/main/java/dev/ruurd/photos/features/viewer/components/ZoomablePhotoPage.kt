@@ -21,6 +21,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -29,11 +30,11 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import coil3.request.ImageRequest
+import coil3.request.crossfade
 import dev.ruurd.photos.core.database.entity.TimelineMediaProjection
 import dev.ruurd.photos.core.image.MediaStoreThumbnail
 import dev.ruurd.photos.core.image.MemoryCacheKeyRegistry
 import dev.ruurd.photos.ui.theme.PhotosRadii
-import kotlinx.coroutines.delay
 import me.saket.telephoto.zoomable.ZoomableState
 import me.saket.telephoto.zoomable.coil3.ZoomableAsyncImage
 import me.saket.telephoto.zoomable.rememberZoomableImageState
@@ -44,46 +45,46 @@ fun ZoomablePhotoPage(
     item: TimelineMediaProjection,
     baseUrl: String,
     isActivePage: Boolean,
-    isSettledPage: Boolean,
     memoryCacheKeyRegistry: MemoryCacheKeyRegistry,
     onTap: () -> Unit,
     modifier: Modifier = Modifier,
-    onZoomableStateReady: (ZoomableState) -> Unit = {}
+    onZoomFractionChanged: (Float) -> Unit = {}
 ) {
     val context = LocalContext.current
     val zoomableState = rememberZoomableState()
-
-    LaunchedEffect(zoomableState) {
-        onZoomableStateReady(zoomableState)
-    }
 
     // Reset zoom when swiping off-page
     LaunchedEffect(isActivePage) {
         if (!isActivePage) {
             zoomableState.resetZoom()
+            onZoomFractionChanged(0f)
         }
     }
 
     val zoomFraction = zoomableState.zoomFraction ?: 0f
     val isZoomed = zoomFraction > 0.01f
 
-    // Two-tier preview-first loading for local items:
-    // Render lightweight MediaStoreThumbnail on frame 1 and N ± 1 offscreen pages.
-    // Upgrade to full-res raw content:// Uri only ~150-250ms after settled or immediately when zoom begins.
-    var isUpgradedToFullRes by remember(item.id) { mutableStateOf(false) }
-
-    LaunchedEffect(item.id, isSettledPage, isZoomed) {
-        if (item.localContentUri != null && !item.isVideo && !isUpgradedToFullRes) {
-            if (isZoomed) {
-                isUpgradedToFullRes = true
-            } else if (isSettledPage) {
-                delay(200L)
-                isUpgradedToFullRes = true
+    // Continuously observe zoom fraction on active page so HorizontalPager userScrollEnabled
+    // is immediately disabled when zoomed in, preventing accidental paging while panning
+    LaunchedEffect(zoomableState, isActivePage) {
+        if (isActivePage) {
+            snapshotFlow { zoomableState.zoomFraction ?: 0f }.collect { fraction ->
+                onZoomFractionChanged(fraction)
             }
         }
     }
 
-    val cachedKey = remember(item.id) { memoryCacheKeyRegistry.get(item.id) }
+    // Active page upgrades to full-res immediately so opening a photo doesn't flash
+    // a low-res thumbnail before swapping to high-res. Offscreen neighbor pages stay on lightweight preview.
+    var isUpgradedToFullRes by remember(item.id) { mutableStateOf(isActivePage) }
+
+    LaunchedEffect(item.id, isActivePage, isZoomed) {
+        if (item.localContentUri != null && !item.isVideo && !isUpgradedToFullRes) {
+            if (isActivePage || isZoomed) {
+                isUpgradedToFullRes = true
+            }
+        }
+    }
 
     val localUri = remember(item.localContentUri) { item.localContentUri?.let(Uri::parse) }
     val cloudFallbackUrl = remember(item, baseUrl) {
@@ -122,7 +123,7 @@ fun ZoomablePhotoPage(
         }
     }
 
-    val request = remember(imageModel, cachedKey, isUpgradedToFullRes) {
+    val request = remember(imageModel, isUpgradedToFullRes) {
         ImageRequest.Builder(context)
             .data(imageModel)
             .apply {
@@ -130,10 +131,11 @@ fun ZoomablePhotoPage(
                     val targetHeight = if (item.isVideo) 720 else 1440
                     size(targetHeight, targetHeight)
                 }
-                if (cachedKey != null) {
-                    placeholderMemoryCacheKey(cachedKey)
-                }
+                // Cheap already-decoded bitmap stays on screen until the next tier arrives, so
+                // swapping preview -> full-res fades instead of blinking to black.
+                memoryCacheKeyRegistry.get(item.id)?.let(::placeholderMemoryCacheKey)
             }
+            .crossfade(CROSSFADE_MS)
             .listener(
                 onSuccess = { _, result ->
                     result.memoryCacheKey?.let { key ->
@@ -192,3 +194,5 @@ fun ZoomablePhotoPage(
         }
     }
 }
+
+private const val CROSSFADE_MS = 180

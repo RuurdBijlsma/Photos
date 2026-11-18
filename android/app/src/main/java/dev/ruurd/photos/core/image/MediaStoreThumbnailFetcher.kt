@@ -170,8 +170,11 @@ class MediaStoreThumbnailFetcher(
     }
 
     class ThumbnailKeyer : Keyer<MediaStoreThumbnail> {
-        override fun key(data: MediaStoreThumbnail, options: Options): String =
-            "mediastore:${data.uri}"
+        override fun key(data: MediaStoreThumbnail, options: Options): String {
+            val width = (options.size.width as? Dimension.Pixels)?.px ?: DEFAULT_SIZE_PX
+            val height = (options.size.height as? Dimension.Pixels)?.px ?: DEFAULT_SIZE_PX
+            return "mediastore:${data.uri}?size=${width}x${height}"
+        }
     }
 
     private companion object {
