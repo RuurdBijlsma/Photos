@@ -173,12 +173,11 @@ class MediaViewerTransitionState(
             }
         }
 
-    fun chromeAlpha(isChromeVisible: Boolean): Float = when {
+    fun chromeAlpha(visibilityAlpha: Float): Float = when {
         closingState != null -> 0f
-        !isChromeVisible -> 0f
-        isOpeningHero -> ((openProgress.value * 1.4f) - 0.2f).coerceIn(0f, 1f)
-        hasValidOpenSource -> chromeDragAlpha
-        else -> (fallbackFadeIn.value * chromeDragAlpha).coerceIn(0f, 1f)
+        isOpeningHero -> ((openProgress.value * 1.4f) - 0.2f).coerceIn(0f, 1f) * visibilityAlpha
+        hasValidOpenSource -> chromeDragAlpha * visibilityAlpha
+        else -> (fallbackFadeIn.value * chromeDragAlpha) * visibilityAlpha
     }
 
     fun onSizeChanged(size: IntSize) {
@@ -274,7 +273,9 @@ class MediaViewerTransitionState(
         }
 
         val targetRect = boundsRegistry.boundsInRoot(activeItem.id)
-        onPreSyncScroll(activeItem.id)
+        if (targetRect == null) {
+            onPreSyncScroll(activeItem.id)
+        }
         onHiddenTimelineMediaChanged(targetRect?.let { activeItem.id })
 
         systemBars.restoreForTimeline()
@@ -372,7 +373,7 @@ class MediaViewerTransitionState(
                     val releaseY = releaseOffset.y.coerceAtLeast(0f)
                     val velocityY = velocityTracker.calculateVelocity().y
                     val shouldDismiss = releaseY > dismissThresholdPx ||
-                        (velocityY > 1000f && releaseY > fastFlickMinDistancePx)
+                            (velocityY > 1000f && releaseY > fastFlickMinDistancePx)
 
                     if (shouldDismiss) {
                         val releaseScale = (1f - (releaseY / 1400f)).coerceIn(0.55f, 1f)
@@ -443,8 +444,8 @@ fun rememberMediaViewerTransitionState(
             initialPagerState = pagerState,
             initialSize = containerSize,
             initiallyHasOpenSource = openSourceRect != null &&
-                containerSize.width > 0 &&
-                containerSize.height > 0,
+                    containerSize.width > 0 &&
+                    containerSize.height > 0,
             touchSlopPx = viewConfig.touchSlop,
             dismissThresholdPx = with(density) { DISMISS_THRESHOLD_DP.dp.toPx() },
             fastFlickMinDistancePx = with(density) { FAST_FLICK_MIN_DISTANCE_DP.dp.toPx() },

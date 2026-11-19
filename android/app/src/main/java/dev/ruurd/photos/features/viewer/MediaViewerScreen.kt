@@ -1,6 +1,8 @@
 ﻿package dev.ruurd.photos.features.viewer
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -48,6 +50,7 @@ fun MediaViewerScreen(
     onPreSyncScroll: (mediaId: String) -> Unit,
     onDismissFinished: () -> Unit,
     modifier: Modifier = Modifier,
+    onActiveMediaChanged: (String) -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val items = uiState.items
@@ -55,6 +58,7 @@ fun MediaViewerScreen(
     val currentItems by rememberUpdatedState(items)
     val currentActiveId by rememberUpdatedState(uiState.activeMediaId)
     val currentOnHiddenChanged by rememberUpdatedState(onHiddenTimelineMediaChanged)
+    val currentOnActiveMediaChanged by rememberUpdatedState(onActiveMediaChanged)
 
     val pagerState = key(uiState.isProjectionLoading) {
         val targetInitialIndex = if (uiState.isProjectionLoading) {
@@ -83,6 +87,10 @@ fun MediaViewerScreen(
         onPreSyncScroll = onPreSyncScroll,
         onDismissFinished = onDismissFinished,
     )
+
+    LaunchedEffect(uiState.activeMediaId) {
+        currentOnActiveMediaChanged(uiState.activeMediaId)
+    }
 
     LaunchedEffect(transition.hasValidOpenSource) {
         transition.playOpening()
@@ -145,9 +153,18 @@ fun MediaViewerScreen(
         baseUrl = baseUrl,
     )
 
-    BackHandler(enabled = !transition.isClosing) {
-        transition.startClosing(Offset.Zero, 1f, transition.backdropAlpha)
+    // Keep enabled throughout the closing animation so rapid double-back taps don't leak underneath.
+    BackHandler {
+        if (!transition.isClosing) {
+            transition.startClosing(Offset.Zero, 1f, transition.backdropAlpha)
+        }
     }
+
+    val chromeVisibilityAlpha by animateFloatAsState(
+        targetValue = if (uiState.isChromeVisible) 1f else 0f,
+        animationSpec = tween(durationMillis = CHROME_FADE_MS),
+        label = "chrome_visibility_alpha",
+    )
 
     // Outer Box stays untransformed so pointerInput reads stable screen coordinates during 2D drag
     Box(
@@ -166,7 +183,7 @@ fun MediaViewerScreen(
         // Interactive Pager Layer (hidden only while ClosingHeroOverlay is flying back to the tile)
         if (transition.closingState == null && items.isNotEmpty()) {
             val isPagerScrollEnabled = !isZoomed && !transition.isDragging &&
-                !transition.isOpeningHero
+                    !transition.isOpeningHero
 
             Box(
                 modifier = Modifier
@@ -249,7 +266,7 @@ fun MediaViewerScreen(
             )
         }
 
-        val chromeAlpha = transition.chromeAlpha(uiState.isChromeVisible)
+        val chromeAlpha = transition.chromeAlpha(chromeVisibilityAlpha)
         if (chromeAlpha > 0.01f) {
             ViewerChromeOverlay(
                 alpha = chromeAlpha,
@@ -264,3 +281,5 @@ fun MediaViewerScreen(
         }
     }
 }
+
+private const val CHROME_FADE_MS = 180

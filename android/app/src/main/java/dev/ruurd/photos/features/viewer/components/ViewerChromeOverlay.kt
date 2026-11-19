@@ -4,8 +4,10 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -16,7 +18,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -58,6 +60,7 @@ import kotlinx.collections.immutable.ImmutableList
  * Floating viewer chrome (top bar, overflow menu, bottom action pill) plus the status bar scrim.
  * Anchored to the screen edges and faded as one layer during open, drag and close.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ViewerChromeOverlay(
     alpha: Float,
@@ -67,7 +70,10 @@ fun ViewerChromeOverlay(
     isProjectionLoading: Boolean,
     onBack: () -> Unit,
 ) {
-    val statusBarPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    // Ignoring visibility keeps the top bar anchored when statusBars() animates back in on tap.
+    val statusBarPadding = WindowInsets.statusBarsIgnoringVisibility
+        .asPaddingValues()
+        .calculateTopPadding()
     val navBarPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
 
     Box(
@@ -99,6 +105,11 @@ fun ViewerChromeOverlay(
                     shape = CircleShape,
                     color = ViewerPillColor,
                     border = ViewerPillBorder,
+                    modifier = Modifier.clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = {},
+                    ),
                 ) {
                     val activeIndex = items.indexOfFirst { it.id == activeMediaId }
                     val displayIndex = ((if (activeIndex >= 0) activeIndex else currentPage) + 1)
@@ -185,16 +196,22 @@ fun ViewerChromeOverlay(
             border = ViewerPillBorder,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .padding(bottom = navBarPadding + 14.dp),
+                .padding(bottom = navBarPadding + 14.dp)
+                // Consume taps until Share / Add to / Bin are wired in Phases 2B, 4 & 5.
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = {},
+                ),
         ) {
             Row(
                 modifier = Modifier.padding(horizontal = 7.dp, vertical = 5.dp),
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                ViewerPillAction(imageVector = Icons.Default.Share, label = "Share")
-                ViewerPillAction(imageVector = Icons.Default.Add, label = "Add to")
-                ViewerPillAction(imageVector = Icons.Outlined.Delete, label = "Bin")
+                ViewerPillAction(imageVector = Icons.Default.Share, label = "Share", enabled = false)
+                ViewerPillAction(imageVector = Icons.Default.Add, label = "Add to", enabled = false)
+                ViewerPillAction(imageVector = Icons.Outlined.Delete, label = "Bin", enabled = false)
             }
         }
     }
@@ -251,7 +268,12 @@ private fun ViewerCircleButton(
 }
 
 @Composable
-private fun ViewerPillAction(imageVector: ImageVector, label: String) {
+private fun ViewerPillAction(
+    imageVector: ImageVector,
+    label: String,
+    enabled: Boolean = true,
+) {
+    val contentTint = if (enabled) Color.White else Color.White.copy(alpha = 0.5f)
     Row(
         modifier = Modifier
             .clip(CircleShape)
@@ -261,14 +283,14 @@ private fun ViewerPillAction(imageVector: ImageVector, label: String) {
         Icon(
             imageVector = imageVector,
             contentDescription = label,
-            tint = Color.White,
+            tint = contentTint,
             modifier = Modifier.size(21.dp),
         )
         Spacer(modifier = Modifier.width(7.dp))
         Text(
             text = label,
             style = MaterialTheme.typography.labelLarge,
-            color = Color.White,
+            color = contentTint,
         )
     }
 }

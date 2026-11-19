@@ -144,9 +144,14 @@ private fun AuthenticatedSession(
 
         fun syncTimelineToMedia(mediaId: String) {
             val rowIndex = currentLayout.findRowIndexForMedia(mediaId) ?: return
-            val isVisible = timelineListState.layoutInfo.visibleItemsInfo
-                .any { it.index == rowIndex }
-            if (!isVisible) {
+            val layoutInfo = timelineListState.layoutInfo
+            val clearTop = layoutInfo.viewportStartOffset + layoutInfo.beforeContentPadding
+            val clearBottom = layoutInfo.viewportEndOffset - layoutInfo.afterContentPadding
+            val itemInfo = layoutInfo.visibleItemsInfo.firstOrNull { it.index == rowIndex }
+            val isFullyInClearViewport = itemInfo != null &&
+                    itemInfo.offset >= clearTop &&
+                    itemInfo.offset + itemInfo.size <= clearBottom
+            if (!isFullyInClearViewport) {
                 coroutineScope.launch {
                     timelineListState.scrollToItem(rowIndex)
                 }
@@ -218,6 +223,11 @@ private fun AuthenticatedSession(
                     containerSize = rootContainerSize,
                     onHiddenTimelineMediaChanged = { hiddenTimelineMediaId = it },
                     onPreSyncScroll = ::syncTimelineToMedia,
+                    onActiveMediaChanged = { activeId ->
+                        if (activeViewerMediaId != null) {
+                            activeViewerMediaId = activeId
+                        }
+                    },
                     onDismissFinished = {
                         hiddenTimelineMediaId = null
                         viewerOpenSourceRect = null
@@ -243,6 +253,7 @@ private fun SessionMediaViewer(
     containerSize: IntSize,
     onHiddenTimelineMediaChanged: (String?) -> Unit,
     onPreSyncScroll: (mediaId: String) -> Unit,
+    onActiveMediaChanged: (String) -> Unit,
     onDismissFinished: () -> Unit,
 ) {
     val viewerOwner = remember(userId, sessionHolder) {
@@ -265,6 +276,7 @@ private fun SessionMediaViewer(
         onHiddenTimelineMediaChanged = onHiddenTimelineMediaChanged,
         onPreSyncScroll = onPreSyncScroll,
         onDismissFinished = onDismissFinished,
+        onActiveMediaChanged = onActiveMediaChanged,
     )
 }
 

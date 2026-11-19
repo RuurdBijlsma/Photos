@@ -9,13 +9,16 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.platform.LocalContext
 import coil3.SingletonImageLoader
 import dev.ruurd.photos.core.database.entity.TimelineMediaProjection
+import dev.ruurd.photos.core.image.LocalMemoryCacheKeyRegistry
 import dev.ruurd.photos.core.image.MediaImageRequests
 import kotlinx.collections.immutable.ImmutableList
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.launch
 
-/** Warms the current page ± 1 previews ~130 ms after the pager settles. */
+/** Warms nearby previews ~130 ms after the pager settles, cancelling superseded loads on swipe. */
 @Composable
 fun ViewerPrefetchEffect(
     pagerState: PagerState,
@@ -25,28 +28,38 @@ fun ViewerPrefetchEffect(
     val currentItems by rememberUpdatedState(items)
     val context = LocalContext.current
     val imageLoader = SingletonImageLoader.get(context)
+    val memoryCacheKeyRegistry = LocalMemoryCacheKeyRegistry.current
 
-    LaunchedEffect(pagerState, baseUrl, imageLoader) {
+    LaunchedEffect(pagerState, baseUrl, imageLoader, memoryCacheKeyRegistry) {
         snapshotFlow {
             if (currentItems.isEmpty()) null else pagerState.settledPage to currentItems
         }
             .filterNotNull()
             .collectLatest { (settledIndex, latestItems) ->
                 delay(PREFETCH_SETTLE_DELAY_MS)
-                val neighbors = listOf(settledIndex - 1, settledIndex + 1)
-                    .filter { it in latestItems.indices }
-                for (idx in neighbors) {
-                    val neighbor = latestItems[idx]
-                    val request = MediaImageRequests.previewRequest(
-                        context = context,
-                        localContentUri = neighbor.localContentUri,
-                        cloudId = neighbor.cloudId,
-                        isVideo = neighbor.isVideo,
-                        hasThumbnails = neighbor.hasThumbnails,
-                        baseUrl = baseUrl,
-                    )
-                    if (request != null) {
-                        imageLoader.enqueue(request)
+                val neighborIndices = listOf(
+                    settledIndex - 1,
+                    settledIndex + 1,
+                    settledIndex - 2,
+                    settledIndex + 2,
+                ).filter { it in latestItems.indices }
+
+                coroutineScope {
+                    for (idx in neighborIndices) {
+                        val neighbor = latestItems[idx]
+                        val request = MediaImageRequests.previewRequest(
+                            context = context,
+                            localContentUri = neighbor.localContentUri,
+                            cloudId = neighbor.cloudId,
+                            isVideo = neighbor.isVideo,
+                            hasThumbnails = neighbor.hasThumbnails,
+                            baseUrl = baseUrl,
+                            placeholderKey = memoryCacheKeyRegistry.get(neighbor.id),
+                            onCacheKey = { key -> memoryCacheKeyRegistry.put(neighbor.id, key) },
+                        )
+                        if (request != null) {
+                            launch { imageLoader.execute(request) }
+                        }
                     }
                 }
             }

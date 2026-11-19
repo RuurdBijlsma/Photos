@@ -69,14 +69,17 @@ fun ZoomablePhotoPage(
     var hasDisplayedFullResInFullQuality by remember(item.id, isUpgradedToFullRes) {
         mutableStateOf(false)
     }
-    if (isUpgradedToFullRes && fullResImageState?.isImageDisplayedInFullQuality == true) {
-        hasDisplayedFullResInFullQuality = true
+    val isFullResFullQuality = fullResImageState?.isImageDisplayedInFullQuality == true
+    LaunchedEffect(item.id, isUpgradedToFullRes, isFullResFullQuality) {
+        if (isUpgradedToFullRes && isFullResFullQuality) {
+            hasDisplayedFullResInFullQuality = true
+        }
     }
 
     val fullResReady = canUpgradeLocal &&
-        isUpgradedToFullRes &&
-        hasDisplayedFullResInFullQuality &&
-        !isPreviewZoomed
+            isUpgradedToFullRes &&
+            hasDisplayedFullResInFullQuality &&
+            !isPreviewZoomed
 
     val activeZoomableState = if (fullResReady && fullResZoomableState != null) {
         fullResZoomableState
