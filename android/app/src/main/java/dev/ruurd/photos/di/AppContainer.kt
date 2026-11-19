@@ -3,10 +3,10 @@ package dev.ruurd.photos.di
 import android.app.ActivityManager
 import android.content.Context
 import android.content.pm.ApplicationInfo
-import coil3.ImageLoader
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import coil3.ImageLoader
 import dev.ruurd.photos.core.common.AppDispatchers
 import dev.ruurd.photos.core.common.DefaultAppDispatchers
 import dev.ruurd.photos.core.database.AppDatabase
@@ -106,6 +106,7 @@ class DefaultAppContainer(private val context: Context) : AppContainer {
             context = context,
             scope = applicationScope,
             onClearSessionData = {
+                bootstrapState.reset()
                 withContext(dispatchers.io) {
                     mediaRepository.clearAll()
                     imageLoader.memoryCache?.clear()
@@ -262,7 +263,7 @@ class DefaultAppContainer(private val context: Context) : AppContainer {
         // Reached only after `SessionManager` loaded its persisted state, since that gates auth.
         BootstrapState(
             needsBootstrap = sessionManager.latestSyncTimestamp.value <= 0L &&
-                !sessionManager.hasScanSignature.value
+                    !sessionManager.hasScanSignature.value
         )
     }
 

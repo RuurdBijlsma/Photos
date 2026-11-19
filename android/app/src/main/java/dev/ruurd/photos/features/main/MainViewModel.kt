@@ -128,7 +128,6 @@ class MainViewModel(
                         _destination.value = MainDestination.PHOTOS
                         _isAvatarMenuOpen.value = false
                         _syncErrorMessage.value = null
-                        bootstrapState.reset()
                         return@collect
                     }
 

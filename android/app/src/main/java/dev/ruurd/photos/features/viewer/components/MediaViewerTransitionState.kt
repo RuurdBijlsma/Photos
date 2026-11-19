@@ -61,7 +61,8 @@ class MediaViewerTransitionState(
     private val scope: CoroutineScope,
     private val imageLoader: ImageLoader,
     private val memoryCacheKeyRegistry: MemoryCacheKeyRegistry,
-    private val boundsRegistry: TimelineTileBoundsRegistry,    private val pagerState: PagerState,
+    private val boundsRegistry: TimelineTileBoundsRegistry,
+    initialPagerState: PagerState,
     initialSize: IntSize,
     initiallyHasOpenSource: Boolean,
     private val touchSlopPx: Float,
@@ -73,14 +74,14 @@ class MediaViewerTransitionState(
     onDismissFinished: () -> Unit
 ) {
     /** Assigned by [rememberMediaViewerTransitionState] on every composition. */
+    internal var pagerState: PagerState = initialPagerState
     internal var items: ImmutableList<TimelineMediaProjection> = persistentListOf()
     internal var activeMediaId: String = ""
     internal var isZoomed: Boolean = false
     internal var openSourceRect: Rect? = null
-
-    private val onHiddenTimelineMediaChanged = onHiddenTimelineMediaChanged
-    private val onPreSyncScroll = onPreSyncScroll
-    private val onDismissFinished = onDismissFinished
+    internal var onHiddenTimelineMediaChanged: (String?) -> Unit = onHiddenTimelineMediaChanged
+    internal var onPreSyncScroll: (String) -> Unit = onPreSyncScroll
+    internal var onDismissFinished: () -> Unit = onDismissFinished
 
     var viewerSize by mutableStateOf(initialSize)
         private set
@@ -351,7 +352,7 @@ class MediaViewerTransitionState(
                     val releaseY = releaseOffset.y.coerceAtLeast(0f)
                     val velocityY = velocityTracker.calculateVelocity().y
                     val shouldDismiss = releaseY > dismissThresholdPx ||
-                        (velocityY > 1000f && releaseY > fastFlickMinDistancePx)
+                            (velocityY > 1000f && releaseY > fastFlickMinDistancePx)
 
                     if (shouldDismiss) {
                         val releaseScale = (1f - (releaseY / 1400f)).coerceIn(0.55f, 1f)
@@ -406,26 +407,24 @@ fun rememberMediaViewerTransitionState(
     val boundsRegistry = LocalTimelineTileBoundsRegistry.current
 
     val state = remember(
-        pagerState,
+        scope,
         imageLoader,
         memoryCacheKeyRegistry,
         boundsRegistry,
         viewConfig,
-        systemBars,
-        onHiddenTimelineMediaChanged,
-        onPreSyncScroll,
-        onDismissFinished
+        density,
+        systemBars
     ) {
         MediaViewerTransitionState(
             scope = scope,
             imageLoader = imageLoader,
             memoryCacheKeyRegistry = memoryCacheKeyRegistry,
             boundsRegistry = boundsRegistry,
-            pagerState = pagerState,
+            initialPagerState = pagerState,
             initialSize = containerSize,
             initiallyHasOpenSource = openSourceRect != null &&
-                containerSize.width > 0 &&
-                containerSize.height > 0,
+                    containerSize.width > 0 &&
+                    containerSize.height > 0,
             touchSlopPx = viewConfig.touchSlop,
             dismissThresholdPx = with(density) { DISMISS_THRESHOLD_DP.dp.toPx() },
             fastFlickMinDistancePx = with(density) { FAST_FLICK_MIN_DISTANCE_DP.dp.toPx() },
@@ -443,10 +442,14 @@ fun rememberMediaViewerTransitionState(
         onHiddenTimelineMediaChanged = onHiddenTimelineMediaChanged
     )
 
+    state.pagerState = pagerState
     state.items = items
     state.activeMediaId = activeMediaId
     state.isZoomed = isZoomed
     state.openSourceRect = openSourceRect
+    state.onHiddenTimelineMediaChanged = onHiddenTimelineMediaChanged
+    state.onPreSyncScroll = onPreSyncScroll
+    state.onDismissFinished = onDismissFinished
 
     return state
 }

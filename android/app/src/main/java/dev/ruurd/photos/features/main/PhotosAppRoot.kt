@@ -58,10 +58,6 @@ import kotlinx.coroutines.launch
  * The app's composition root: auth gate, per-user ViewModel stores, the navigation shell and the
  * viewer overlay that sits above it. `MainActivity` only hosts this.
  */
-@OptIn(
-    ExperimentalComposeUiApi::class,
-    ExperimentalFoundationApi::class
-)
 @Composable
 fun PhotosAppRoot(container: AppContainer) {
     val authState by container.authRepository.authState.collectAsState()
@@ -99,7 +95,9 @@ fun PhotosAppRoot(container: AppContainer) {
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(
+    ExperimentalFoundationApi::class
+)
 @Composable
 private fun AuthenticatedSession(
     container: AppContainer,

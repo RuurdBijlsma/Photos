@@ -2,7 +2,6 @@ package dev.ruurd.photos.features.viewer
 
 import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import dev.ruurd.photos.core.common.AppDispatchers
 import dev.ruurd.photos.core.database.entity.TimelineMediaProjection

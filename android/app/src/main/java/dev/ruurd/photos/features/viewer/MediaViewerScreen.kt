@@ -5,7 +5,6 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.Composable
@@ -29,13 +28,12 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.IntSize
 import dev.ruurd.photos.features.viewer.components.ClosingHeroState
 import dev.ruurd.photos.features.viewer.components.HeroImageOverlay
+import dev.ruurd.photos.features.viewer.components.VideoPlayBadge
 import dev.ruurd.photos.features.viewer.components.ViewerChromeOverlay
 import dev.ruurd.photos.features.viewer.components.ViewerPreSyncScrollEffect
 import dev.ruurd.photos.features.viewer.components.ViewerPrefetchEffect
-import dev.ruurd.photos.features.viewer.components.VideoPlayBadge
 import dev.ruurd.photos.features.viewer.components.ZoomablePhotoPage
 import dev.ruurd.photos.features.viewer.components.rememberMediaViewerTransitionState
-import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.filterNotNull
 
 /**
@@ -171,7 +169,7 @@ fun MediaViewerScreen(
         // Interactive Pager Layer (hidden only while ClosingHeroOverlay is flying back to the tile)
         if (transition.closingState == null && items.isNotEmpty()) {
             val isPagerScrollEnabled = !isZoomed && !transition.isDragging &&
-                !transition.isOpeningHero
+                    !transition.isOpeningHero
 
             Box(
                 modifier = Modifier

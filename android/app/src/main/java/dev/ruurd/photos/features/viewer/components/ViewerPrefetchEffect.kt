@@ -65,7 +65,7 @@ fun ViewerPreSyncScrollEffect(
     val currentIsClosing by rememberUpdatedState(isClosing)
     val currentOnPreSyncScroll by rememberUpdatedState(onPreSyncScroll)
 
-    LaunchedEffect(pagerState, currentItems) {
+    LaunchedEffect(pagerState) {
         snapshotFlow {
             if (currentItems.isEmpty()) null else pagerState.settledPage
         }
