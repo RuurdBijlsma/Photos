@@ -47,7 +47,7 @@ data class ClosingHeroState(
     val item: TimelineMediaProjection,
     val startRect: Rect,
     val targetRect: Rect?,
-    val startBackdropAlpha: Float
+    val startBackdropAlpha: Float,
 )
 
 /**
@@ -71,7 +71,7 @@ class MediaViewerTransitionState(
     private val systemBars: ViewerSystemBars,
     onHiddenTimelineMediaChanged: (String?) -> Unit,
     onPreSyncScroll: (String) -> Unit,
-    onDismissFinished: () -> Unit
+    onDismissFinished: () -> Unit,
 ) {
     /** Assigned by [rememberMediaViewerTransitionState] on every composition. */
     internal var pagerState: PagerState = initialPagerState
@@ -130,8 +130,7 @@ class MediaViewerTransitionState(
             else -> fallbackFadeIn.value
         }
 
-    fun openingRect(sourceRect: Rect, item: TimelineMediaProjection): Rect =
-        lerp(sourceRect, fittedRect(item), openProgress.value)
+    fun openingRect(sourceRect: Rect, item: TimelineMediaProjection): Rect = lerp(sourceRect, fittedRect(item), openProgress.value)
 
     fun closingRect(closing: ClosingHeroState): Rect {
         val targetRect = closing.targetRect
@@ -147,15 +146,13 @@ class MediaViewerTransitionState(
         return Rect(cx - w / 2f, cy - h / 2f, cx + w / 2f, cy + h / 2f)
     }
 
-    fun closingAlpha(closing: ClosingHeroState): Float =
-        if (closing.targetRect != null) 1f else (1f - closeProgress.value).coerceIn(0f, 1f)
+    fun closingAlpha(closing: ClosingHeroState): Float = if (closing.targetRect != null) 1f else (1f - closeProgress.value).coerceIn(0f, 1f)
 
-    private fun fittedRect(item: TimelineMediaProjection): Rect =
-        computeFittedRect(
-            containerWidth = viewerSize.width.toFloat(),
-            containerHeight = viewerSize.height.toFloat(),
-            ratio = resolvePhotoRatio(item)
-        )
+    private fun fittedRect(item: TimelineMediaProjection): Rect = computeFittedRect(
+        containerWidth = viewerSize.width.toFloat(),
+        containerHeight = viewerSize.height.toFloat(),
+        ratio = resolvePhotoRatio(item),
+    )
 
     private val dragBackdropAlpha: Float get() = (1f - (dragDistanceY / 500f)).coerceIn(0f, 1f)
 
@@ -167,8 +164,11 @@ class MediaViewerTransitionState(
             return when {
                 closing != null ->
                     (closing.startBackdropAlpha * (1f - closeProgress.value)).coerceIn(0f, 1f)
+
                 isOpeningHero -> openProgress.value.coerceIn(0f, 1f)
+
                 hasValidOpenSource -> dragBackdropAlpha
+
                 else -> (fallbackFadeIn.value * dragBackdropAlpha).coerceIn(0f, 1f)
             }
         }
@@ -196,8 +196,8 @@ class MediaViewerTransitionState(
                 targetValue = 1f,
                 animationSpec = spring(
                     dampingRatio = 0.85f,
-                    stiffness = Spring.StiffnessMediumLow
-                )
+                    stiffness = Spring.StiffnessMediumLow,
+                ),
             )
             if (!isClosing) {
                 hasFinishedOpening = true
@@ -217,8 +217,8 @@ class MediaViewerTransitionState(
                 targetValue = 1f,
                 animationSpec = spring(
                     dampingRatio = 0.88f,
-                    stiffness = Spring.StiffnessMediumLow
-                )
+                    stiffness = Spring.StiffnessMediumLow,
+                ),
             )
         } else {
             closeProgress.animateTo(1f, tween(durationMillis = FALLBACK_FADE_MS))
@@ -230,7 +230,7 @@ class MediaViewerTransitionState(
     fun startClosing(
         releaseOffset: Offset,
         releaseScale: Float,
-        releaseBackdropAlpha: Float
+        releaseBackdropAlpha: Float,
     ) {
         if (isClosing) return
         settleJob?.cancel()
@@ -268,7 +268,7 @@ class MediaViewerTransitionState(
                 left = centerX - startW / 2f,
                 top = centerY - startH / 2f,
                 right = centerX + startW / 2f,
-                bottom = centerY + startH / 2f
+                bottom = centerY + startH / 2f,
             )
             startAlpha = releaseBackdropAlpha
         }
@@ -283,7 +283,7 @@ class MediaViewerTransitionState(
             item = activeItem,
             startRect = startRect,
             targetRect = targetRect,
-            startBackdropAlpha = startAlpha
+            startBackdropAlpha = startAlpha,
         )
     }
 
@@ -372,7 +372,7 @@ class MediaViewerTransitionState(
                     val releaseY = releaseOffset.y.coerceAtLeast(0f)
                     val velocityY = velocityTracker.calculateVelocity().y
                     val shouldDismiss = releaseY > dismissThresholdPx ||
-                            (velocityY > 1000f && releaseY > fastFlickMinDistancePx)
+                        (velocityY > 1000f && releaseY > fastFlickMinDistancePx)
 
                     if (shouldDismiss) {
                         val releaseScale = (1f - (releaseY / 1400f)).coerceIn(0.55f, 1f)
@@ -387,8 +387,8 @@ class MediaViewerTransitionState(
                                 targetValue = Offset.Zero,
                                 animationSpec = spring(
                                     dampingRatio = Spring.DampingRatioNoBouncy,
-                                    stiffness = Spring.StiffnessMedium
-                                )
+                                    stiffness = Spring.StiffnessMedium,
+                                ),
                             )
                             if (!isActivelyDragging && !isClosing) {
                                 onHiddenTimelineMediaChanged(null)
@@ -416,7 +416,7 @@ fun rememberMediaViewerTransitionState(
     isChromeVisible: Boolean,
     onHiddenTimelineMediaChanged: (String?) -> Unit,
     onPreSyncScroll: (String) -> Unit,
-    onDismissFinished: () -> Unit
+    onDismissFinished: () -> Unit,
 ): MediaViewerTransitionState {
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
@@ -433,7 +433,7 @@ fun rememberMediaViewerTransitionState(
         boundsRegistry,
         viewConfig,
         density,
-        systemBars
+        systemBars,
     ) {
         MediaViewerTransitionState(
             scope = scope,
@@ -443,15 +443,15 @@ fun rememberMediaViewerTransitionState(
             initialPagerState = pagerState,
             initialSize = containerSize,
             initiallyHasOpenSource = openSourceRect != null &&
-                    containerSize.width > 0 &&
-                    containerSize.height > 0,
+                containerSize.width > 0 &&
+                containerSize.height > 0,
             touchSlopPx = viewConfig.touchSlop,
             dismissThresholdPx = with(density) { DISMISS_THRESHOLD_DP.dp.toPx() },
             fastFlickMinDistancePx = with(density) { FAST_FLICK_MIN_DISTANCE_DP.dp.toPx() },
             systemBars = systemBars,
             onHiddenTimelineMediaChanged = onHiddenTimelineMediaChanged,
             onPreSyncScroll = onPreSyncScroll,
-            onDismissFinished = onDismissFinished
+            onDismissFinished = onDismissFinished,
         )
     }
 
@@ -459,7 +459,7 @@ fun rememberMediaViewerTransitionState(
         systemBars = systemBars,
         isChromeVisible = isChromeVisible,
         isClosing = state.isClosing,
-        onHiddenTimelineMediaChanged = onHiddenTimelineMediaChanged
+        onHiddenTimelineMediaChanged = onHiddenTimelineMediaChanged,
     )
 
     state.pagerState = pagerState

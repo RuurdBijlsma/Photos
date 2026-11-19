@@ -30,7 +30,7 @@ class PullToRefreshState(
     isOnline: Boolean,
     isRefreshing: Boolean,
     onRefresh: () -> Unit,
-    onOfflineRefresh: () -> Unit
+    onOfflineRefresh: () -> Unit,
 ) {
     internal var currentIsOnline: Boolean = isOnline
     internal var currentIsRefreshing: Boolean = isRefreshing
@@ -113,8 +113,8 @@ class PullToRefreshState(
                 targetValue = 0f,
                 animationSpec = spring(
                     dampingRatio = Spring.DampingRatioNoBouncy,
-                    stiffness = Spring.StiffnessMediumLow
-                )
+                    stiffness = Spring.StiffnessMediumLow,
+                ),
             ) { value, _ ->
                 rawPullPx = value
             }
@@ -138,7 +138,7 @@ fun rememberPullToRefreshState(
     isOnline: Boolean,
     isRefreshing: Boolean,
     onRefresh: () -> Unit,
-    onOfflineRefresh: () -> Unit
+    onOfflineRefresh: () -> Unit,
 ): PullToRefreshState {
     val scope = rememberCoroutineScope()
     val haptic = LocalHapticFeedback.current
@@ -156,7 +156,7 @@ fun rememberPullToRefreshState(
             isOnline = isOnline,
             isRefreshing = isRefreshing,
             onRefresh = onRefresh,
-            onOfflineRefresh = onOfflineRefresh
+            onOfflineRefresh = onOfflineRefresh,
         )
     }
 

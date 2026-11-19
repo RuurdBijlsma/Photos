@@ -25,11 +25,11 @@ data class AuthUiState(
     val scanProgress: Float? = null,
     val hasScannedLan: Boolean = false,
     val discoveredServers: List<DiscoveredServer> = emptyList(),
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
 )
 
 class AuthViewModel(
-    private val authRepository: AuthRepository
+    private val authRepository: AuthRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(AuthUiState())
@@ -55,7 +55,7 @@ class AuthViewModel(
             it.copy(
                 serverUrl = url,
                 serverTestSuccess = null,
-                errorMessage = null
+                errorMessage = null,
             )
         }
     }
@@ -90,7 +90,7 @@ class AuthViewModel(
                     scanProgress = 0f,
                     hasScannedLan = false,
                     discoveredServers = emptyList(),
-                    errorMessage = null
+                    errorMessage = null,
                 )
             }
 
@@ -103,22 +103,24 @@ class AuthViewModel(
                                     .distinctBy { it.url }
                                     .sortedWith(
                                         compareByDescending<DiscoveredServer> { it.isEmulatorHost }
-                                            .thenBy { it.latencyMs }
+                                            .thenBy { it.latencyMs },
                                     )
                                 state.copy(discoveredServers = merged)
                             }
                         }
+
                         is LanScanEvent.Progress -> {
                             val fraction = event.completed.toFloat() / event.total.coerceAtLeast(1)
                             _uiState.update { it.copy(scanProgress = fraction.coerceIn(0f, 1f)) }
                         }
+
                         LanScanEvent.NoLocalNetwork -> {
                             _uiState.update {
                                 it.copy(
                                     isScanningLan = false,
                                     scanProgress = null,
                                     hasScannedLan = false,
-                                    errorMessage = "Connect to Wi-Fi to scan your local network."
+                                    errorMessage = "Connect to Wi-Fi to scan your local network.",
                                 )
                             }
                         }
@@ -130,7 +132,7 @@ class AuthViewModel(
                         state.copy(
                             isScanningLan = false,
                             scanProgress = null,
-                            hasScannedLan = true
+                            hasScannedLan = true,
                         )
                     } else {
                         state
@@ -155,7 +157,7 @@ class AuthViewModel(
             it.copy(
                 serverUrl = server.url,
                 serverTestSuccess = true,
-                errorMessage = null
+                errorMessage = null,
             )
         }
         viewModelScope.launch {
@@ -167,7 +169,7 @@ class AuthViewModel(
         _uiState.update {
             it.copy(
                 email = email,
-                errorMessage = null
+                errorMessage = null,
             )
         }
     }
@@ -176,7 +178,7 @@ class AuthViewModel(
         _uiState.update {
             it.copy(
                 password = password,
-                errorMessage = null
+                errorMessage = null,
             )
         }
     }
@@ -196,7 +198,7 @@ class AuthViewModel(
                 it.copy(
                     isTestingServer = true,
                     serverTestSuccess = null,
-                    errorMessage = null
+                    errorMessage = null,
                 )
             }
 
@@ -209,7 +211,7 @@ class AuthViewModel(
                             serverUrl = normalizedUrl,
                             isTestingServer = false,
                             serverTestSuccess = true,
-                            errorMessage = null
+                            errorMessage = null,
                         )
                     }
                 },
@@ -218,10 +220,10 @@ class AuthViewModel(
                         it.copy(
                             isTestingServer = false,
                             serverTestSuccess = false,
-                            errorMessage = "Cannot reach server: ${error.localizedMessage ?: "Unknown error"}"
+                            errorMessage = "Cannot reach server: ${error.localizedMessage ?: "Unknown error"}",
                         )
                     }
-                }
+                },
             )
         }
     }
@@ -254,7 +256,7 @@ class AuthViewModel(
                 it.copy(
                     serverUrl = normalizedUrl,
                     isLoading = true,
-                    errorMessage = null
+                    errorMessage = null,
                 )
             }
             authRepository.setServerUrl(normalizedUrl)
@@ -268,10 +270,10 @@ class AuthViewModel(
                     _uiState.update {
                         it.copy(
                             isLoading = false,
-                            errorMessage = error.localizedMessage ?: "Login failed"
+                            errorMessage = error.localizedMessage ?: "Login failed",
                         )
                     }
-                }
+                },
             )
         }
     }

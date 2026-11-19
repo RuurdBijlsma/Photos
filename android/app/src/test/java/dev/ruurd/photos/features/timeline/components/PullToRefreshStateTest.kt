@@ -29,7 +29,7 @@ class PullToRefreshStateTest {
         isRefreshing: Boolean = false,
         onRefresh: () -> Unit = {},
         onOfflineRefresh: () -> Unit = {},
-        haptics: MutableList<HapticFeedbackType> = mutableListOf()
+        haptics: MutableList<HapticFeedbackType> = mutableListOf(),
     ) = PullToRefreshState(
         scope = scope,
         thresholdRawPx = 300f,
@@ -38,7 +38,7 @@ class PullToRefreshStateTest {
         isOnline = isOnline,
         isRefreshing = isRefreshing,
         onRefresh = onRefresh,
-        onOfflineRefresh = onOfflineRefresh
+        onOfflineRefresh = onOfflineRefresh,
     )
 
     @Test
@@ -77,60 +77,58 @@ class PullToRefreshStateTest {
     }
 
     @Test
-    fun `releasing past threshold when online triggers refresh and settles to zero`() =
-        runTest(TestFrameClock()) {
-            val haptics = mutableListOf<HapticFeedbackType>()
-            var refreshCalls = 0
-            var offlineCalls = 0
-            val state = createState(
-                scope = this,
-                isOnline = true,
-                onRefresh = { refreshCalls++ },
-                onOfflineRefresh = { offlineCalls++ },
-                haptics = haptics
-            )
+    fun `releasing past threshold when online triggers refresh and settles to zero`() = runTest(TestFrameClock()) {
+        val haptics = mutableListOf<HapticFeedbackType>()
+        var refreshCalls = 0
+        var offlineCalls = 0
+        val state = createState(
+            scope = this,
+            isOnline = true,
+            onRefresh = { refreshCalls++ },
+            onOfflineRefresh = { offlineCalls++ },
+            haptics = haptics,
+        )
 
-            state.onPullDelta(320f)
-            state.onRelease()
+        state.onPullDelta(320f)
+        state.onRelease()
 
-            assertEquals(1, refreshCalls)
-            assertEquals(0, offlineCalls)
-            assertEquals(
-                listOf(HapticFeedbackType.GestureThresholdActivate, HapticFeedbackType.Confirm),
-                haptics
-            )
+        assertEquals(1, refreshCalls)
+        assertEquals(0, offlineCalls)
+        assertEquals(
+            listOf(HapticFeedbackType.GestureThresholdActivate, HapticFeedbackType.Confirm),
+            haptics,
+        )
 
-            advanceUntilIdle()
-            assertFalse(state.isPulled)
-            assertEquals(0f, state.contentOffsetPx, 0.001f)
-        }
+        advanceUntilIdle()
+        assertFalse(state.isPulled)
+        assertEquals(0f, state.contentOffsetPx, 0.001f)
+    }
 
     @Test
-    fun `releasing past threshold when offline triggers offline feedback and local refresh only`() =
-        runTest(TestFrameClock()) {
-            val haptics = mutableListOf<HapticFeedbackType>()
-            var refreshCalls = 0
-            var offlineCalls = 0
-            val state = createState(
-                scope = this,
-                isOnline = false,
-                onRefresh = { refreshCalls++ },
-                onOfflineRefresh = { offlineCalls++ },
-                haptics = haptics
-            )
+    fun `releasing past threshold when offline triggers offline feedback and local refresh only`() = runTest(TestFrameClock()) {
+        val haptics = mutableListOf<HapticFeedbackType>()
+        var refreshCalls = 0
+        var offlineCalls = 0
+        val state = createState(
+            scope = this,
+            isOnline = false,
+            onRefresh = { refreshCalls++ },
+            onOfflineRefresh = { offlineCalls++ },
+            haptics = haptics,
+        )
 
-            state.onPullDelta(320f)
-            state.onRelease()
+        state.onPullDelta(320f)
+        state.onRelease()
 
-            assertEquals(0, refreshCalls)
-            assertEquals(1, offlineCalls)
-            assertEquals(1, state.offlineFeedbackCount)
-            assertEquals(
-                listOf(HapticFeedbackType.GestureThresholdActivate, HapticFeedbackType.Reject),
-                haptics
-            )
-            advanceUntilIdle()
-        }
+        assertEquals(0, refreshCalls)
+        assertEquals(1, offlineCalls)
+        assertEquals(1, state.offlineFeedbackCount)
+        assertEquals(
+            listOf(HapticFeedbackType.GestureThresholdActivate, HapticFeedbackType.Reject),
+            haptics,
+        )
+        advanceUntilIdle()
+    }
 
     @Test
     fun `releasing before threshold does not trigger refresh`() = runTest(TestFrameClock()) {
@@ -153,7 +151,7 @@ class PullToRefreshStateTest {
             scope = this,
             isRefreshing = true,
             onRefresh = { refreshCalls++ },
-            haptics = haptics
+            haptics = haptics,
         )
 
         state.onPullDelta(350f)

@@ -27,8 +27,9 @@ private val Context.sessionDataStore: DataStore<Preferences> by preferencesDataS
 class SessionManager(
     private val context: Context,
     scope: CoroutineScope,
-    private val onClearSessionData: suspend () -> Unit = {}
-) : SyncTimestampStore, ScanStateStore {
+    private val onClearSessionData: suspend () -> Unit = {},
+) : SyncTimestampStore,
+    ScanStateStore {
     companion object {
         const val DEFAULT_SERVER_URL = "http://192.168.2.2:5272"
 
@@ -78,8 +79,8 @@ class SessionManager(
                         name = name,
                         role = role,
                         mediaFolder = prefs[KEY_USER_MEDIA_FOLDER],
-                        avatarId = prefs[KEY_USER_AVATAR_ID]
-                    )
+                        avatarId = prefs[KEY_USER_AVATAR_ID],
+                    ),
                 )
             } else {
                 AuthState.Unauthenticated

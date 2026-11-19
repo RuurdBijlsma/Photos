@@ -58,7 +58,7 @@ fun ViewerSystemBarsEffect(
     systemBars: ViewerSystemBars,
     isChromeVisible: Boolean,
     isClosing: Boolean,
-    onHiddenTimelineMediaChanged: (String?) -> Unit
+    onHiddenTimelineMediaChanged: (String?) -> Unit,
 ) {
     val currentOnHiddenChanged = rememberUpdatedState(onHiddenTimelineMediaChanged)
 

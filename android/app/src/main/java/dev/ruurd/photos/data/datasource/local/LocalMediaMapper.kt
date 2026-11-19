@@ -20,13 +20,12 @@ object LocalMediaMapper {
         return date.year * 100 + date.monthValue
     }
 
-    fun timezoneOffsetMinutes(timestampMs: Long, zone: ZoneId): Int =
-        zone.rules.getOffset(Instant.ofEpochMilli(timestampMs)).totalSeconds / 60
+    fun timezoneOffsetMinutes(timestampMs: Long, zone: ZoneId): Int = zone.rules.getOffset(Instant.ofEpochMilli(timestampMs)).totalSeconds / 60
 
     fun toEntity(
         file: LocalMediaFile,
         isVisibleInTimeline: Boolean,
-        zone: ZoneId = ZoneId.systemDefault()
+        zone: ZoneId = ZoneId.systemDefault(),
     ): MediaEntity = MediaEntity(
         id = rowId(file.mediaStoreId),
         cloudId = null,
@@ -45,7 +44,7 @@ object LocalMediaMapper {
         durationMs = file.durationMs,
         hasThumbnails = false,
         blake3Hash = null,
-        syncStatus = SyncStatus.LOCAL_ONLY
+        syncStatus = SyncStatus.LOCAL_ONLY,
     )
 
     fun rowId(mediaStoreId: Long): String = "local_$mediaStoreId"

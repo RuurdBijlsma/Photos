@@ -29,23 +29,17 @@ class MediaStoreDataSource(private val context: Context) : LocalMediaStore {
 
     private val contentResolver: ContentResolver = context.contentResolver
 
-    override suspend fun queryImages(modifiedAfterGeneration: Long?): List<LocalMediaFile> =
-        query(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, isVideo = false, modifiedAfterGeneration)
+    override suspend fun queryImages(modifiedAfterGeneration: Long?): List<LocalMediaFile> = query(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, isVideo = false, modifiedAfterGeneration)
 
-    override suspend fun queryVideos(modifiedAfterGeneration: Long?): List<LocalMediaFile> =
-        query(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, isVideo = true, modifiedAfterGeneration)
+    override suspend fun queryVideos(modifiedAfterGeneration: Long?): List<LocalMediaFile> = query(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, isVideo = true, modifiedAfterGeneration)
 
-    override suspend fun queryImageUris(): Set<String> =
-        queryUris(MediaStore.Images.Media.EXTERNAL_CONTENT_URI)
+    override suspend fun queryImageUris(): Set<String> = queryUris(MediaStore.Images.Media.EXTERNAL_CONTENT_URI)
 
-    override suspend fun queryVideoUris(): Set<String> =
-        queryUris(MediaStore.Video.Media.EXTERNAL_CONTENT_URI)
+    override suspend fun queryVideoUris(): Set<String> = queryUris(MediaStore.Video.Media.EXTERNAL_CONTENT_URI)
 
-    override suspend fun generation(): Long =
-        MediaStore.getGeneration(context, MediaStore.VOLUME_EXTERNAL)
+    override suspend fun generation(): Long = MediaStore.getGeneration(context, MediaStore.VOLUME_EXTERNAL)
 
-    override suspend fun version(): String =
-        MediaStore.getVersion(context, MediaStore.VOLUME_EXTERNAL)
+    override suspend fun version(): String = MediaStore.getVersion(context, MediaStore.VOLUME_EXTERNAL)
 
     @OptIn(FlowPreview::class)
     override fun observeChanges(): Flow<Unit> = callbackFlow {
@@ -57,12 +51,12 @@ class MediaStoreDataSource(private val context: Context) : LocalMediaStore {
         contentResolver.registerContentObserver(
             MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
             true,
-            observer
+            observer,
         )
         contentResolver.registerContentObserver(
             MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
             true,
-            observer
+            observer,
         )
         awaitClose {
             contentResolver.unregisterContentObserver(observer)
@@ -74,7 +68,7 @@ class MediaStoreDataSource(private val context: Context) : LocalMediaStore {
     private fun query(
         collection: Uri,
         isVideo: Boolean,
-        modifiedAfterGeneration: Long?
+        modifiedAfterGeneration: Long?,
     ): List<LocalMediaFile> {
         val projection =
             BASE_PROJECTION + if (isVideo) arrayOf(MediaStore.Video.Media.DURATION) else emptyArray<String>()
@@ -131,18 +125,15 @@ class MediaStoreDataSource(private val context: Context) : LocalMediaStore {
             dateTakenMs = dateTaken,
             mimeType = getStringOrNull(MediaStore.MediaColumns.MIME_TYPE),
             isVideo = isVideo,
-            durationMs = if (isVideo) getIntOrNull(MediaStore.Video.Media.DURATION) else null
+            durationMs = if (isVideo) getIntOrNull(MediaStore.Video.Media.DURATION) else null,
         )
     }
 
-    private fun Cursor.getLongOrNull(column: String): Long? =
-        getColumnIndex(column).takeIf { it >= 0 && !isNull(it) }?.let { getLong(it) }
+    private fun Cursor.getLongOrNull(column: String): Long? = getColumnIndex(column).takeIf { it >= 0 && !isNull(it) }?.let { getLong(it) }
 
-    private fun Cursor.getIntOrNull(column: String): Int? =
-        getColumnIndex(column).takeIf { it >= 0 && !isNull(it) }?.let { getInt(it) }
+    private fun Cursor.getIntOrNull(column: String): Int? = getColumnIndex(column).takeIf { it >= 0 && !isNull(it) }?.let { getInt(it) }
 
-    private fun Cursor.getStringOrNull(column: String): String? =
-        getColumnIndex(column).takeIf { it >= 0 && !isNull(it) }?.let { getString(it) }
+    private fun Cursor.getStringOrNull(column: String): String? = getColumnIndex(column).takeIf { it >= 0 && !isNull(it) }?.let { getString(it) }
 
     private companion object {
         // Column ids only: `MediaStore.MediaColumns.ORIENTATION` is deprecated and may be removed.
@@ -160,11 +151,11 @@ class MediaStoreDataSource(private val context: Context) : LocalMediaStore {
             MediaStore.MediaColumns.BUCKET_ID,
             MediaStore.MediaColumns.BUCKET_DISPLAY_NAME,
             MediaStore.MediaColumns.RELATIVE_PATH,
-            MediaStore.MediaColumns.MIME_TYPE
+            MediaStore.MediaColumns.MIME_TYPE,
         )
 
         val SELECTION = "${MediaStore.MediaColumns.IS_PENDING} = 0" +
-                " AND ${MediaStore.MediaColumns.IS_TRASHED} = 0" +
-                " AND ${MediaStore.MediaColumns.SIZE} > 0"
+            " AND ${MediaStore.MediaColumns.IS_TRASHED} = 0" +
+            " AND ${MediaStore.MediaColumns.SIZE} > 0"
     }
 }

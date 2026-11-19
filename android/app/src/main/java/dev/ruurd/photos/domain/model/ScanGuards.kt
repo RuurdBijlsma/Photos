@@ -11,6 +11,5 @@ object ScanGuards {
      * @param scannedCount rows the cursor returned for this media type
      * @param localCount local rows of this media type currently in Room
      */
-    fun shouldReconcileRemovals(fullAccess: Boolean, scannedCount: Int, localCount: Int): Boolean =
-        fullAccess && !(scannedCount == 0 && localCount > 0)
+    fun shouldReconcileRemovals(fullAccess: Boolean, scannedCount: Int, localCount: Int): Boolean = fullAccess && !(scannedCount == 0 && localCount > 0)
 }

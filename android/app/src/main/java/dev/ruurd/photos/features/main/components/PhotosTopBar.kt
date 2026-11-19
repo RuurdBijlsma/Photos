@@ -73,7 +73,7 @@ fun PhotosTopBar(
     pullToRefreshState: PullToRefreshState? = null,
     onStatusPillClick: () -> Unit = {},
     onAvatarClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val semanticColors = LocalSemanticColors.current
     val density = LocalDensity.current
@@ -101,8 +101,8 @@ fun PhotosTopBar(
                 targetValue = target,
                 animationSpec = spring(
                     dampingRatio = 0.85f,
-                    stiffness = Spring.StiffnessLow
-                )
+                    stiffness = Spring.StiffnessLow,
+                ),
             )
             syncSpinAngle.snapTo(0f)
         }
@@ -111,13 +111,13 @@ fun PhotosTopBar(
     val logoScale by animateFloatAsState(
         targetValue = if (isPulling && isArmed && !isSyncing) 1.12f else 1f,
         animationSpec = spring(dampingRatio = 0.5f, stiffness = Spring.StiffnessMedium),
-        label = "logo_pull_scale"
+        label = "logo_pull_scale",
     )
 
     val pillScale by animateFloatAsState(
         targetValue = if (isPulling && isArmed && !isSyncing) 1.06f else 1f,
         animationSpec = spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessMedium),
-        label = "pill_pull_scale"
+        label = "pill_pull_scale",
     )
 
     val offlineShakeOffsetDp = remember { Animatable(0f) }
@@ -127,7 +127,7 @@ fun PhotosTopBar(
             for (offset in keyframes) {
                 offlineShakeOffsetDp.animateTo(
                     targetValue = offset,
-                    animationSpec = tween(durationMillis = 48)
+                    animationSpec = tween(durationMillis = 48),
                 )
             }
         }
@@ -139,7 +139,7 @@ fun PhotosTopBar(
             .statusBarsPadding()
             .height(PhotosTopBarHeight)
             .padding(horizontal = 16.dp),
-        contentAlignment = Alignment.Center
+        contentAlignment = Alignment.Center,
     ) {
         // Left: Ruurd Photos flower-petal logo mark (rotates with pull and during sync)
         Image(
@@ -154,39 +154,44 @@ fun PhotosTopBar(
                     rotationZ = syncSpinAngle.value + pullProgress * 220f
                     scaleX = logoScale
                     scaleY = logoScale
-                }
+                },
         )
 
         // Center: Connectivity / Sync / Pull-to-refresh Status Pill
         val showStatusPill = !isOnline ||
-                isPulling ||
-                isSyncing ||
-                syncState == SyncState.SERVER_UNREACHABLE ||
-                syncState == SyncState.ERROR ||
-                hasSyncError
+            isPulling ||
+            isSyncing ||
+            syncState == SyncState.SERVER_UNREACHABLE ||
+            syncState == SyncState.ERROR ||
+            hasSyncError
 
         AnimatedVisibility(
             visible = showStatusPill,
             enter = fadeIn() + scaleIn(initialScale = 0.88f),
             exit = fadeOut() + scaleOut(targetScale = 0.88f),
-            modifier = Modifier.align(Alignment.Center)
+            modifier = Modifier.align(Alignment.Center),
         ) {
             val (pillText, pillColor, pillIcon) = when {
                 isSyncing -> Triple("Syncing...", semanticColors.syncing, Icons.Default.Sync)
+
                 !isOnline -> Triple(
                     if (isPulling && isArmed) "No connection" else "Offline",
                     semanticColors.offline,
-                    Icons.Default.CloudOff
+                    Icons.Default.CloudOff,
                 )
+
                 isPulling -> Triple(
                     if (isArmed) "Release to sync" else "Refresh",
                     semanticColors.syncing,
-                    Icons.Default.Sync
+                    Icons.Default.Sync,
                 )
+
                 syncState == SyncState.SERVER_UNREACHABLE ->
                     Triple("Server unreachable", semanticColors.error, Icons.Default.CloudOff)
+
                 syncState == SyncState.ERROR || hasSyncError ->
                     Triple("Sync failed", semanticColors.error, Icons.Default.ErrorOutline)
+
                 else -> Triple("", Color.Transparent, Icons.Default.Sync)
             }
 
@@ -208,30 +213,30 @@ fun PhotosTopBar(
                     .clip(CircleShape)
                     .background(
                         color = pillColor.copy(alpha = 0.15f),
-                        shape = CircleShape
+                        shape = CircleShape,
                     )
                     .then(
                         if (showPullFill) {
                             Modifier.border(
                                 width = 1.dp,
                                 color = pillColor.copy(alpha = 0.32f),
-                                shape = CircleShape
+                                shape = CircleShape,
                             )
                         } else {
                             Modifier
-                        }
+                        },
                     )
                     .clickable(
                         enabled = isOnline && !isSyncing && !isPulling,
-                        onClick = onStatusPillClick
+                        onClick = onStatusPillClick,
                     )
                     .animateContentSize(
                         animationSpec = spring(
                             dampingRatio = Spring.DampingRatioNoBouncy,
-                            stiffness = Spring.StiffnessMedium
-                        )
+                            stiffness = Spring.StiffnessMedium,
+                        ),
                     ),
-                contentAlignment = Alignment.Center
+                contentAlignment = Alignment.Center,
             ) {
                 StatusPillContent(
                     text = pillText,
@@ -240,7 +245,7 @@ fun PhotosTopBar(
                     rotateIconWithPull = showPullFill && isOnline,
                     pullToRefreshState = pullToRefreshState,
                     contentColor = pillColor,
-                    modifier = Modifier.padding(horizontal = 12.dp)
+                    modifier = Modifier.padding(horizontal = 12.dp),
                 )
 
                 if (showPullFill) {
@@ -258,7 +263,7 @@ fun PhotosTopBar(
                                 }
                             }
                             .background(pillColor),
-                        contentAlignment = Alignment.Center
+                        contentAlignment = Alignment.Center,
                     ) {
                         StatusPillContent(
                             text = pillText,
@@ -267,7 +272,7 @@ fun PhotosTopBar(
                             rotateIconWithPull = isOnline,
                             pullToRefreshState = pullToRefreshState,
                             contentColor = fillForeground,
-                            modifier = Modifier.padding(horizontal = 12.dp)
+                            modifier = Modifier.padding(horizontal = 12.dp),
                         )
                     }
                 }
@@ -286,15 +291,15 @@ fun PhotosTopBar(
                 .clip(CircleShape)
                 .background(MaterialTheme.colorScheme.primaryContainer)
                 .clickable(onClick = onAvatarClick),
-            contentAlignment = Alignment.Center
+            contentAlignment = Alignment.Center,
         ) {
             Text(
                 text = initial,
                 color = MaterialTheme.colorScheme.onPrimaryContainer,
                 style = MaterialTheme.typography.titleMedium.copy(
                     fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp
-                )
+                    fontSize = 16.sp,
+                ),
             )
         }
     }
@@ -308,18 +313,18 @@ private fun StatusPillContent(
     rotateIconWithPull: Boolean,
     pullToRefreshState: PullToRefreshState?,
     contentColor: Color,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     Row(
         modifier = modifier,
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Center
+        horizontalArrangement = Arrangement.Center,
     ) {
         if (isSyncing) {
             CircularProgressIndicator(
                 color = contentColor,
                 strokeWidth = 2.dp,
-                modifier = Modifier.size(14.dp)
+                modifier = Modifier.size(14.dp),
             )
         } else {
             Icon(
@@ -332,7 +337,7 @@ private fun StatusPillContent(
                         if (rotateIconWithPull) {
                             rotationZ = (pullToRefreshState?.pullProgress ?: 0f) * 220f
                         }
-                    }
+                    },
             )
         }
         Spacer(modifier = Modifier.width(6.dp))
@@ -340,7 +345,7 @@ private fun StatusPillContent(
             text = text,
             color = contentColor,
             maxLines = 1,
-            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold)
+            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
         )
     }
 }

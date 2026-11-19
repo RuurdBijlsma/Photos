@@ -12,7 +12,7 @@ object PhotosImageLoader {
 
     fun create(
         context: Context,
-        okHttpClient: OkHttpClient
+        okHttpClient: OkHttpClient,
     ): ImageLoader {
         val cacheDir = context.cacheDir.resolve("image_cache")
 
@@ -23,8 +23,8 @@ object PhotosImageLoader {
                 add(LibavifDecoder.Factory(threads = 2))
                 add(
                     OkHttpNetworkFetcherFactory(
-                        callFactory = { okHttpClient }
-                    )
+                        callFactory = { okHttpClient },
+                    ),
                 )
             }
             .memoryCache {

@@ -37,7 +37,7 @@ class AuthRepositoryImpl(
     private val directClient: OkHttpClient,
     private val lanServerScanner: LanServerScanner,
     private val dispatchers: AppDispatchers,
-    private val applicationScope: CoroutineScope
+    private val applicationScope: CoroutineScope,
 ) : AuthRepository {
 
     // Reachability checks and best-effort logout should fail fast instead of waiting out 30s timeouts.
@@ -56,66 +56,63 @@ class AuthRepositoryImpl(
         sessionManager.setServerUrl(url)
     }
 
-    override fun scanLocalServers(prioritizedHost: String?): Flow<LanScanEvent> =
-        lanServerScanner.scan(prioritizedHost)
+    override fun scanLocalServers(prioritizedHost: String?): Flow<LanScanEvent> = lanServerScanner.scan(prioritizedHost)
 
-    override suspend fun testServerConnection(url: String): Result<Unit> =
-        withContext(dispatchers.io) {
-            try {
-                val normalized = normalizeServerUrl(url)
-                if (normalized.isEmpty()) {
-                    return@withContext Result.failure(IllegalArgumentException("Server URL cannot be empty"))
-                }
-
-                val healthUrl = "$normalized/api/health".toHttpUrlOrNull()
-                    ?: return@withContext Result.failure(IllegalArgumentException("Invalid URL format"))
-
-                val request = Request.Builder()
-                    .url(healthUrl)
-                    .get()
-                    .build()
-
-                // Enqueued instead of execute() so cancelling the caller aborts the socket instead of
-                // blocking the IO dispatcher until the connect timeout expires.
-                shortTimeoutClient.newCall(request).await().use { response ->
-                    if (response.isSuccessful) {
-                        Result.success(Unit)
-                    } else {
-                        Result.failure(Exception("Server returned status ${response.code}"))
-                    }
-                }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                Result.failure(e)
+    override suspend fun testServerConnection(url: String): Result<Unit> = withContext(dispatchers.io) {
+        try {
+            val normalized = normalizeServerUrl(url)
+            if (normalized.isEmpty()) {
+                return@withContext Result.failure(IllegalArgumentException("Server URL cannot be empty"))
             }
-        }
 
-    override suspend fun login(email: String, password: String): Result<User> =
-        withContext(dispatchers.io) {
-            try {
-                val jsonBody = authJson.encodeToString(LoginRequest(email = email, password = password))
+            val healthUrl = "$normalized/api/health".toHttpUrlOrNull()
+                ?: return@withContext Result.failure(IllegalArgumentException("Invalid URL format"))
 
-                val requestBody = jsonBody.toRequestBody("application/json".toMediaType())
-                val response = apiService.login(requestBody)
+            val request = Request.Builder()
+                .url(healthUrl)
+                .get()
+                .build()
 
-                if (!response.isSuccessful) {
-                    val errorMsg = when (response.code()) {
-                        401 -> "Invalid email or password"
-                        429 -> "Too many attempts. Please try again shortly"
-                        else -> "Login failed: HTTP ${response.code()}"
-                    }
-                    return@withContext Result.failure(Exception(errorMsg))
+            // Enqueued instead of execute() so cancelling the caller aborts the socket instead of
+            // blocking the IO dispatcher until the connect timeout expires.
+            shortTimeoutClient.newCall(request).await().use { response ->
+                if (response.isSuccessful) {
+                    Result.success(Unit)
+                } else {
+                    Result.failure(Exception("Server returned status ${response.code}"))
                 }
-
-                // Successfully logged in; fetch user profile
-                fetchCurrentUser()
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                Result.failure(e)
             }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Result.failure(e)
         }
+    }
+
+    override suspend fun login(email: String, password: String): Result<User> = withContext(dispatchers.io) {
+        try {
+            val jsonBody = authJson.encodeToString(LoginRequest(email = email, password = password))
+
+            val requestBody = jsonBody.toRequestBody("application/json".toMediaType())
+            val response = apiService.login(requestBody)
+
+            if (!response.isSuccessful) {
+                val errorMsg = when (response.code()) {
+                    401 -> "Invalid email or password"
+                    429 -> "Too many attempts. Please try again shortly"
+                    else -> "Login failed: HTTP ${response.code()}"
+                }
+                return@withContext Result.failure(Exception(errorMsg))
+            }
+
+            // Successfully logged in; fetch user profile
+            fetchCurrentUser()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
 
     override suspend fun logout(): Result<Unit> = withContext(dispatchers.io) {
         try {
@@ -173,7 +170,7 @@ class AuthRepositoryImpl(
                     name = dto.name,
                     role = dto.role,
                     mediaFolder = dto.mediaFolder,
-                    avatarId = dto.avatarId
+                    avatarId = dto.avatarId,
                 )
                 sessionManager.setAuthenticated(user)
                 Result.success(user)

@@ -6,7 +6,7 @@ import okhttp3.Interceptor
 import okhttp3.Response
 
 class DynamicBaseUrlInterceptor(
-    private val sessionManager: SessionManager
+    private val sessionManager: SessionManager,
 ) : Interceptor {
 
     override fun intercept(chain: Interceptor.Chain): Response {

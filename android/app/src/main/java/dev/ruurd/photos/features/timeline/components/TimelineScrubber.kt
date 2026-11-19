@@ -85,7 +85,7 @@ fun TimelineScrubber(
     bottomPaddingDp: Float = 0f,
     topPaddingDp: Float = 0f,
     onScrubbingChanged: (Boolean) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val scope = rememberCoroutineScope()
     val haptic = LocalHapticFeedback.current
@@ -111,7 +111,7 @@ fun TimelineScrubber(
                 year = mark.year,
                 fraction = mark.fraction,
                 textLayout = textMeasurer.measure(AnnotatedString(mark.year.toString()), yearStyle),
-                activeTextLayout = textMeasurer.measure(AnnotatedString(mark.year.toString()), activeYearStyle)
+                activeTextLayout = textMeasurer.measure(AnnotatedString(mark.year.toString()), activeYearStyle),
             )
         }
     }
@@ -134,7 +134,7 @@ fun TimelineScrubber(
                 isDragging = isDragging,
                 isScrolling = listState.isScrollInProgress,
                 firstIndex = listState.firstVisibleItemIndex,
-                firstOffset = listState.firstVisibleItemScrollOffset
+                firstOffset = listState.firstVisibleItemScrollOffset,
             )
         }.collect { obs ->
             val moved = obs.firstIndex != lastIndex || obs.firstOffset != lastOffset
@@ -179,7 +179,7 @@ fun TimelineScrubber(
         } else {
             tween(durationMillis = 240)
         },
-        label = "scrubber_slide"
+        label = "scrubber_slide",
     )
     val slideOutPx = with(density) { (ThumbVisibleWidth + 12.dp).toPx() }
 
@@ -228,7 +228,7 @@ fun TimelineScrubber(
                             haptic.performHapticFeedback(HapticFeedbackType.SegmentFrequentTick)
                             seek(
                                 rawFraction = offset.y / size.height.coerceAtLeast(1),
-                                triggerYearHaptic = false
+                                triggerYearHaptic = false,
                             )
                         },
                         onDragEnd = {
@@ -253,9 +253,9 @@ fun TimelineScrubber(
                             }
                             seek(
                                 rawFraction = change.position.y / size.height.coerceAtLeast(1),
-                                triggerYearHaptic = true
+                                triggerYearHaptic = true,
                             )
-                        }
+                        },
                     )
                 } finally {
                     dragState.pauseJob?.cancel()
@@ -263,7 +263,7 @@ fun TimelineScrubber(
                     draggedLabel = null
                     currentOnScrubbingChanged(false)
                 }
-            }
+            },
     ) {
         val activeYear = if (isDragging) {
             layout.yearAt(layout.findRowIndexAtOffsetDp(dragFraction * currentMaxScrollDp))
@@ -284,7 +284,7 @@ fun TimelineScrubber(
                     activePillColor = activePillColor,
                     paddingX = 6.dp.toPx(),
                     paddingY = 2.dp.toPx(),
-                    gap = 4.dp.toPx()
+                    gap = 4.dp.toPx(),
                 )
             }
         }
@@ -292,7 +292,7 @@ fun TimelineScrubber(
         val thumbSizePx = with(density) { ThumbDiameter.roundToPx() }
         // Left of the visible part of the circle: the rest hangs past the screen edge.
         val thumbLeftPx = sizePx.width -
-                with(density) { ScrubberOverhang.roundToPx() + ThumbVisibleWidth.roundToPx() }
+            with(density) { ScrubberOverhang.roundToPx() + ThumbVisibleWidth.roundToPx() }
         Surface(
             shape = CircleShape,
             color = thumbColor,
@@ -305,14 +305,14 @@ fun TimelineScrubber(
                     val fraction = if (isDragging) dragFraction else scrollFraction.value
                     IntOffset(
                         x = thumbLeftPx,
-                        y = ((sizePx.height - thumbSizePx) * fraction).roundToInt()
+                        y = ((sizePx.height - thumbSizePx) * fraction).roundToInt(),
                     )
                 }
                 .graphicsLayer {
                     val effectiveReveal = if (isDragging) 1f else revealProgress
                     translationX = (1f - effectiveReveal) * slideOutPx
                 }
-                .size(ThumbDiameter)
+                .size(ThumbDiameter),
         ) {
             Box(contentAlignment = Alignment.Center) {
                 Icon(
@@ -321,7 +321,7 @@ fun TimelineScrubber(
                     tint = thumbIconColor,
                     modifier = Modifier
                         .offset(x = -ThumbIconOpticalShift)
-                        .size(ThumbIconSize)
+                        .size(ThumbIconSize),
                 )
             }
         }
@@ -339,7 +339,7 @@ fun TimelineScrubber(
                     softWrap = false,
                     style = MaterialTheme.typography.labelMedium.copy(
                         fontFamily = MontserratFontFamily,
-                        fontWeight = FontWeight.SemiBold
+                        fontWeight = FontWeight.SemiBold,
                     ),
                     color = MaterialTheme.colorScheme.onPrimaryContainer,
                     modifier = Modifier
@@ -352,7 +352,7 @@ fun TimelineScrubber(
                                 x = -with(density) {
                                     (ScrubberOverhang + ThumbVisibleWidth + PillGap).roundToPx()
                                 },
-                                y = pillYPx
+                                y = pillYPx,
                             )
                         }
                         .background(
@@ -361,10 +361,10 @@ fun TimelineScrubber(
                                 topStart = 16.dp,
                                 bottomStart = 16.dp,
                                 topEnd = 4.dp,
-                                bottomEnd = 4.dp
-                            )
+                                bottomEnd = 4.dp,
+                            ),
                         )
-                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
                 )
             }
         }
@@ -373,7 +373,7 @@ fun TimelineScrubber(
 
 internal data class PlacedYearMark(
     val top: Float,
-    val height: Float
+    val height: Float,
 )
 
 /**
@@ -382,7 +382,7 @@ internal data class PlacedYearMark(
  */
 internal fun selectVisibleYearMarkIndices(
     marks: List<PlacedYearMark>,
-    gap: Float
+    gap: Float,
 ): List<Int> {
     if (marks.isEmpty()) return emptyList()
     if (marks.size == 1) return listOf(0)
@@ -421,7 +421,7 @@ private fun DrawScope.drawYearPills(
     activePillColor: Color,
     paddingX: Float,
     paddingY: Float,
-    gap: Float
+    gap: Float,
 ) {
     if (marks.isEmpty()) return
 
@@ -447,11 +447,11 @@ private fun DrawScope.drawYearPills(
             color = if (isActive) activePillColor else pillColor,
             topLeft = Offset(left, placement.top),
             size = Size(pillWidth, placement.height),
-            cornerRadius = CornerRadius(placement.height / 2f)
+            cornerRadius = CornerRadius(placement.height / 2f),
         )
         drawText(
             textLayoutResult = text,
-            topLeft = Offset(left + paddingX, placement.top + paddingY)
+            topLeft = Offset(left + paddingX, placement.top + paddingY),
         )
     }
 }
@@ -460,14 +460,14 @@ private fun maxScrollDp(
     layout: TimelineLayoutIndex,
     viewportHeightDp: Float,
     topPaddingDp: Float,
-    bottomPaddingDp: Float
+    bottomPaddingDp: Float,
 ): Float = (layout.totalHeightDp + topPaddingDp + bottomPaddingDp - viewportHeightDp)
     .coerceAtLeast(1f)
 
 private fun yearLabelStyle(color: Color) = TextStyle(
     fontSize = 12.sp,
     fontWeight = FontWeight.SemiBold,
-    color = color
+    color = color,
 )
 
 private class ScrubberDragState {
@@ -479,7 +479,7 @@ private data class ScrollObservation(
     val isDragging: Boolean,
     val isScrolling: Boolean,
     val firstIndex: Int,
-    val firstOffset: Int
+    val firstOffset: Int,
 )
 
 @Immutable
@@ -487,7 +487,7 @@ private data class MeasuredYearMark(
     val year: Int,
     val fraction: Float,
     val textLayout: TextLayoutResult,
-    val activeTextLayout: TextLayoutResult
+    val activeTextLayout: TextLayoutResult,
 )
 
 private val ScrubberWidth = 36.dp

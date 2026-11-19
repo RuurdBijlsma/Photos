@@ -15,8 +15,7 @@ import coil3.size.Size as CoilSize
  */
 object MediaImageRequests {
 
-    fun previewHeightPx(isVideo: Boolean): Int =
-        if (isVideo) VIDEO_PREVIEW_HEIGHT_PX else PHOTO_PREVIEW_HEIGHT_PX
+    fun previewHeightPx(isVideo: Boolean): Int = if (isVideo) VIDEO_PREVIEW_HEIGHT_PX else PHOTO_PREVIEW_HEIGHT_PX
 
     /**
      * @param bypassPlatformThumbnail skips `ContentResolver.loadThumbnail`, used by viewer stills so
@@ -31,7 +30,7 @@ object MediaImageRequests {
         hasThumbnails: Boolean,
         baseUrl: String,
         heightPx: Int = previewHeightPx(isVideo),
-        bypassPlatformThumbnail: Boolean = !isVideo
+        bypassPlatformThumbnail: Boolean = !isVideo,
     ): Any? {
         val cloudUrl = cloudThumbnailUrl(baseUrl, cloudId, hasThumbnails, heightPx)
         val localUri = localContentUri?.let(Uri::parse)
@@ -41,7 +40,7 @@ object MediaImageRequests {
                 cloudId = cloudId,
                 cloudFallbackUrl = cloudUrl,
                 isVideo = isVideo,
-                bypassPlatformThumbnail = bypassPlatformThumbnail
+                bypassPlatformThumbnail = bypassPlatformThumbnail,
             )
         } else {
             cloudUrl
@@ -62,7 +61,7 @@ object MediaImageRequests {
         heightPx: Int = previewHeightPx(isVideo),
         bypassPlatformThumbnail: Boolean = !isVideo,
         placeholderKey: MemoryCache.Key? = null,
-        onCacheKey: ((MemoryCache.Key) -> Unit)? = null
+        onCacheKey: ((MemoryCache.Key) -> Unit)? = null,
     ): ImageRequest? {
         val model = previewModel(
             localContentUri = localContentUri,
@@ -71,7 +70,7 @@ object MediaImageRequests {
             hasThumbnails = hasThumbnails,
             baseUrl = baseUrl,
             heightPx = heightPx,
-            bypassPlatformThumbnail = bypassPlatformThumbnail
+            bypassPlatformThumbnail = bypassPlatformThumbnail,
         ) ?: return null
 
         return ImageRequest.Builder(context)
@@ -95,7 +94,7 @@ object MediaImageRequests {
         baseUrl: String,
         cloudId: String?,
         hasThumbnails: Boolean,
-        heightPx: Int
+        heightPx: Int,
     ): String? {
         if (cloudId.isNullOrBlank() || baseUrl.isBlank()) return null
         return if (hasThumbnails) {

@@ -18,7 +18,7 @@ object PassOneDeduplication {
         cloudRatio: Float,
         cloudSortTimestamp: Long,
         localRatio: Float,
-        localTimestampMs: Long
+        localTimestampMs: Long,
     ): Boolean {
         if (abs(cloudRatio - localRatio) >= RATIO_TOLERANCE) return false
 

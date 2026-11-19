@@ -85,7 +85,7 @@ private const val PERMISSION_ACCESS_LOCAL_NETWORK = "android.permission.ACCESS_L
 @Composable
 fun AuthScreen(
     viewModel: AuthViewModel,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
@@ -96,13 +96,13 @@ fun AuthScreen(
     var hasLocalNetworkPermission by remember {
         mutableStateOf(
             Build.VERSION.SDK_INT < 37 ||
-                    ContextCompat.checkSelfPermission(context, PERMISSION_ACCESS_LOCAL_NETWORK) ==
-                    PackageManager.PERMISSION_GRANTED
+                ContextCompat.checkSelfPermission(context, PERMISSION_ACCESS_LOCAL_NETWORK) ==
+                PackageManager.PERMISSION_GRANTED,
         )
     }
 
     val localNetworkPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
+        contract = ActivityResultContracts.RequestPermission(),
     ) { granted ->
         hasLocalNetworkPermission = granted
         val action = pendingAction
@@ -118,13 +118,13 @@ fun AuthScreen(
 
     fun runWithLocalNetworkCheck(
         requirePermissionAlways: Boolean = false,
-        action: () -> Unit
+        action: () -> Unit,
     ) {
         localNetworkError = null
         if (Build.VERSION.SDK_INT >= 37) {
             val granted = ContextCompat.checkSelfPermission(
                 context,
-                PERMISSION_ACCESS_LOCAL_NETWORK
+                PERMISSION_ACCESS_LOCAL_NETWORK,
             ) == PackageManager.PERMISSION_GRANTED
             hasLocalNetworkPermission = granted
 
@@ -144,7 +144,7 @@ fun AuthScreen(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
             .imePadding(),
-        contentAlignment = Alignment.Center
+        contentAlignment = Alignment.Center,
     ) {
         Column(
             modifier = Modifier
@@ -152,14 +152,14 @@ fun AuthScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 24.dp, vertical = 32.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+            verticalArrangement = Arrangement.Center,
         ) {
             // App Brand Mark
             Image(
                 painter = painterResource(id = R.drawable.icon_transparent),
                 contentDescription = "Ruurd Photos",
                 contentScale = ContentScale.Fit,
-                modifier = Modifier.size(72.dp)
+                modifier = Modifier.size(72.dp),
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -168,35 +168,35 @@ fun AuthScreen(
                 text = "Ruurd Photos",
                 style = MaterialTheme.typography.headlineMedium.copy(
                     fontWeight = FontWeight.Bold,
-                    letterSpacing = (-0.5).sp
+                    letterSpacing = (-0.5).sp,
                 ),
-                color = MaterialTheme.colorScheme.onBackground
+                color = MaterialTheme.colorScheme.onBackground,
             )
 
             Text(
                 text = "Sign in to connect to your personal library",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 4.dp, bottom = 28.dp)
+                modifier = Modifier.padding(top = 4.dp, bottom = 28.dp),
             )
 
             // Auth Card
             Card(
                 shape = RoundedCornerShape(PhotosRadii.Card),
                 colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
                 ),
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
             ) {
                 Column(
                     modifier = Modifier.padding(20.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
                     // Server URL Field + Scan LAN Trigger
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         OutlinedTextField(
                             value = uiState.serverUrl,
@@ -213,32 +213,32 @@ fun AuthScreen(
                                 if (uiState.isTestingServer) {
                                     CircularProgressIndicator(
                                         modifier = Modifier.size(20.dp),
-                                        strokeWidth = 2.dp
+                                        strokeWidth = 2.dp,
                                     )
                                 } else if (uiState.serverTestSuccess == true) {
                                     Icon(
                                         Icons.Default.CheckCircle,
                                         contentDescription = "Online",
-                                        tint = MaterialTheme.colorScheme.primary
+                                        tint = MaterialTheme.colorScheme.primary,
                                     )
                                 } else if (uiState.serverTestSuccess == false) {
                                     Icon(
                                         Icons.Default.Error,
                                         contentDescription = "Error",
-                                        tint = MaterialTheme.colorScheme.error
+                                        tint = MaterialTheme.colorScheme.error,
                                     )
                                 }
                             },
                             singleLine = true,
                             keyboardOptions = KeyboardOptions(
                                 keyboardType = KeyboardType.Uri,
-                                imeAction = ImeAction.Next
+                                imeAction = ImeAction.Next,
                             ),
                             keyboardActions = KeyboardActions(
-                                onNext = { focusManager.moveFocus(FocusDirection.Down) }
+                                onNext = { focusManager.moveFocus(FocusDirection.Down) },
                             ),
                             shape = RoundedCornerShape(PhotosRadii.NestedCard),
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.weight(1f),
                         )
 
                         FilledTonalIconButton(
@@ -255,7 +255,7 @@ fun AuthScreen(
                             enabled = !uiState.isLoading,
                             modifier = Modifier
                                 .padding(top = 6.dp)
-                                .size(50.dp)
+                                .size(50.dp),
                         ) {
                             Icon(
                                 imageVector = if (uiState.isScanningLan) Icons.Default.Close else Icons.Default.WifiFind,
@@ -263,7 +263,7 @@ fun AuthScreen(
                                     "Cancel local network scan"
                                 } else {
                                     "Scan Wi-Fi for servers"
-                                }
+                                },
                             )
                         }
                     }
@@ -271,7 +271,7 @@ fun AuthScreen(
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
                         UrlSchemeChip(
                             scheme = "http",
@@ -279,7 +279,7 @@ fun AuthScreen(
                             onClick = {
                                 localNetworkError = null
                                 viewModel.onServerSchemeSelected("http")
-                            }
+                            },
                         )
                         UrlSchemeChip(
                             scheme = "https",
@@ -287,7 +287,7 @@ fun AuthScreen(
                             onClick = {
                                 localNetworkError = null
                                 viewModel.onServerSchemeSelected("https")
-                            }
+                            },
                         )
                         Spacer(modifier = Modifier.weight(1f))
                         OutlinedButton(
@@ -299,11 +299,11 @@ fun AuthScreen(
                                 }
                             },
                             shape = CircleShape,
-                            enabled = !uiState.isLoading
+                            enabled = !uiState.isLoading,
                         ) {
                             Text(
                                 text = if (uiState.isTestingServer) "Cancel" else "Test Connection",
-                                style = MaterialTheme.typography.labelMedium
+                                style = MaterialTheme.typography.labelMedium,
                             )
                         }
                     }
@@ -311,23 +311,23 @@ fun AuthScreen(
                     // LAN Discovery Progress & Results
                     AnimatedVisibility(
                         visible = uiState.isScanningLan ||
-                                uiState.discoveredServers.isNotEmpty() ||
-                                (uiState.hasScannedLan && displayedError == null)
+                            uiState.discoveredServers.isNotEmpty() ||
+                            (uiState.hasScannedLan && displayedError == null),
                     ) {
                         Surface(
                             shape = RoundedCornerShape(PhotosRadii.NestedCard),
                             color = MaterialTheme.colorScheme.surfaceContainer,
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth(),
                         ) {
                             Column(
                                 modifier = Modifier.padding(12.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
                             ) {
                                 if (uiState.isScanningLan) {
                                     Text(
                                         text = "Scanning Wi-Fi for Ruurd Photos servers…",
                                         style = MaterialTheme.typography.labelMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
                                     val progress = uiState.scanProgress
                                     if (progress != null) {
@@ -335,13 +335,13 @@ fun AuthScreen(
                                             progress = { progress },
                                             modifier = Modifier
                                                 .fillMaxWidth()
-                                                .clip(CircleShape)
+                                                .clip(CircleShape),
                                         )
                                     } else {
                                         LinearProgressIndicator(
                                             modifier = Modifier
                                                 .fillMaxWidth()
-                                                .clip(CircleShape)
+                                                .clip(CircleShape),
                                         )
                                     }
                                 }
@@ -350,7 +350,7 @@ fun AuthScreen(
                                     Text(
                                         text = "Discovered on local network",
                                         style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
                                     uiState.discoveredServers.forEach { server ->
                                         DiscoveredServerRow(
@@ -359,14 +359,14 @@ fun AuthScreen(
                                             onClick = {
                                                 localNetworkError = null
                                                 viewModel.selectDiscoveredServer(server)
-                                            }
+                                            },
                                         )
                                     }
                                 } else if (!uiState.isScanningLan && uiState.hasScannedLan) {
                                     Text(
                                         text = "No Ruurd Photos servers found on this Wi-Fi network.",
                                         style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
                                 }
                             }
@@ -387,13 +387,13 @@ fun AuthScreen(
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(
                             keyboardType = KeyboardType.Email,
-                            imeAction = ImeAction.Next
+                            imeAction = ImeAction.Next,
                         ),
                         keyboardActions = KeyboardActions(
-                            onNext = { focusManager.moveFocus(FocusDirection.Down) }
+                            onNext = { focusManager.moveFocus(FocusDirection.Down) },
                         ),
                         shape = RoundedCornerShape(PhotosRadii.NestedCard),
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
                     )
 
                     // Password Field
@@ -411,7 +411,7 @@ fun AuthScreen(
                             IconButton(onClick = { passwordVisible = !passwordVisible }) {
                                 Icon(
                                     imageVector = if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
-                                    contentDescription = if (passwordVisible) "Hide password" else "Show password"
+                                    contentDescription = if (passwordVisible) "Hide password" else "Show password",
                                 )
                             }
                         },
@@ -419,16 +419,16 @@ fun AuthScreen(
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(
                             keyboardType = KeyboardType.Password,
-                            imeAction = ImeAction.Done
+                            imeAction = ImeAction.Done,
                         ),
                         keyboardActions = KeyboardActions(
                             onDone = {
                                 focusManager.clearFocus()
                                 runWithLocalNetworkCheck(action = viewModel::login)
-                            }
+                            },
                         ),
                         shape = RoundedCornerShape(PhotosRadii.NestedCard),
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
                     )
 
                     // Error Message Banner
@@ -436,24 +436,24 @@ fun AuthScreen(
                         displayedError?.let { error ->
                             Card(
                                 colors = CardDefaults.cardColors(
-                                    containerColor = MaterialTheme.colorScheme.errorContainer
+                                    containerColor = MaterialTheme.colorScheme.errorContainer,
                                 ),
                                 shape = RoundedCornerShape(PhotosRadii.NestedCard),
-                                modifier = Modifier.fillMaxWidth()
+                                modifier = Modifier.fillMaxWidth(),
                             ) {
                                 Column(modifier = Modifier.padding(12.dp)) {
                                     Text(
                                         text = error,
                                         color = MaterialTheme.colorScheme.onErrorContainer,
-                                        style = MaterialTheme.typography.bodySmall
+                                        style = MaterialTheme.typography.bodySmall,
                                     )
                                     if (Build.VERSION.SDK_INT >= 37 && !hasLocalNetworkPermission) {
                                         TextButton(
                                             onClick = {
                                                 localNetworkPermissionLauncher.launch(
-                                                    PERMISSION_ACCESS_LOCAL_NETWORK
+                                                    PERMISSION_ACCESS_LOCAL_NETWORK,
                                                 )
-                                            }
+                                            },
                                         ) {
                                             Text("Allow Local Network Access")
                                         }
@@ -473,18 +473,18 @@ fun AuthScreen(
                         enabled = !uiState.isLoading,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(52.dp)
+                            .height(52.dp),
                     ) {
                         if (uiState.isLoading) {
                             CircularProgressIndicator(
                                 color = MaterialTheme.colorScheme.onPrimary,
                                 modifier = Modifier.size(24.dp),
-                                strokeWidth = 2.dp
+                                strokeWidth = 2.dp,
                             )
                         } else {
                             Text(
                                 text = "Sign In",
-                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold)
+                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
                             )
                         }
                     }
@@ -498,7 +498,7 @@ fun AuthScreen(
 private fun DiscoveredServerRow(
     server: DiscoveredServer,
     selected: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
 ) {
     Surface(
         shape = RoundedCornerShape(12.dp),
@@ -515,11 +515,11 @@ private fun DiscoveredServerRow(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
-            .clickable(onClick = onClick)
+            .clickable(onClick = onClick),
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
                 imageVector = if (selected) Icons.Default.CheckCircle else Icons.Default.Dns,
@@ -529,7 +529,7 @@ private fun DiscoveredServerRow(
                 } else {
                     MaterialTheme.colorScheme.onSurfaceVariant
                 },
-                modifier = Modifier.size(18.dp)
+                modifier = Modifier.size(18.dp),
             )
             Spacer(modifier = Modifier.width(10.dp))
             Column(modifier = Modifier.weight(1f)) {
@@ -538,7 +538,7 @@ private fun DiscoveredServerRow(
                     style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis,
                 )
                 val badge = buildString {
                     if (server.isEmulatorHost) append("Emulator host • ")
@@ -547,7 +547,7 @@ private fun DiscoveredServerRow(
                 Text(
                     text = badge,
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
@@ -558,7 +558,7 @@ private fun DiscoveredServerRow(
 private fun UrlSchemeChip(
     scheme: String,
     selected: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
 ) {
     Surface(
         shape = CircleShape,
@@ -570,11 +570,11 @@ private fun UrlSchemeChip(
         modifier = Modifier
             .height(28.dp)
             .clip(CircleShape)
-            .clickable(onClick = onClick)
+            .clickable(onClick = onClick),
     ) {
         Box(
             modifier = Modifier.padding(horizontal = 10.dp),
-            contentAlignment = Alignment.Center
+            contentAlignment = Alignment.Center,
         ) {
             Text(
                 text = scheme,
@@ -583,7 +583,7 @@ private fun UrlSchemeChip(
                     MaterialTheme.colorScheme.onSecondaryContainer
                 } else {
                     MaterialTheme.colorScheme.onSurfaceVariant
-                }
+                },
             )
         }
     }

@@ -16,7 +16,7 @@ import java.util.concurrent.TimeUnit
 class AuthAuthenticator(
     private val cookieJar: PersistentCookieJar,
     private val sessionManager: SessionManager,
-    private val scope: CoroutineScope
+    private val scope: CoroutineScope,
 ) : Authenticator {
 
     private val lock = Any()
@@ -77,6 +77,7 @@ class AuthAuthenticator(
                                 .removeHeader("Cookie")
                                 .build()
                         }
+
                         refreshResponse.code == 401 || refreshResponse.code == 403 -> {
                             // Refresh token invalid, expired, or revoked: clear session
                             cookieJar.clear()
@@ -85,6 +86,7 @@ class AuthAuthenticator(
                             }
                             null
                         }
+
                         else -> {
                             // Transient failure (429 rate-limit, 5xx server restart, etc.): preserve session
                             null

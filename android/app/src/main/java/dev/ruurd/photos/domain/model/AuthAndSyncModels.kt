@@ -6,7 +6,7 @@ data class User(
     val name: String,
     val role: String,
     val mediaFolder: String? = null,
-    val avatarId: String? = null
+    val avatarId: String? = null,
 )
 
 sealed interface AuthState {
@@ -20,5 +20,5 @@ enum class SyncState {
     SYNCING,
     OFFLINE,
     SERVER_UNREACHABLE,
-    ERROR
+    ERROR,
 }

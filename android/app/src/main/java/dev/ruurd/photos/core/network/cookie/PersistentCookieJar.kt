@@ -100,8 +100,7 @@ class PersistentCookieJar(context: Context) : CookieJar {
         sharedPrefs.edit().clear().apply()
     }
 
-    private fun cookieKey(cookie: Cookie): String =
-        "${cookie.domain}|${cookie.path}|${cookie.name}"
+    private fun cookieKey(cookie: Cookie): String = "${cookie.domain}|${cookie.path}|${cookie.name}"
 
     private fun serializeCookie(cookie: Cookie): String {
         val sb = StringBuilder()
@@ -137,15 +136,20 @@ class PersistentCookieJar(context: Context) : CookieJar {
                         val exp = part.removePrefix("expires=").toLongOrNull() ?: continue
                         builder.expiresAt(exp)
                     }
+
                     part.startsWith("domain=") -> {
                         domain = part.removePrefix("domain=").trim().takeIf { it.isNotEmpty() }
                     }
+
                     part.startsWith("path=") -> {
                         val path = part.removePrefix("path=").trim()
                         if (path.isNotEmpty()) builder.path(path)
                     }
+
                     part.equals("secure", ignoreCase = true) -> builder.secure()
+
                     part.equals("httponly", ignoreCase = true) -> builder.httpOnly()
+
                     part.equals("hostonly", ignoreCase = true) -> hostOnly = true
                 }
             }

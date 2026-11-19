@@ -30,7 +30,7 @@ class TimelineScrollBenchmark {
         compilationMode = CompilationMode.None(),
         startupMode = StartupMode.COLD,
         iterations = 5,
-        setupBlock = { pressHome() }
+        setupBlock = { pressHome() },
     ) {
         startActivityAndWait(mainActivityIntent())
         val list = awaitTimelineList()
@@ -51,7 +51,7 @@ class TimelineScrollBenchmark {
             startActivityAndWait(mainActivityIntent())
             awaitTimelineList()
             device.waitForIdle()
-        }
+        },
     ) {
         val list = awaitTimelineList()
         continuousScroll(list, downSwipes = 6, upSwipes = 4, steps = 14)
@@ -70,7 +70,7 @@ class TimelineScrollBenchmark {
             startActivityAndWait(mainActivityIntent())
             awaitTimelineList()
             device.waitForIdle()
-        }
+        },
     ) {
         val scrubber = device.wait(Until.findObject(By.res("timeline_scrubber")), 10_000)
             ?: error("timeline_scrubber not found (library may be shorter than one screen)")
@@ -85,18 +85,17 @@ class TimelineScrollBenchmark {
         device.waitForIdle()
     }
 
-    private fun MacrobenchmarkScope.awaitTimelineList(): UiObject2 =
-        device.wait(Until.findObject(By.res("timeline_list")), 15_000)
-            ?: error(
-                "timeline_list not found. Ensure dev.ruurd.photos is signed in on the device, " +
-                        "media permissions are granted, and the timeline is non-empty."
-            )
+    private fun MacrobenchmarkScope.awaitTimelineList(): UiObject2 = device.wait(Until.findObject(By.res("timeline_list")), 15_000)
+        ?: error(
+            "timeline_list not found. Ensure dev.ruurd.photos is signed in on the device, " +
+                "media permissions are granted, and the timeline is non-empty.",
+        )
 
     private fun MacrobenchmarkScope.continuousScroll(
         list: UiObject2,
         downSwipes: Int,
         upSwipes: Int,
-        steps: Int
+        steps: Int,
     ) {
         val bounds = list.visibleBounds
         val x = bounds.centerX()

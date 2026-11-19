@@ -18,7 +18,7 @@ interface PhotosApiService {
     @Headers("Content-Type: application/json")
     @POST("api/auth/login")
     suspend fun login(
-        @Body request: RequestBody
+        @Body request: RequestBody,
     ): Response<ResponseBody>
 
     @POST("api/auth/refresh")
@@ -32,6 +32,6 @@ interface PhotosApiService {
 
     @GET("api/timeline/sync")
     suspend fun getTimelineSync(
-        @Query("since") since: Long? = null
+        @Query("since") since: Long? = null,
     ): Response<TimelineSyncResponse>
 }

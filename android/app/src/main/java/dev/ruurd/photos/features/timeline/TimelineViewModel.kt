@@ -21,14 +21,14 @@ import kotlinx.coroutines.flow.stateIn
 
 data class TimelineUiState(
     val isLoading: Boolean = true,
-    val layout: TimelineLayoutIndex = TimelineLayoutIndex()
+    val layout: TimelineLayoutIndex = TimelineLayoutIndex(),
 )
 
 class TimelineViewModel(
     private val observeTimelineUseCase: ObserveTimelineUseCase,
     private val calculateTimelineLayoutUseCase: CalculateTimelineLayoutUseCase,
     private val dispatchers: AppDispatchers,
-    isBootstrapping: Flow<Boolean>
+    isBootstrapping: Flow<Boolean>,
 ) : ViewModel() {
 
     private val viewport = MutableStateFlow(Viewport())
@@ -41,7 +41,7 @@ class TimelineViewModel(
             } else {
                 combine(
                     observeTimelineUseCase().distinctUntilChanged(),
-                    viewport
+                    viewport,
                 ) { media, viewport ->
                     if (viewport.widthPx <= 0) {
                         TimelineUiState(isLoading = true)
@@ -54,10 +54,10 @@ class TimelineViewModel(
                                     containerWidthPx = viewport.widthPx,
                                     density = viewport.density,
                                     desiredRowHeightDp = desiredRowHeightDp(
-                                        viewport.widthPx / viewport.density
-                                    )
-                                )
-                            )
+                                        viewport.widthPx / viewport.density,
+                                    ),
+                                ),
+                            ),
                         )
                     }
                 }
@@ -82,7 +82,6 @@ class TimelineViewModel(
         private const val ROW_HEIGHT_WIDE_DP = 240f
         private const val WIDE_WIDTH_DP = 600f
 
-        private fun desiredRowHeightDp(widthDp: Float): Float =
-            if (widthDp >= WIDE_WIDTH_DP) ROW_HEIGHT_WIDE_DP else ROW_HEIGHT_PHONE_DP
+        private fun desiredRowHeightDp(widthDp: Float): Float = if (widthDp >= WIDE_WIDTH_DP) ROW_HEIGHT_WIDE_DP else ROW_HEIGHT_PHONE_DP
     }
 }

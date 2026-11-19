@@ -35,11 +35,11 @@ class NetworkMonitor(context: Context) {
 
         override fun onCapabilitiesChanged(
             network: Network,
-            networkCapabilities: NetworkCapabilities
+            networkCapabilities: NetworkCapabilities,
         ) {
             val hasInternet =
                 networkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
-                        networkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+                    networkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
             _isOnline.value = hasInternet
         }
     }
@@ -50,49 +50,47 @@ class NetworkMonitor(context: Context) {
             NetworkRequest.Builder()
                 .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
                 .build(),
-            createLanCallback()
+            createLanCallback(),
         )
         connectivityManager.registerNetworkCallback(
             NetworkRequest.Builder()
                 .addTransportType(NetworkCapabilities.TRANSPORT_ETHERNET)
                 .build(),
-            createLanCallback()
+            createLanCallback(),
         )
     }
 
-    private fun createLanCallback(): ConnectivityManager.NetworkCallback =
-        object : ConnectivityManager.NetworkCallback() {
-            override fun onLinkPropertiesChanged(network: Network, linkProperties: LinkProperties) {
-                val ipv4 = extractSiteLocalIpv4(linkProperties)
-                if (ipv4 != null) {
-                    lanAddresses[network] = ipv4
-                } else {
-                    lanAddresses.remove(network)
-                }
-                _lanIpv4Address.value = lanAddresses.values.firstOrNull() ?: seedCurrentLanIpv4()
-            }
-
-            override fun onLost(network: Network) {
+    private fun createLanCallback(): ConnectivityManager.NetworkCallback = object : ConnectivityManager.NetworkCallback() {
+        override fun onLinkPropertiesChanged(network: Network, linkProperties: LinkProperties) {
+            val ipv4 = extractSiteLocalIpv4(linkProperties)
+            if (ipv4 != null) {
+                lanAddresses[network] = ipv4
+            } else {
                 lanAddresses.remove(network)
-                _lanIpv4Address.value = lanAddresses.values.firstOrNull() ?: seedCurrentLanIpv4()
             }
+            _lanIpv4Address.value = lanAddresses.values.firstOrNull() ?: seedCurrentLanIpv4()
         }
+
+        override fun onLost(network: Network) {
+            lanAddresses.remove(network)
+            _lanIpv4Address.value = lanAddresses.values.firstOrNull() ?: seedCurrentLanIpv4()
+        }
+    }
 
     private fun seedCurrentLanIpv4(): Inet4Address? {
         val activeNetwork = connectivityManager.activeNetwork ?: return null
         val caps = connectivityManager.getNetworkCapabilities(activeNetwork) ?: return null
         if (caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN)) return null
         val isLan = caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
-                caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)
+            caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)
         if (!isLan) return null
         return extractSiteLocalIpv4(connectivityManager.getLinkProperties(activeNetwork))
     }
 
-    private fun extractSiteLocalIpv4(linkProperties: LinkProperties?): Inet4Address? =
-        linkProperties?.linkAddresses
-            ?.asSequence()
-            ?.mapNotNull { it.address as? Inet4Address }
-            ?.firstOrNull { !it.isLoopbackAddress && it.isSiteLocalAddress }
+    private fun extractSiteLocalIpv4(linkProperties: LinkProperties?): Inet4Address? = linkProperties?.linkAddresses
+        ?.asSequence()
+        ?.mapNotNull { it.address as? Inet4Address }
+        ?.firstOrNull { !it.isLoopbackAddress && it.isSiteLocalAddress }
 
     private fun checkCurrentConnectivity(): Boolean {
         val activeNetwork = connectivityManager.activeNetwork ?: return false

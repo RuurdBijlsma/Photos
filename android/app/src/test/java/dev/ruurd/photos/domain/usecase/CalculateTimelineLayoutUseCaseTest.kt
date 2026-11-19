@@ -19,7 +19,7 @@ class CalculateTimelineLayoutUseCaseTest {
     private val params = TimelineLayoutParams(containerWidthPx = containerWidthPx, density = density)
     private val useCase = CalculateTimelineLayoutUseCase(
         currentYearProvider = { 2026 },
-        todayProvider = { LocalDate.of(2026, 11, 16) }
+        todayProvider = { LocalDate.of(2026, 11, 16) },
     )
 
     private fun media(
@@ -27,7 +27,7 @@ class CalculateTimelineLayoutUseCaseTest {
         yearMonth: Int,
         ratio: Float = 1f,
         sortTimestamp: Long = 0L,
-        timezoneOffsetMinutes: Int = 0
+        timezoneOffsetMinutes: Int = 0,
     ) = TimelineMediaProjection(
         id = id,
         cloudId = null,
@@ -39,7 +39,7 @@ class CalculateTimelineLayoutUseCaseTest {
         hasThumbnails = false,
         syncStatus = SyncStatus.LOCAL_ONLY,
         sortTimestamp = sortTimestamp,
-        timezoneOffsetMinutes = timezoneOffsetMinutes
+        timezoneOffsetMinutes = timezoneOffsetMinutes,
     )
 
     /** Width/height ratio of square items, so a full row is exactly two tiles. */
@@ -59,7 +59,7 @@ class CalculateTimelineLayoutUseCaseTest {
         assertEquals(
             row.estimatedOffsetTopDp + row.heightDp,
             layout.totalHeightDp,
-            0.01f
+            0.01f,
         )
     }
 
@@ -84,7 +84,7 @@ class CalculateTimelineLayoutUseCaseTest {
         // so they land in the trailing finishRow call with rawMultiplier ~ 1.33 <= 1.5.
         val layout = useCase(
             listOf(media("p1", 202610, 0.75f), media("p2", 202610, 0.75f)),
-            params
+            params,
         )
         val row = layout.rows.filterIsInstance<TimelineRowUiItem>().single()
         val gapPx = (CalculateTimelineLayoutUseCase.ITEM_GAP_DP * density).roundToInt()
@@ -112,12 +112,12 @@ class CalculateTimelineLayoutUseCaseTest {
 
         val lowRam = CalculateTimelineLayoutUseCase(
             maxThumbnailHeightPx = 480,
-            currentYearProvider = { 2026 }
+            currentYearProvider = { 2026 },
         )
         val capped = lowRam((1..2).map { square("square$it", 202610) }, params)
         assertEquals(
             480,
-            capped.rows.filterIsInstance<TimelineRowUiItem>().single().thumbnailTargetHeightPx
+            capped.rows.filterIsInstance<TimelineRowUiItem>().single().thumbnailTargetHeightPx,
         )
     }
 
@@ -125,7 +125,7 @@ class CalculateTimelineLayoutUseCaseTest {
     fun `layout index resolves media, months and percentages`() {
         val layout = useCase(
             listOf(square("new1", 202610), square("new2", 202610), square("old1", 202506)),
-            params
+            params,
         )
 
         val rowForNew2 = layout.findRowIndexForMedia("new2")
@@ -152,7 +152,7 @@ class CalculateTimelineLayoutUseCaseTest {
             media("today", 202611, sortTimestamp = millis(LocalDate.of(2026, 11, 16))),
             media("yesterday", 202611, sortTimestamp = millis(LocalDate.of(2026, 11, 15))),
             media("oct", 202610, sortTimestamp = millis(LocalDate.of(2026, 10, 24))),
-            media("old", 201608, sortTimestamp = millis(LocalDate.of(2016, 8, 9)))
+            media("old", 201608, sortTimestamp = millis(LocalDate.of(2016, 8, 9))),
         )
 
         val layout = useCase(items, params)
@@ -165,9 +165,9 @@ class CalculateTimelineLayoutUseCaseTest {
                 media("today", 202611, ratio = 3f, sortTimestamp = millis(LocalDate.of(2026, 11, 16))),
                 media("yesterday", 202611, ratio = 3f, sortTimestamp = millis(LocalDate.of(2026, 11, 15))),
                 media("oct", 202610, ratio = 3f, sortTimestamp = millis(LocalDate.of(2026, 10, 24))),
-                media("old", 201608, ratio = 3f, sortTimestamp = millis(LocalDate.of(2016, 8, 9)))
+                media("old", 201608, ratio = 3f, sortTimestamp = millis(LocalDate.of(2016, 8, 9))),
             ),
-            params
+            params,
         )
         val singleRows = singleRowLayout.rows.filterIsInstance<TimelineRowUiItem>()
         assertEquals("Today", singleRows[0].dateLabel)

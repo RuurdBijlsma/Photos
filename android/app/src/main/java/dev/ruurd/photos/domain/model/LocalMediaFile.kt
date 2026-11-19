@@ -14,5 +14,5 @@ data class LocalMediaFile(
     val dateTakenMs: Long,
     val mimeType: String?,
     val isVideo: Boolean,
-    val durationMs: Int?
+    val durationMs: Int?,
 )

@@ -20,5 +20,5 @@ data class DeviceFolderEntity(
     val showInTimeline: Boolean = false,
 
     @ColumnInfo(name = "backup_enabled")
-    val backupEnabled: Boolean = false
+    val backupEnabled: Boolean = false,
 )

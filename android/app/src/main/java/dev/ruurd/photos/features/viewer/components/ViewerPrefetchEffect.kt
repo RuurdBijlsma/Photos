@@ -20,7 +20,7 @@ import kotlinx.coroutines.flow.filterNotNull
 fun ViewerPrefetchEffect(
     pagerState: PagerState,
     items: ImmutableList<TimelineMediaProjection>,
-    baseUrl: String
+    baseUrl: String,
 ) {
     val currentItems by rememberUpdatedState(items)
     val context = LocalContext.current
@@ -43,7 +43,7 @@ fun ViewerPrefetchEffect(
                         cloudId = neighbor.cloudId,
                         isVideo = neighbor.isVideo,
                         hasThumbnails = neighbor.hasThumbnails,
-                        baseUrl = baseUrl
+                        baseUrl = baseUrl,
                     )
                     if (request != null) {
                         imageLoader.enqueue(request)
@@ -59,7 +59,7 @@ fun ViewerPreSyncScrollEffect(
     pagerState: PagerState,
     items: ImmutableList<TimelineMediaProjection>,
     isClosing: () -> Boolean,
-    onPreSyncScroll: (String) -> Unit
+    onPreSyncScroll: (String) -> Unit,
 ) {
     val currentItems by rememberUpdatedState(items)
     val currentIsClosing by rememberUpdatedState(isClosing)

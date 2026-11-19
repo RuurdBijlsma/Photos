@@ -29,7 +29,7 @@ class TimelineProjectionStoreTest {
         val store = TimelineProjectionStore(
             mediaRepository = repo,
             scope = backgroundScope,
-            dispatchers = dispatchers
+            dispatchers = dispatchers,
         )
 
         runCurrent()

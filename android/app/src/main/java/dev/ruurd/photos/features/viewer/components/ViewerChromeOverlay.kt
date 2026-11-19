@@ -65,7 +65,7 @@ fun ViewerChromeOverlay(
     activeMediaId: String,
     currentPage: Int,
     isProjectionLoading: Boolean,
-    onBack: () -> Unit
+    onBack: () -> Unit,
 ) {
     val statusBarPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val navBarPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
@@ -73,23 +73,23 @@ fun ViewerChromeOverlay(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .graphicsLayer { this.alpha = alpha }
+            .graphicsLayer { this.alpha = alpha },
     ) {
         ViewerStatusBarScrim(
             statusBarHeight = statusBarPadding,
-            modifier = Modifier.align(Alignment.TopCenter)
+            modifier = Modifier.align(Alignment.TopCenter),
         )
 
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .align(Alignment.TopCenter)
-                .padding(top = statusBarPadding + 6.dp, start = 8.dp, end = 8.dp)
+                .padding(top = statusBarPadding + 6.dp, start = 8.dp, end = 8.dp),
         ) {
             ViewerCircleButton(
                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                 contentDescription = "Back",
-                onClick = onBack
+                onClick = onBack,
             )
 
             Spacer(modifier = Modifier.width(8.dp))
@@ -98,7 +98,7 @@ fun ViewerChromeOverlay(
                 Surface(
                     shape = CircleShape,
                     color = ViewerPillColor,
-                    border = ViewerPillBorder
+                    border = ViewerPillBorder,
                 ) {
                     val activeIndex = items.indexOfFirst { it.id == activeMediaId }
                     val displayIndex = ((if (activeIndex >= 0) activeIndex else currentPage) + 1)
@@ -107,10 +107,10 @@ fun ViewerChromeOverlay(
                         text = "$displayIndex of ${items.size}",
                         style = MaterialTheme.typography.titleSmall.copy(
                             fontFamily = MontserratFontFamily,
-                            fontWeight = FontWeight.SemiBold
+                            fontWeight = FontWeight.SemiBold,
                         ),
                         color = Color.White,
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp)
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp),
                     )
                 }
             }
@@ -122,24 +122,24 @@ fun ViewerChromeOverlay(
                 ViewerCircleButton(
                     imageVector = Icons.Default.MoreVert,
                     contentDescription = "Options",
-                    onClick = { isMenuExpanded = true }
+                    onClick = { isMenuExpanded = true },
                 )
 
                 val currentItem = items.firstOrNull { it.id == activeMediaId }
                     ?: items.getOrNull(currentPage)
                 DropdownMenu(
                     expanded = isMenuExpanded,
-                    onDismissRequest = { isMenuExpanded = false }
+                    onDismissRequest = { isMenuExpanded = false },
                 ) {
                     DropdownMenuItem(
                         text = { Text("About") },
                         leadingIcon = {
                             Icon(
                                 imageVector = Icons.Outlined.Info,
-                                contentDescription = null
+                                contentDescription = null,
                             )
                         },
-                        onClick = { isMenuExpanded = false }
+                        onClick = { isMenuExpanded = false },
                     )
                     if (currentItem != null && !currentItem.isVideo) {
                         DropdownMenuItem(
@@ -147,20 +147,20 @@ fun ViewerChromeOverlay(
                             leadingIcon = {
                                 Icon(
                                     imageVector = Icons.Outlined.ContentCopy,
-                                    contentDescription = null
+                                    contentDescription = null,
                                 )
                             },
-                            onClick = { isMenuExpanded = false }
+                            onClick = { isMenuExpanded = false },
                         )
                         DropdownMenuItem(
                             text = { Text("Rotate clockwise") },
                             leadingIcon = {
                                 Icon(
                                     imageVector = Icons.Outlined.RotateRight,
-                                    contentDescription = null
+                                    contentDescription = null,
                                 )
                             },
-                            onClick = { isMenuExpanded = false }
+                            onClick = { isMenuExpanded = false },
                         )
                     }
                     if (currentItem?.cloudId != null) {
@@ -169,10 +169,10 @@ fun ViewerChromeOverlay(
                             leadingIcon = {
                                 Icon(
                                     imageVector = Icons.Outlined.Refresh,
-                                    contentDescription = null
+                                    contentDescription = null,
                                 )
                             },
-                            onClick = { isMenuExpanded = false }
+                            onClick = { isMenuExpanded = false },
                         )
                     }
                 }
@@ -185,12 +185,12 @@ fun ViewerChromeOverlay(
             border = ViewerPillBorder,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .padding(bottom = navBarPadding + 14.dp)
+                .padding(bottom = navBarPadding + 14.dp),
         ) {
             Row(
                 modifier = Modifier.padding(horizontal = 7.dp, vertical = 5.dp),
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 ViewerPillAction(imageVector = Icons.Default.Share, label = "Share")
                 ViewerPillAction(imageVector = Icons.Default.Add, label = "Add to")
@@ -203,7 +203,7 @@ fun ViewerChromeOverlay(
 @Composable
 private fun ViewerStatusBarScrim(
     statusBarHeight: Dp,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     if (statusBarHeight <= 0.dp) return
     Box(
@@ -214,9 +214,9 @@ private fun ViewerStatusBarScrim(
                 Brush.verticalGradient(
                     0.0f to Color.Black.copy(alpha = 0.72f),
                     0.65f to Color.Black.copy(alpha = 0.35f),
-                    1.0f to Color.Transparent
-                )
-            )
+                    1.0f to Color.Transparent,
+                ),
+            ),
     )
 }
 
@@ -230,7 +230,7 @@ private val ViewerPillBorder = BorderStroke(1.dp, Color.White.copy(alpha = 0.12f
 private fun ViewerCircleButton(
     imageVector: ImageVector,
     contentDescription: String,
-    onClick: () -> Unit
+    onClick: () -> Unit,
 ) {
     Box(
         modifier = Modifier
@@ -239,13 +239,13 @@ private fun ViewerCircleButton(
             .background(ViewerPillColor)
             .border(1.dp, Color.White.copy(alpha = 0.12f), CircleShape)
             .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center
+        contentAlignment = Alignment.Center,
     ) {
         Icon(
             imageVector = imageVector,
             contentDescription = contentDescription,
             tint = Color.White,
-            modifier = Modifier.size(20.dp)
+            modifier = Modifier.size(20.dp),
         )
     }
 }
@@ -256,19 +256,19 @@ private fun ViewerPillAction(imageVector: ImageVector, label: String) {
         modifier = Modifier
             .clip(CircleShape)
             .padding(horizontal = 12.dp, vertical = 9.dp),
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
             imageVector = imageVector,
             contentDescription = label,
             tint = Color.White,
-            modifier = Modifier.size(21.dp)
+            modifier = Modifier.size(21.dp),
         )
         Spacer(modifier = Modifier.width(7.dp))
         Text(
             text = label,
             style = MaterialTheme.typography.labelLarge,
-            color = Color.White
+            color = Color.White,
         )
     }
 }

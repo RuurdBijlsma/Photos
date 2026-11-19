@@ -15,14 +15,12 @@ import kotlinx.coroutines.flow.flowOn
 class MediaRepositoryImpl(
     private val database: AppDatabase,
     private val mediaDao: MediaDao,
-    private val dispatchers: AppDispatchers
+    private val dispatchers: AppDispatchers,
 ) : MediaRepository {
 
-    override fun getTimelineStage1(limitMonths: Int): Flow<List<TimelineMediaProjection>> =
-        mediaDao.getTimelineStage1(limitMonths).flowOn(dispatchers.io)
+    override fun getTimelineStage1(limitMonths: Int): Flow<List<TimelineMediaProjection>> = mediaDao.getTimelineStage1(limitMonths).flowOn(dispatchers.io)
 
-    override fun getTimelineStage2(): Flow<List<TimelineMediaProjection>> =
-        mediaDao.getTimelineStage2().flowOn(dispatchers.io)
+    override fun getTimelineStage2(): Flow<List<TimelineMediaProjection>> = mediaDao.getTimelineStage2().flowOn(dispatchers.io)
 
     override suspend fun getById(id: String): MediaEntity? = mediaDao.getById(id)
 
@@ -36,28 +34,22 @@ class MediaRepositoryImpl(
         return uris.chunked(BATCH_SIZE).flatMap { chunk -> mediaDao.getByLocalContentUris(chunk) }
     }
 
-    override suspend fun getByCloudId(cloudId: String): MediaEntity? =
-        mediaDao.getByCloudId(cloudId)
+    override suspend fun getByCloudId(cloudId: String): MediaEntity? = mediaDao.getByCloudId(cloudId)
 
-    override suspend fun getAllByCloudId(cloudId: String): List<MediaEntity> =
-        mediaDao.getAllByCloudId(cloudId)
+    override suspend fun getAllByCloudId(cloudId: String): List<MediaEntity> = mediaDao.getAllByCloudId(cloudId)
 
-    override suspend fun getAllByCloudIds(cloudIds: List<String>): List<MediaEntity> =
-        if (cloudIds.isEmpty()) emptyList() else mediaDao.getAllByCloudIds(cloudIds)
+    override suspend fun getAllByCloudIds(cloudIds: List<String>): List<MediaEntity> = if (cloudIds.isEmpty()) emptyList() else mediaDao.getAllByCloudIds(cloudIds)
 
     override suspend fun getAllCloudIds(): List<String> = mediaDao.getAllCloudIds()
 
-    override suspend fun getLocalRows(isVideo: Boolean): List<MediaEntity> =
-        mediaDao.getLocalRows(isVideo)
+    override suspend fun getLocalRows(isVideo: Boolean): List<MediaEntity> = mediaDao.getLocalRows(isVideo)
 
-    override suspend fun getLocalRowRefs(isVideo: Boolean): List<LocalRowRef> =
-        mediaDao.getLocalRowRefs(isVideo)
+    override suspend fun getLocalRowRefs(isVideo: Boolean): List<LocalRowRef> = mediaDao.getLocalRowRefs(isVideo)
 
     override suspend fun findBySizesAndStatus(
         sizeBytes: List<Long>,
-        syncStatus: SyncStatus
-    ): List<MediaEntity> =
-        if (sizeBytes.isEmpty()) emptyList() else mediaDao.findBySizesAndStatus(sizeBytes, syncStatus)
+        syncStatus: SyncStatus,
+    ): List<MediaEntity> = if (sizeBytes.isEmpty()) emptyList() else mediaDao.findBySizesAndStatus(sizeBytes, syncStatus)
 
     override suspend fun upsert(media: MediaEntity) = mediaDao.upsert(media)
 
@@ -90,9 +82,7 @@ class MediaRepositoryImpl(
 
     override suspend fun clearAll() = mediaDao.clearAll()
 
-    override suspend fun <T> withTransaction(block: suspend () -> T): T {
-        return database.withTransaction(block)
-    }
+    override suspend fun <T> withTransaction(block: suspend () -> T): T = database.withTransaction(block)
 
     private companion object {
         const val BATCH_SIZE = 500

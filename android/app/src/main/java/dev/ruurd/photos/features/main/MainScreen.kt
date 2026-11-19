@@ -85,10 +85,10 @@ fun MainScreen(
     timelineViewModel: TimelineViewModel,
     modifier: Modifier = Modifier,
     timelineListState: LazyListState = rememberLazyListState(
-        cacheWindow = remember { LazyLayoutCacheWindow(aheadFraction = 0.75f, behindFraction = 0.4f) }
+        cacheWindow = remember { LazyLayoutCacheWindow(aheadFraction = 0.75f, behindFraction = 0.4f) },
     ),
     hiddenTimelineMediaId: String? = null,
-    onMediaClick: (mediaId: String, sourceRect: Rect?) -> Unit = { _, _ -> }
+    onMediaClick: (mediaId: String, sourceRect: Rect?) -> Unit = { _, _ -> },
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val coroutineScope = rememberCoroutineScope()
@@ -100,7 +100,7 @@ fun MainScreen(
     var hasRequestedPermissions by rememberSaveable { mutableStateOf(false) }
     var isPermissionDialogPending by rememberSaveable { mutableStateOf(false) }
     val permissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions()
+        ActivityResultContracts.RequestMultiplePermissions(),
     ) {
         isPermissionDialogPending = false
         val currentAccess = MediaPermissions.read(context)
@@ -116,7 +116,7 @@ fun MainScreen(
         isOnline = uiState.isOnline,
         isRefreshing = uiState.syncState == SyncState.SYNCING,
         onRefresh = { viewModel.refreshTimeline(MediaPermissions.read(context)) },
-        onOfflineRefresh = { viewModel.refreshTimeline(MediaPermissions.read(context)) }
+        onOfflineRefresh = { viewModel.refreshTimeline(MediaPermissions.read(context)) },
     )
 
     BackHandler(enabled = uiState.destination == MainDestination.SEARCH) {
@@ -146,7 +146,7 @@ fun MainScreen(
             message = message,
             actionLabel = "Retry",
             withDismissAction = true,
-            duration = SnackbarDuration.Long
+            duration = SnackbarDuration.Long,
         )
         when (result) {
             SnackbarResult.ActionPerformed -> viewModel.syncNow()
@@ -176,7 +176,7 @@ fun MainScreen(
     val statusBarHeight = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val topInset = statusBarHeight + PhotosTopBarHeight
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() +
-            FloatingBottomNavHeight
+        FloatingBottomNavHeight
 
     // Hide on scroll-down, reveal on scroll-up or near the top; ignore non-scroll layout shifts.
     var topBarHidden by remember { mutableStateOf(false) }
@@ -188,7 +188,7 @@ fun MainScreen(
             Triple(
                 timelineListState.isScrollInProgress,
                 timelineListState.firstVisibleItemIndex,
-                timelineListState.firstVisibleItemScrollOffset
+                timelineListState.firstVisibleItemScrollOffset,
             )
         }.collect { (isScrolling, index, offset) ->
             if (index == 0 && offset <= TOP_BAR_HIDE_THRESHOLD_PX.toInt()) {
@@ -222,7 +222,7 @@ fun MainScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
+            .background(MaterialTheme.colorScheme.background),
     ) {
         when (uiState.destination) {
             MainDestination.PHOTOS -> {
@@ -236,31 +236,34 @@ fun MainScreen(
                     isSyncing = uiState.syncState == SyncState.SYNCING,
                     pullToRefreshState = pullToRefreshState,
                     hiddenMediaId = hiddenTimelineMediaId,
-                    onMediaClick = onMediaClick
+                    onMediaClick = onMediaClick,
                 )
             }
+
             MainDestination.COLLECTIONS -> {
                 PlaceholderTabContent(
                     title = "Collections",
                     subtitle = "Albums, Device Folders and People will appear here in Phase 2 & 3.",
                     icon = Icons.Default.Collections,
-                    modifier = Modifier.padding(top = topInset, bottom = bottomInset)
+                    modifier = Modifier.padding(top = topInset, bottom = bottomInset),
                 )
             }
+
             MainDestination.EXPLORE -> {
                 PlaceholderTabContent(
                     title = "Explore",
                     subtitle = "Explore your stats, locations, and memories.",
                     icon = Icons.Default.Explore,
-                    modifier = Modifier.padding(top = topInset, bottom = bottomInset)
+                    modifier = Modifier.padding(top = topInset, bottom = bottomInset),
                 )
             }
+
             MainDestination.SEARCH -> {
                 PlaceholderTabContent(
                     title = "Search",
                     subtitle = "Semantic, people, and place search will appear here.",
                     icon = Icons.Default.Search,
-                    modifier = Modifier.padding(top = topInset, bottom = bottomInset)
+                    modifier = Modifier.padding(top = topInset, bottom = bottomInset),
                 )
             }
         }
@@ -270,7 +273,7 @@ fun MainScreen(
         if (uiState.destination == MainDestination.PHOTOS) {
             StatusBarScrim(
                 statusBarHeight = statusBarHeight,
-                modifier = Modifier.align(Alignment.TopCenter)
+                modifier = Modifier.align(Alignment.TopCenter),
             )
         }
 
@@ -278,7 +281,7 @@ fun MainScreen(
             visible = !hideTopBar,
             enter = slideInVertically { -it } + fadeIn(),
             exit = slideOutVertically { -it } + fadeOut(),
-            modifier = Modifier.align(Alignment.TopCenter)
+            modifier = Modifier.align(Alignment.TopCenter),
         ) {
             PhotosTopBar(
                 currentUser = uiState.currentUser,
@@ -292,7 +295,7 @@ fun MainScreen(
                     }
                 },
                 onAvatarClick = { viewModel.setAvatarMenuOpen(true) },
-                modifier = Modifier.background(MaterialTheme.colorScheme.background)
+                modifier = Modifier.background(MaterialTheme.colorScheme.background),
             )
         }
 
@@ -301,7 +304,7 @@ fun MainScreen(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .navigationBarsPadding()
-                .padding(bottom = FloatingBottomNavHeight + 4.dp, start = 16.dp, end = 16.dp)
+                .padding(bottom = FloatingBottomNavHeight + 4.dp, start = 16.dp, end = 16.dp),
         )
 
         FloatingBottomNav(
@@ -318,7 +321,7 @@ fun MainScreen(
                 }
             },
             onSearchClick = viewModel::onSearchSelected,
-            modifier = Modifier.align(Alignment.BottomCenter)
+            modifier = Modifier.align(Alignment.BottomCenter),
         )
 
         // Avatar Menu Bottom Sheet
@@ -331,7 +334,7 @@ fun MainScreen(
                 syncErrorMessage = uiState.syncErrorMessage,
                 onSyncClick = { viewModel.syncNow(forceFullSnapshot = true) },
                 onLogoutClick = viewModel::logout,
-                onDismissRequest = { viewModel.setAvatarMenuOpen(false) }
+                onDismissRequest = { viewModel.setAvatarMenuOpen(false) },
             )
         }
     }
@@ -340,7 +343,7 @@ fun MainScreen(
 @Composable
 private fun StatusBarScrim(
     statusBarHeight: Dp,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     if (statusBarHeight <= 0.dp) return
     val scrimColor = MaterialTheme.colorScheme.background
@@ -352,9 +355,9 @@ private fun StatusBarScrim(
                 Brush.verticalGradient(
                     0.0f to scrimColor.copy(alpha = 0.95f),
                     0.65f to scrimColor.copy(alpha = 0.55f),
-                    1.0f to Color.Transparent
-                )
-            )
+                    1.0f to Color.Transparent,
+                ),
+            ),
     )
 }
 
@@ -363,34 +366,34 @@ private fun PlaceholderTabContent(
     title: String,
     subtitle: String,
     icon: ImageVector,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     Box(
         modifier = modifier
             .fillMaxSize()
             .padding(32.dp),
-        contentAlignment = Alignment.Center
+        contentAlignment = Alignment.Center,
     ) {
         Column(
-            horizontalAlignment = Alignment.CenterHorizontally
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
-                modifier = Modifier.size(56.dp)
+                modifier = Modifier.size(56.dp),
             )
             Spacer(modifier = Modifier.height(16.dp))
             Text(
                 text = title,
                 style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                color = MaterialTheme.colorScheme.onBackground
+                color = MaterialTheme.colorScheme.onBackground,
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = subtitle,
                 style = MaterialTheme.typography.bodyMedium.copy(textAlign = TextAlign.Center),
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }

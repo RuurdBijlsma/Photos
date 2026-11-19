@@ -61,7 +61,7 @@ import kotlinx.coroutines.launch
 fun PhotosAppRoot(container: AppContainer) {
     val authState by container.authRepository.authState.collectAsState()
     val sessionHolder: SessionViewModelStoreHolder = viewModel(
-        factory = SessionViewModelStoreHolder.FACTORY
+        factory = SessionViewModelStoreHolder.FACTORY,
     )
 
     when (val state = authState) {
@@ -70,7 +70,7 @@ fun PhotosAppRoot(container: AppContainer) {
                 modifier = Modifier
                     .fillMaxSize()
                     .background(MaterialTheme.colorScheme.background),
-                contentAlignment = Alignment.Center
+                contentAlignment = Alignment.Center,
             ) {
                 CircularProgressIndicator()
             }
@@ -81,7 +81,7 @@ fun PhotosAppRoot(container: AppContainer) {
                 sessionHolder.clearStore()
             }
             val authViewModel: AuthViewModel = viewModel(
-                factory = container.authViewModelFactory()
+                factory = container.authViewModelFactory(),
             )
             AuthScreen(viewModel = authViewModel)
         }
@@ -89,7 +89,7 @@ fun PhotosAppRoot(container: AppContainer) {
         is AuthState.Authenticated -> AuthenticatedSession(
             container = container,
             sessionHolder = sessionHolder,
-            user = state.user
+            user = state.user,
         )
     }
 }
@@ -99,7 +99,7 @@ fun PhotosAppRoot(container: AppContainer) {
 private fun AuthenticatedSession(
     container: AppContainer,
     sessionHolder: SessionViewModelStoreHolder,
-    user: User
+    user: User,
 ) {
     val sessionOwner = remember(user.id, sessionHolder) {
         object : ViewModelStoreOwner {
@@ -112,23 +112,23 @@ private fun AuthenticatedSession(
     CompositionLocalProvider(
         LocalViewModelStoreOwner provides sessionOwner,
         LocalMemoryCacheKeyRegistry provides container.memoryCacheKeyRegistry,
-        LocalTimelineTileBoundsRegistry provides boundsRegistry
+        LocalTimelineTileBoundsRegistry provides boundsRegistry,
     ) {
         val userKey = "user_${user.id}"
         val mainViewModel: MainViewModel = viewModel(
             key = "${userKey}_main",
-            factory = container.mainViewModelFactory()
+            factory = container.mainViewModelFactory(),
         )
         val timelineViewModel: TimelineViewModel = viewModel(
             key = "${userKey}_timeline",
-            factory = container.timelineViewModelFactory()
+            factory = container.timelineViewModelFactory(),
         )
 
         val navController = rememberNavController()
         val timelineListState = rememberLazyListState(
             cacheWindow = remember {
                 LazyLayoutCacheWindow(aheadFraction = 0.75f, behindFraction = 0.4f)
-            }
+            },
         )
         val timelineUiState by timelineViewModel.uiState.collectAsState()
         val mainUiState by mainViewModel.uiState.collectAsState()
@@ -156,7 +156,7 @@ private fun AuthenticatedSession(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .onSizeChanged { rootContainerSize = it }
+                .onSizeChanged { rootContainerSize = it },
         ) {
             // NavHost container (MainScreen root + pushed routes)
             // Suppress accessibility and focus while viewer overlay is open
@@ -170,13 +170,13 @@ private fun AuthenticatedSession(
                                 .focusProperties { canFocus = false }
                         } else {
                             Modifier
-                        }
-                    )
+                        },
+                    ),
             ) {
                 NavHost(
                     navController = navController,
                     startDestination = MainRoute,
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier.fillMaxSize(),
                 ) {
                     composable<MainRoute> {
                         MainScreen(
@@ -189,7 +189,7 @@ private fun AuthenticatedSession(
                                     viewerOpenSourceRect = sourceRect
                                     activeViewerMediaId = mediaId
                                 }
-                            }
+                            },
                         )
                     }
                     composable<DeviceFoldersRoute> {
@@ -223,7 +223,7 @@ private fun AuthenticatedSession(
                         viewerOpenSourceRect = null
                         activeViewerMediaId = null
                         sessionHolder.clearViewerStore()
-                    }
+                    },
                 )
             }
         }
@@ -243,7 +243,7 @@ private fun SessionMediaViewer(
     containerSize: IntSize,
     onHiddenTimelineMediaChanged: (String?) -> Unit,
     onPreSyncScroll: (mediaId: String) -> Unit,
-    onDismissFinished: () -> Unit
+    onDismissFinished: () -> Unit,
 ) {
     val viewerOwner = remember(userId, sessionHolder) {
         object : ViewModelStoreOwner {
@@ -254,7 +254,7 @@ private fun SessionMediaViewer(
     val viewerViewModel: MediaViewerViewModel = viewModel(
         viewModelStoreOwner = viewerOwner,
         key = "${userKey}_viewer",
-        factory = container.mediaViewerViewModelFactory(viewerMediaId)
+        factory = container.mediaViewerViewModelFactory(viewerMediaId),
     )
 
     MediaViewerScreen(
@@ -264,7 +264,7 @@ private fun SessionMediaViewer(
         containerSize = containerSize,
         onHiddenTimelineMediaChanged = onHiddenTimelineMediaChanged,
         onPreSyncScroll = onPreSyncScroll,
-        onDismissFinished = onDismissFinished
+        onDismissFinished = onDismissFinished,
     )
 }
 
@@ -312,9 +312,7 @@ internal class SessionViewModelStoreHolder : ViewModel() {
     companion object {
         val FACTORY: ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
-            override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                return SessionViewModelStoreHolder() as T
-            }
+            override fun <T : ViewModel> create(modelClass: Class<T>): T = SessionViewModelStoreHolder() as T
         }
     }
 }

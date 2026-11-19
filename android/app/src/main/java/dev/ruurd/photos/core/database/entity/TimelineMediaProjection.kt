@@ -36,5 +36,5 @@ data class TimelineMediaProjection(
     val sortTimestamp: Long = 0L,
 
     @ColumnInfo(name = "timezone_offset_minutes")
-    val timezoneOffsetMinutes: Int = 0
+    val timezoneOffsetMinutes: Int = 0,
 )

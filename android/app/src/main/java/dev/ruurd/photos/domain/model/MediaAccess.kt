@@ -7,12 +7,12 @@ package dev.ruurd.photos.domain.model
 enum class MediaAccess {
     NONE,
     PARTIAL,
-    FULL
+    FULL,
 }
 
 data class MediaAccessState(
     val images: MediaAccess = MediaAccess.NONE,
-    val videos: MediaAccess = MediaAccess.NONE
+    val videos: MediaAccess = MediaAccess.NONE,
 ) {
     val hasAnyAccess: Boolean
         get() = images != MediaAccess.NONE || videos != MediaAccess.NONE

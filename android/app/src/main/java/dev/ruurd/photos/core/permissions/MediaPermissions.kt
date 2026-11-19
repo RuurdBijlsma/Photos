@@ -17,12 +17,12 @@ object MediaPermissions {
     val requestedPermissions = arrayOf(
         Manifest.permission.READ_MEDIA_IMAGES,
         Manifest.permission.READ_MEDIA_VIDEO,
-        Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED
+        Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED,
     )
 
     fun read(context: Context): MediaAccessState = MediaAccessState(
         images = accessFor(context, Manifest.permission.READ_MEDIA_IMAGES),
-        videos = accessFor(context, Manifest.permission.READ_MEDIA_VIDEO)
+        videos = accessFor(context, Manifest.permission.READ_MEDIA_VIDEO),
     )
 
     private fun accessFor(context: Context, fullPermission: String): MediaAccess = when {
@@ -31,6 +31,5 @@ object MediaPermissions {
         else -> MediaAccess.NONE
     }
 
-    private fun isGranted(context: Context, permission: String): Boolean =
-        ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
+    private fun isGranted(context: Context, permission: String): Boolean = ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
 }

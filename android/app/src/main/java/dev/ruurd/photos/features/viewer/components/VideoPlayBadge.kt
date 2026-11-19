@@ -23,22 +23,22 @@ import dev.ruurd.photos.ui.theme.PhotosRadii
 @Composable
 fun VideoPlayBadge(
     durationMs: Int?,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     Row(
         modifier = modifier
             .background(
                 color = Color.Black.copy(alpha = 0.6f),
-                shape = RoundedCornerShape(PhotosRadii.Card)
+                shape = RoundedCornerShape(PhotosRadii.Card),
             )
             .padding(horizontal = 16.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
             imageVector = Icons.Default.PlayArrow,
             contentDescription = "Video",
             tint = Color.White,
-            modifier = Modifier.size(36.dp)
+            modifier = Modifier.size(36.dp),
         )
         if (durationMs != null && durationMs > 0) {
             Spacer(modifier = Modifier.width(6.dp))
@@ -46,7 +46,7 @@ fun VideoPlayBadge(
             Text(
                 text = "%d:%02d".format(totalSec / 60, totalSec % 60),
                 style = MaterialTheme.typography.titleMedium,
-                color = Color.White
+                color = Color.White,
             )
         }
     }

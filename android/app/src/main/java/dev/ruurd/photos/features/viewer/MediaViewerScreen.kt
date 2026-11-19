@@ -47,7 +47,7 @@ fun MediaViewerScreen(
     onHiddenTimelineMediaChanged: (String?) -> Unit,
     onPreSyncScroll: (mediaId: String) -> Unit,
     onDismissFinished: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val items = uiState.items
@@ -64,7 +64,7 @@ fun MediaViewerScreen(
         }
         rememberPagerState(
             initialPage = targetInitialIndex,
-            pageCount = { currentItems.size }
+            pageCount = { currentItems.size },
         )
     }
 
@@ -81,7 +81,7 @@ fun MediaViewerScreen(
         isChromeVisible = uiState.isChromeVisible,
         onHiddenTimelineMediaChanged = onHiddenTimelineMediaChanged,
         onPreSyncScroll = onPreSyncScroll,
-        onDismissFinished = onDismissFinished
+        onDismissFinished = onDismissFinished,
     )
 
     LaunchedEffect(transition.hasValidOpenSource) {
@@ -136,13 +136,13 @@ fun MediaViewerScreen(
         pagerState = pagerState,
         items = items,
         isClosing = { transition.isClosing },
-        onPreSyncScroll = onPreSyncScroll
+        onPreSyncScroll = onPreSyncScroll,
     )
 
     ViewerPrefetchEffect(
         pagerState = pagerState,
         items = items,
-        baseUrl = baseUrl
+        baseUrl = baseUrl,
     )
 
     BackHandler(enabled = !transition.isClosing) {
@@ -154,19 +154,19 @@ fun MediaViewerScreen(
         modifier = modifier
             .fillMaxSize()
             .onSizeChanged(transition::onSizeChanged)
-            .then(transition.dismissDragModifier())
+            .then(transition.dismissDragModifier()),
     ) {
         // Backdrop scrim
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.Black.copy(alpha = transition.backdropAlpha))
+                .background(Color.Black.copy(alpha = transition.backdropAlpha)),
         )
 
         // Interactive Pager Layer (hidden only while ClosingHeroOverlay is flying back to the tile)
         if (transition.closingState == null && items.isNotEmpty()) {
             val isPagerScrollEnabled = !isZoomed && !transition.isDragging &&
-                    !transition.isOpeningHero
+                !transition.isOpeningHero
 
             Box(
                 modifier = Modifier
@@ -177,14 +177,14 @@ fun MediaViewerScreen(
                         scaleX = transition.viewerScale
                         scaleY = transition.viewerScale
                         alpha = transition.pagerAlpha
-                    }
+                    },
             ) {
                 HorizontalPager(
                     state = pagerState,
                     key = { page -> if (page in items.indices) items[page].id else page },
                     beyondViewportPageCount = 1,
                     userScrollEnabled = isPagerScrollEnabled,
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier.fillMaxSize(),
                 ) { page ->
                     val item = items.getOrNull(page)
                     if (item != null) {
@@ -208,13 +208,13 @@ fun MediaViewerScreen(
                                             activePageZoomFraction = fraction
                                         }
                                     },
-                                    modifier = Modifier.fillMaxSize()
+                                    modifier = Modifier.fillMaxSize(),
                                 )
                                 // Phase 2C swaps this slot for a real VideoPlayerPage.
                                 if (item.isVideo) {
                                     VideoPlayBadge(
                                         durationMs = item.durationMs,
-                                        modifier = Modifier.align(Alignment.Center)
+                                        modifier = Modifier.align(Alignment.Center),
                                     )
                                 }
                             }
@@ -234,7 +234,7 @@ fun MediaViewerScreen(
                     baseUrl = baseUrl,
                     rect = transition.openingRect(openSourceRect, openingItem),
                     alpha = 1f,
-                    onImageReady = transition::onHeroImageReady
+                    onImageReady = transition::onHeroImageReady,
                 )
             }
         }
@@ -245,7 +245,7 @@ fun MediaViewerScreen(
                 item = closing.item,
                 baseUrl = baseUrl,
                 rect = transition.closingRect(closing),
-                alpha = transition.closingAlpha(closing)
+                alpha = transition.closingAlpha(closing),
             )
         }
 
@@ -259,7 +259,7 @@ fun MediaViewerScreen(
                 isProjectionLoading = uiState.isProjectionLoading,
                 onBack = {
                     transition.startClosing(Offset.Zero, 1f, transition.backdropAlpha)
-                }
+                },
             )
         }
     }

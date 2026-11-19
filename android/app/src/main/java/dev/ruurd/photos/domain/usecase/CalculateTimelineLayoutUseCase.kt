@@ -22,7 +22,7 @@ import kotlin.math.roundToInt
 data class TimelineLayoutParams(
     val containerWidthPx: Int,
     val density: Float,
-    val desiredRowHeightDp: Float = DEFAULT_ROW_HEIGHT_DP
+    val desiredRowHeightDp: Float = DEFAULT_ROW_HEIGHT_DP,
 ) {
     companion object {
         const val DEFAULT_ROW_HEIGHT_DP = 180f
@@ -37,12 +37,12 @@ data class TimelineLayoutParams(
 class CalculateTimelineLayoutUseCase(
     private val maxThumbnailHeightPx: Int = DEFAULT_MAX_THUMBNAIL_PX,
     private val currentYearProvider: () -> Int = { LocalDate.now().year },
-    private val todayProvider: () -> LocalDate = { LocalDate.now() }
+    private val todayProvider: () -> LocalDate = { LocalDate.now() },
 ) {
 
     operator fun invoke(
         media: List<TimelineMediaProjection>,
-        params: TimelineLayoutParams
+        params: TimelineLayoutParams,
     ): TimelineLayoutIndex {
         if (media.isEmpty() || params.containerWidthPx <= 0) return TimelineLayoutIndex()
 
@@ -87,7 +87,9 @@ class CalculateTimelineLayoutUseCase(
             val isFlush = flushToWidth || rawMultiplier <= MAX_SIZE_MULTIPLIER
             val multiplier = when {
                 flushToWidth -> min(rawMultiplier, MAX_SIZE_MULTIPLIER)
+
                 rawMultiplier <= MAX_SIZE_MULTIPLIER -> rawMultiplier
+
                 // A month that ends on an incomplete row must not stretch into giant blocks.
                 else -> 1f
             }
@@ -118,8 +120,8 @@ class CalculateTimelineLayoutUseCase(
                     isLastOfMonth = lastOfMonth,
                     thumbnailTargetHeightPx = thumbnailHeightFor(heightPx),
                     dateLabel = dateLabelOf(firstItem),
-                    estimatedOffsetTopDp = offsetPx / density
-                )
+                    estimatedOffsetTopDp = offsetPx / density,
+                ),
             )
 
             offsetPx += heightPx
@@ -145,8 +147,8 @@ class CalculateTimelineLayoutUseCase(
                     yearMonth = yearMonth,
                     title = monthTitle(yearMonth),
                     yearLabel = (yearMonth / 100).takeIf { it != currentYear }?.toString(),
-                    estimatedOffsetTopDp = offsetPx / density
-                )
+                    estimatedOffsetTopDp = offsetPx / density,
+                ),
             )
             offsetPx += headerHeightPx
 
@@ -160,7 +162,7 @@ class CalculateTimelineLayoutUseCase(
                     finishRow(
                         firstOfMonth = firstOfMonth,
                         lastOfMonth = index == monthEnd - 1,
-                        flushToWidth = true
+                        flushToWidth = true,
                     )
                     firstOfMonth = false
                 }
@@ -181,7 +183,7 @@ class CalculateTimelineLayoutUseCase(
             monthOffsets = monthOffsets,
             monthLabels = monthLabels,
             itemOffsets = itemOffsets,
-            yearFractions = yearFractions
+            yearFractions = yearFractions,
         )
     }
 
@@ -200,17 +202,17 @@ class CalculateTimelineLayoutUseCase(
         durationLabel = if (isVideo) durationMs?.let(::formatDuration) else null,
         hasThumbnails = hasThumbnails,
         widthDp = widthDp,
-        syncStatus = syncStatus
+        syncStatus = syncStatus,
     )
 
     private fun formatDateLabel(
         item: TimelineMediaProjection,
         today: LocalDate,
-        currentYear: Int
+        currentYear: Int,
     ): String {
         if (item.sortTimestamp <= 0L) return ""
         val localDate = Instant.ofEpochMilli(
-            item.sortTimestamp + item.timezoneOffsetMinutes * 60_000L
+            item.sortTimestamp + item.timezoneOffsetMinutes * 60_000L,
         ).atZone(ZoneOffset.UTC).toLocalDate()
 
         return when {
@@ -228,8 +230,7 @@ class CalculateTimelineLayoutUseCase(
         return if (seconds < 10) "$minutes:0$seconds" else "$minutes:$seconds"
     }
 
-    private fun monthTitle(yearMonth: Int): String =
-        monthOf(yearMonth)?.getDisplayName(TextStyle.FULL, Locale.getDefault()).orEmpty()
+    private fun monthTitle(yearMonth: Int): String = monthOf(yearMonth)?.getDisplayName(TextStyle.FULL, Locale.getDefault()).orEmpty()
 
     private fun shortMonthLabel(yearMonth: Int): String {
         val month = monthOf(yearMonth) ?: return ""
@@ -255,7 +256,6 @@ class CalculateTimelineLayoutUseCase(
 
         private const val DAY_MS = 86_400_000L
 
-        fun ratioOf(item: TimelineMediaProjection): Float =
-            if (item.ratio.isFinite() && item.ratio > 0f) item.ratio else 1f
+        fun ratioOf(item: TimelineMediaProjection): Float = if (item.ratio.isFinite() && item.ratio > 0f) item.ratio else 1f
     }
 }

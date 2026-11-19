@@ -114,7 +114,7 @@ class DefaultAppContainer(private val context: Context) : AppContainer {
                     timelineProjectionStore.clear()
                     memoryCacheKeyRegistry.clear()
                 }
-            }
+            },
         )
     }
 
@@ -150,7 +150,7 @@ class DefaultAppContainer(private val context: Context) : AppContainer {
                     addInterceptor(
                         HttpLoggingInterceptor().apply {
                             level = HttpLoggingInterceptor.Level.BASIC
-                        }
+                        },
                     )
                 }
             }
@@ -178,7 +178,7 @@ class DefaultAppContainer(private val context: Context) : AppContainer {
         LanServerScanner(
             networkMonitor = networkMonitor,
             directClient = directClient,
-            dispatchers = dispatchers
+            dispatchers = dispatchers,
         )
     }
 
@@ -190,7 +190,7 @@ class DefaultAppContainer(private val context: Context) : AppContainer {
             directClient = directClient,
             lanServerScanner = lanServerScanner,
             dispatchers = dispatchers,
-            applicationScope = applicationScope
+            applicationScope = applicationScope,
         )
     }
 
@@ -198,7 +198,7 @@ class DefaultAppContainer(private val context: Context) : AppContainer {
         MediaRepositoryImpl(
             database = database,
             mediaDao = mediaDao,
-            dispatchers = dispatchers
+            dispatchers = dispatchers,
         )
     }
 
@@ -216,7 +216,7 @@ class DefaultAppContainer(private val context: Context) : AppContainer {
             mediaRepository = mediaRepository,
             deviceFolderRepository = deviceFolderRepository,
             scanStateStore = sessionManager,
-            dispatchers = dispatchers
+            dispatchers = dispatchers,
         )
     }
 
@@ -225,7 +225,7 @@ class DefaultAppContainer(private val context: Context) : AppContainer {
             apiService = photosApiService,
             mediaRepository = mediaRepository,
             sessionManager = sessionManager,
-            dispatchers = dispatchers
+            dispatchers = dispatchers,
         )
     }
 
@@ -233,19 +233,18 @@ class DefaultAppContainer(private val context: Context) : AppContainer {
         ObserveTimelineUseCase(
             mediaRepository = mediaRepository,
             dispatchers = dispatchers,
-            timelineProjectionStore = timelineProjectionStore
+            timelineProjectionStore = timelineProjectionStore,
         )
     }
 
     override val calculateTimelineLayoutUseCase: CalculateTimelineLayoutUseCase by lazy {
         val activityManager = context.getSystemService(ActivityManager::class.java)
         CalculateTimelineLayoutUseCase(
-            maxThumbnailHeightPx = if (activityManager?.isLowRamDevice == true) 480 else 720
+            maxThumbnailHeightPx = if (activityManager?.isLowRamDevice == true) 480 else 720,
         )
     }
 
-    private fun isDebuggable(): Boolean =
-        (context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
+    private fun isDebuggable(): Boolean = (context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
 
     override val memoryCacheKeyRegistry: MemoryCacheKeyRegistry by lazy {
         MemoryCacheKeyRegistry()
@@ -255,7 +254,7 @@ class DefaultAppContainer(private val context: Context) : AppContainer {
         TimelineProjectionStore(
             mediaRepository = mediaRepository,
             scope = applicationScope,
-            dispatchers = dispatchers
+            dispatchers = dispatchers,
         )
     }
 
@@ -263,7 +262,7 @@ class DefaultAppContainer(private val context: Context) : AppContainer {
         // Reached only after `SessionManager` loaded its persisted state, since that gates auth.
         BootstrapState(
             needsBootstrap = sessionManager.latestSyncTimestamp.value <= 0L &&
-                    !sessionManager.hasScanSignature.value
+                !sessionManager.hasScanSignature.value,
         )
     }
 
@@ -283,7 +282,7 @@ class DefaultAppContainer(private val context: Context) : AppContainer {
                 scanLocalMediaUseCase = scanLocalMediaUseCase,
                 localMediaStore = localMediaStore,
                 bootstrapState = bootstrapState,
-                networkMonitor = networkMonitor
+                networkMonitor = networkMonitor,
             )
         }
     }
@@ -294,20 +293,20 @@ class DefaultAppContainer(private val context: Context) : AppContainer {
                 observeTimelineUseCase = observeTimelineUseCase,
                 calculateTimelineLayoutUseCase = calculateTimelineLayoutUseCase,
                 dispatchers = dispatchers,
-                isBootstrapping = bootstrapState.isBootstrapping
+                isBootstrapping = bootstrapState.isBootstrapping,
             )
         }
     }
 
     override fun mediaViewerViewModelFactory(
-        initialMediaId: String
+        initialMediaId: String,
     ): ViewModelProvider.Factory = viewModelFactory {
         initializer {
             MediaViewerViewModel(
                 initialMediaId = initialMediaId,
                 timelineProjectionStore = timelineProjectionStore,
                 mediaRepository = mediaRepository,
-                dispatchers = dispatchers
+                dispatchers = dispatchers,
             )
         }
     }

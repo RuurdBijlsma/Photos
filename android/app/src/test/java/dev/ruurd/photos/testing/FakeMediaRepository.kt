@@ -25,47 +25,41 @@ class FakeMediaRepository : MediaRepository {
 
     private val timelineFlow = MutableStateFlow<List<TimelineMediaProjection>>(emptyList())
 
-    override fun getTimelineStage1(limitMonths: Int): Flow<List<TimelineMediaProjection>> =
-        timelineFlow.map { list ->
-            val topMonths = list.asSequence()
-                .map { it.yearMonth }
-                .distinct()
-                .take(limitMonths)
-                .toHashSet()
-            list.filter { it.yearMonth in topMonths }
-        }
+    override fun getTimelineStage1(limitMonths: Int): Flow<List<TimelineMediaProjection>> = timelineFlow.map { list ->
+        val topMonths = list.asSequence()
+            .map { it.yearMonth }
+            .distinct()
+            .take(limitMonths)
+            .toHashSet()
+        list.filter { it.yearMonth in topMonths }
+    }
 
     override fun getTimelineStage2(): Flow<List<TimelineMediaProjection>> = timelineFlow
 
     override suspend fun getById(id: String): MediaEntity? = items[id]
 
-    override suspend fun getByIds(ids: List<String>): List<MediaEntity> =
-        ids.mapNotNull { items[it] }
+    override suspend fun getByIds(ids: List<String>): List<MediaEntity> = ids.mapNotNull { items[it] }
 
     override suspend fun getByLocalContentUris(uris: List<String>): List<MediaEntity> {
         val uriSet = uris.toHashSet()
         return items.values.filter { it.localContentUri in uriSet }
     }
 
-    override suspend fun getByCloudId(cloudId: String): MediaEntity? =
-        items.values.firstOrNull { it.cloudId == cloudId }
+    override suspend fun getByCloudId(cloudId: String): MediaEntity? = items.values.firstOrNull { it.cloudId == cloudId }
 
-    override suspend fun getAllByCloudId(cloudId: String): List<MediaEntity> =
-        items.values.filter { it.cloudId == cloudId }
+    override suspend fun getAllByCloudId(cloudId: String): List<MediaEntity> = items.values.filter { it.cloudId == cloudId }
 
     override suspend fun getAllByCloudIds(cloudIds: List<String>): List<MediaEntity> {
         val ids = cloudIds.toHashSet()
         return items.values.filter { it.cloudId in ids }
     }
 
-    override suspend fun getLocalRows(isVideo: Boolean): List<MediaEntity> =
-        items.values.filter { it.localContentUri != null && it.isVideo == isVideo }
+    override suspend fun getLocalRows(isVideo: Boolean): List<MediaEntity> = items.values.filter { it.localContentUri != null && it.isVideo == isVideo }
 
-    override suspend fun getLocalRowRefs(isVideo: Boolean): List<LocalRowRef> =
-        items.values.mapNotNull { row ->
-            val uri = row.localContentUri ?: return@mapNotNull null
-            if (row.isVideo == isVideo) LocalRowRef(row.id, uri) else null
-        }
+    override suspend fun getLocalRowRefs(isVideo: Boolean): List<LocalRowRef> = items.values.mapNotNull { row ->
+        val uri = row.localContentUri ?: return@mapNotNull null
+        if (row.isVideo == isVideo) LocalRowRef(row.id, uri) else null
+    }
 
     override suspend fun getAllCloudIds(): List<String> {
         getAllCloudIdsCalls++
@@ -74,14 +68,14 @@ class FakeMediaRepository : MediaRepository {
 
     override suspend fun findBySizesAndStatus(
         sizeBytes: List<Long>,
-        syncStatus: SyncStatus
+        syncStatus: SyncStatus,
     ): List<MediaEntity> {
         val sizes = sizeBytes.toHashSet()
         return items.values
             .filter { it.sizeBytes in sizes && it.syncStatus == syncStatus }
             .sortedWith(
                 compareByDescending<MediaEntity> { it.isVisibleInTimeline }
-                    .thenBy { it.id }
+                    .thenBy { it.id },
             )
     }
 
@@ -111,7 +105,7 @@ class FakeMediaRepository : MediaRepository {
                     syncStatus = SyncStatus.LOCAL_ONLY,
                     autoBackupSuppressed = true,
                     // Mirrors the DAO's COALESCE(device_folder.show_in_timeline, 1) subquery.
-                    isVisibleInTimeline = it.bucketId?.let(folderVisibility::get) ?: true
+                    isVisibleInTimeline = it.bucketId?.let(folderVisibility::get) ?: true,
                 )
             }
         emitTimeline()
@@ -154,7 +148,7 @@ class FakeMediaRepository : MediaRepository {
             .sortedWith(
                 compareByDescending<MediaEntity> { it.yearMonth }
                     .thenByDescending { it.sortTimestamp }
-                    .thenByDescending { it.id }
+                    .thenByDescending { it.id },
             )
             .map { it.toTimelineProjection() }
     }

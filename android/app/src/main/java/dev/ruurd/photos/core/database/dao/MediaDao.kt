@@ -15,7 +15,7 @@ data class LocalRowRef(
     val id: String,
 
     @ColumnInfo(name = "local_content_uri")
-    val localContentUri: String
+    val localContentUri: String,
 )
 
 @Dao
@@ -38,7 +38,7 @@ interface MediaDao {
             0
           )
         ORDER BY year_month DESC, sort_timestamp DESC, id DESC
-        """
+        """,
     )
     fun getTimelineStage1(limitMonths: Int = 2): Flow<List<TimelineMediaProjection>>
 
@@ -48,7 +48,7 @@ interface MediaDao {
         FROM media_item
         WHERE is_visible_in_timeline = 1
         ORDER BY year_month DESC, sort_timestamp DESC, id DESC
-        """
+        """,
     )
     fun getTimelineStage2(): Flow<List<TimelineMediaProjection>>
 
@@ -77,7 +77,7 @@ interface MediaDao {
         """
         SELECT id, local_content_uri FROM media_item
         WHERE local_content_uri IS NOT NULL AND is_video = :isVideo
-        """
+        """,
     )
     suspend fun getLocalRowRefs(isVideo: Boolean): List<LocalRowRef>
 
@@ -90,11 +90,11 @@ interface MediaDao {
         SELECT * FROM media_item
         WHERE size_bytes IN (:sizeBytes) AND sync_status = :syncStatus
         ORDER BY is_visible_in_timeline DESC, id ASC
-        """
+        """,
     )
     suspend fun findBySizesAndStatus(
         sizeBytes: List<Long>,
-        syncStatus: SyncStatus
+        syncStatus: SyncStatus,
     ): List<MediaEntity>
 
     @Upsert
@@ -129,18 +129,18 @@ interface MediaDao {
                 1
             )
         WHERE cloud_id IN (:cloudIds) AND local_content_uri IS NOT NULL
-        """
+        """,
     )
     suspend fun transitionToLocalOnlyByCloudIds(
         cloudIds: List<String>,
-        localOnlyStatus: SyncStatus = SyncStatus.LOCAL_ONLY
+        localOnlyStatus: SyncStatus = SyncStatus.LOCAL_ONLY,
     )
 
     @Query(
         """
         DELETE FROM media_item
         WHERE cloud_id IN (:cloudIds) AND local_content_uri IS NULL
-        """
+        """,
     )
     suspend fun deleteCloudOnlyByCloudIds(cloudIds: List<String>)
 

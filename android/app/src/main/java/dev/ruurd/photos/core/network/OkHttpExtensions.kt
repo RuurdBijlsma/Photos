@@ -26,6 +26,6 @@ internal suspend fun Call.await(): Response = suspendCancellableCoroutine { cont
                     response.close()
                 }
             }
-        }
+        },
     )
 }

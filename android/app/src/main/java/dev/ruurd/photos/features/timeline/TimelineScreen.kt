@@ -106,7 +106,7 @@ fun TimelineScreen(
     listState: LazyListState = rememberLazyListState(
         cacheWindow = remember {
             LazyLayoutCacheWindow(aheadFraction = 0.75f, behindFraction = 0.4f)
-        }
+        },
     ),
     contentPadding: PaddingValues = PaddingValues(),
     topBarHeight: Dp = 0.dp,
@@ -115,7 +115,7 @@ fun TimelineScreen(
     pullToRefreshState: PullToRefreshState? = null,
     hiddenMediaId: String? = null,
     onMediaClick: (mediaId: String, sourceRect: Rect?) -> Unit = { _, _ -> },
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val layout = uiState.layout
@@ -140,7 +140,7 @@ fun TimelineScreen(
             Triple(
                 currentLayout,
                 listState.firstVisibleItemIndex,
-                listState.firstVisibleItemScrollOffset
+                listState.firstVisibleItemScrollOffset,
             )
         }.collect { (activeLayout, firstIndex, firstOffset) ->
             val topRowId = activeLayout.rows.firstOrNull()?.id
@@ -185,7 +185,7 @@ fun TimelineScreen(
                 override fun onPostScroll(
                     consumed: Offset,
                     available: Offset,
-                    source: NestedScrollSource
+                    source: NestedScrollSource,
                 ): Offset {
                     val atTop = currentIsEmpty || !listState.canScrollBackward
                     if (source == NestedScrollSource.UserInput &&
@@ -221,13 +221,13 @@ fun TimelineScreen(
                     Modifier.nestedScroll(pullNestedScrollConnection)
                 } else {
                     Modifier
-                }
+                },
             )
             .semantics { testTagsAsResourceId = true }
             .onSizeChanged {
                 viewModel.onViewportChanged(it.width, density.density)
                 viewportHeightDp = with(density) { it.height.toDp().value }
-            }
+            },
     ) {
         when {
             uiState.isLoading || (layout.isEmpty && isSyncing) -> {
@@ -238,7 +238,7 @@ fun TimelineScreen(
                 EmptyTimeline(
                     contentPadding = contentPadding,
                     pullToRefreshState = pullToRefreshState,
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier.fillMaxSize(),
                 )
             }
 
@@ -256,21 +256,21 @@ fun TimelineScreen(
                         .testTag("timeline_list"),
                     contentPadding = PaddingValues(
                         top = topPaddingDp.dp,
-                        bottom = bottomPaddingDp.dp
-                    )
+                        bottom = bottomPaddingDp.dp,
+                    ),
                 ) {
                     itemsIndexed(
                         items = layout.rows,
                         key = { _, item -> item.id },
                         contentType = { _, item ->
                             if (item is MonthHeaderUiItem) "header" else "row"
-                        }
+                        },
                     ) { index, item ->
                         val cascadeModifier = if (pullToRefreshState != null && index < CASCADE_ROW_LIMIT) {
                             Modifier.pullCascadeGraphicsLayer(
                                 index = index,
                                 pullState = pullToRefreshState,
-                                scaleRows = item is TimelineRowUiItem
+                                scaleRows = item is TimelineRowUiItem,
                             )
                         } else {
                             Modifier
@@ -279,15 +279,16 @@ fun TimelineScreen(
                             is MonthHeaderUiItem -> MonthHeader(
                                 item = item,
                                 heightDp = layout.headerHeightDp,
-                                modifier = cascadeModifier
+                                modifier = cascadeModifier,
                             )
+
                             is TimelineRowUiItem -> TimelineRow(
                                 item = item,
                                 baseUrl = baseUrl,
                                 isScrubbing = isScrubbing,
                                 hiddenMediaId = hiddenMediaId,
                                 onMediaClick = onMediaClick,
-                                modifier = cascadeModifier
+                                modifier = cascadeModifier,
                             )
                         }
                     }
@@ -299,7 +300,7 @@ fun TimelineScreen(
                     topPadding = contentPadding.calculateTopPadding(),
                     topBarHeight = topBarHeight,
                     topBarVisible = topBarVisible,
-                    modifier = Modifier.align(Alignment.TopCenter)
+                    modifier = Modifier.align(Alignment.TopCenter),
                 )
 
                 if (layout.totalHeightDp + topPaddingDp + bottomPaddingDp > viewportHeightDp) {
@@ -313,7 +314,7 @@ fun TimelineScreen(
                         modifier = Modifier
                             .align(Alignment.CenterEnd)
                             .padding(top = topPaddingDp.dp, bottom = bottomPaddingDp.dp)
-                            .testTag("timeline_scrubber")
+                            .testTag("timeline_scrubber"),
                     )
                 }
             }
@@ -324,7 +325,7 @@ fun TimelineScreen(
 private fun Modifier.pullCascadeGraphicsLayer(
     index: Int,
     pullState: PullToRefreshState,
-    scaleRows: Boolean
+    scaleRows: Boolean,
 ): Modifier = graphicsLayer {
     val progress = pullState.pullProgress
     if (progress > 0f) {
@@ -349,14 +350,14 @@ private fun FloatingDatePillOverlay(
     topPadding: Dp,
     topBarHeight: Dp,
     topBarVisible: Boolean,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val topBufferPx = with(LocalDensity.current) { DATE_PILL_TOP_BUFFER_DP.dp.roundToPx() }
 
     val datePillLabel by remember(layout, listState, topBufferPx) {
         derivedStateOf {
             val isScrolledPastTop = listState.firstVisibleItemIndex > 0 ||
-                    listState.firstVisibleItemScrollOffset > topBufferPx
+                listState.firstVisibleItemScrollOffset > topBufferPx
             if (!isScrolledPastTop || layout.isEmpty) {
                 null
             } else {
@@ -368,7 +369,7 @@ private fun FloatingDatePillOverlay(
     val statusBarOnlyTopDp = (topPadding - topBarHeight).coerceAtLeast(0.dp)
     val datePillTopOffset = animateDpAsState(
         targetValue = if (topBarVisible) topPadding + 8.dp else statusBarOnlyTopDp + 8.dp,
-        label = "date_pill_top_offset"
+        label = "date_pill_top_offset",
     )
 
     AnimatedVisibility(
@@ -376,7 +377,7 @@ private fun FloatingDatePillOverlay(
         enter = fadeIn() + slideInVertically { -it / 2 },
         exit = fadeOut() + slideOutVertically { -it / 2 },
         // Layout-offset only: `.padding()` would relayout this subtree on every animation frame.
-        modifier = modifier.offset { IntOffset(0, datePillTopOffset.value.roundToPx()) }
+        modifier = modifier.offset { IntOffset(0, datePillTopOffset.value.roundToPx()) },
     ) {
         // The label turns null before the exit animation runs, so keep the last one to animate out.
         var lastLabel by remember { mutableStateOf("") }
@@ -388,23 +389,23 @@ private fun FloatingDatePillOverlay(
 @Composable
 private fun FloatingDatePill(
     label: String,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     Surface(
         shape = CircleShape,
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         tonalElevation = 6.dp,
         shadowElevation = 8.dp,
-        modifier = modifier
+        modifier = modifier,
     ) {
         Text(
             text = label,
             style = MaterialTheme.typography.labelLarge.copy(
                 fontFamily = MontserratFontFamily,
-                fontWeight = FontWeight.SemiBold
+                fontWeight = FontWeight.SemiBold,
             ),
             color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
         )
     }
 }
@@ -413,7 +414,7 @@ private fun FloatingDatePill(
 private fun MonthHeader(
     item: MonthHeaderUiItem,
     heightDp: Float,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     // Baseline alignment does not use the row's fixed height, so the texts are wrapped in a Box that
     // bottom-aligns them; that keeps the gap above the month larger than the gap below it.
@@ -422,21 +423,21 @@ private fun MonthHeader(
             .fillMaxWidth()
             .height(heightDp.dp)
             .padding(start = 24.dp, end = 24.dp, top = 16.dp, bottom = 10.dp),
-        contentAlignment = Alignment.BottomStart
+        contentAlignment = Alignment.BottomStart,
     ) {
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             Text(
                 text = item.title,
                 style = MaterialTheme.typography.headlineMedium,
                 color = MaterialTheme.colorScheme.onBackground,
-                modifier = Modifier.alignByBaseline()
+                modifier = Modifier.alignByBaseline(),
             )
             item.yearLabel?.let { year ->
                 Text(
                     text = year,
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Medium),
                     color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
-                    modifier = Modifier.alignByBaseline()
+                    modifier = Modifier.alignByBaseline(),
                 )
             }
         }
@@ -450,26 +451,26 @@ private fun TimelineRow(
     isScrubbing: Boolean,
     hiddenMediaId: String?,
     onMediaClick: (mediaId: String, sourceRect: Rect?) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val shape = RoundedCornerShape(
         topStart = if (item.isFirstOfMonth) PhotosRadii.Card else 0.dp,
         topEnd = if (item.isFirstOfMonth) PhotosRadii.Card else 0.dp,
         bottomStart = if (item.isLastOfMonth) PhotosRadii.Card else 0.dp,
-        bottomEnd = if (item.isLastOfMonth) PhotosRadii.Card else 0.dp
+        bottomEnd = if (item.isLastOfMonth) PhotosRadii.Card else 0.dp,
     )
 
     // The row gap is part of the row box so its height matches the precomputed offsets.
     Box(
         modifier = modifier.padding(
-            bottom = if (item.isLastOfMonth) 0.dp else ITEM_GAP_DP.dp
-        )
+            bottom = if (item.isLastOfMonth) 0.dp else ITEM_GAP_DP.dp,
+        ),
     ) {
         Row(
             modifier = Modifier
                 .height(item.heightDp.dp)
                 .clip(shape),
-            horizontalArrangement = Arrangement.spacedBy(ITEM_GAP_DP.dp)
+            horizontalArrangement = Arrangement.spacedBy(ITEM_GAP_DP.dp),
         ) {
             item.items.forEach { gridItem ->
                 TimelineTile(
@@ -479,7 +480,7 @@ private fun TimelineRow(
                     baseUrl = baseUrl,
                     isScrubbing = isScrubbing,
                     isHidden = hiddenMediaId == gridItem.id,
-                    onClick = { rect -> onMediaClick(gridItem.id, rect) }
+                    onClick = { rect -> onMediaClick(gridItem.id, rect) },
                 )
             }
         }
@@ -494,7 +495,7 @@ private fun TimelineTile(
     baseUrl: String,
     isScrubbing: Boolean,
     isHidden: Boolean,
-    onClick: (sourceRect: Rect?) -> Unit
+    onClick: (sourceRect: Rect?) -> Unit,
 ) {
     val context = LocalContext.current
     val density = LocalDensity.current.density
@@ -533,7 +534,7 @@ private fun TimelineTile(
         baseUrl,
         widthPx,
         heightPx,
-        gateLoads
+        gateLoads,
     ) {
         val model = MediaImageRequests.previewModel(
             localContentUri = item.localContentUri,
@@ -542,7 +543,7 @@ private fun TimelineTile(
             hasThumbnails = item.hasThumbnails,
             baseUrl = baseUrl,
             heightPx = thumbnailTargetHeightPx,
-            bypassPlatformThumbnail = false
+            bypassPlatformThumbnail = false,
         )
         ImageRequest.Builder(context)
             .data(model)
@@ -570,7 +571,7 @@ private fun TimelineTile(
             .clickable {
                 val rect = coordsHolder[0]?.takeIf { it.isAttached }?.boundsInRoot()
                 onClick(rect)
-            }
+            },
     ) {
         // Coil 3's default model equality ignores CachePolicy changes, so uncached tiles that were
         // skipped during scrubbing must re-mount once scrubbing stops.
@@ -587,7 +588,7 @@ private fun TimelineTile(
                 },
                 modifier = Modifier
                     .fillMaxSize()
-                    .graphicsLayer { alpha = if (isHidden) 0f else 1f }
+                    .graphicsLayer { alpha = if (isHidden) 0f else 1f },
             )
         }
 
@@ -598,23 +599,23 @@ private fun TimelineTile(
                     .padding(4.dp)
                     .background(
                         color = Color.Black.copy(alpha = 0.6f),
-                        shape = RoundedCornerShape(PhotosRadii.TileOverlay)
+                        shape = RoundedCornerShape(PhotosRadii.TileOverlay),
                     )
                     .padding(horizontal = 6.dp, vertical = 2.dp),
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 Icon(
                     imageVector = Icons.Default.PlayArrow,
                     contentDescription = null,
                     tint = Color.White,
-                    modifier = Modifier.size(12.dp)
+                    modifier = Modifier.size(12.dp),
                 )
                 if (item.durationLabel != null) {
                     Spacer(modifier = Modifier.width(2.dp))
                     Text(
                         text = item.durationLabel,
                         style = MaterialTheme.typography.labelSmall,
-                        color = Color.White
+                        color = Color.White,
                     )
                 }
             }
@@ -630,7 +631,7 @@ private fun TimelineTile(
                     .padding(4.dp)
                     .background(Color.Black.copy(alpha = 0.4f), CircleShape)
                     .padding(3.dp)
-                    .size(11.dp)
+                    .size(11.dp),
             )
         }
     }
@@ -640,7 +641,7 @@ private fun TimelineTile(
 private fun EmptyTimeline(
     contentPadding: PaddingValues,
     pullToRefreshState: PullToRefreshState?,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val emptyListState = rememberLazyListState()
     LazyColumn(
@@ -651,19 +652,19 @@ private fun EmptyTimeline(
             if (offset != 0f) {
                 translationY = offset
             }
-        }
+        },
     ) {
         item {
             Box(
                 modifier = Modifier
                     .fillParentMaxSize()
                     .padding(32.dp),
-                contentAlignment = Alignment.Center
+                contentAlignment = Alignment.Center,
             ) {
                 Text(
                     text = "No photos yet.\nBacked-up photos and camera folders will appear here.",
                     style = MaterialTheme.typography.bodyMedium.copy(textAlign = TextAlign.Center),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }

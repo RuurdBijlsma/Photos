@@ -18,7 +18,7 @@ class LocalMediaMapperTest {
         orientation: Int = 0,
         dateTakenMs: Long = 1_730_000_000_000L,
         isVideo: Boolean = false,
-        durationMs: Int? = null
+        durationMs: Int? = null,
     ) = LocalMediaFile(
         mediaStoreId = id,
         contentUri = "content://media/external/images/media/$id",
@@ -32,7 +32,7 @@ class LocalMediaMapperTest {
         dateTakenMs = dateTakenMs,
         mimeType = if (isVideo) "video/mp4" else "image/jpeg",
         isVideo = isVideo,
-        durationMs = durationMs
+        durationMs = durationMs,
     )
 
     @Test

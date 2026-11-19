@@ -23,7 +23,7 @@ class ObserveTimelineUseCaseTest {
     private fun entity(id: String, yearMonth: Int) = MediaEntity(
         id = id,
         yearMonth = yearMonth,
-        sortTimestamp = yearMonth.toLong()
+        sortTimestamp = yearMonth.toLong(),
     )
 
     @Test
@@ -33,8 +33,8 @@ class ObserveTimelineUseCaseTest {
             listOf(
                 entity("m1", 202611),
                 entity("m2", 202610),
-                entity("m3", 202609)
-            )
+                entity("m3", 202609),
+            ),
         )
 
         val emissions = mutableListOf<List<TimelineMediaProjection>>()

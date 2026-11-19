@@ -35,14 +35,14 @@ sealed interface LanScanEvent {
 class LanServerScanner(
     private val networkMonitor: NetworkMonitor,
     directClient: OkHttpClient,
-    private val dispatchers: AppDispatchers
+    private val dispatchers: AppDispatchers,
 ) {
     private val probeClient: OkHttpClient = directClient.newBuilder()
         .dispatcher(
             Dispatcher().apply {
                 maxRequests = MAX_CONCURRENCY + 8
                 maxRequestsPerHost = 8
-            }
+            },
         )
         .connectTimeout(CONNECT_TIMEOUT_MS, TimeUnit.MILLISECONDS)
         .readTimeout(READ_TIMEOUT_MS, TimeUnit.MILLISECONDS)
@@ -79,7 +79,7 @@ class LanServerScanner(
             completed = completed,
             total = total,
             onFound = { send(LanScanEvent.Found(it)) },
-            onProgress = { done -> send(LanScanEvent.Progress(done, total)) }
+            onProgress = { done -> send(LanScanEvent.Progress(done, total)) },
         )
 
         probeBatch(
@@ -88,7 +88,7 @@ class LanServerScanner(
             completed = completed,
             total = total,
             onFound = { send(LanScanEvent.Found(it)) },
-            onProgress = { done -> send(LanScanEvent.Progress(done, total)) }
+            onProgress = { done -> send(LanScanEvent.Progress(done, total)) },
         )
 
         send(LanScanEvent.Progress(total, total))
@@ -100,7 +100,7 @@ class LanServerScanner(
         completed: AtomicInteger,
         total: Int,
         onFound: suspend (DiscoveredServer) -> Unit,
-        onProgress: suspend (Int) -> Unit
+        onProgress: suspend (Int) -> Unit,
     ) {
         if (targets.isEmpty()) return
         coroutineScope {
@@ -136,7 +136,7 @@ class LanServerScanner(
                     host = target.host,
                     port = target.port,
                     latencyMs = latencyMs,
-                    isEmulatorHost = target.isEmulatorHost
+                    isEmulatorHost = target.isEmulatorHost,
                 )
             }
         } catch (e: CancellationException) {
@@ -146,14 +146,13 @@ class LanServerScanner(
         }
     }
 
-    private fun isRuurdPhotosHealthResponse(response: Response): Boolean =
-        response.isSuccessful && response.header(RUURD_PHOTOS_HEADER).equals("1", ignoreCase = true)
+    private fun isRuurdPhotosHealthResponse(response: Response): Boolean = response.isSuccessful && response.header(RUURD_PHOTOS_HEADER).equals("1", ignoreCase = true)
 
     private fun buildTargets(
         localIp: Inet4Address?,
         emulator: Boolean,
         ports: List<PortSpec>,
-        prioritizedHost: String?
+        prioritizedHost: String?,
     ): List<ProbeTarget> {
         val hosts = LinkedHashSet<HostCandidate>()
 
@@ -187,27 +186,26 @@ class LanServerScanner(
                     host = host.host,
                     port = port.port,
                     omitDefaultPort = port.omitDefaultPort,
-                    isEmulatorHost = host.isEmulatorHost
+                    isEmulatorHost = host.isEmulatorHost,
                 )
             }
         }
         return targets
     }
 
-    private fun isEmulator(): Boolean =
-        Build.HARDWARE.contains("ranchu", ignoreCase = true) ||
-                Build.HARDWARE.contains("goldfish", ignoreCase = true) ||
-                Build.FINGERPRINT.startsWith("generic", ignoreCase = true) ||
-                Build.FINGERPRINT.contains("emulator", ignoreCase = true) ||
-                Build.MODEL.contains("Emulator", ignoreCase = true) ||
-                Build.MODEL.contains("Android SDK built for", ignoreCase = true)
+    private fun isEmulator(): Boolean = Build.HARDWARE.contains("ranchu", ignoreCase = true) ||
+        Build.HARDWARE.contains("goldfish", ignoreCase = true) ||
+        Build.FINGERPRINT.startsWith("generic", ignoreCase = true) ||
+        Build.FINGERPRINT.contains("emulator", ignoreCase = true) ||
+        Build.MODEL.contains("Emulator", ignoreCase = true) ||
+        Build.MODEL.contains("Android SDK built for", ignoreCase = true)
 
     private data class HostCandidate(val host: String, val isEmulatorHost: Boolean)
 
     private data class PortSpec(
         val scheme: String,
         val port: Int,
-        val omitDefaultPort: Boolean = false
+        val omitDefaultPort: Boolean = false,
     )
 
     private data class ProbeTarget(
@@ -215,7 +213,7 @@ class LanServerScanner(
         val host: String,
         val port: Int,
         val omitDefaultPort: Boolean,
-        val isEmulatorHost: Boolean
+        val isEmulatorHost: Boolean,
     ) {
         val baseUrl: String
             get() = if (omitDefaultPort) "$scheme://$host" else "$scheme://$host:$port"
@@ -231,11 +229,11 @@ class LanServerScanner(
 
         val PRIMARY_PORTS = listOf(
             PortSpec("http", 5272),
-            PortSpec("http", 9475)
+            PortSpec("http", 9475),
         )
         val PROXY_PORTS = listOf(
             PortSpec("http", 80, omitDefaultPort = true),
-            PortSpec("https", 443, omitDefaultPort = true)
+            PortSpec("https", 443, omitDefaultPort = true),
         )
     }
 }

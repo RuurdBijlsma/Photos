@@ -27,7 +27,7 @@ sealed interface TimelineProjectionState {
 class TimelineProjectionStore(
     private val mediaRepository: MediaRepository,
     private val scope: CoroutineScope,
-    private val dispatchers: AppDispatchers
+    private val dispatchers: AppDispatchers,
 ) {
     private val _state = MutableStateFlow<TimelineProjectionState>(TimelineProjectionState.Loading)
     val state: StateFlow<TimelineProjectionState> = _state.asStateFlow()

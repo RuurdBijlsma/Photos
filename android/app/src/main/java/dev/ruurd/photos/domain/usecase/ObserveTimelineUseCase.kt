@@ -24,7 +24,7 @@ import kotlinx.coroutines.flow.map
 class ObserveTimelineUseCase(
     private val mediaRepository: MediaRepository,
     private val dispatchers: AppDispatchers,
-    private val timelineProjectionStore: TimelineProjectionStore? = null
+    private val timelineProjectionStore: TimelineProjectionStore? = null,
 ) {
     operator fun invoke(): Flow<List<TimelineMediaProjection>> = channelFlow {
         send(mediaRepository.getTimelineStage1().first())

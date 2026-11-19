@@ -12,10 +12,10 @@ import dev.ruurd.photos.core.database.entity.MediaEntity
 @Database(
     entities = [
         MediaEntity::class,
-        DeviceFolderEntity::class
+        DeviceFolderEntity::class,
     ],
     version = AppDatabase.VERSION,
-    exportSchema = false
+    exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
 
@@ -28,15 +28,13 @@ abstract class AppDatabase : RoomDatabase() {
 
         private const val DATABASE_NAME = "photos.db"
 
-        fun create(context: Context): AppDatabase {
-            return Room.databaseBuilder(
-                context.applicationContext,
-                AppDatabase::class.java,
-                DATABASE_NAME
-            )
-                .setJournalMode(JournalMode.WRITE_AHEAD_LOGGING)
-                .fallbackToDestructiveMigration(dropAllTables = true)
-                .build()
-        }
+        fun create(context: Context): AppDatabase = Room.databaseBuilder(
+            context.applicationContext,
+            AppDatabase::class.java,
+            DATABASE_NAME,
+        )
+            .setJournalMode(JournalMode.WRITE_AHEAD_LOGGING)
+            .fallbackToDestructiveMigration(dropAllTables = true)
+            .build()
     }
 }

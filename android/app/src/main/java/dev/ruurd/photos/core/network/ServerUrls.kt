@@ -8,8 +8,10 @@ fun normalizeServerUrl(url: String): String {
     return when {
         trimmed.startsWith("http://", ignoreCase = true) ->
             "http://" + trimmed.substring(7)
+
         trimmed.startsWith("https://", ignoreCase = true) ->
             "https://" + trimmed.substring(8)
+
         else -> "http://$trimmed"
     }
 }

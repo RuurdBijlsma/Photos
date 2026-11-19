@@ -35,7 +35,7 @@ class LibavifDecoder(
     private val source: ImageSource,
     private val options: Options,
     private val parallelismLock: Semaphore,
-    private val threads: Int
+    private val threads: Int,
 ) : Decoder {
 
     override suspend fun decode(): DecodeResult? = parallelismLock.withPermit {
@@ -56,7 +56,7 @@ class LibavifDecoder(
         val (dstWidth, dstHeight) = computeTargetDimensions(
             srcWidth = info.width,
             srcHeight = info.height,
-            options = options
+            options = options,
         )
         val isSampled = dstWidth < info.width || dstHeight < info.height
         val config = if (info.depth > 8) Bitmap.Config.RGBA_F16 else Bitmap.Config.ARGB_8888
@@ -73,7 +73,7 @@ class LibavifDecoder(
 
         DecodeResult(
             image = (if (options.allowHardware) bitmap.toHardwareBitmapOrSelf() else bitmap).asImage(),
-            isSampled = isSampled
+            isSampled = isSampled,
         )
     }
 
@@ -113,7 +113,7 @@ class LibavifDecoder(
     private fun computeTargetDimensions(
         srcWidth: Int,
         srcHeight: Int,
-        options: Options
+        options: Options,
     ): Pair<Int, Int> {
         val dstW = (options.size.width as? Dimension.Pixels)?.px
         val dstH = (options.size.height as? Dimension.Pixels)?.px
@@ -127,8 +127,11 @@ class LibavifDecoder(
                     Scale.FIT -> minOf(widthRatio, heightRatio)
                 }
             }
+
             dstW != null -> dstW.toDouble() / srcWidth
+
             dstH != null -> dstH.toDouble() / srcHeight
+
             else -> 1.0
         }.coerceAtMost(1.0)
 
@@ -148,7 +151,7 @@ class LibavifDecoder(
 
     class Factory(
         maxParallelism: Int = DEFAULT_MAX_PARALLELISM,
-        private val threads: Int = DEFAULT_THREADS_PER_DECODE
+        private val threads: Int = DEFAULT_THREADS_PER_DECODE,
     ) : Decoder.Factory {
 
         private val parallelismLock = Semaphore(maxParallelism)
@@ -156,14 +159,14 @@ class LibavifDecoder(
         override fun create(
             result: SourceFetchResult,
             options: Options,
-            imageLoader: ImageLoader
+            imageLoader: ImageLoader,
         ): Decoder? {
             if (!isStillAvif(result.source.source())) return null
             return LibavifDecoder(
                 source = result.source,
                 options = options,
                 parallelismLock = parallelismLock,
-                threads = threads
+                threads = threads,
             )
         }
     }

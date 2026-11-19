@@ -2,7 +2,7 @@ package dev.ruurd.photos.domain.model
 
 data class DeviceFolderDefaults(
     val showInTimeline: Boolean,
-    val backupEnabled: Boolean
+    val backupEnabled: Boolean,
 )
 
 /**

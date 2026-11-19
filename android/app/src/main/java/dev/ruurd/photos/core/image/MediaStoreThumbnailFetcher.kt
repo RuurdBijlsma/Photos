@@ -42,7 +42,7 @@ data class MediaStoreThumbnail(
     val cloudId: String? = null,
     val cloudFallbackUrl: String? = null,
     val isVideo: Boolean = false,
-    val bypassPlatformThumbnail: Boolean = false
+    val bypassPlatformThumbnail: Boolean = false,
 )
 
 class MediaStoreThumbnailFetcher(
@@ -50,7 +50,7 @@ class MediaStoreThumbnailFetcher(
     private val options: Options,
     private val imageLoader: ImageLoader,
     /** Caps concurrent Binder IPC; this fetcher returns decoded bitmaps, so it bypasses Coil's decoder cap. */
-    private val ioLimiter: Semaphore
+    private val ioLimiter: Semaphore,
 ) : Fetcher {
 
     override suspend fun fetch(): FetchResult? {
@@ -94,7 +94,7 @@ class MediaStoreThumbnailFetcher(
                     options.context.contentResolver.loadThumbnail(
                         data.uri,
                         Size(width, height),
-                        signal
+                        signal,
                     )
                 } finally {
                     handle.dispose()
@@ -110,7 +110,7 @@ class MediaStoreThumbnailFetcher(
 
     private suspend fun fetchLocalFallbackOrCloud(): FetchResult? = try {
         val isVideo = data.isVideo ||
-                options.context.contentResolver.getType(data.uri)?.startsWith("video/") == true
+            options.context.contentResolver.getType(data.uri)?.startsWith("video/") == true
 
         if (isVideo) {
             loadVideoFrame() ?: fetchModel(data.cloudFallbackUrl)
@@ -136,13 +136,13 @@ class MediaStoreThumbnailFetcher(
                             -1L,
                             MediaMetadataRetriever.OPTION_CLOSEST_SYNC,
                             width,
-                            height
+                            height,
                         ) ?: return@withContext null
 
                         ImageFetchResult(
                             frame.asImage(),
                             isSampled = true,
-                            dataSource = DataSource.DISK
+                            dataSource = DataSource.DISK,
                         )
                     }
                 } catch (e: CancellationException) {
@@ -154,8 +154,7 @@ class MediaStoreThumbnailFetcher(
         }
     }
 
-    private fun requestedDimensionPx(dimension: Dimension): Int =
-        ((dimension as? Dimension.Pixels)?.px ?: DEFAULT_SIZE_PX).coerceAtLeast(1)
+    private fun requestedDimensionPx(dimension: Dimension): Int = ((dimension as? Dimension.Pixels)?.px ?: DEFAULT_SIZE_PX).coerceAtLeast(1)
 
     /** Delegates to the regular component pipeline (content URI fetcher or network fetcher). */
     private suspend fun fetchModel(model: Any?): FetchResult? {
@@ -171,7 +170,7 @@ class MediaStoreThumbnailFetcher(
         override fun create(
             data: MediaStoreThumbnail,
             options: Options,
-            imageLoader: ImageLoader
+            imageLoader: ImageLoader,
         ): Fetcher = MediaStoreThumbnailFetcher(data, options, imageLoader, ioLimiter)
     }
 
@@ -180,7 +179,7 @@ class MediaStoreThumbnailFetcher(
             val width = (options.size.width as? Dimension.Pixels)?.px ?: DEFAULT_SIZE_PX
             val height = (options.size.height as? Dimension.Pixels)?.px ?: DEFAULT_SIZE_PX
             val prefix = if (data.bypassPlatformThumbnail && !data.isVideo) "mediastore_full" else "mediastore"
-            return "$prefix:${data.uri}?size=${width}x${height}"
+            return "$prefix:${data.uri}?size=${width}x$height"
         }
     }
 

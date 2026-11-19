@@ -26,11 +26,26 @@ spotless {
     }
 }
 
+val spotlessApplyTask = tasks.named("spotlessApply")
+
+subprojects {
+    tasks.configureEach {
+        if (name.startsWith("compile") ||
+            name.startsWith("ksp") ||
+            name.startsWith("lint") ||
+            name.startsWith("test") ||
+            name.startsWith("assemble")
+        ) {
+            mustRunAfter(spotlessApplyTask)
+        }
+    }
+}
+
 tasks.register("qualityCheck") {
     group = "verification"
-    description = "Runs formatting, Android lint, JVM unit tests, and debug/release/benchmark builds."
+    description = "Auto-formats code, then runs Android lint, JVM unit tests, and debug/release/benchmark builds."
     dependsOn(
-        "spotlessCheck",
+        spotlessApplyTask,
         ":app:lintDebug",
         ":app:testDebugUnitTest",
         ":app:assembleDebug",

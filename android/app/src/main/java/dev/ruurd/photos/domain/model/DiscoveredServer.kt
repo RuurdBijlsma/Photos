@@ -5,5 +5,5 @@ data class DiscoveredServer(
     val host: String,
     val port: Int,
     val latencyMs: Long,
-    val isEmulatorHost: Boolean = false
+    val isEmulatorHost: Boolean = false,
 )

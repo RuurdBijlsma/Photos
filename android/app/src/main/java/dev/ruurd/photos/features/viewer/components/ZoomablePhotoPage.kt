@@ -38,7 +38,7 @@ fun ZoomablePhotoPage(
     isOpeningTransition: Boolean,
     onTap: () -> Unit,
     modifier: Modifier = Modifier,
-    onZoomFractionChanged: (Float) -> Unit = {}
+    onZoomFractionChanged: (Float) -> Unit = {},
 ) {
     val context = LocalContext.current
     val imageLoader = SingletonImageLoader.get(context)
@@ -74,9 +74,9 @@ fun ZoomablePhotoPage(
     }
 
     val fullResReady = canUpgradeLocal &&
-            isUpgradedToFullRes &&
-            hasDisplayedFullResInFullQuality &&
-            !isPreviewZoomed
+        isUpgradedToFullRes &&
+        hasDisplayedFullResInFullQuality &&
+        !isPreviewZoomed
 
     val activeZoomableState = if (fullResReady && fullResZoomableState != null) {
         fullResZoomableState
@@ -109,7 +109,7 @@ fun ZoomablePhotoPage(
         isSettledPage,
         isPreviewZoomed,
         isActivePage,
-        isOpeningTransition
+        isOpeningTransition,
     ) {
         if (!canUpgradeLocal) {
             isUpgradedToFullRes = false
@@ -144,7 +144,7 @@ fun ZoomablePhotoPage(
             hasThumbnails = item.hasThumbnails,
             baseUrl = baseUrl,
             placeholderKey = memoryCacheKeyRegistry.get(item.id),
-            onCacheKey = { memoryCacheKeyRegistry.put(item.id, it) }
+            onCacheKey = { memoryCacheKeyRegistry.put(item.id, it) },
         )
     }
 
@@ -158,21 +158,21 @@ fun ZoomablePhotoPage(
                     result.memoryCacheKey?.let { key ->
                         memoryCacheKeyRegistry.put(item.id, key)
                     }
-                }
+                },
             )
             .build()
     }
 
     Box(
         modifier = modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
+        contentAlignment = Alignment.Center,
     ) {
         if (syncFallbackPainter != null && !previewImageState.isImageDisplayed && !fullResReady) {
             Image(
                 painter = syncFallbackPainter,
                 contentDescription = null,
                 contentScale = ContentScale.Fit,
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier.fillMaxSize(),
             )
         }
 
@@ -186,7 +186,7 @@ fun ZoomablePhotoPage(
                 contentScale = ContentScale.Fit,
                 modifier = Modifier
                     .fillMaxSize()
-                    .graphicsLayer { alpha = if (fullResReady) 1f else 0f }
+                    .graphicsLayer { alpha = if (fullResReady) 1f else 0f },
             )
         }
 
@@ -198,7 +198,7 @@ fun ZoomablePhotoPage(
                 onClick = { onTap() },
                 onDoubleClick = DoubleClickToZoomListener.cycle(DOUBLE_TAP_MAX_ZOOM_FACTOR),
                 contentScale = ContentScale.Fit,
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier.fillMaxSize(),
             )
         }
     }

@@ -24,7 +24,7 @@ import java.time.ZoneId
 data class ScanResult(
     val scanned: Int = 0,
     val deduplicated: Int = 0,
-    val removed: Int = 0
+    val removed: Int = 0,
 )
 
 /**
@@ -43,53 +43,55 @@ class ScanLocalMediaUseCase(
     private val deviceFolderRepository: DeviceFolderRepository,
     private val scanStateStore: ScanStateStore,
     private val dispatchers: AppDispatchers,
-    private val zoneProvider: () -> ZoneId = ZoneId::systemDefault
+    private val zoneProvider: () -> ZoneId = ZoneId::systemDefault,
 ) {
-    suspend operator fun invoke(access: MediaAccessState): Result<ScanResult> =
-        withContext(dispatchers.io) {
-            try {
-                if (!access.hasAnyAccess) return@withContext Result.success(ScanResult())
+    suspend operator fun invoke(access: MediaAccessState): Result<ScanResult> = withContext(dispatchers.io) {
+        try {
+            if (!access.hasAnyAccess) return@withContext Result.success(ScanResult())
 
-                val zone = zoneProvider()
-                if (access.hasPartialAccess) {
-                    // Partial selection isn't tracked by volume generation; always run full scan.
-                    return@withContext Result.success(runFullScan(access, zone))
-                }
-
-                // Read generation & version *before* querying so any concurrent MediaStore write
-                // during the query bumps generation above what we persist, triggering a rescan.
-                val currentGeneration = localMediaStore.generation()
-                val currentVersion = localMediaStore.version()
-                val previous = ScanWatermark.parse(scanStateStore.lastScanSignature())
-                val currentWatermark = ScanWatermark(
-                    dbVersion = AppDatabase.VERSION,
-                    mediaStoreVersion = currentVersion,
-                    imageAccess = access.images,
-                    videoAccess = access.videos,
-                    zoneId = zone.id,
-                    generation = currentGeneration
-                )
-
-                val result = when {
-                    previous != null && previous.matchesContext(currentWatermark) -> {
-                        when {
-                            currentGeneration == previous.generation -> return@withContext Result.success(ScanResult())
-                            currentGeneration > previous.generation ->
-                                runIncrementalScan(access, zone, sinceGeneration = previous.generation)
-                            else -> runFullScan(access, zone)
-                        }
-                    }
-                    else -> runFullScan(access, zone)
-                }
-
-                scanStateStore.setLastScanSignature(currentWatermark.serialize())
-                Result.success(result)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                Result.failure(e)
+            val zone = zoneProvider()
+            if (access.hasPartialAccess) {
+                // Partial selection isn't tracked by volume generation; always run full scan.
+                return@withContext Result.success(runFullScan(access, zone))
             }
+
+            // Read generation & version *before* querying so any concurrent MediaStore write
+            // during the query bumps generation above what we persist, triggering a rescan.
+            val currentGeneration = localMediaStore.generation()
+            val currentVersion = localMediaStore.version()
+            val previous = ScanWatermark.parse(scanStateStore.lastScanSignature())
+            val currentWatermark = ScanWatermark(
+                dbVersion = AppDatabase.VERSION,
+                mediaStoreVersion = currentVersion,
+                imageAccess = access.images,
+                videoAccess = access.videos,
+                zoneId = zone.id,
+                generation = currentGeneration,
+            )
+
+            val result = when {
+                previous != null && previous.matchesContext(currentWatermark) -> {
+                    when {
+                        currentGeneration == previous.generation -> return@withContext Result.success(ScanResult())
+
+                        currentGeneration > previous.generation ->
+                            runIncrementalScan(access, zone, sinceGeneration = previous.generation)
+
+                        else -> runFullScan(access, zone)
+                    }
+                }
+
+                else -> runFullScan(access, zone)
+            }
+
+            scanStateStore.setLastScanSignature(currentWatermark.serialize())
+            Result.success(result)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Result.failure(e)
         }
+    }
 
     private suspend fun runFullScan(access: MediaAccessState, zone: ZoneId): ScanResult {
         val images =
@@ -105,11 +107,11 @@ class ScanLocalMediaUseCase(
             // to CLOUD_ONLY before Pass 1 links the replacement MediaStore URI.
             val removed =
                 reconcileRemovalsFromFiles(access.isFull(images = true), images, initialImageRows) +
-                        reconcileRemovalsFromFiles(access.isFull(images = false), videos, initialVideoRows)
+                    reconcileRemovalsFromFiles(access.isFull(images = false), videos, initialVideoRows)
 
             val currentLocalRows = if (removed > 0) {
                 mediaRepository.getLocalRows(isVideo = false) +
-                        mediaRepository.getLocalRows(isVideo = true)
+                    mediaRepository.getLocalRows(isVideo = true)
             } else {
                 initialImageRows + initialVideoRows
             }
@@ -123,7 +125,7 @@ class ScanLocalMediaUseCase(
                 files = images + videos,
                 knownByUri = knownByUri,
                 zone = zone,
-                removed = removed
+                removed = removed,
             )
         }
     }
@@ -131,7 +133,7 @@ class ScanLocalMediaUseCase(
     private suspend fun runIncrementalScan(
         access: MediaAccessState,
         zone: ZoneId,
-        sinceGeneration: Long
+        sinceGeneration: Long,
     ): ScanResult {
         val modifiedImages = if (access.images != MediaAccess.NONE) {
             localMediaStore.queryImages(modifiedAfterGeneration = sinceGeneration)
@@ -210,7 +212,7 @@ class ScanLocalMediaUseCase(
                 files = modifiedFiles,
                 knownByUri = knownByUri,
                 zone = zone,
-                removed = removed
+                removed = removed,
             )
         }
     }
@@ -219,7 +221,7 @@ class ScanLocalMediaUseCase(
         files: List<LocalMediaFile>,
         knownByUri: Map<String, MediaEntity>,
         zone: ZoneId,
-        removed: Int
+        removed: Int,
     ): ScanResult {
         if (files.isEmpty()) {
             return ScanResult(scanned = 0, deduplicated = 0, removed = removed)
@@ -255,7 +257,7 @@ class ScanLocalMediaUseCase(
                     folder = folder,
                     zone = zone,
                     matchedCloudRowIds = matchedCloudRowIds,
-                    toUpsert = toUpsert
+                    toUpsert = toUpsert,
                 )
             ) {
                 deduplicated++
@@ -274,14 +276,14 @@ class ScanLocalMediaUseCase(
         return ScanResult(
             scanned = files.size,
             deduplicated = deduplicated,
-            removed = removed
+            removed = removed,
         )
     }
 
     private fun collectMissingIds(
         localRefs: List<LocalRowRef>,
         liveUris: Set<String>,
-        outMissingIds: MutableList<String>
+        outMissingIds: MutableList<String>,
     ) {
         if (!ScanGuards.shouldReconcileRemovals(true, liveUris.size, localRefs.size)) return
         for (ref in localRefs) {
@@ -294,7 +296,7 @@ class ScanLocalMediaUseCase(
     private suspend fun folderFor(
         file: LocalMediaFile,
         cache: MutableMap<String, DeviceFolderEntity>,
-        newFolders: MutableList<DeviceFolderEntity>
+        newFolders: MutableList<DeviceFolderEntity>,
     ): DeviceFolderEntity {
         cache[file.bucketId]?.let { return it }
 
@@ -309,7 +311,7 @@ class ScanLocalMediaUseCase(
                 displayName = displayName,
                 relativePath = file.relativePath ?: "",
                 showInTimeline = defaults.showInTimeline,
-                backupEnabled = defaults.backupEnabled
+                backupEnabled = defaults.backupEnabled,
             ).also { newFolders.add(it) }
         }
 
@@ -324,7 +326,7 @@ class ScanLocalMediaUseCase(
         folder: DeviceFolderEntity,
         zone: ZoneId,
         matchedCloudRowIds: MutableSet<String>,
-        toUpsert: MutableList<MediaEntity>
+        toUpsert: MutableList<MediaEntity>,
     ): Boolean {
         val local = LocalMediaMapper.toEntity(file, folder.showInTimeline, zone)
         if (existing == null) {
@@ -344,7 +346,7 @@ class ScanLocalMediaUseCase(
             sortTimestamp = if (linked) existing.sortTimestamp else local.sortTimestamp,
             timezoneOffsetMinutes = if (linked) existing.timezoneOffsetMinutes else local.timezoneOffsetMinutes,
             yearMonth = if (linked) existing.yearMonth else local.yearMonth,
-            durationMs = if (linked) existing.durationMs else local.durationMs
+            durationMs = if (linked) existing.durationMs else local.durationMs,
         )
         if (updated != existing) {
             toUpsert.add(updated)
@@ -359,18 +361,18 @@ class ScanLocalMediaUseCase(
     private suspend fun linkToCloudOrQueueInsert(
         local: MediaEntity,
         matchedCloudRowIds: MutableSet<String>,
-        toUpsert: MutableList<MediaEntity>
+        toUpsert: MutableList<MediaEntity>,
     ): Boolean {
         val match = mediaRepository
             .findBySizesAndStatus(listOf(local.sizeBytes), SyncStatus.CLOUD_ONLY)
             .firstOrNull { candidate ->
                 candidate.id !in matchedCloudRowIds &&
-                        PassOneDeduplication.isMatch(
-                            cloudRatio = candidate.ratio,
-                            cloudSortTimestamp = candidate.sortTimestamp,
-                            localRatio = local.ratio,
-                            localTimestampMs = local.sortTimestamp
-                        )
+                    PassOneDeduplication.isMatch(
+                        cloudRatio = candidate.ratio,
+                        cloudSortTimestamp = candidate.sortTimestamp,
+                        localRatio = local.ratio,
+                        localTimestampMs = local.sortTimestamp,
+                    )
             }
 
         if (match == null) {
@@ -386,8 +388,8 @@ class ScanLocalMediaUseCase(
                 bucketName = local.bucketName,
                 relativePath = local.relativePath,
                 syncStatus = SyncStatus.SYNCED,
-                isVisibleInTimeline = true
-            )
+                isVisibleInTimeline = true,
+            ),
         )
         return true
     }
@@ -395,7 +397,7 @@ class ScanLocalMediaUseCase(
     private suspend fun reconcileRemovalsFromFiles(
         fullAccess: Boolean,
         scanned: List<LocalMediaFile>,
-        localRows: List<MediaEntity>
+        localRows: List<MediaEntity>,
     ): Int {
         if (!ScanGuards.shouldReconcileRemovals(fullAccess, scanned.size, localRows.size)) return 0
 
@@ -431,8 +433,8 @@ class ScanLocalMediaUseCase(
                     bucketName = null,
                     relativePath = null,
                     syncStatus = SyncStatus.CLOUD_ONLY,
-                    isVisibleInTimeline = true
-                )
+                    isVisibleInTimeline = true,
+                ),
             )
         }
     }
@@ -443,17 +445,15 @@ class ScanLocalMediaUseCase(
         val imageAccess: MediaAccess,
         val videoAccess: MediaAccess,
         val zoneId: String,
-        val generation: Long
+        val generation: Long,
     ) {
-        fun matchesContext(other: ScanWatermark): Boolean =
-            dbVersion == other.dbVersion &&
-                    mediaStoreVersion == other.mediaStoreVersion &&
-                    imageAccess == other.imageAccess &&
-                    videoAccess == other.videoAccess &&
-                    zoneId == other.zoneId
+        fun matchesContext(other: ScanWatermark): Boolean = dbVersion == other.dbVersion &&
+            mediaStoreVersion == other.mediaStoreVersion &&
+            imageAccess == other.imageAccess &&
+            videoAccess == other.videoAccess &&
+            zoneId == other.zoneId
 
-        fun serialize(): String =
-            "$dbVersion|$mediaStoreVersion|$imageAccess|$videoAccess|$zoneId|$generation"
+        fun serialize(): String = "$dbVersion|$mediaStoreVersion|$imageAccess|$videoAccess|$zoneId|$generation"
 
         companion object {
             fun parse(raw: String?): ScanWatermark? {
@@ -470,7 +470,7 @@ class ScanLocalMediaUseCase(
                     imageAccess = imageAccess,
                     videoAccess = videoAccess,
                     zoneId = parts[4],
-                    generation = generation
+                    generation = generation,
                 )
             }
         }

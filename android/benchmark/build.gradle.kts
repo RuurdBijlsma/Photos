@@ -58,7 +58,6 @@ dependencies {
 }
 
 abstract class PerfRegressionTask : DefaultTask() {
-
     @get:Internal
     abstract val benchmarkOutputDir: DirectoryProperty
 
@@ -75,10 +74,12 @@ abstract class PerfRegressionTask : DefaultTask() {
             throw GradleException("Benchmark output directory not found: ${outDir.absolutePath}")
         }
 
-        val latestJson = outDir.walkTopDown()
-            .filter { it.isFile && it.name.endsWith("-benchmarkData.json") }
-            .maxByOrNull { it.lastModified() }
-            ?: throw GradleException("No *-benchmarkData.json found under ${outDir.absolutePath}")
+        val latestJson =
+            outDir
+                .walkTopDown()
+                .filter { it.isFile && it.name.endsWith("-benchmarkData.json") }
+                .maxByOrNull { it.lastModified() }
+                ?: throw GradleException("No *-benchmarkData.json found under ${outDir.absolutePath}")
 
         val raw = JsonSlurper().parse(latestJson).asMap()
         val current = extractSummary(raw)
@@ -121,7 +122,7 @@ abstract class PerfRegressionTask : DefaultTask() {
                     for ((pct, limit) in listOf(
                         "p50" to MAX_MEDIAN_REGRESSION,
                         "p95" to MAX_TAIL_REGRESSION,
-                        "p99" to MAX_TAIL_REGRESSION
+                        "p99" to MAX_TAIL_REGRESSION,
                     )) {
                         val curVal = curCpu[pct].asDouble() ?: continue
                         val baseVal = baseCpu[pct].asDouble() ?: continue
@@ -129,7 +130,7 @@ abstract class PerfRegressionTask : DefaultTask() {
                         val ratio = if (baseVal > 0.0) delta / baseVal else 0.0
                         if (delta > MIN_ABS_DELTA_MS && ratio > limit) {
                             failures += "$name: frameDurationCpuMs $pct regressed from ${"%.2f".format(baseVal)}ms " +
-                                    "to ${"%.2f".format(curVal)}ms (+${"%.1f".format(ratio * 100.0)}%)"
+                                "to ${"%.2f".format(curVal)}ms (+${"%.1f".format(ratio * 100.0)}%)"
                         }
                     }
                 }
@@ -144,7 +145,7 @@ abstract class PerfRegressionTask : DefaultTask() {
                         val ratio = if (baseMedian > 0.0) delta / baseMedian else 0.0
                         if (delta > MIN_STARTUP_ABS_DELTA_MS && ratio > MAX_MEDIAN_REGRESSION) {
                             failures += "$name: timeToInitialDisplayMs median regressed from ${"%.1f".format(baseMedian)}ms " +
-                                    "to ${"%.1f".format(curMedian)}ms (+${"%.1f".format(ratio * 100.0)}%)"
+                                "to ${"%.1f".format(curMedian)}ms (+${"%.1f".format(ratio * 100.0)}%)"
                         }
                     }
                 }
@@ -154,10 +155,11 @@ abstract class PerfRegressionTask : DefaultTask() {
         }
 
         if (failures.isNotEmpty()) {
-            val msg = buildString {
-                appendLine("Performance regression gate FAILED:")
-                failures.forEach { appendLine("  - $it") }
-            }
+            val msg =
+                buildString {
+                    appendLine("Performance regression gate FAILED:")
+                    failures.forEach { appendLine("  - $it") }
+                }
             throw GradleException(msg)
         }
 
@@ -174,17 +176,18 @@ abstract class PerfRegressionTask : DefaultTask() {
             val sampled = b["sampledMetrics"].asMap()
             val metrics = b["metrics"].asMap()
 
-            benchmarksOut[name] = linkedMapOf(
-                "frameDurationCpuMs" to sampled["frameDurationCpuMs"]?.asMap()?.let(::summarizeSampled),
-                "frameOverrunMs" to sampled["frameOverrunMs"]?.asMap()?.let(::summarizeSampled),
-                "timeToInitialDisplayMs" to metrics["timeToInitialDisplayMs"]?.asMap()?.let(::summarizeScalar),
-                "timeToFullDisplayMs" to metrics["timeToFullDisplayMs"]?.asMap()?.let(::summarizeScalar)
-            )
+            benchmarksOut[name] =
+                linkedMapOf(
+                    "frameDurationCpuMs" to sampled["frameDurationCpuMs"]?.asMap()?.let(::summarizeSampled),
+                    "frameOverrunMs" to sampled["frameOverrunMs"]?.asMap()?.let(::summarizeSampled),
+                    "timeToInitialDisplayMs" to metrics["timeToInitialDisplayMs"]?.asMap()?.let(::summarizeScalar),
+                    "timeToFullDisplayMs" to metrics["timeToFullDisplayMs"]?.asMap()?.let(::summarizeScalar),
+                )
         }
 
         return linkedMapOf(
             "context" to context,
-            "benchmarks" to benchmarksOut
+            "benchmarks" to benchmarksOut,
         )
     }
 
@@ -197,20 +200,22 @@ abstract class PerfRegressionTask : DefaultTask() {
                 "p50" to p50,
                 "p90" to (metric["P90"].asDouble() ?: p95),
                 "p95" to p95,
-                "p99" to p99
+                "p99" to p99,
             )
         }
 
-        val all = metric["runs"].asList()
-            .flatMap { it.asList() }
-            .mapNotNull { it.asDouble() }
-            .sorted()
+        val all =
+            metric["runs"]
+                .asList()
+                .flatMap { it.asList() }
+                .mapNotNull { it.asDouble() }
+                .sorted()
 
         return linkedMapOf(
             "p50" to nearestRank(all, 50.0),
             "p90" to nearestRank(all, 90.0),
             "p95" to nearestRank(all, 95.0),
-            "p99" to nearestRank(all, 99.0)
+            "p99" to nearestRank(all, 99.0),
         )
     }
 
@@ -222,11 +227,14 @@ abstract class PerfRegressionTask : DefaultTask() {
         return linkedMapOf(
             "min" to min,
             "median" to median,
-            "max" to max
+            "max" to max,
         )
     }
 
-    private fun nearestRank(sorted: List<Double>, p: Double): Double {
+    private fun nearestRank(
+        sorted: List<Double>,
+        p: Double,
+    ): Double {
         if (sorted.isEmpty()) return 0.0
         val idx = (ceil((p / 100.0) * sorted.size).toInt() - 1).coerceIn(0, sorted.lastIndex)
         return sorted[idx]
@@ -249,9 +257,10 @@ abstract class PerfRegressionTask : DefaultTask() {
     }
 }
 
-val benchmarkJsonOutputDir = layout.buildDirectory.dir(
-    "outputs/connected_android_test_additional_output/benchmark/connected"
-)
+val benchmarkJsonOutputDir =
+    layout.buildDirectory.dir(
+        "outputs/connected_android_test_additional_output/benchmark/connected",
+    )
 val perfBaselineFile = rootProject.layout.projectDirectory.file("perf/baseline.json")
 
 val checkPerfRegression by tasks.registering(PerfRegressionTask::class) {

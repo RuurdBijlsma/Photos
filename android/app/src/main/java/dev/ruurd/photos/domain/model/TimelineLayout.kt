@@ -24,7 +24,7 @@ data class MonthHeaderUiItem(
     val title: String,
     /** `null` for the current year, matching the web header. */
     val yearLabel: String?,
-    override val estimatedOffsetTopDp: Float
+    override val estimatedOffsetTopDp: Float,
 ) : TimelineListItem
 
 @Immutable
@@ -39,7 +39,7 @@ data class TimelineRowUiItem(
     val thumbnailTargetHeightPx: Int,
     /** Pre-formatted capture date of the first item in this row (e.g. "Today", "Sat, 24 Oct"). */
     val dateLabel: String = "",
-    override val estimatedOffsetTopDp: Float
+    override val estimatedOffsetTopDp: Float,
 ) : TimelineListItem
 
 @Immutable
@@ -53,7 +53,7 @@ data class TimelineGridItemUiModel(
     val hasThumbnails: Boolean,
     /** Pixel-snapped tile width, so rows end flush against the right edge. */
     val widthDp: Float,
-    val syncStatus: SyncStatus
+    val syncStatus: SyncStatus,
 )
 
 @Immutable
@@ -68,14 +68,13 @@ class TimelineLayoutIndex(
     val monthOffsets: Map<Int, Int> = emptyMap(),
     val monthLabels: Map<Int, String> = emptyMap(),
     val itemOffsets: Map<String, Int> = emptyMap(),
-    val yearFractions: ImmutableList<TimelineYearMark> = persistentListOf()
+    val yearFractions: ImmutableList<TimelineYearMark> = persistentListOf(),
 ) {
 
     val isEmpty: Boolean get() = rows.isEmpty()
 
     /** Row/header index whose top is nearest above [fraction] (0f..1f) of the total height. */
-    fun findRowIndexAtPercentage(fraction: Float): Int =
-        findRowIndexAtOffsetDp(fraction.coerceIn(0f, 1f) * totalHeightDp)
+    fun findRowIndexAtPercentage(fraction: Float): Int = findRowIndexAtOffsetDp(fraction.coerceIn(0f, 1f) * totalHeightDp)
 
     /** Row/header index whose top is nearest above [offsetDp] from the top of the timeline. */
     fun findRowIndexAtOffsetDp(offsetDp: Float): Int {

@@ -6,7 +6,9 @@ import coil3.SingletonImageLoader
 import dev.ruurd.photos.di.AppContainer
 import dev.ruurd.photos.di.DefaultAppContainer
 
-class PhotosApplication : Application(), SingletonImageLoader.Factory {
+class PhotosApplication :
+    Application(),
+    SingletonImageLoader.Factory {
 
     lateinit var container: AppContainer
         private set
@@ -16,7 +18,5 @@ class PhotosApplication : Application(), SingletonImageLoader.Factory {
         container = DefaultAppContainer(this)
     }
 
-    override fun newImageLoader(context: android.content.Context): ImageLoader {
-        return container.imageLoader
-    }
+    override fun newImageLoader(context: android.content.Context): ImageLoader = container.imageLoader
 }

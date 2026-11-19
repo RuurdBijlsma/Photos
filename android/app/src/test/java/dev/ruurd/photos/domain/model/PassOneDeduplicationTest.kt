@@ -24,16 +24,16 @@ class PassOneDeduplicationTest {
         for (offsetHours in listOf(1, 2, 5, 8, 12)) {
             assertTrue(
                 "offset $offsetHours h",
-                PassOneDeduplication.isMatch(1.5f, taken, 1.5f, taken + offsetHours * 3_600_000L)
+                PassOneDeduplication.isMatch(1.5f, taken, 1.5f, taken + offsetHours * 3_600_000L),
             )
         }
         assertTrue(
             "30 minute offset",
-            PassOneDeduplication.isMatch(1.5f, taken, 1.5f, taken + 5 * 3_600_000L + 1_800_000L)
+            PassOneDeduplication.isMatch(1.5f, taken, 1.5f, taken + 5 * 3_600_000L + 1_800_000L),
         )
         assertTrue(
             "45 minute offset",
-            PassOneDeduplication.isMatch(1.5f, taken, 1.5f, taken + 5 * 3_600_000L + 2_700_000L)
+            PassOneDeduplication.isMatch(1.5f, taken, 1.5f, taken + 5 * 3_600_000L + 2_700_000L),
         )
     }
 

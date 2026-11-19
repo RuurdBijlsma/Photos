@@ -30,7 +30,7 @@ data class SemanticColors(
     val offline: Color,
     val syncing: Color,
     val localOnly: Color,
-    val error: Color
+    val error: Color,
 )
 
 val LocalSemanticColors = staticCompositionLocalOf {
@@ -38,6 +38,6 @@ val LocalSemanticColors = staticCompositionLocalOf {
         offline = SemanticOfflineLight,
         syncing = SemanticSyncingLight,
         localOnly = SemanticLocalOnlyLight,
-        error = SemanticErrorLight
+        error = SemanticErrorLight,
     )
 }

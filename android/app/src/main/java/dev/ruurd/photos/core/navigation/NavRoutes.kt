@@ -35,5 +35,5 @@ sealed interface ViewerSource {
  */
 data class ViewerArgs(
     val initialMediaId: String,
-    val source: ViewerSource = ViewerSource.Timeline
+    val source: ViewerSource = ViewerSource.Timeline,
 )

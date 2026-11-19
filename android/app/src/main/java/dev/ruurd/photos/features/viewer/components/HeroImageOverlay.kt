@@ -35,7 +35,7 @@ fun HeroImageOverlay(
     baseUrl: String,
     rect: Rect,
     alpha: Float,
-    onImageReady: () -> Unit = {}
+    onImageReady: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val imageLoader = SingletonImageLoader.get(context)
@@ -61,7 +61,7 @@ fun HeroImageOverlay(
             isVideo = item.isVideo,
             hasThumbnails = item.hasThumbnails,
             baseUrl = baseUrl,
-            onCacheKey = { key -> memoryCacheKeyRegistry.put(item.id, key) }
+            onCacheKey = { key -> memoryCacheKeyRegistry.put(item.id, key) },
         )
     }
 
@@ -77,14 +77,14 @@ fun HeroImageOverlay(
                 }
             }
             .graphicsLayer { this.alpha = alpha }
-            .clip(RectangleShape)
+            .clip(RectangleShape),
     ) {
         if (cachedPainter != null) {
             Image(
                 painter = cachedPainter,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier.fillMaxSize(),
             )
         } else if (previewRequest != null) {
             AsyncImage(
@@ -92,7 +92,7 @@ fun HeroImageOverlay(
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 onSuccess = { onImageReady() },
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier.fillMaxSize(),
             )
         }
     }
