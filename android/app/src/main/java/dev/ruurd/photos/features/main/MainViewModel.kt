@@ -31,7 +31,8 @@ enum class MainDestination {
     PHOTOS,
     COLLECTIONS,
     EXPLORE,
-    SEARCH;
+    SEARCH,
+    ;
 
     fun asNavTabOrNull(): MainNavTab? = when (this) {
         PHOTOS -> MainNavTab.PHOTOS
@@ -48,7 +49,7 @@ data class MainUiState(
     val syncState: SyncState = SyncState.IDLE,
     val destination: MainDestination = MainDestination.PHOTOS,
     val isAvatarMenuOpen: Boolean = false,
-    val syncErrorMessage: String? = null
+    val syncErrorMessage: String? = null,
 )
 
 class MainViewModel(
@@ -57,13 +58,13 @@ class MainViewModel(
     private val scanLocalMediaUseCase: ScanLocalMediaUseCase,
     private val localMediaStore: LocalMediaStore,
     private val bootstrapState: BootstrapState,
-    private val networkMonitor: NetworkMonitor
+    private val networkMonitor: NetworkMonitor,
 ) : ViewModel() {
 
-    private val _destination = MutableStateFlow(MainDestination.PHOTOS)
+    private val destinationFlow = MutableStateFlow(MainDestination.PHOTOS)
     private var lastNonSearchTab: MainNavTab = MainNavTab.PHOTOS
-    private val _isAvatarMenuOpen = MutableStateFlow(false)
-    private val _syncErrorMessage = MutableStateFlow<String?>(null)
+    private val avatarMenuOpen = MutableStateFlow(false)
+    private val syncErrorMessage = MutableStateFlow<String?>(null)
 
     private var hasRefreshedProfile = false
     private var isFirstLaunchScan = true
@@ -74,19 +75,19 @@ class MainViewModel(
     private val connectionInfoFlow = combine(
         authRepository.serverUrl,
         networkMonitor.isOnline,
-        syncTimelineUseCase.syncState
+        syncTimelineUseCase.syncState,
     ) { url, online, sync -> Triple(url, online, sync) }
 
     private val uiControlsFlow = combine(
-        _destination,
-        _isAvatarMenuOpen,
-        _syncErrorMessage
+        destinationFlow,
+        avatarMenuOpen,
+        syncErrorMessage,
     ) { destination, menuOpen, error -> Triple(destination, menuOpen, error) }
 
     val uiState: StateFlow<MainUiState> = combine(
         authRepository.authState,
         connectionInfoFlow,
-        uiControlsFlow
+        uiControlsFlow,
     ) { authState, conn, controls ->
         val (serverUrl, isOnline, syncState) = conn
         val (destination, menuOpen, error) = controls
@@ -99,12 +100,12 @@ class MainViewModel(
             syncState = syncState,
             destination = destination,
             isAvatarMenuOpen = menuOpen,
-            syncErrorMessage = error
+            syncErrorMessage = error,
         )
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
-        initialValue = MainUiState()
+        initialValue = MainUiState(),
     )
 
     init {
@@ -125,9 +126,9 @@ class MainViewModel(
                         scanJob?.cancel()
                         scanJob = null
                         lastNonSearchTab = MainNavTab.PHOTOS
-                        _destination.value = MainDestination.PHOTOS
-                        _isAvatarMenuOpen.value = false
-                        _syncErrorMessage.value = null
+                        destinationFlow.value = MainDestination.PHOTOS
+                        avatarMenuOpen.value = false
+                        syncErrorMessage.value = null
                         return@collect
                     }
 
@@ -150,7 +151,7 @@ class MainViewModel(
 
     fun onTabSelected(tab: MainNavTab) {
         lastNonSearchTab = tab
-        _destination.value = when (tab) {
+        destinationFlow.value = when (tab) {
             MainNavTab.PHOTOS -> MainDestination.PHOTOS
             MainNavTab.COLLECTIONS -> MainDestination.COLLECTIONS
             MainNavTab.EXPLORE -> MainDestination.EXPLORE
@@ -158,21 +159,21 @@ class MainViewModel(
     }
 
     fun onSearchSelected() {
-        _destination.value = MainDestination.SEARCH
+        destinationFlow.value = MainDestination.SEARCH
     }
 
     fun onBackFromSearch() {
-        if (_destination.value == MainDestination.SEARCH) {
+        if (destinationFlow.value == MainDestination.SEARCH) {
             onTabSelected(lastNonSearchTab)
         }
     }
 
     fun setAvatarMenuOpen(open: Boolean) {
-        _isAvatarMenuOpen.value = open
+        avatarMenuOpen.value = open
     }
 
     fun clearSyncError() {
-        _syncErrorMessage.value = null
+        syncErrorMessage.value = null
     }
 
     fun refreshTimeline(access: MediaAccessState) {
@@ -196,10 +197,10 @@ class MainViewModel(
         }
 
         syncJob = viewModelScope.launch {
-            _syncErrorMessage.value = null
+            syncErrorMessage.value = null
             val result = syncTimelineUseCase(forceFullSnapshot = forceFullSnapshot)
             result.onFailure { error ->
-                _syncErrorMessage.value = formatSyncError(error)
+                syncErrorMessage.value = formatSyncError(error)
             }
             bootstrapState.onSyncSettled()
         }
