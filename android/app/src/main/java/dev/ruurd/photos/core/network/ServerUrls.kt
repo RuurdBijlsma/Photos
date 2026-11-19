@@ -2,12 +2,24 @@ package dev.ruurd.photos.core.network
 
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 
+fun normalizeServerUrl(url: String): String {
+    val trimmed = url.trim().trimEnd('/')
+    if (trimmed.isEmpty()) return ""
+    return when {
+        trimmed.startsWith("http://", ignoreCase = true) ->
+            "http://" + trimmed.substring(7)
+        trimmed.startsWith("https://", ignoreCase = true) ->
+            "https://" + trimmed.substring(8)
+        else -> "http://$trimmed"
+    }
+}
+
 /**
  * True when the server URL points at a LAN/private host, where cleartext HTTP is expected and the
  * permission prompts differ from a public HTTPS server.
  */
 fun isLikelyLocalServerUrl(rawUrl: String): Boolean {
-    val normalized = SessionManager.normalizeUrl(rawUrl)
+    val normalized = normalizeServerUrl(rawUrl)
     if (normalized.isEmpty()) return false
     val host = normalized.toHttpUrlOrNull()?.host?.lowercase() ?: return false
 

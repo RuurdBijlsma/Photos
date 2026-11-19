@@ -75,8 +75,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import dev.ruurd.photos.R
-import dev.ruurd.photos.core.network.SessionManager
 import dev.ruurd.photos.core.network.isLikelyLocalServerUrl
+import dev.ruurd.photos.core.network.normalizeServerUrl
 import dev.ruurd.photos.domain.model.DiscoveredServer
 import dev.ruurd.photos.ui.theme.PhotosRadii
 
@@ -355,7 +355,7 @@ fun AuthScreen(
                                     uiState.discoveredServers.forEach { server ->
                                         DiscoveredServerRow(
                                             server = server,
-                                            selected = SessionManager.normalizeUrl(uiState.serverUrl) == server.url,
+                                            selected = normalizeServerUrl(uiState.serverUrl) == server.url,
                                             onClick = {
                                                 localNetworkError = null
                                                 viewModel.selectDiscoveredServer(server)
@@ -588,4 +588,3 @@ private fun UrlSchemeChip(
         }
     }
 }
-

@@ -1,7 +1,6 @@
 ﻿package dev.ruurd.photos.features.viewer
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -21,12 +20,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.geometry.lerp
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.IntSize
-import dev.ruurd.photos.features.viewer.components.ClosingHeroState
 import dev.ruurd.photos.features.viewer.components.HeroImageOverlay
 import dev.ruurd.photos.features.viewer.components.VideoPlayBadge
 import dev.ruurd.photos.features.viewer.components.ViewerChromeOverlay
@@ -235,11 +232,7 @@ fun MediaViewerScreen(
                 HeroImageOverlay(
                     item = openingItem,
                     baseUrl = baseUrl,
-                    rect = lerp(
-                        openSourceRect,
-                        transition.fittedRect(openingItem),
-                        transition.openProgress.value
-                    ),
+                    rect = transition.openingRect(openSourceRect, openingItem),
                     alpha = 1f,
                     onImageReady = transition::onHeroImageReady
                 )
@@ -248,21 +241,11 @@ fun MediaViewerScreen(
 
         // Closing Hero Overlay: starts from exact dragged/released rect and lands directly on tile
         transition.closingState?.let { closing ->
-            val heroRect: Rect
-            val heroAlpha: Float
-            if (closing.targetRect != null) {
-                heroRect = lerp(closing.startRect, closing.targetRect, transition.closeProgress.value)
-                heroAlpha = 1f
-            } else {
-                heroRect = shrinkRect(closing, transition.closeProgress)
-                heroAlpha = (1f - transition.closeProgress.value).coerceIn(0f, 1f)
-            }
-
             HeroImageOverlay(
                 item = closing.item,
                 baseUrl = baseUrl,
-                rect = heroRect,
-                alpha = heroAlpha
+                rect = transition.closingRect(closing),
+                alpha = transition.closingAlpha(closing)
             )
         }
 
@@ -280,14 +263,4 @@ fun MediaViewerScreen(
             )
         }
     }
-}
-
-/** No tile to land on (e.g. it scrolled away): shrink and fade out in place instead. */
-private fun shrinkRect(closing: ClosingHeroState, progress: Animatable<Float, *>): Rect {
-    val shrinkScale = 1f - 0.15f * progress.value
-    val cx = closing.startRect.center.x
-    val cy = closing.startRect.center.y
-    val w = closing.startRect.width * shrinkScale
-    val h = closing.startRect.height * shrinkScale
-    return Rect(cx - w / 2f, cy - h / 2f, cx + w / 2f, cy + h / 2f)
 }

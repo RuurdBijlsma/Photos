@@ -41,18 +41,6 @@ class SessionManager(
         private val KEY_USER_AVATAR_ID = stringPreferencesKey("user_avatar_id")
         private val KEY_LATEST_SYNC_TIMESTAMP = longPreferencesKey("latest_sync_timestamp")
         private val KEY_SCAN_SIGNATURE = stringPreferencesKey("scan_signature")
-
-        fun normalizeUrl(url: String): String {
-            val trimmed = url.trim().trimEnd('/')
-            if (trimmed.isEmpty()) return ""
-            return when {
-                trimmed.startsWith("http://", ignoreCase = true) ->
-                    "http://" + trimmed.substring(7)
-                trimmed.startsWith("https://", ignoreCase = true) ->
-                    "https://" + trimmed.substring(8)
-                else -> "http://$trimmed"
-            }
-        }
     }
 
     private val sessionMutex = Mutex()
@@ -73,7 +61,7 @@ class SessionManager(
         try {
             val prefs = context.sessionDataStore.data.first()
             val url = prefs[KEY_SERVER_URL] ?: DEFAULT_SERVER_URL
-            _serverUrl.value = normalizeUrl(url).ifEmpty { DEFAULT_SERVER_URL }
+            _serverUrl.value = normalizeServerUrl(url).ifEmpty { DEFAULT_SERVER_URL }
             _latestSyncTimestamp.value = prefs[KEY_LATEST_SYNC_TIMESTAMP] ?: 0L
             _hasScanSignature.value = prefs[KEY_SCAN_SIGNATURE] != null
 
@@ -105,7 +93,7 @@ class SessionManager(
 
     suspend fun setServerUrl(url: String) {
         initJob.join()
-        val cleanUrl = normalizeUrl(url)
+        val cleanUrl = normalizeServerUrl(url)
         _serverUrl.value = cleanUrl
         context.sessionDataStore.edit { prefs ->
             prefs[KEY_SERVER_URL] = cleanUrl

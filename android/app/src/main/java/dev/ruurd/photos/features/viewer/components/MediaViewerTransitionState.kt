@@ -89,15 +89,15 @@ class MediaViewerTransitionState(
     // Opening hero animation state
     var hasFinishedOpening by mutableStateOf(!initiallyHasOpenSource)
         private set
-    val openProgress = Animatable(if (initiallyHasOpenSource) 0f else 1f)
-    val fallbackFadeIn = Animatable(if (initiallyHasOpenSource) 1f else 0f)
+    private val openProgress = Animatable(if (initiallyHasOpenSource) 0f else 1f)
+    private val fallbackFadeIn = Animatable(if (initiallyHasOpenSource) 1f else 0f)
     var openingHeroImageReady by mutableStateOf(false)
         private set
 
     // Closing hero animation state
     var closingState by mutableStateOf<ClosingHeroState?>(null)
         private set
-    val closeProgress = Animatable(0f)
+    private val closeProgress = Animatable(0f)
 
     // 2D finger drag-to-dismiss state
     private var isActivelyDragging by mutableStateOf(false)
@@ -130,7 +130,27 @@ class MediaViewerTransitionState(
             else -> fallbackFadeIn.value
         }
 
-    fun fittedRect(item: TimelineMediaProjection): Rect =
+    fun openingRect(sourceRect: Rect, item: TimelineMediaProjection): Rect =
+        lerp(sourceRect, fittedRect(item), openProgress.value)
+
+    fun closingRect(closing: ClosingHeroState): Rect {
+        val targetRect = closing.targetRect
+        if (targetRect != null) {
+            return lerp(closing.startRect, targetRect, closeProgress.value)
+        }
+        // No tile to land on (e.g. it scrolled away): shrink in place instead.
+        val shrinkScale = 1f - 0.15f * closeProgress.value
+        val cx = closing.startRect.center.x
+        val cy = closing.startRect.center.y
+        val w = closing.startRect.width * shrinkScale
+        val h = closing.startRect.height * shrinkScale
+        return Rect(cx - w / 2f, cy - h / 2f, cx + w / 2f, cy + h / 2f)
+    }
+
+    fun closingAlpha(closing: ClosingHeroState): Float =
+        if (closing.targetRect != null) 1f else (1f - closeProgress.value).coerceIn(0f, 1f)
+
+    private fun fittedRect(item: TimelineMediaProjection): Rect =
         computeFittedRect(
             containerWidth = viewerSize.width.toFloat(),
             containerHeight = viewerSize.height.toFloat(),

@@ -1,10 +1,9 @@
 package dev.ruurd.photos.features.auth
 
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import dev.ruurd.photos.core.network.SessionManager
 import dev.ruurd.photos.core.network.discovery.LanScanEvent
+import dev.ruurd.photos.core.network.normalizeServerUrl
 import dev.ruurd.photos.domain.model.DiscoveredServer
 import dev.ruurd.photos.domain.repository.AuthRepository
 import kotlinx.coroutines.Job
@@ -80,7 +79,7 @@ class AuthViewModel(
         if (currentState.isScanningLan || currentState.isLoading) return
 
         cancelServerTest()
-        val prioritizedHost = SessionManager.normalizeUrl(currentState.serverUrl)
+        val prioritizedHost = normalizeServerUrl(currentState.serverUrl)
             .toHttpUrlOrNull()
             ?.host
 
@@ -186,7 +185,7 @@ class AuthViewModel(
         val currentState = _uiState.value
         if (currentState.isTestingServer || currentState.isLoading) return
 
-        val normalizedUrl = SessionManager.normalizeUrl(currentState.serverUrl)
+        val normalizedUrl = normalizeServerUrl(currentState.serverUrl)
         if (normalizedUrl.isEmpty()) {
             _uiState.update { it.copy(errorMessage = "Server URL cannot be empty") }
             return
@@ -227,10 +226,11 @@ class AuthViewModel(
         }
     }
 
-    fun login() {        val state = _uiState.value
+    fun login() {
+        val state = _uiState.value
         if (state.isLoading) return
 
-        val normalizedUrl = SessionManager.normalizeUrl(state.serverUrl)
+        val normalizedUrl = normalizeServerUrl(state.serverUrl)
         val email = state.email.trim()
         val password = state.password
 

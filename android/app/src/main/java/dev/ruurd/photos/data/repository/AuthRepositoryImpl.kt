@@ -9,6 +9,7 @@ import dev.ruurd.photos.core.network.discovery.LanScanEvent
 import dev.ruurd.photos.core.network.discovery.LanServerScanner
 import dev.ruurd.photos.core.network.dto.LoginRequest
 import dev.ruurd.photos.core.network.dto.UserDto
+import dev.ruurd.photos.core.network.normalizeServerUrl
 import dev.ruurd.photos.domain.model.AuthState
 import dev.ruurd.photos.domain.model.User
 import dev.ruurd.photos.domain.repository.AuthRepository
@@ -61,7 +62,7 @@ class AuthRepositoryImpl(
     override suspend fun testServerConnection(url: String): Result<Unit> =
         withContext(dispatchers.io) {
             try {
-                val normalized = SessionManager.normalizeUrl(url)
+                val normalized = normalizeServerUrl(url)
                 if (normalized.isEmpty()) {
                     return@withContext Result.failure(IllegalArgumentException("Server URL cannot be empty"))
                 }
