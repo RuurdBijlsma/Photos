@@ -18,7 +18,6 @@ interface MediaRepository {
     suspend fun getAllByCloudIds(cloudIds: List<String>): List<MediaEntity>
     suspend fun getLocalRows(isVideo: Boolean): List<MediaEntity>
     suspend fun getLocalRowRefs(isVideo: Boolean): List<LocalRowRef>
-    suspend fun findBySizeAndStatus(sizeBytes: Long, syncStatus: SyncStatus): List<MediaEntity>
     suspend fun findBySizesAndStatus(sizeBytes: List<Long>, syncStatus: SyncStatus): List<MediaEntity>
     suspend fun getAllCloudIds(): List<String>
 

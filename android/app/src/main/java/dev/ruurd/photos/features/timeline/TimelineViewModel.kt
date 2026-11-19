@@ -1,16 +1,14 @@
 package dev.ruurd.photos.features.timeline
 
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import dev.ruurd.photos.core.common.AppDispatchers
-import dev.ruurd.photos.core.network.SyncTimestampStore
 import dev.ruurd.photos.domain.model.TimelineLayoutIndex
-import dev.ruurd.photos.domain.repository.ScanStateStore
 import dev.ruurd.photos.domain.usecase.CalculateTimelineLayoutUseCase
 import dev.ruurd.photos.domain.usecase.ObserveTimelineUseCase
 import dev.ruurd.photos.domain.usecase.TimelineLayoutParams
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -30,11 +28,10 @@ class TimelineViewModel(
     private val observeTimelineUseCase: ObserveTimelineUseCase,
     private val calculateTimelineLayoutUseCase: CalculateTimelineLayoutUseCase,
     private val dispatchers: AppDispatchers,
-    initialBootstrapping: Boolean = false
+    isBootstrapping: Flow<Boolean>
 ) : ViewModel() {
 
     private val viewport = MutableStateFlow(Viewport())
-    private val isBootstrapping = MutableStateFlow(initialBootstrapping)
 
     @OptIn(ExperimentalCoroutinesApi::class)
     val uiState: StateFlow<TimelineUiState> = isBootstrapping
@@ -69,10 +66,6 @@ class TimelineViewModel(
         .flowOn(dispatchers.default)
         .stateIn(viewModelScope, SharingStarted.Lazily, TimelineUiState())
 
-    fun setBootstrapping(bootstrapping: Boolean) {
-        isBootstrapping.value = bootstrapping
-    }
-
     fun onViewportChanged(widthPx: Int, density: Float) {
         if (widthPx <= 0 || density <= 0f) return
         val current = viewport.value
@@ -91,26 +84,5 @@ class TimelineViewModel(
 
         private fun desiredRowHeightDp(widthDp: Float): Float =
             if (widthDp >= WIDE_WIDTH_DP) ROW_HEIGHT_WIDE_DP else ROW_HEIGHT_PHONE_DP
-
-        fun factory(
-            observeTimelineUseCase: ObserveTimelineUseCase,
-            calculateTimelineLayoutUseCase: CalculateTimelineLayoutUseCase,
-            dispatchers: AppDispatchers,
-            syncTimestampStore: SyncTimestampStore,
-            scanStateStore: ScanStateStore
-        ): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
-            @Suppress("UNCHECKED_CAST")
-            override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                val initialBootstrapping =
-                    syncTimestampStore.latestSyncTimestamp.value <= 0L &&
-                            !scanStateStore.hasScanSignature.value
-                return TimelineViewModel(
-                    observeTimelineUseCase = observeTimelineUseCase,
-                    calculateTimelineLayoutUseCase = calculateTimelineLayoutUseCase,
-                    dispatchers = dispatchers,
-                    initialBootstrapping = initialBootstrapping
-                ) as T
-            }
-        }
     }
 }

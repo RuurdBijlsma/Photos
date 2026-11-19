@@ -1,9 +1,8 @@
 package dev.ruurd.photos.data.repository
 
-import dev.ruurd.photos.core.common.AppDispatchers
 import dev.ruurd.photos.core.database.entity.MediaEntity
 import dev.ruurd.photos.testing.FakeMediaRepository
-import kotlinx.coroutines.CoroutineDispatcher
+import dev.ruurd.photos.testing.TestAppDispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -20,11 +19,7 @@ class TimelineProjectionStoreTest {
     private val testDispatcher = StandardTestDispatcher()
     private val testScope = TestScope(testDispatcher)
 
-    private val dispatchers = object : AppDispatchers {
-        override val default: CoroutineDispatcher = testDispatcher
-        override val io: CoroutineDispatcher = testDispatcher
-        override val main: CoroutineDispatcher = testDispatcher
-    }
+    private val dispatchers = TestAppDispatchers(testDispatcher)
 
     @Test
     fun `emits loaded state from repository and updates on changes`() = testScope.runTest {

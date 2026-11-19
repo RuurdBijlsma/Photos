@@ -53,11 +53,6 @@ class MediaRepositoryImpl(
     override suspend fun getLocalRowRefs(isVideo: Boolean): List<LocalRowRef> =
         mediaDao.getLocalRowRefs(isVideo)
 
-    override suspend fun findBySizeAndStatus(
-        sizeBytes: Long,
-        syncStatus: SyncStatus
-    ): List<MediaEntity> = mediaDao.findBySizeAndStatus(sizeBytes, syncStatus)
-
     override suspend fun findBySizesAndStatus(
         sizeBytes: List<Long>,
         syncStatus: SyncStatus

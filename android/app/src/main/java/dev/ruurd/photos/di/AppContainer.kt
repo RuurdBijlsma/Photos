@@ -4,6 +4,9 @@ import android.app.ActivityManager
 import android.content.Context
 import android.content.pm.ApplicationInfo
 import coil3.ImageLoader
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
 import dev.ruurd.photos.core.common.AppDispatchers
 import dev.ruurd.photos.core.common.DefaultAppDispatchers
 import dev.ruurd.photos.core.database.AppDatabase
@@ -18,6 +21,7 @@ import dev.ruurd.photos.core.network.auth.AuthAuthenticator
 import dev.ruurd.photos.core.network.cookie.PersistentCookieJar
 import dev.ruurd.photos.core.network.discovery.LanServerScanner
 import dev.ruurd.photos.core.network.interceptor.DynamicBaseUrlInterceptor
+import dev.ruurd.photos.core.state.BootstrapState
 import dev.ruurd.photos.data.datasource.local.MediaStoreDataSource
 import dev.ruurd.photos.data.repository.AuthRepositoryImpl
 import dev.ruurd.photos.data.repository.DeviceFolderRepositoryImpl
@@ -31,6 +35,10 @@ import dev.ruurd.photos.domain.usecase.CalculateTimelineLayoutUseCase
 import dev.ruurd.photos.domain.usecase.ObserveTimelineUseCase
 import dev.ruurd.photos.domain.usecase.ScanLocalMediaUseCase
 import dev.ruurd.photos.domain.usecase.SyncTimelineUseCase
+import dev.ruurd.photos.features.auth.AuthViewModel
+import dev.ruurd.photos.features.main.MainViewModel
+import dev.ruurd.photos.features.timeline.TimelineViewModel
+import dev.ruurd.photos.features.viewer.MediaViewerViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -65,6 +73,12 @@ interface AppContainer {
     val imageLoader: ImageLoader
     val memoryCacheKeyRegistry: MemoryCacheKeyRegistry
     val timelineProjectionStore: TimelineProjectionStore
+    val bootstrapState: BootstrapState
+
+    fun authViewModelFactory(): ViewModelProvider.Factory
+    fun mainViewModelFactory(): ViewModelProvider.Factory
+    fun timelineViewModelFactory(): ViewModelProvider.Factory
+    fun mediaViewerViewModelFactory(initialMediaId: String): ViewModelProvider.Factory
 }
 
 class DefaultAppContainer(private val context: Context) : AppContainer {
@@ -244,7 +258,56 @@ class DefaultAppContainer(private val context: Context) : AppContainer {
         )
     }
 
+    override val bootstrapState: BootstrapState by lazy {
+        // Reached only after `SessionManager` loaded its persisted state, since that gates auth.
+        BootstrapState(
+            needsBootstrap = sessionManager.latestSyncTimestamp.value <= 0L &&
+                !sessionManager.hasScanSignature.value
+        )
+    }
+
     override val imageLoader: ImageLoader by lazy {
         PhotosImageLoader.create(context, okHttpClient)
+    }
+
+    override fun authViewModelFactory(): ViewModelProvider.Factory = viewModelFactory {
+        initializer { AuthViewModel(authRepository = authRepository) }
+    }
+
+    override fun mainViewModelFactory(): ViewModelProvider.Factory = viewModelFactory {
+        initializer {
+            MainViewModel(
+                authRepository = authRepository,
+                syncTimelineUseCase = syncTimelineUseCase,
+                scanLocalMediaUseCase = scanLocalMediaUseCase,
+                localMediaStore = localMediaStore,
+                bootstrapState = bootstrapState,
+                networkMonitor = networkMonitor
+            )
+        }
+    }
+
+    override fun timelineViewModelFactory(): ViewModelProvider.Factory = viewModelFactory {
+        initializer {
+            TimelineViewModel(
+                observeTimelineUseCase = observeTimelineUseCase,
+                calculateTimelineLayoutUseCase = calculateTimelineLayoutUseCase,
+                dispatchers = dispatchers,
+                isBootstrapping = bootstrapState.isBootstrapping
+            )
+        }
+    }
+
+    override fun mediaViewerViewModelFactory(
+        initialMediaId: String
+    ): ViewModelProvider.Factory = viewModelFactory {
+        initializer {
+            MediaViewerViewModel(
+                initialMediaId = initialMediaId,
+                timelineProjectionStore = timelineProjectionStore,
+                mediaRepository = mediaRepository,
+                dispatchers = dispatchers
+            )
+        }
     }
 }

@@ -74,3 +74,18 @@ data class MediaEntity(
     @ColumnInfo(name = "sync_status")
     val syncStatus: SyncStatus = SyncStatus.LOCAL_ONLY
 )
+
+/** The subset of a row the timeline and the viewer render. */
+fun MediaEntity.toTimelineProjection(): TimelineMediaProjection = TimelineMediaProjection(
+    id = id,
+    cloudId = cloudId,
+    localContentUri = localContentUri,
+    yearMonth = yearMonth,
+    ratio = ratio,
+    isVideo = isVideo,
+    durationMs = durationMs,
+    hasThumbnails = hasThumbnails,
+    syncStatus = syncStatus,
+    sortTimestamp = sortTimestamp,
+    timezoneOffsetMinutes = timezoneOffsetMinutes
+)

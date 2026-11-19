@@ -1,6 +1,5 @@
 package dev.ruurd.photos.domain.usecase
 
-import dev.ruurd.photos.core.common.AppDispatchers
 import dev.ruurd.photos.core.database.entity.MediaEntity
 import dev.ruurd.photos.core.database.entity.SyncStatus
 import dev.ruurd.photos.core.network.SyncTimestampStore
@@ -9,7 +8,7 @@ import dev.ruurd.photos.core.network.proto.CompactTimelineItem
 import dev.ruurd.photos.core.network.proto.TimelineSyncResponse
 import dev.ruurd.photos.domain.model.SyncState
 import dev.ruurd.photos.testing.FakeMediaRepository
-import kotlinx.coroutines.CoroutineDispatcher
+import dev.ruurd.photos.testing.TestAppDispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -30,11 +29,7 @@ class SyncTimelineUseCaseTest {
 
     private val testDispatcher = StandardTestDispatcher()
 
-    private val dispatchers = object : AppDispatchers {
-        override val default: CoroutineDispatcher = testDispatcher
-        override val io: CoroutineDispatcher = testDispatcher
-        override val main: CoroutineDispatcher = testDispatcher
-    }
+    private val dispatchers = TestAppDispatchers(testDispatcher)
 
     private class FakeSyncTimestampStore : SyncTimestampStore {
         override val latestSyncTimestamp = MutableStateFlow(0L)

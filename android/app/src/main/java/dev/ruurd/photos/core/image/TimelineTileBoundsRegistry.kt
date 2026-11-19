@@ -1,5 +1,6 @@
 package dev.ruurd.photos.core.image
 
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInRoot
@@ -34,4 +35,9 @@ class TimelineTileBoundsRegistry {
     fun clear() {
         coordinates.clear()
     }
+}
+
+/** Provided once by the app root; the viewer reads the tile bounds the timeline registered. */
+val LocalTimelineTileBoundsRegistry = staticCompositionLocalOf<TimelineTileBoundsRegistry> {
+    error("No TimelineTileBoundsRegistry provided")
 }

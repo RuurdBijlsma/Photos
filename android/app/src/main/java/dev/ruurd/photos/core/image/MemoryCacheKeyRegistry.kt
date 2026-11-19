@@ -1,6 +1,7 @@
 package dev.ruurd.photos.core.image
 
 import androidx.collection.LruCache
+import androidx.compose.runtime.staticCompositionLocalOf
 import coil3.memory.MemoryCache
 
 /**
@@ -25,4 +26,9 @@ class MemoryCacheKeyRegistry(maxSize: Int = 256) {
     fun clear() {
         cache.evictAll()
     }
+}
+
+/** Provided once by the app root; timeline tiles record keys and the viewer reads them. */
+val LocalMemoryCacheKeyRegistry = staticCompositionLocalOf<MemoryCacheKeyRegistry> {
+    error("No MemoryCacheKeyRegistry provided")
 }

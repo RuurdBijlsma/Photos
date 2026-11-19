@@ -1,10 +1,9 @@
 package dev.ruurd.photos.domain.usecase
 
-import dev.ruurd.photos.core.common.AppDispatchers
 import dev.ruurd.photos.core.database.entity.MediaEntity
 import dev.ruurd.photos.core.database.entity.TimelineMediaProjection
 import dev.ruurd.photos.testing.FakeMediaRepository
-import kotlinx.coroutines.CoroutineDispatcher
+import dev.ruurd.photos.testing.TestAppDispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -19,11 +18,7 @@ class ObserveTimelineUseCaseTest {
 
     private val testDispatcher = StandardTestDispatcher()
 
-    private val dispatchers = object : AppDispatchers {
-        override val default: CoroutineDispatcher = testDispatcher
-        override val io: CoroutineDispatcher = testDispatcher
-        override val main: CoroutineDispatcher = testDispatcher
-    }
+    private val dispatchers = TestAppDispatchers(testDispatcher)
 
     private fun entity(id: String, yearMonth: Int) = MediaEntity(
         id = id,

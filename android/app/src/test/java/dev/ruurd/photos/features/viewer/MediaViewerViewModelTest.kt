@@ -1,10 +1,9 @@
 package dev.ruurd.photos.features.viewer
 import androidx.lifecycle.viewModelScope
-import dev.ruurd.photos.core.common.AppDispatchers
 import dev.ruurd.photos.core.database.entity.MediaEntity
 import dev.ruurd.photos.data.repository.TimelineProjectionStore
 import dev.ruurd.photos.testing.FakeMediaRepository
-import kotlinx.coroutines.CoroutineDispatcher
+import dev.ruurd.photos.testing.TestAppDispatchers
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.cancel
@@ -27,11 +26,7 @@ class MediaViewerViewModelTest {
     private val testDispatcher = StandardTestDispatcher()
     private val testScope = TestScope(testDispatcher)
 
-    private val dispatchers = object : AppDispatchers {
-        override val default: CoroutineDispatcher = testDispatcher
-        override val io: CoroutineDispatcher = testDispatcher
-        override val main: CoroutineDispatcher = testDispatcher
-    }
+    private val dispatchers = TestAppDispatchers(testDispatcher)
 
     @Before
     fun setUp() {

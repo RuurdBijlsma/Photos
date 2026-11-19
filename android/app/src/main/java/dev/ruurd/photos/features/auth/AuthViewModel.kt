@@ -227,8 +227,7 @@ class AuthViewModel(
         }
     }
 
-    fun login() {
-        val state = _uiState.value
+    fun login() {        val state = _uiState.value
         if (state.isLoading) return
 
         val normalizedUrl = SessionManager.normalizeUrl(state.serverUrl)
@@ -275,15 +274,5 @@ class AuthViewModel(
                 }
             )
         }
-    }
-
-    companion object {
-        fun factory(authRepository: AuthRepository): ViewModelProvider.Factory =
-            object : ViewModelProvider.Factory {
-                @Suppress("UNCHECKED_CAST")
-                override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                    return AuthViewModel(authRepository) as T
-                }
-            }
     }
 }

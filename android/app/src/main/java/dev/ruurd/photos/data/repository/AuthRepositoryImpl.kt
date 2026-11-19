@@ -7,6 +7,8 @@ import dev.ruurd.photos.core.network.await
 import dev.ruurd.photos.core.network.cookie.PersistentCookieJar
 import dev.ruurd.photos.core.network.discovery.LanScanEvent
 import dev.ruurd.photos.core.network.discovery.LanServerScanner
+import dev.ruurd.photos.core.network.dto.LoginRequest
+import dev.ruurd.photos.core.network.dto.UserDto
 import dev.ruurd.photos.domain.model.AuthState
 import dev.ruurd.photos.domain.model.User
 import dev.ruurd.photos.domain.repository.AuthRepository
@@ -16,13 +18,16 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.Json
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
-import org.json.JSONObject
 import java.util.concurrent.TimeUnit
+
+/** Unknown fields are ignored so a newer server can add profile fields without breaking sign-in. */
+private val authJson = Json { ignoreUnknownKeys = true }
 
 class AuthRepositoryImpl(
     private val apiService: PhotosApiService,
@@ -88,10 +93,7 @@ class AuthRepositoryImpl(
     override suspend fun login(email: String, password: String): Result<User> =
         withContext(dispatchers.io) {
             try {
-                val jsonBody = JSONObject().apply {
-                    put("email", email)
-                    put("password", password)
-                }.toString()
+                val jsonBody = authJson.encodeToString(LoginRequest(email = email, password = password))
 
                 val requestBody = jsonBody.toRequestBody("application/json".toMediaType())
                 val response = apiService.login(requestBody)
@@ -163,14 +165,14 @@ class AuthRepositoryImpl(
             if (response.isSuccessful) {
                 val bodyStr = response.body()?.string()
                     ?: return@withContext Result.failure(Exception("Empty response from /api/auth/me"))
-                val json = JSONObject(bodyStr)
+                val dto = authJson.decodeFromString<UserDto>(bodyStr)
                 val user = User(
-                    id = json.getInt("id"),
-                    email = json.getString("email"),
-                    name = json.getString("name"),
-                    role = json.optString("role", "user"),
-                    mediaFolder = if (json.isNull("mediaFolder")) null else json.optString("mediaFolder"),
-                    avatarId = if (json.isNull("avatarId")) null else json.optString("avatarId")
+                    id = dto.id,
+                    email = dto.email,
+                    name = dto.name,
+                    role = dto.role,
+                    mediaFolder = dto.mediaFolder,
+                    avatarId = dto.avatarId
                 )
                 sessionManager.setAuthenticated(user)
                 Result.success(user)

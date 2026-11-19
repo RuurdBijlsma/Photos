@@ -361,7 +361,8 @@ class ScanLocalMediaUseCase(
         matchedCloudRowIds: MutableSet<String>,
         toUpsert: MutableList<MediaEntity>
     ): Boolean {
-        val match = mediaRepository.findBySizeAndStatus(local.sizeBytes, SyncStatus.CLOUD_ONLY)
+        val match = mediaRepository
+            .findBySizesAndStatus(listOf(local.sizeBytes), SyncStatus.CLOUD_ONLY)
             .firstOrNull { candidate ->
                 candidate.id !in matchedCloudRowIds &&
                         PassOneDeduplication.isMatch(

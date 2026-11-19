@@ -76,9 +76,9 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import dev.ruurd.photos.R
 import dev.ruurd.photos.core.network.SessionManager
+import dev.ruurd.photos.core.network.isLikelyLocalServerUrl
 import dev.ruurd.photos.domain.model.DiscoveredServer
 import dev.ruurd.photos.ui.theme.PhotosRadii
-import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 
 private const val PERMISSION_ACCESS_LOCAL_NETWORK = "android.permission.ACCESS_LOCAL_NETWORK"
 
@@ -589,28 +589,3 @@ private fun UrlSchemeChip(
     }
 }
 
-private fun isLikelyLocalServerUrl(rawUrl: String): Boolean {
-    val normalized = SessionManager.normalizeUrl(rawUrl)
-    if (normalized.isEmpty()) return false
-    val host = normalized.toHttpUrlOrNull()?.host?.lowercase() ?: return false
-
-    if (host == "localhost" || host == "127.0.0.1" || host == "::1") {
-        return false
-    }
-    if (host.endsWith(".local") || host.endsWith(".lan") || host.endsWith(".home") || !host.contains('.')) {
-        return true
-    }
-    val octets = host.split('.')
-    if (octets.size == 4) {
-        val first = octets[0].toIntOrNull() ?: return false
-        val second = octets[1].toIntOrNull() ?: return false
-        return when {
-            first == 10 -> true
-            first == 192 && second == 168 -> true
-            first == 172 && second in 16..31 -> true
-            first == 169 && second == 254 -> true
-            else -> false
-        }
-    }
-    return false
-}

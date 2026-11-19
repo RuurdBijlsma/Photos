@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import dev.ruurd.photos.core.common.AppDispatchers
 import dev.ruurd.photos.core.database.entity.TimelineMediaProjection
+import dev.ruurd.photos.core.database.entity.toTimelineProjection
 import dev.ruurd.photos.data.repository.TimelineProjectionState
 import dev.ruurd.photos.data.repository.TimelineProjectionStore
 import dev.ruurd.photos.domain.repository.MediaRepository
@@ -61,19 +62,7 @@ class MediaViewerViewModel(
             viewModelScope.launch(dispatchers.io) {
                 val entity = mediaRepository.getById(initialMediaId)
                 if (entity != null) {
-                    val fallbackProjection = TimelineMediaProjection(
-                        id = entity.id,
-                        cloudId = entity.cloudId,
-                        localContentUri = entity.localContentUri,
-                        yearMonth = entity.yearMonth,
-                        ratio = entity.ratio,
-                        isVideo = entity.isVideo,
-                        durationMs = entity.durationMs,
-                        hasThumbnails = entity.hasThumbnails,
-                        syncStatus = entity.syncStatus,
-                        sortTimestamp = entity.sortTimestamp,
-                        timezoneOffsetMinutes = entity.timezoneOffsetMinutes
-                    )
+                    val fallbackProjection = entity.toTimelineProjection()
                     _uiState.update { current ->
                         if (current.items.isEmpty() &&
                             timelineProjectionStore.state.value is TimelineProjectionState.Loading
@@ -151,24 +140,5 @@ class MediaViewerViewModel(
 
     fun setChromeVisible(visible: Boolean) {
         _uiState.update { it.copy(isChromeVisible = visible) }
-    }
-
-    companion object {
-        fun factory(
-            initialMediaId: String,
-            timelineProjectionStore: TimelineProjectionStore,
-            mediaRepository: MediaRepository,
-            dispatchers: AppDispatchers
-        ): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
-            @Suppress("UNCHECKED_CAST")
-            override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                return MediaViewerViewModel(
-                    initialMediaId = initialMediaId,
-                    timelineProjectionStore = timelineProjectionStore,
-                    mediaRepository = mediaRepository,
-                    dispatchers = dispatchers
-                ) as T
-            }
-        }
     }
 }

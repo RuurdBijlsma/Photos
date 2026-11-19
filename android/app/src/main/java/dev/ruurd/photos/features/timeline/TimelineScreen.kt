@@ -1,6 +1,5 @@
 package dev.ruurd.photos.features.timeline
 
-import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.fadeIn
@@ -80,9 +79,9 @@ import coil3.compose.AsyncImage
 import coil3.request.CachePolicy
 import coil3.request.ImageRequest
 import dev.ruurd.photos.core.database.entity.SyncStatus
-import dev.ruurd.photos.core.image.MediaStoreThumbnail
-import dev.ruurd.photos.core.image.MemoryCacheKeyRegistry
-import dev.ruurd.photos.core.image.TimelineTileBoundsRegistry
+import dev.ruurd.photos.core.image.LocalMemoryCacheKeyRegistry
+import dev.ruurd.photos.core.image.LocalTimelineTileBoundsRegistry
+import dev.ruurd.photos.core.image.MediaImageRequests
 import dev.ruurd.photos.domain.model.MonthHeaderUiItem
 import dev.ruurd.photos.domain.model.TimelineGridItemUiModel
 import dev.ruurd.photos.domain.model.TimelineLayoutIndex
@@ -113,10 +112,7 @@ fun TimelineScreen(
     topBarHeight: Dp = 0.dp,
     topBarVisible: Boolean = true,
     isSyncing: Boolean = false,
-    isBootstrapping: Boolean = false,
     pullToRefreshState: PullToRefreshState? = null,
-    memoryCacheKeyRegistry: MemoryCacheKeyRegistry? = null,
-    boundsRegistry: TimelineTileBoundsRegistry? = null,
     hiddenMediaId: String? = null,
     onMediaClick: (mediaId: String, sourceRect: Rect?) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier
@@ -127,10 +123,6 @@ fun TimelineScreen(
 
     var isScrubbing by remember { mutableStateOf(false) }
     var viewportHeightDp by remember { mutableFloatStateOf(0f) }
-
-    LaunchedEffect(isBootstrapping) {
-        viewModel.setBootstrapping(isBootstrapping)
-    }
 
     DisposableEffect(pullToRefreshState) {
         onDispose { pullToRefreshState?.reset() }
@@ -172,7 +164,7 @@ fun TimelineScreen(
         }
     }
 
-    val isEmptyState = !uiState.isLoading && !isBootstrapping && layout.isEmpty && !isSyncing
+    val isEmptyState = !uiState.isLoading && layout.isEmpty && !isSyncing
     val currentIsEmpty by rememberUpdatedState(isEmptyState)
     val pullNestedScrollConnection = remember(pullToRefreshState, listState) {
         if (pullToRefreshState == null) {
@@ -238,7 +230,7 @@ fun TimelineScreen(
             }
     ) {
         when {
-            uiState.isLoading || isBootstrapping || (layout.isEmpty && isSyncing) -> {
+            uiState.isLoading || (layout.isEmpty && isSyncing) -> {
                 CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
             }
 
@@ -293,8 +285,6 @@ fun TimelineScreen(
                                 item = item,
                                 baseUrl = baseUrl,
                                 isScrubbing = isScrubbing,
-                                memoryCacheKeyRegistry = memoryCacheKeyRegistry,
-                                boundsRegistry = boundsRegistry,
                                 hiddenMediaId = hiddenMediaId,
                                 onMediaClick = onMediaClick,
                                 modifier = cascadeModifier
@@ -458,8 +448,6 @@ private fun TimelineRow(
     item: TimelineRowUiItem,
     baseUrl: String,
     isScrubbing: Boolean,
-    memoryCacheKeyRegistry: MemoryCacheKeyRegistry?,
-    boundsRegistry: TimelineTileBoundsRegistry?,
     hiddenMediaId: String?,
     onMediaClick: (mediaId: String, sourceRect: Rect?) -> Unit,
     modifier: Modifier = Modifier
@@ -490,8 +478,6 @@ private fun TimelineRow(
                     thumbnailTargetHeightPx = item.thumbnailTargetHeightPx,
                     baseUrl = baseUrl,
                     isScrubbing = isScrubbing,
-                    memoryCacheKeyRegistry = memoryCacheKeyRegistry,
-                    boundsRegistry = boundsRegistry,
                     isHidden = hiddenMediaId == gridItem.id,
                     onClick = { rect -> onMediaClick(gridItem.id, rect) }
                 )
@@ -507,13 +493,13 @@ private fun TimelineTile(
     thumbnailTargetHeightPx: Int,
     baseUrl: String,
     isScrubbing: Boolean,
-    memoryCacheKeyRegistry: MemoryCacheKeyRegistry?,
-    boundsRegistry: TimelineTileBoundsRegistry?,
     isHidden: Boolean,
     onClick: (sourceRect: Rect?) -> Unit
 ) {
     val context = LocalContext.current
     val density = LocalDensity.current.density
+    val boundsRegistry = LocalTimelineTileBoundsRegistry.current
+    val memoryCacheKeyRegistry = LocalMemoryCacheKeyRegistry.current
     val widthPx = (item.widthDp * density).roundToInt().coerceAtLeast(1)
     val heightPx = (heightDp * density).roundToInt().coerceAtLeast(1)
 
@@ -525,7 +511,7 @@ private fun TimelineTile(
 
     DisposableEffect(item.id, boundsRegistry) {
         onDispose {
-            boundsRegistry?.unregister(item.id, coordsHolder[0])
+            boundsRegistry.unregister(item.id, coordsHolder[0])
             coordsHolder[0] = null
         }
     }
@@ -549,8 +535,17 @@ private fun TimelineTile(
         heightPx,
         gateLoads
     ) {
+        val model = MediaImageRequests.previewModel(
+            localContentUri = item.localContentUri,
+            cloudId = item.cloudId,
+            isVideo = item.isVideo,
+            hasThumbnails = item.hasThumbnails,
+            baseUrl = baseUrl,
+            heightPx = thumbnailTargetHeightPx,
+            bypassPlatformThumbnail = false
+        )
         ImageRequest.Builder(context)
-            .data(tileModel(item, baseUrl, thumbnailTargetHeightPx))
+            .data(model)
             .size(widthPx, heightPx)
             .apply {
                 if (gateLoads) {
@@ -570,7 +565,7 @@ private fun TimelineTile(
             .background(MaterialTheme.colorScheme.surfaceContainerHigh)
             .onPlaced { coords ->
                 coordsHolder[0] = coords
-                boundsRegistry?.register(item.id, coords)
+                boundsRegistry.register(item.id, coords)
             }
             .clickable {
                 val rect = coordsHolder[0]?.takeIf { it.isAttached }?.boundsInRoot()
@@ -587,7 +582,7 @@ private fun TimelineTile(
                 onSuccess = { result ->
                     loadState.succeeded = true
                     result.result.memoryCacheKey?.let { key ->
-                        memoryCacheKeyRegistry?.put(item.id, key)
+                        memoryCacheKeyRegistry.put(item.id, key)
                     }
                 },
                 modifier = Modifier
@@ -684,41 +679,4 @@ private const val CASCADE_STEP_DP = 3f
 /** Mutable-without-recomposition flag for "this tile already rendered its image". */
 private class TileLoadState {
     var succeeded = false
-}
-
-private fun tileModel(
-    item: TimelineGridItemUiModel,
-    baseUrl: String,
-    thumbnailTargetHeightPx: Int
-): Any? {
-    val localUri = item.localContentUri?.let(Uri::parse)
-    val cloudUrl = cloudThumbnailUrl(baseUrl, item, thumbnailTargetHeightPx)
-    return if (localUri != null) {
-        MediaStoreThumbnail(
-            uri = localUri,
-            cloudId = item.cloudId,
-            cloudFallbackUrl = cloudUrl,
-            isVideo = item.isVideo
-        )
-    } else {
-        cloudUrl
-    }
-}
-
-/**
- * Pre-generated AVIF thumbnails are served without auth; items whose thumbnails are not ready use the
- * on-demand endpoint, which needs the session cookie (sent by the shared OkHttp client).
- */
-private fun cloudThumbnailUrl(
-    baseUrl: String,
-    item: TimelineGridItemUiModel,
-    heightPx: Int
-): String? {
-    val cloudId = item.cloudId ?: return null
-    if (baseUrl.isBlank()) return null
-    return if (item.hasThumbnails) {
-        "$baseUrl/thumbnails/$cloudId/${heightPx}p.avif"
-    } else {
-        "$baseUrl/api/photos/$cloudId/thumbnail?size=$heightPx"
-    }
 }

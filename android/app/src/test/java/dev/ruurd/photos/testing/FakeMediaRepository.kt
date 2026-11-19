@@ -4,6 +4,7 @@ import dev.ruurd.photos.core.database.dao.LocalRowRef
 import dev.ruurd.photos.core.database.entity.MediaEntity
 import dev.ruurd.photos.core.database.entity.SyncStatus
 import dev.ruurd.photos.core.database.entity.TimelineMediaProjection
+import dev.ruurd.photos.core.database.entity.toTimelineProjection
 import dev.ruurd.photos.domain.repository.MediaRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -70,17 +71,6 @@ class FakeMediaRepository : MediaRepository {
         getAllCloudIdsCalls++
         return items.values.mapNotNull { it.cloudId }.distinct()
     }
-
-    override suspend fun findBySizeAndStatus(
-        sizeBytes: Long,
-        syncStatus: SyncStatus
-    ): List<MediaEntity> =
-        items.values
-            .filter { it.sizeBytes == sizeBytes && it.syncStatus == syncStatus }
-            .sortedWith(
-                compareByDescending<MediaEntity> { it.isVisibleInTimeline }
-                    .thenBy { it.id }
-            )
 
     override suspend fun findBySizesAndStatus(
         sizeBytes: List<Long>,
@@ -166,20 +156,6 @@ class FakeMediaRepository : MediaRepository {
                     .thenByDescending { it.sortTimestamp }
                     .thenByDescending { it.id }
             )
-            .map {
-                TimelineMediaProjection(
-                    id = it.id,
-                    cloudId = it.cloudId,
-                    localContentUri = it.localContentUri,
-                    yearMonth = it.yearMonth,
-                    ratio = it.ratio,
-                    isVideo = it.isVideo,
-                    durationMs = it.durationMs,
-                    hasThumbnails = it.hasThumbnails,
-                    syncStatus = it.syncStatus,
-                    sortTimestamp = it.sortTimestamp,
-                    timezoneOffsetMinutes = it.timezoneOffsetMinutes
-                )
-            }
+            .map { it.toTimelineProjection() }
     }
 }

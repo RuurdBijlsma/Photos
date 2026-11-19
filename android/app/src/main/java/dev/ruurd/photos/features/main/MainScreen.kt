@@ -64,8 +64,6 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
-import dev.ruurd.photos.core.image.MemoryCacheKeyRegistry
-import dev.ruurd.photos.core.image.TimelineTileBoundsRegistry
 import dev.ruurd.photos.core.permissions.MediaPermissions
 import dev.ruurd.photos.domain.model.MediaAccessState
 import dev.ruurd.photos.domain.model.SyncState
@@ -89,8 +87,6 @@ fun MainScreen(
     timelineListState: LazyListState = rememberLazyListState(
         cacheWindow = remember { LazyLayoutCacheWindow(aheadFraction = 0.75f, behindFraction = 0.4f) }
     ),
-    memoryCacheKeyRegistry: MemoryCacheKeyRegistry? = null,
-    boundsRegistry: TimelineTileBoundsRegistry? = null,
     hiddenTimelineMediaId: String? = null,
     onMediaClick: (mediaId: String, sourceRect: Rect?) -> Unit = { _, _ -> }
 ) {
@@ -238,10 +234,7 @@ fun MainScreen(
                     topBarHeight = PhotosTopBarHeight,
                     topBarVisible = !hideTopBar,
                     isSyncing = uiState.syncState == SyncState.SYNCING,
-                    isBootstrapping = uiState.isBootstrapping,
                     pullToRefreshState = pullToRefreshState,
-                    memoryCacheKeyRegistry = memoryCacheKeyRegistry,
-                    boundsRegistry = boundsRegistry,
                     hiddenMediaId = hiddenTimelineMediaId,
                     onMediaClick = onMediaClick
                 )
