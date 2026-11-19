@@ -52,6 +52,14 @@ android {
     buildFeatures {
         compose = true
     }
+    lint {
+        warningsAsErrors = true
+        abortOnError = true
+        checkReleaseBuilds = false
+        // If existing findings are noisy at first, generate a baseline with `./gradlew :app:updateLintBaseline`
+        // and uncomment the line below so only new issues fail CI:
+        // baseline = file("lint-baseline.xml")
+    }
     sourceSets {
         getByName("debug") {
             java.directories.add("build/generated/java/generateDebugProto/java")
@@ -116,6 +124,9 @@ dependencies {
     // Telephoto
     implementation(libs.telephoto.zoomable.image.coil3)
     implementation(libs.telephoto.zoomable)
+
+    // Lint
+    lintChecks(libs.compose.lint.checks)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

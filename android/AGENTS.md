@@ -1,3 +1,17 @@
+## Quality checks & unit tests
+
+Run formatting, Android Lint (including Compose rules), JVM unit tests, and debug/release/benchmark builds:
+
+```powershell
+./gradlew qualityCheck
+
+# Individual checks:
+./gradlew spotlessApply      # Auto-format Kotlin & Gradle scripts
+./gradlew spotlessCheck      # Verify formatting
+./gradlew :app:lintDebug     # Android Lint + compose-lint-checks
+./gradlew :app:testDebugUnitTest
+```
+
 Check for performance regressions in timeline:
 
 Ensure `dev.ruurd.photos` is signed in on the test device, media permissions are granted, and the
