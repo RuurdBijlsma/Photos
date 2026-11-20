@@ -9,7 +9,10 @@ plugins {
 android {
     namespace = "dev.ruurd.photos"
     compileSdk {
-        version = release(37)
+        version =
+            release(37) {
+                minorApiLevel = 2
+            }
     }
 
     defaultConfig {
@@ -140,7 +143,7 @@ dependencies {
 
 protobuf {
     protoc {
-        artifact = "com.google.protobuf:protoc:3.25.5"
+        artifact = libs.protoc.get().toString()
     }
     generateProtoTasks {
         all().forEach { task ->
