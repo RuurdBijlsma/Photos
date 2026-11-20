@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.RotateRight
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Share
@@ -30,7 +31,6 @@ import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Refresh
-import androidx.compose.material.icons.outlined.RotateRight
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -69,6 +69,7 @@ fun ViewerChromeOverlay(
     currentPage: Int,
     isProjectionLoading: Boolean,
     onBack: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     // Ignoring visibility keeps the top bar anchored when statusBars() animates back in on tap.
     val statusBarPadding = WindowInsets.statusBarsIgnoringVisibility
@@ -77,7 +78,7 @@ fun ViewerChromeOverlay(
     val navBarPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
 
     Box(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxSize()
             .graphicsLayer { this.alpha = alpha },
     ) {
@@ -167,7 +168,7 @@ fun ViewerChromeOverlay(
                             text = { Text("Rotate clockwise") },
                             leadingIcon = {
                                 Icon(
-                                    imageVector = Icons.Outlined.RotateRight,
+                                    imageVector = Icons.AutoMirrored.Outlined.RotateRight,
                                     contentDescription = null,
                                 )
                             },

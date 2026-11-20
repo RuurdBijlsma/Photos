@@ -1,6 +1,7 @@
 package dev.ruurd.photos.core.image
 
 import android.graphics.Bitmap
+import androidx.core.graphics.createBitmap
 import coil3.ImageLoader
 import coil3.asImage
 import coil3.decode.DecodeResult
@@ -62,7 +63,7 @@ class LibavifDecoder(
         val config = if (info.depth > 8) Bitmap.Config.RGBA_F16 else Bitmap.Config.ARGB_8888
 
         currentCoroutineContext().ensureActive()
-        val bitmap = Bitmap.createBitmap(dstWidth, dstHeight, config)
+        val bitmap = createBitmap(dstWidth, dstHeight, config)
 
         buffer.rewind()
         val decoded = NativeAvifDecoder.decode(buffer, buffer.remaining(), bitmap, threads)

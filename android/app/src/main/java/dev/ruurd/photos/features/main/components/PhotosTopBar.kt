@@ -69,11 +69,11 @@ fun PhotosTopBar(
     currentUser: User?,
     isOnline: Boolean,
     syncState: SyncState,
+    onAvatarClick: () -> Unit,
+    modifier: Modifier = Modifier,
     hasSyncError: Boolean = false,
     pullToRefreshState: PullToRefreshState? = null,
     onStatusPillClick: () -> Unit = {},
-    onAvatarClick: () -> Unit,
-    modifier: Modifier = Modifier,
 ) {
     val semanticColors = LocalSemanticColors.current
     val density = LocalDensity.current

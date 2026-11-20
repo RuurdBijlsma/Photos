@@ -12,6 +12,10 @@ Run formatting, Android Lint (including Compose rules), JVM unit tests, and debu
 ./gradlew :app:testDebugUnitTest
 ```
 
+Lint runs with `warningsAsErrors`. Findings that are deliberate for a self-hosted client (plain
+http / self-signed certs, dependency-version updates) and the app-level CompositionLocals are
+listed with a reason in `app/lint.xml`; fix code instead of adding entries there.
+
 Check for performance regressions in timeline:
 
 Ensure `dev.ruurd.photos` is signed in on the test device, media permissions are granted, and the

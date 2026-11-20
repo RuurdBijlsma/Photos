@@ -35,6 +35,7 @@ fun HeroImageOverlay(
     baseUrl: String,
     rect: Rect,
     alpha: Float,
+    modifier: Modifier = Modifier,
     onImageReady: () -> Unit = {},
 ) {
     val context = LocalContext.current
@@ -66,7 +67,7 @@ fun HeroImageOverlay(
     }
 
     Box(
-        modifier = Modifier
+        modifier = modifier
             .offset { IntOffset(rect.left.roundToInt(), rect.top.roundToInt()) }
             .layout { measurable, _ ->
                 val w = rect.width.roundToInt().coerceAtLeast(1)

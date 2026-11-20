@@ -304,7 +304,7 @@ class MediaViewerTransitionState(
      * Two-axis drag: downward wins over the pager, horizontal swipes stay with the pager. Must be
      * applied to the untransformed root so pointer positions are stable screen coordinates.
      */
-    fun dismissDragModifier(): Modifier = Modifier.pointerInput(Unit) {
+    fun Modifier.dismissDragModifier(): Modifier = pointerInput(Unit) {
         val velocityTracker = VelocityTracker()
 
         awaitEachGesture {

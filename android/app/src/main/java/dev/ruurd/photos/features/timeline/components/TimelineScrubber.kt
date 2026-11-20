@@ -82,10 +82,10 @@ fun TimelineScrubber(
     layout: TimelineLayoutIndex,
     listState: LazyListState,
     viewportHeightDp: Float,
-    bottomPaddingDp: Float = 0f,
-    topPaddingDp: Float = 0f,
     onScrubbingChanged: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
+    bottomPaddingDp: Float = 0f,
+    topPaddingDp: Float = 0f,
 ) {
     val scope = rememberCoroutineScope()
     val haptic = LocalHapticFeedback.current

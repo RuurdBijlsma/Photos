@@ -49,11 +49,11 @@ fun AvatarMenuSheet(
     serverUrl: String,
     isOnline: Boolean,
     syncState: SyncState,
-    syncErrorMessage: String? = null,
     onSyncClick: () -> Unit,
     onLogoutClick: () -> Unit,
     onDismissRequest: () -> Unit,
     modifier: Modifier = Modifier,
+    syncErrorMessage: String? = null,
 ) {
     val sheetState = rememberModalBottomSheetState()
 

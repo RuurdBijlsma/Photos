@@ -103,6 +103,7 @@ import kotlin.math.roundToInt
 fun TimelineScreen(
     viewModel: TimelineViewModel,
     baseUrl: String,
+    modifier: Modifier = Modifier,
     listState: LazyListState = rememberLazyListState(
         cacheWindow = remember {
             LazyLayoutCacheWindow(aheadFraction = 0.75f, behindFraction = 0.4f)
@@ -115,7 +116,6 @@ fun TimelineScreen(
     pullToRefreshState: PullToRefreshState? = null,
     hiddenMediaId: String? = null,
     onMediaClick: (mediaId: String, sourceRect: Rect?) -> Unit = { _, _ -> },
-    modifier: Modifier = Modifier,
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val layout = uiState.layout

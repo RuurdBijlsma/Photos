@@ -56,10 +56,10 @@ val FloatingBottomNavHeight = 86.dp
 @Composable
 fun FloatingBottomNav(
     selectedTab: MainNavTab?,
-    showSearchButton: Boolean = true,
     onTabSelected: (MainNavTab) -> Unit,
     onSearchClick: () -> Unit,
     modifier: Modifier = Modifier,
+    showSearchButton: Boolean = true,
 ) {
     Row(
         modifier = modifier

@@ -2,6 +2,7 @@ package dev.ruurd.photos.core.network.cookie
 
 import android.content.Context
 import android.content.SharedPreferences
+import androidx.core.content.edit
 import okhttp3.Cookie
 import okhttp3.CookieJar
 import okhttp3.HttpUrl
@@ -34,30 +35,30 @@ class PersistentCookieJar(context: Context) : CookieJar {
         }
 
         if (expiredPrefsKeys.isNotEmpty()) {
-            val editor = sharedPrefs.edit()
-            for (key in expiredPrefsKeys) {
-                editor.remove(key)
+            sharedPrefs.edit {
+                for (key in expiredPrefsKeys) {
+                    remove(key)
+                }
             }
-            editor.apply()
         }
     }
 
     @Synchronized
     override fun saveFromResponse(url: HttpUrl, cookies: List<Cookie>) {
-        val editor = sharedPrefs.edit()
         val now = System.currentTimeMillis()
 
-        for (cookie in cookies) {
-            val key = cookieKey(cookie)
-            if (cookie.expiresAt <= now) {
-                memoryStore.remove(key)
-                editor.remove(key)
-            } else {
-                memoryStore[key] = cookie
-                editor.putString(key, serializeCookie(cookie))
+        sharedPrefs.edit {
+            for (cookie in cookies) {
+                val key = cookieKey(cookie)
+                if (cookie.expiresAt <= now) {
+                    memoryStore.remove(key)
+                    remove(key)
+                } else {
+                    memoryStore[key] = cookie
+                    putString(key, serializeCookie(cookie))
+                }
             }
         }
-        editor.apply()
     }
 
     @Synchronized
@@ -75,12 +76,12 @@ class PersistentCookieJar(context: Context) : CookieJar {
         }
 
         if (expiredKeys.isNotEmpty()) {
-            val editor = sharedPrefs.edit()
-            for (key in expiredKeys) {
-                memoryStore.remove(key)
-                editor.remove(key)
+            sharedPrefs.edit {
+                for (key in expiredKeys) {
+                    memoryStore.remove(key)
+                    remove(key)
+                }
             }
-            editor.apply()
         }
 
         return matchingCookies
@@ -97,7 +98,7 @@ class PersistentCookieJar(context: Context) : CookieJar {
     @Synchronized
     fun clear() {
         memoryStore.clear()
-        sharedPrefs.edit().clear().apply()
+        sharedPrefs.edit { clear() }
     }
 
     private fun cookieKey(cookie: Cookie): String = "${cookie.domain}|${cookie.path}|${cookie.name}"

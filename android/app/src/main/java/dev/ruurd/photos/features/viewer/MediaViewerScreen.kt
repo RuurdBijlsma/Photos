@@ -171,7 +171,7 @@ fun MediaViewerScreen(
         modifier = modifier
             .fillMaxSize()
             .onSizeChanged(transition::onSizeChanged)
-            .then(transition.dismissDragModifier()),
+            .then(with(transition) { Modifier.dismissDragModifier() }),
     ) {
         // Backdrop scrim
         Box(
