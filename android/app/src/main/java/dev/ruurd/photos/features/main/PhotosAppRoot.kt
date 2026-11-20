@@ -149,8 +149,8 @@ private fun AuthenticatedSession(
             val clearBottom = layoutInfo.viewportEndOffset - layoutInfo.afterContentPadding
             val itemInfo = layoutInfo.visibleItemsInfo.firstOrNull { it.index == rowIndex }
             val isFullyInClearViewport = itemInfo != null &&
-                    itemInfo.offset >= clearTop &&
-                    itemInfo.offset + itemInfo.size <= clearBottom
+                itemInfo.offset >= clearTop &&
+                itemInfo.offset + itemInfo.size <= clearBottom
             if (!isFullyInClearViewport) {
                 coroutineScope.launch {
                     timelineListState.scrollToItem(rowIndex)

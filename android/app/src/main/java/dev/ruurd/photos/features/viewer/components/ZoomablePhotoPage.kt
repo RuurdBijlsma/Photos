@@ -77,9 +77,9 @@ fun ZoomablePhotoPage(
     }
 
     val fullResReady = canUpgradeLocal &&
-            isUpgradedToFullRes &&
-            hasDisplayedFullResInFullQuality &&
-            !isPreviewZoomed
+        isUpgradedToFullRes &&
+        hasDisplayedFullResInFullQuality &&
+        !isPreviewZoomed
 
     val activeZoomableState = if (fullResReady && fullResZoomableState != null) {
         fullResZoomableState

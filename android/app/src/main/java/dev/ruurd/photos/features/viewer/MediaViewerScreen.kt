@@ -183,7 +183,7 @@ fun MediaViewerScreen(
         // Interactive Pager Layer (hidden only while ClosingHeroOverlay is flying back to the tile)
         if (transition.closingState == null && items.isNotEmpty()) {
             val isPagerScrollEnabled = !isZoomed && !transition.isDragging &&
-                    !transition.isOpeningHero
+                !transition.isOpeningHero
 
             Box(
                 modifier = Modifier

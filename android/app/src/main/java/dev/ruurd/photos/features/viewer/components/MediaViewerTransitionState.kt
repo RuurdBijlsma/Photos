@@ -373,7 +373,7 @@ class MediaViewerTransitionState(
                     val releaseY = releaseOffset.y.coerceAtLeast(0f)
                     val velocityY = velocityTracker.calculateVelocity().y
                     val shouldDismiss = releaseY > dismissThresholdPx ||
-                            (velocityY > 1000f && releaseY > fastFlickMinDistancePx)
+                        (velocityY > 1000f && releaseY > fastFlickMinDistancePx)
 
                     if (shouldDismiss) {
                         val releaseScale = (1f - (releaseY / 1400f)).coerceIn(0.55f, 1f)
@@ -444,8 +444,8 @@ fun rememberMediaViewerTransitionState(
             initialPagerState = pagerState,
             initialSize = containerSize,
             initiallyHasOpenSource = openSourceRect != null &&
-                    containerSize.width > 0 &&
-                    containerSize.height > 0,
+                containerSize.width > 0 &&
+                containerSize.height > 0,
             touchSlopPx = viewConfig.touchSlop,
             dismissThresholdPx = with(density) { DISMISS_THRESHOLD_DP.dp.toPx() },
             fastFlickMinDistancePx = with(density) { FAST_FLICK_MIN_DISTANCE_DP.dp.toPx() },
