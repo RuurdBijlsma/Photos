@@ -1,18 +1,26 @@
 use crate::api_state::ApiContext;
 use axum::extract::State;
-use axum::http::StatusCode;
+use axum::http::{HeaderName, HeaderValue, StatusCode};
 use tracing::error;
 
 pub async fn root() -> &'static str {
     "Hello, World!"
 }
 
-pub async fn health_check(State(context): State<ApiContext>) -> Result<&'static str, StatusCode> {
+pub async fn health_check(
+    State(context): State<ApiContext>,
+) -> Result<([(HeaderName, HeaderValue); 1], &'static str), StatusCode> {
     match sqlx::query!("SELECT 1 AS one")
         .fetch_one(&context.pool)
         .await
     {
-        Ok(_) => Ok("OK"),
+        Ok(_) => Ok((
+            [(
+                HeaderName::from_static("x-ruurd-photos"),
+                HeaderValue::from_static("1"),
+            )],
+            "OK",
+        )),
         Err(e) => {
             error!("Health check failed: database connection error: {}", e);
             Err(StatusCode::SERVICE_UNAVAILABLE)

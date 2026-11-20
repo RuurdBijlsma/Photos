@@ -1,0 +1,59 @@
+name: Android CI
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'android/**'
+      - '.github/workflows/android-quality.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'android/**'
+      - '.github/workflows/android-quality.yml'
+
+jobs:
+  android-quality:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./android
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Set up JDK
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
+      - name: Check formatting
+        run: ./gradlew spotlessCheck
+
+      - name: Run Android Lint
+        run: ./gradlew :app:lintDebug
+
+      - name: Run JVM unit tests
+        run: ./gradlew :app:testDebugUnitTest
+
+      - name: Build Debug, Release (R8), and Benchmark
+        run: ./gradlew :app:assembleDebug :app:assembleRelease :benchmark:compileBenchmarkKotlin
+
+      - name: Upload Lint & Test reports on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-reports
+          path: |
+            android/app/build/reports/lint-results-debug.html
+            android/app/build/reports/tests/testDebugUnitTest/

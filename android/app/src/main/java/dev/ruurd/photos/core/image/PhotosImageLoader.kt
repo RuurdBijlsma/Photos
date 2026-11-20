@@ -12,27 +12,30 @@ object PhotosImageLoader {
 
     fun create(
         context: Context,
-        okHttpClient: OkHttpClient
+        okHttpClient: OkHttpClient,
     ): ImageLoader {
         val cacheDir = context.cacheDir.resolve("image_cache")
 
         return ImageLoader.Builder(context)
             .components {
+                add(MediaStoreThumbnailFetcher.Factory())
+                add(MediaStoreThumbnailFetcher.ThumbnailKeyer())
+                add(LibavifDecoder.Factory(threads = 2))
                 add(
                     OkHttpNetworkFetcherFactory(
-                        callFactory = { okHttpClient }
-                    )
+                        callFactory = { okHttpClient },
+                    ),
                 )
             }
             .memoryCache {
                 MemoryCache.Builder()
-                    .maxSizePercent(context, 0.25)
+                    .maxSizePercent(context, 0.35)
                     .build()
             }
             .diskCache {
                 DiskCache.Builder()
                     .directory(cacheDir.toOkioPath())
-                    .maxSizeBytes(500L * 1024 * 1024) // 500 MB LRU disk cache
+                    .maxSizeBytes(1L * 1024 * 1024 * 1024) // 1 GB LRU disk cache
                     .build()
             }
             .build()

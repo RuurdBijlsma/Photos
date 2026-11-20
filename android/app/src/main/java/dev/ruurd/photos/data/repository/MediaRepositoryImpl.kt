@@ -3,68 +3,88 @@ package dev.ruurd.photos.data.repository
 import androidx.room.withTransaction
 import dev.ruurd.photos.core.common.AppDispatchers
 import dev.ruurd.photos.core.database.AppDatabase
+import dev.ruurd.photos.core.database.dao.LocalRowRef
 import dev.ruurd.photos.core.database.dao.MediaDao
 import dev.ruurd.photos.core.database.entity.MediaEntity
+import dev.ruurd.photos.core.database.entity.SyncStatus
+import dev.ruurd.photos.core.database.entity.TimelineMediaProjection
 import dev.ruurd.photos.domain.repository.MediaRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOn
-import kotlinx.coroutines.withContext
 
 class MediaRepositoryImpl(
     private val database: AppDatabase,
     private val mediaDao: MediaDao,
-    private val dispatchers: AppDispatchers
+    private val dispatchers: AppDispatchers,
 ) : MediaRepository {
 
-    override fun getTimelineStage1(limitMonths: Int): Flow<List<MediaEntity>> =
-        mediaDao.getTimelineStage1(limitMonths).flowOn(dispatchers.io)
+    override fun getTimelineStage1(limitMonths: Int): Flow<List<TimelineMediaProjection>> = mediaDao.getTimelineStage1(limitMonths).flowOn(dispatchers.io)
 
-    override fun getTimelineStage2(): Flow<List<MediaEntity>> =
-        mediaDao.getTimelineStage2().flowOn(dispatchers.io)
+    override fun getTimelineStage2(): Flow<List<TimelineMediaProjection>> = mediaDao.getTimelineStage2().flowOn(dispatchers.io)
 
-    override fun countVisible(): Flow<Int> =
-        mediaDao.countVisibleFlow().flowOn(dispatchers.io)
+    override suspend fun getById(id: String): MediaEntity? = mediaDao.getById(id)
 
-    override fun countTotal(): Flow<Int> =
-        mediaDao.countTotalFlow().flowOn(dispatchers.io)
-
-    override suspend fun getById(id: String): MediaEntity? = withContext(dispatchers.io) {
-        mediaDao.getById(id)
+    override suspend fun getByIds(ids: List<String>): List<MediaEntity> {
+        if (ids.isEmpty()) return emptyList()
+        return ids.chunked(BATCH_SIZE).flatMap { chunk -> mediaDao.getByIds(chunk) }
     }
 
-    override suspend fun getByCloudId(cloudId: String): MediaEntity? = withContext(dispatchers.io) {
-        mediaDao.getByCloudId(cloudId)
+    override suspend fun getByLocalContentUris(uris: List<String>): List<MediaEntity> {
+        if (uris.isEmpty()) return emptyList()
+        return uris.chunked(BATCH_SIZE).flatMap { chunk -> mediaDao.getByLocalContentUris(chunk) }
     }
 
-    override suspend fun getAllCloudIds(): List<String> = withContext(dispatchers.io) {
-        mediaDao.getAllCloudIds()
+    override suspend fun getByCloudId(cloudId: String): MediaEntity? = mediaDao.getByCloudId(cloudId)
+
+    override suspend fun getAllByCloudId(cloudId: String): List<MediaEntity> = mediaDao.getAllByCloudId(cloudId)
+
+    override suspend fun getAllByCloudIds(cloudIds: List<String>): List<MediaEntity> = if (cloudIds.isEmpty()) emptyList() else mediaDao.getAllByCloudIds(cloudIds)
+
+    override suspend fun getAllCloudIds(): List<String> = mediaDao.getAllCloudIds()
+
+    override suspend fun getLocalRows(isVideo: Boolean): List<MediaEntity> = mediaDao.getLocalRows(isVideo)
+
+    override suspend fun getLocalRowRefs(isVideo: Boolean): List<LocalRowRef> = mediaDao.getLocalRowRefs(isVideo)
+
+    override suspend fun findBySizesAndStatus(
+        sizeBytes: List<Long>,
+        syncStatus: SyncStatus,
+    ): List<MediaEntity> = if (sizeBytes.isEmpty()) emptyList() else mediaDao.findBySizesAndStatus(sizeBytes, syncStatus)
+
+    override suspend fun upsert(media: MediaEntity) = mediaDao.upsert(media)
+
+    override suspend fun upsertAll(mediaList: List<MediaEntity>) = mediaDao.upsertAll(mediaList)
+
+    override suspend fun deleteById(id: String) = mediaDao.deleteById(id)
+
+    override suspend fun transitionToLocalOnlyByCloudIds(cloudIds: List<String>) {
+        if (cloudIds.isEmpty()) return
+        cloudIds.chunked(BATCH_SIZE).forEach { chunk ->
+            mediaDao.transitionToLocalOnlyByCloudIds(chunk)
+        }
     }
 
-    override suspend fun upsert(media: MediaEntity) = withContext(dispatchers.io) {
-        mediaDao.upsert(media)
+    override suspend fun deleteCloudOnlyByCloudIds(cloudIds: List<String>) {
+        if (cloudIds.isEmpty()) return
+        cloudIds.chunked(BATCH_SIZE).forEach { chunk ->
+            mediaDao.deleteCloudOnlyByCloudIds(chunk)
+        }
     }
 
-    override suspend fun upsertAll(mediaList: List<MediaEntity>) = withContext(dispatchers.io) {
-        mediaDao.upsertAll(mediaList)
+    override suspend fun deleteByCloudId(cloudId: String) = mediaDao.deleteByCloudId(cloudId)
+
+    override suspend fun deleteByCloudIds(cloudIds: List<String>) {
+        if (cloudIds.isEmpty()) return
+        cloudIds.chunked(BATCH_SIZE).forEach { chunk ->
+            mediaDao.deleteByCloudIds(chunk)
+        }
     }
 
-    override suspend fun transitionToLocalOnly(cloudId: String, isVisible: Boolean) = withContext(dispatchers.io) {
-        mediaDao.transitionToLocalOnly(cloudId, isVisible)
-    }
+    override suspend fun clearAll() = mediaDao.clearAll()
 
-    override suspend fun deleteCloudOnlyByCloudId(cloudId: String) = withContext(dispatchers.io) {
-        mediaDao.deleteCloudOnlyByCloudId(cloudId)
-    }
+    override suspend fun <T> withTransaction(block: suspend () -> T): T = database.withTransaction(block)
 
-    override suspend fun deleteByCloudId(cloudId: String) = withContext(dispatchers.io) {
-        mediaDao.deleteByCloudId(cloudId)
-    }
-
-    override suspend fun deleteByCloudIds(cloudIds: List<String>) = withContext(dispatchers.io) {
-        mediaDao.deleteByCloudIds(cloudIds)
-    }
-
-    override suspend fun <T> withTransaction(block: suspend () -> T): T {
-        return database.withTransaction(block)
+    private companion object {
+        const val BATCH_SIZE = 500
     }
 }

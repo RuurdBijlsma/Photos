@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<lint>
+    <!-- A newer release exists is not a defect, and the checks query the network on every run. -->
+    <issue id="GradleDependency" severity="ignore" />
+    <issue id="NewerVersionAvailable" severity="ignore" />
+
+    <!--
+      Self-hosted client: the server address is user supplied, so plain http and self-signed
+      certificates from the user's own trust store must work in release builds too.
+    -->
+    <issue id="AcceptsUserCertificates" severity="ignore" />
+    <issue id="InsecureBaseConfiguration" severity="ignore" />
+
+    <!-- App-level singletons provided once by PhotosAppRoot; new ones still fail the check. -->
+    <issue id="ComposeCompositionLocalUsage">
+        <option
+            name="allowed-composition-locals"
+            value="LocalSemanticColors,LocalMemoryCacheKeyRegistry,LocalTimelineTileBoundsRegistry" />
+    </issue>
+
+    <!--
+      Composition root: the ViewModels are per-user and only exist inside the authenticated
+      branch, so they cannot be default parameters of PhotosAppRoot, and there is no caller
+      above the root to attach a modifier for.
+    -->
+    <issue id="ComposeViewModelInjection">
+        <ignore path="src/main/java/dev/ruurd/photos/features/main/PhotosAppRoot.kt" />
+    </issue>
+    <issue id="ComposeModifierMissing">
+        <ignore path="src/main/java/dev/ruurd/photos/features/main/PhotosAppRoot.kt" />
+    </issue>
+
+    <!-- The shell forwards the per-user timeline ViewModel to the timeline tab it hosts. -->
+    <issue id="ComposeViewModelForwarding">
+        <ignore path="src/main/java/dev/ruurd/photos/features/main/MainScreen.kt" />
+    </issue>
+</lint>

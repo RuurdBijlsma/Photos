@@ -24,3 +24,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "Ruurd Photos"
 include(":app")
+include(":benchmark")

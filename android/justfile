@@ -1,0 +1,56 @@
+set windows-shell := ["powershell.exe", "-Command"]
+
+gradlew := if os_family() == "windows" { ".\\gradlew.bat" } else { "./gradlew" }
+
+# --- Lints & Formatting:
+
+check:
+    {{gradlew}} qualityCheck
+
+fmt:
+    {{gradlew}} spotlessApply
+
+fmt-check:
+    {{gradlew}} spotlessCheck
+
+lint:
+    {{gradlew}} :app:lintDebug
+
+lint-baseline:
+    {{gradlew}} :app:updateLintBaseline
+
+# --- Build & Tests:
+
+test:
+    {{gradlew}} :app:testDebugUnitTest
+
+connected-test:
+    {{gradlew}} :app:connectedDebugAndroidTest
+
+build:
+    {{gradlew}} :app:assembleDebug :app:assembleRelease :benchmark:compileBenchmarkKotlin
+
+install:
+    {{gradlew}} :app:installDebug
+
+# --- Benchmarks & Baseline Profile:
+
+bench:
+    {{gradlew}} :benchmark:benchmarkAndCheck
+
+bench-run:
+    {{gradlew}} :benchmark:connectedBenchmarkAndroidTest
+
+bench-check:
+    {{gradlew}} :benchmark:checkPerfRegression
+
+bench-update:
+    {{gradlew}} :benchmark:updatePerfBaseline
+
+baseline-profile:
+    {{gradlew}} :benchmark:connectedBenchmarkAndroidTest "-Pandroid.testInstrumentationRunnerArguments.class=dev.ruurd.photos.benchmark.BaselineProfileGenerator" -PbaselineProfileRecording
+
+# --- Misc:
+
+clean:
+    {{gradlew}} clean

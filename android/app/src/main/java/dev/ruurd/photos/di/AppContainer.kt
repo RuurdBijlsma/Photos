@@ -1,27 +1,48 @@
 package dev.ruurd.photos.di
 
+import android.app.ActivityManager
 import android.content.Context
+import android.content.pm.ApplicationInfo
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
 import coil3.ImageLoader
 import dev.ruurd.photos.core.common.AppDispatchers
 import dev.ruurd.photos.core.common.DefaultAppDispatchers
 import dev.ruurd.photos.core.database.AppDatabase
 import dev.ruurd.photos.core.database.dao.DeviceFolderDao
 import dev.ruurd.photos.core.database.dao.MediaDao
+import dev.ruurd.photos.core.image.MemoryCacheKeyRegistry
 import dev.ruurd.photos.core.image.PhotosImageLoader
 import dev.ruurd.photos.core.network.NetworkMonitor
 import dev.ruurd.photos.core.network.SessionManager
 import dev.ruurd.photos.core.network.api.PhotosApiService
 import dev.ruurd.photos.core.network.auth.AuthAuthenticator
 import dev.ruurd.photos.core.network.cookie.PersistentCookieJar
+import dev.ruurd.photos.core.network.discovery.LanServerScanner
 import dev.ruurd.photos.core.network.interceptor.DynamicBaseUrlInterceptor
+import dev.ruurd.photos.core.state.BootstrapState
+import dev.ruurd.photos.data.datasource.local.MediaStoreDataSource
 import dev.ruurd.photos.data.repository.AuthRepositoryImpl
+import dev.ruurd.photos.data.repository.DeviceFolderRepositoryImpl
 import dev.ruurd.photos.data.repository.MediaRepositoryImpl
+import dev.ruurd.photos.data.repository.TimelineProjectionStore
 import dev.ruurd.photos.domain.repository.AuthRepository
+import dev.ruurd.photos.domain.repository.DeviceFolderRepository
+import dev.ruurd.photos.domain.repository.LocalMediaStore
 import dev.ruurd.photos.domain.repository.MediaRepository
+import dev.ruurd.photos.domain.usecase.CalculateTimelineLayoutUseCase
+import dev.ruurd.photos.domain.usecase.ObserveTimelineUseCase
+import dev.ruurd.photos.domain.usecase.ScanLocalMediaUseCase
 import dev.ruurd.photos.domain.usecase.SyncTimelineUseCase
+import dev.ruurd.photos.features.auth.AuthViewModel
+import dev.ruurd.photos.features.main.MainViewModel
+import dev.ruurd.photos.features.timeline.TimelineViewModel
+import dev.ruurd.photos.features.viewer.MediaViewerViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.withContext
 import okhttp3.Dispatcher
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
@@ -41,9 +62,23 @@ interface AppContainer {
     val photosApiService: PhotosApiService
     val authRepository: AuthRepository
     val mediaRepository: MediaRepository
+    val deviceFolderRepository: DeviceFolderRepository
+    val localMediaStore: LocalMediaStore
+    val scanLocalMediaUseCase: ScanLocalMediaUseCase
     val syncTimelineUseCase: SyncTimelineUseCase
+    val observeTimelineUseCase: ObserveTimelineUseCase
+    val calculateTimelineLayoutUseCase: CalculateTimelineLayoutUseCase
     val networkMonitor: NetworkMonitor
+    val lanServerScanner: LanServerScanner
     val imageLoader: ImageLoader
+    val memoryCacheKeyRegistry: MemoryCacheKeyRegistry
+    val timelineProjectionStore: TimelineProjectionStore
+    val bootstrapState: BootstrapState
+
+    fun authViewModelFactory(): ViewModelProvider.Factory
+    fun mainViewModelFactory(): ViewModelProvider.Factory
+    fun timelineViewModelFactory(): ViewModelProvider.Factory
+    fun mediaViewerViewModelFactory(initialMediaId: String): ViewModelProvider.Factory
 }
 
 class DefaultAppContainer(private val context: Context) : AppContainer {
@@ -67,7 +102,20 @@ class DefaultAppContainer(private val context: Context) : AppContainer {
     }
 
     override val sessionManager: SessionManager by lazy {
-        SessionManager(context, applicationScope)
+        SessionManager(
+            context = context,
+            scope = applicationScope,
+            onClearSessionData = {
+                bootstrapState.reset()
+                withContext(dispatchers.io) {
+                    mediaRepository.clearAll()
+                    imageLoader.memoryCache?.clear()
+                    imageLoader.diskCache?.clear()
+                    timelineProjectionStore.clear()
+                    memoryCacheKeyRegistry.clear()
+                }
+            },
+        )
     }
 
     override val cookieJar: PersistentCookieJar by lazy {
@@ -87,10 +135,6 @@ class DefaultAppContainer(private val context: Context) : AppContainer {
             maxRequestsPerHost = 16
         }
 
-        val logging = HttpLoggingInterceptor().apply {
-            level = HttpLoggingInterceptor.Level.BASIC
-        }
-
         val dynamicBaseUrlInterceptor = DynamicBaseUrlInterceptor(sessionManager)
         val authenticator = AuthAuthenticator(cookieJar, sessionManager, applicationScope)
 
@@ -99,7 +143,17 @@ class DefaultAppContainer(private val context: Context) : AppContainer {
             .cookieJar(cookieJar)
             .authenticator(authenticator)
             .addInterceptor(dynamicBaseUrlInterceptor)
-            .addInterceptor(logging)
+            .apply {
+                // This client also serves Coil, so request logging in a release build would add two
+                // log lines per thumbnail.
+                if (isDebuggable()) {
+                    addInterceptor(
+                        HttpLoggingInterceptor().apply {
+                            level = HttpLoggingInterceptor.Level.BASIC
+                        },
+                    )
+                }
+            }
             .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
             .writeTimeout(30, TimeUnit.SECONDS)
@@ -116,13 +170,27 @@ class DefaultAppContainer(private val context: Context) : AppContainer {
             .create(PhotosApiService::class.java)
     }
 
+    override val networkMonitor: NetworkMonitor by lazy {
+        NetworkMonitor(context)
+    }
+
+    override val lanServerScanner: LanServerScanner by lazy {
+        LanServerScanner(
+            networkMonitor = networkMonitor,
+            directClient = directClient,
+            dispatchers = dispatchers,
+        )
+    }
+
     override val authRepository: AuthRepository by lazy {
         AuthRepositoryImpl(
             apiService = photosApiService,
             sessionManager = sessionManager,
             cookieJar = cookieJar,
             directClient = directClient,
-            dispatchers = dispatchers
+            lanServerScanner = lanServerScanner,
+            dispatchers = dispatchers,
+            applicationScope = applicationScope,
         )
     }
 
@@ -130,7 +198,25 @@ class DefaultAppContainer(private val context: Context) : AppContainer {
         MediaRepositoryImpl(
             database = database,
             mediaDao = mediaDao,
-            dispatchers = dispatchers
+            dispatchers = dispatchers,
+        )
+    }
+
+    override val deviceFolderRepository: DeviceFolderRepository by lazy {
+        DeviceFolderRepositoryImpl(deviceFolderDao = deviceFolderDao)
+    }
+
+    override val localMediaStore: LocalMediaStore by lazy {
+        MediaStoreDataSource(context)
+    }
+
+    override val scanLocalMediaUseCase: ScanLocalMediaUseCase by lazy {
+        ScanLocalMediaUseCase(
+            localMediaStore = localMediaStore,
+            mediaRepository = mediaRepository,
+            deviceFolderRepository = deviceFolderRepository,
+            scanStateStore = sessionManager,
+            dispatchers = dispatchers,
         )
     }
 
@@ -139,15 +225,89 @@ class DefaultAppContainer(private val context: Context) : AppContainer {
             apiService = photosApiService,
             mediaRepository = mediaRepository,
             sessionManager = sessionManager,
-            dispatchers = dispatchers
+            dispatchers = dispatchers,
         )
     }
 
-    override val networkMonitor: NetworkMonitor by lazy {
-        NetworkMonitor(context, applicationScope)
+    override val observeTimelineUseCase: ObserveTimelineUseCase by lazy {
+        ObserveTimelineUseCase(
+            mediaRepository = mediaRepository,
+            dispatchers = dispatchers,
+            timelineProjectionStore = timelineProjectionStore,
+        )
+    }
+
+    override val calculateTimelineLayoutUseCase: CalculateTimelineLayoutUseCase by lazy {
+        val activityManager = context.getSystemService(ActivityManager::class.java)
+        CalculateTimelineLayoutUseCase(
+            maxThumbnailHeightPx = if (activityManager?.isLowRamDevice == true) 480 else 720,
+        )
+    }
+
+    private fun isDebuggable(): Boolean = (context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
+
+    override val memoryCacheKeyRegistry: MemoryCacheKeyRegistry by lazy {
+        MemoryCacheKeyRegistry()
+    }
+
+    override val timelineProjectionStore: TimelineProjectionStore by lazy {
+        TimelineProjectionStore(
+            mediaRepository = mediaRepository,
+            scope = applicationScope,
+            dispatchers = dispatchers,
+        )
+    }
+
+    override val bootstrapState: BootstrapState by lazy {
+        // Reached only after `SessionManager` loaded its persisted state, since that gates auth.
+        BootstrapState(
+            needsBootstrap = sessionManager.latestSyncTimestamp.value <= 0L &&
+                !sessionManager.hasScanSignature.value,
+        )
     }
 
     override val imageLoader: ImageLoader by lazy {
         PhotosImageLoader.create(context, okHttpClient)
+    }
+
+    override fun authViewModelFactory(): ViewModelProvider.Factory = viewModelFactory {
+        initializer { AuthViewModel(authRepository = authRepository) }
+    }
+
+    override fun mainViewModelFactory(): ViewModelProvider.Factory = viewModelFactory {
+        initializer {
+            MainViewModel(
+                authRepository = authRepository,
+                syncTimelineUseCase = syncTimelineUseCase,
+                scanLocalMediaUseCase = scanLocalMediaUseCase,
+                localMediaStore = localMediaStore,
+                bootstrapState = bootstrapState,
+                networkMonitor = networkMonitor,
+            )
+        }
+    }
+
+    override fun timelineViewModelFactory(): ViewModelProvider.Factory = viewModelFactory {
+        initializer {
+            TimelineViewModel(
+                observeTimelineUseCase = observeTimelineUseCase,
+                calculateTimelineLayoutUseCase = calculateTimelineLayoutUseCase,
+                dispatchers = dispatchers,
+                isBootstrapping = bootstrapState.isBootstrapping,
+            )
+        }
+    }
+
+    override fun mediaViewerViewModelFactory(
+        initialMediaId: String,
+    ): ViewModelProvider.Factory = viewModelFactory {
+        initializer {
+            MediaViewerViewModel(
+                initialMediaId = initialMediaId,
+                timelineProjectionStore = timelineProjectionStore,
+                mediaRepository = mediaRepository,
+                dispatchers = dispatchers,
+            )
+        }
     }
 }

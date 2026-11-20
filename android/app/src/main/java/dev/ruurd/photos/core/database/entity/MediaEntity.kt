@@ -14,9 +14,9 @@ import androidx.room.PrimaryKey
         Index(value = ["bucket_id"]),
         Index(
             value = ["is_visible_in_timeline", "year_month", "sort_timestamp", "id"],
-            orders = [Index.Order.ASC, Index.Order.DESC, Index.Order.DESC, Index.Order.DESC]
-        )
-    ]
+            orders = [Index.Order.ASC, Index.Order.DESC, Index.Order.DESC, Index.Order.DESC],
+        ),
+    ],
 )
 data class MediaEntity(
     @PrimaryKey
@@ -72,5 +72,20 @@ data class MediaEntity(
     val blake3Hash: String? = null,
 
     @ColumnInfo(name = "sync_status")
-    val syncStatus: SyncStatus = SyncStatus.LOCAL_ONLY
+    val syncStatus: SyncStatus = SyncStatus.LOCAL_ONLY,
+)
+
+/** The subset of a row the timeline and the viewer render. */
+fun MediaEntity.toTimelineProjection(): TimelineMediaProjection = TimelineMediaProjection(
+    id = id,
+    cloudId = cloudId,
+    localContentUri = localContentUri,
+    yearMonth = yearMonth,
+    ratio = ratio,
+    isVideo = isVideo,
+    durationMs = durationMs,
+    hasThumbnails = hasThumbnails,
+    syncStatus = syncStatus,
+    sortTimestamp = sortTimestamp,
+    timezoneOffsetMinutes = timezoneOffsetMinutes,
 )

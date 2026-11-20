@@ -2,6 +2,7 @@ package dev.ruurd.photos.core.network.cookie
 
 import android.content.Context
 import android.content.SharedPreferences
+import androidx.core.content.edit
 import okhttp3.Cookie
 import okhttp3.CookieJar
 import okhttp3.HttpUrl
@@ -20,13 +21,23 @@ class PersistentCookieJar(context: Context) : CookieJar {
     }
 
     private fun loadPersistedCookies() {
-        val allEntries = sharedPrefs.all
-        for ((_, serialized) in allEntries) {
-            if (serialized is String) {
-                deserializeCookie(serialized)?.let { cookie ->
-                    if (cookie.expiresAt > System.currentTimeMillis()) {
-                        memoryStore[cookieKey(cookie)] = cookie
-                    }
+        val now = System.currentTimeMillis()
+        val expiredPrefsKeys = mutableListOf<String>()
+
+        for ((prefsKey, serialized) in sharedPrefs.all) {
+            if (serialized !is String) continue
+            val cookie = deserializeCookie(serialized)
+            if (cookie != null && cookie.expiresAt > now) {
+                memoryStore[cookieKey(cookie)] = cookie
+            } else {
+                expiredPrefsKeys.add(prefsKey)
+            }
+        }
+
+        if (expiredPrefsKeys.isNotEmpty()) {
+            sharedPrefs.edit {
+                for (key in expiredPrefsKeys) {
+                    remove(key)
                 }
             }
         }
@@ -34,20 +45,20 @@ class PersistentCookieJar(context: Context) : CookieJar {
 
     @Synchronized
     override fun saveFromResponse(url: HttpUrl, cookies: List<Cookie>) {
-        val editor = sharedPrefs.edit()
         val now = System.currentTimeMillis()
 
-        for (cookie in cookies) {
-            val key = cookieKey(cookie)
-            if (cookie.expiresAt <= now || cookie.maxAgeDuration() == 0L) {
-                memoryStore.remove(key)
-                editor.remove(key)
-            } else {
-                memoryStore[key] = cookie
-                editor.putString(key, serializeCookie(cookie))
+        sharedPrefs.edit {
+            for (cookie in cookies) {
+                val key = cookieKey(cookie)
+                if (cookie.expiresAt <= now) {
+                    memoryStore.remove(key)
+                    remove(key)
+                } else {
+                    memoryStore[key] = cookie
+                    putString(key, serializeCookie(cookie))
+                }
             }
         }
-        editor.apply()
     }
 
     @Synchronized
@@ -65,30 +76,32 @@ class PersistentCookieJar(context: Context) : CookieJar {
         }
 
         if (expiredKeys.isNotEmpty()) {
-            val editor = sharedPrefs.edit()
-            for (key in expiredKeys) {
-                memoryStore.remove(key)
-                editor.remove(key)
+            sharedPrefs.edit {
+                for (key in expiredKeys) {
+                    memoryStore.remove(key)
+                    remove(key)
+                }
             }
-            editor.apply()
         }
 
         return matchingCookies
     }
 
-    fun getCookie(name: String): Cookie? {
+    @Synchronized
+    fun getCookie(name: String, url: HttpUrl): Cookie? {
         val now = System.currentTimeMillis()
-        return memoryStore.values.firstOrNull { it.name == name && it.expiresAt > now }
+        return memoryStore.values.firstOrNull { cookie ->
+            cookie.name == name && cookie.expiresAt > now && cookie.matches(url)
+        }
     }
 
     @Synchronized
     fun clear() {
         memoryStore.clear()
-        sharedPrefs.edit().clear().apply()
+        sharedPrefs.edit { clear() }
     }
 
-    private fun cookieKey(cookie: Cookie): String =
-        "${cookie.domain}|${cookie.path}|${cookie.name}"
+    private fun cookieKey(cookie: Cookie): String = "${cookie.domain}|${cookie.path}|${cookie.name}"
 
     private fun serializeCookie(cookie: Cookie): String {
         val sb = StringBuilder()
@@ -103,7 +116,7 @@ class PersistentCookieJar(context: Context) : CookieJar {
     }
 
     private fun deserializeCookie(str: String): Cookie? {
-        try {
+        return try {
             val parts = str.split(";")
             if (parts.isEmpty()) return null
 
@@ -114,6 +127,9 @@ class PersistentCookieJar(context: Context) : CookieJar {
                 .name(nameValue[0].trim())
                 .value(nameValue[1].trim())
 
+            var domain: String? = null
+            var hostOnly = false
+
             for (i in 1 until parts.size) {
                 val part = parts[i].trim()
                 when {
@@ -121,29 +137,35 @@ class PersistentCookieJar(context: Context) : CookieJar {
                         val exp = part.removePrefix("expires=").toLongOrNull() ?: continue
                         builder.expiresAt(exp)
                     }
+
                     part.startsWith("domain=") -> {
-                        val domain = part.removePrefix("domain=")
-                        if (domain.isNotEmpty()) builder.domain(domain)
+                        domain = part.removePrefix("domain=").trim().takeIf { it.isNotEmpty() }
                     }
+
                     part.startsWith("path=") -> {
-                        val path = part.removePrefix("path=")
+                        val path = part.removePrefix("path=").trim()
                         if (path.isNotEmpty()) builder.path(path)
                     }
+
                     part.equals("secure", ignoreCase = true) -> builder.secure()
+
                     part.equals("httponly", ignoreCase = true) -> builder.httpOnly()
-                    part.equals("hostonly", ignoreCase = true) -> builder.hostOnlyDomain(
-                        parts.firstOrNull { it.trim().startsWith("domain=") }
-                            ?.removePrefix("domain=")?.trim() ?: "localhost"
-                    )
+
+                    part.equals("hostonly", ignoreCase = true) -> hostOnly = true
                 }
             }
-            return builder.build()
-        } catch (_: Exception) {
-            return null
-        }
-    }
 
-    private fun Cookie.maxAgeDuration(): Long {
-        return expiresAt - System.currentTimeMillis()
+            if (domain != null) {
+                if (hostOnly) {
+                    builder.hostOnlyDomain(domain)
+                } else {
+                    builder.domain(domain)
+                }
+            }
+
+            builder.build()
+        } catch (_: Exception) {
+            null
+        }
     }
 }

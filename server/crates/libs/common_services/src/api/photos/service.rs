@@ -453,6 +453,14 @@ pub async fn reprocess_media_item(
         ));
     }
 
+    // check if item is owned by user
+    let item = cached_store()
+        .get_rel_path_and_user_id_for_media_item(pool, media_item_id)
+        .await?;
+    if item.user_id != user_id {
+        return Err(AppError::Forbidden("Denied".to_owned()));
+    }
+
     let analyzer = media_analyzer::MediaAnalyzer::builder()
         .build()
         .await

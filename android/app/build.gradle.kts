@@ -1,6 +1,7 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
     alias(libs.plugins.protobuf)
 }
@@ -8,7 +9,10 @@ plugins {
 android {
     namespace = "dev.ruurd.photos"
     compileSdk {
-        version = release(37)
+        version =
+            release(37) {
+                minorApiLevel = 2
+            }
     }
 
     defaultConfig {
@@ -25,7 +29,18 @@ android {
         release {
             optimization {
                 enable = true
-                packageScope = setOf("androidx.**", "kotlin.**", "kotlinx.**")
+            }
+        }
+        create("benchmark") {
+            initWith(getByName("release"))
+            signingConfig = signingConfigs.getByName("debug")
+            matchingFallbacks += listOf("release")
+            isDebuggable = false
+            // R8 renames app classes, so a profile recorded from a minified build goes stale on the
+            // next code change. Record with -PbaselineProfileRecording, and R8 rewrites the
+            // committed src/main baseline profile's original names for minified variants.
+            if (providers.gradleProperty("baselineProfileRecording").isPresent) {
+                optimization { enable = false }
             }
         }
     }
@@ -36,10 +51,32 @@ android {
     buildFeatures {
         compose = true
     }
+    lint {
+        warningsAsErrors = true
+        abortOnError = true
+        checkReleaseBuilds = false
+        // If existing findings are noisy at first, generate a baseline with `./gradlew :app:updateLintBaseline`
+        // and uncomment the line below so only new issues fail CI:
+        // baseline = file("lint-baseline.xml")
+    }
+    // Workaround for protobuf-gradle-plugin 0.10.x under AGP 9 built-in Kotlin (issue #814)
+    // so generated proto Java sources are visible to Kotlin compilation and IDE indexing.
+    sourceSets {
+        getByName("debug") {
+            java.directories.add("build/generated/java/generateDebugProto/java")
+        }
+        getByName("release") {
+            java.directories.add("build/generated/java/generateReleaseProto/java")
+        }
+        getByName("benchmark") {
+            java.directories.add("build/generated/java/generateBenchmarkProto/java")
+        }
+    }
 }
 
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
     compilerOptions {
+        // Test removing once all dependencies/KSP align with the active Kotlin metadata version.
         freeCompilerArgs.add("-Xskip-metadata-version-check")
     }
 }
@@ -57,6 +94,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.datastore.preferences)
+    implementation(libs.aomedia.avif)
 
     // Room
     implementation(libs.androidx.room.runtime)
@@ -80,8 +118,17 @@ dependencies {
     implementation(libs.coil.network.okhttp)
 
     // Kotlinx
+    implementation(libs.kotlinx.serialization.json)
     implementation(libs.kotlinx.collections.immutable)
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.androidx.profileinstaller)
+
+    // Telephoto
+    implementation(libs.telephoto.zoomable.image.coil3)
+    implementation(libs.telephoto.zoomable)
+
+    // Lint
+    lintChecks(libs.compose.lint.checks)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
@@ -95,7 +142,7 @@ dependencies {
 
 protobuf {
     protoc {
-        artifact = "com.google.protobuf:protoc:3.25.5"
+        artifact = libs.protoc.get().toString()
     }
     generateProtoTasks {
         all().forEach { task ->

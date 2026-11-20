@@ -1,0 +1,155 @@
+package dev.ruurd.photos.testing
+
+import dev.ruurd.photos.core.database.dao.LocalRowRef
+import dev.ruurd.photos.core.database.entity.MediaEntity
+import dev.ruurd.photos.core.database.entity.SyncStatus
+import dev.ruurd.photos.core.database.entity.TimelineMediaProjection
+import dev.ruurd.photos.core.database.entity.toTimelineProjection
+import dev.ruurd.photos.domain.repository.MediaRepository
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.map
+
+/** In-memory repository mirroring the DAO semantics the use cases rely on. */
+class FakeMediaRepository : MediaRepository {
+    val items = mutableMapOf<String, MediaEntity>()
+
+    /** bucket_id -> show_in_timeline, i.e. what the DAO reads from `device_folder`. */
+    val folderVisibility = mutableMapOf<String, Boolean>()
+
+    /** Counters for tests that assert a sync does not touch the database. */
+    var transactionCount = 0
+        private set
+    var getAllCloudIdsCalls = 0
+        private set
+
+    private val timelineFlow = MutableStateFlow<List<TimelineMediaProjection>>(emptyList())
+
+    override fun getTimelineStage1(limitMonths: Int): Flow<List<TimelineMediaProjection>> = timelineFlow.map { list ->
+        val topMonths = list.asSequence()
+            .map { it.yearMonth }
+            .distinct()
+            .take(limitMonths)
+            .toHashSet()
+        list.filter { it.yearMonth in topMonths }
+    }
+
+    override fun getTimelineStage2(): Flow<List<TimelineMediaProjection>> = timelineFlow
+
+    override suspend fun getById(id: String): MediaEntity? = items[id]
+
+    override suspend fun getByIds(ids: List<String>): List<MediaEntity> = ids.mapNotNull { items[it] }
+
+    override suspend fun getByLocalContentUris(uris: List<String>): List<MediaEntity> {
+        val uriSet = uris.toHashSet()
+        return items.values.filter { it.localContentUri in uriSet }
+    }
+
+    override suspend fun getByCloudId(cloudId: String): MediaEntity? = items.values.firstOrNull { it.cloudId == cloudId }
+
+    override suspend fun getAllByCloudId(cloudId: String): List<MediaEntity> = items.values.filter { it.cloudId == cloudId }
+
+    override suspend fun getAllByCloudIds(cloudIds: List<String>): List<MediaEntity> {
+        val ids = cloudIds.toHashSet()
+        return items.values.filter { it.cloudId in ids }
+    }
+
+    override suspend fun getLocalRows(isVideo: Boolean): List<MediaEntity> = items.values.filter { it.localContentUri != null && it.isVideo == isVideo }
+
+    override suspend fun getLocalRowRefs(isVideo: Boolean): List<LocalRowRef> = items.values.mapNotNull { row ->
+        val uri = row.localContentUri ?: return@mapNotNull null
+        if (row.isVideo == isVideo) LocalRowRef(row.id, uri) else null
+    }
+
+    override suspend fun getAllCloudIds(): List<String> {
+        getAllCloudIdsCalls++
+        return items.values.mapNotNull { it.cloudId }.distinct()
+    }
+
+    override suspend fun findBySizesAndStatus(
+        sizeBytes: List<Long>,
+        syncStatus: SyncStatus,
+    ): List<MediaEntity> {
+        val sizes = sizeBytes.toHashSet()
+        return items.values
+            .filter { it.sizeBytes in sizes && it.syncStatus == syncStatus }
+            .sortedWith(
+                compareByDescending<MediaEntity> { it.isVisibleInTimeline }
+                    .thenBy { it.id },
+            )
+    }
+
+    override suspend fun upsert(media: MediaEntity) {
+        items[media.id] = media
+        emitTimeline()
+    }
+
+    override suspend fun upsertAll(mediaList: List<MediaEntity>) {
+        mediaList.forEach { items[it.id] = it }
+        emitTimeline()
+    }
+
+    override suspend fun deleteById(id: String) {
+        items.remove(id)
+        emitTimeline()
+    }
+
+    override suspend fun transitionToLocalOnlyByCloudIds(cloudIds: List<String>) {
+        if (cloudIds.isEmpty()) return
+        val targetIds = cloudIds.toHashSet()
+        items.values
+            .filter { it.cloudId in targetIds && it.localContentUri != null }
+            .forEach {
+                items[it.id] = it.copy(
+                    cloudId = null,
+                    syncStatus = SyncStatus.LOCAL_ONLY,
+                    autoBackupSuppressed = true,
+                    // Mirrors the DAO's COALESCE(device_folder.show_in_timeline, 1) subquery.
+                    isVisibleInTimeline = it.bucketId?.let(folderVisibility::get) ?: true,
+                )
+            }
+        emitTimeline()
+    }
+
+    override suspend fun deleteCloudOnlyByCloudIds(cloudIds: List<String>) {
+        if (cloudIds.isEmpty()) return
+        val targetIds = cloudIds.toHashSet()
+        items.values
+            .filter { it.cloudId in targetIds && it.localContentUri == null }
+            .map { it.id }
+            .forEach { items.remove(it) }
+        emitTimeline()
+    }
+
+    override suspend fun deleteByCloudId(cloudId: String) {
+        items.values.filter { it.cloudId == cloudId }.map { it.id }.forEach { items.remove(it) }
+        emitTimeline()
+    }
+
+    override suspend fun deleteByCloudIds(cloudIds: List<String>) {
+        val targetIds = cloudIds.toHashSet()
+        items.values.filter { it.cloudId in targetIds }.map { it.id }.forEach { items.remove(it) }
+        emitTimeline()
+    }
+
+    override suspend fun clearAll() {
+        items.clear()
+        emitTimeline()
+    }
+
+    override suspend fun <T> withTransaction(block: suspend () -> T): T {
+        transactionCount++
+        return block()
+    }
+
+    private fun emitTimeline() {
+        timelineFlow.value = items.values
+            .filter { it.isVisibleInTimeline }
+            .sortedWith(
+                compareByDescending<MediaEntity> { it.yearMonth }
+                    .thenByDescending { it.sortTimestamp }
+                    .thenByDescending { it.id },
+            )
+            .map { it.toTimelineProjection() }
+    }
+}

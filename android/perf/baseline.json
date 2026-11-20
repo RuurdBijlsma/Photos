@@ -1,0 +1,68 @@
+{
+    "context": {
+        "brand": "google",
+        "device": "husky",
+        "fingerprint": "google/husky/husky:17/CP3A.261005.005/16271449:user/release-keys",
+        "id": "CP3A.261005.005",
+        "model": "Pixel 8 Pro",
+        "type": "user",
+        "version": {
+            "codename": "REL",
+            "sdk": 37
+        }
+    },
+    "benchmarks": {
+        "scrollTimelineContinuous": {
+            "frameDurationCpuMs": {
+                "p50": 5.02653,
+                "p90": 8.204178899999999,
+                "p95": 9.247005149999998,
+                "p99": 11.152909249999995
+            },
+            "frameOverrunMs": {
+                "p50": -8.0689595,
+                "p90": -4.7869255,
+                "p95": -3.604842650000006,
+                "p99": -1.309789550000002
+            },
+            "timeToInitialDisplayMs": null,
+            "timeToFullDisplayMs": null
+        },
+        "coldStartupAndScroll": {
+            "frameDurationCpuMs": {
+                "p50": 5.044149,
+                "p90": 9.7927368,
+                "p95": 14.734869249999992,
+                "p99": 53.28148994999998
+            },
+            "frameOverrunMs": {
+                "p50": -8.335429999999999,
+                "p90": -2.6014209999999984,
+                "p95": 5.943540799999974,
+                "p99": 63.35314061999999
+            },
+            "timeToInitialDisplayMs": {
+                "min": 194.689087,
+                "median": 200.135539,
+                "max": 285.911825
+            },
+            "timeToFullDisplayMs": null
+        },
+        "scrubTimeline": {
+            "frameDurationCpuMs": {
+                "p50": 4.4576215,
+                "p90": 14.0816449,
+                "p95": 15.618873549999998,
+                "p99": 18.497431409999983
+            },
+            "frameOverrunMs": {
+                "p50": -5.2413545,
+                "p90": 0.3645025000000002,
+                "p95": 3.806938099999997,
+                "p99": 9.80591509999999
+            },
+            "timeToInitialDisplayMs": null,
+            "timeToFullDisplayMs": null
+        }
+    }
+}

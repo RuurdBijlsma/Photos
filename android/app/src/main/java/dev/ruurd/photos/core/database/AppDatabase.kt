@@ -12,10 +12,10 @@ import dev.ruurd.photos.core.database.entity.MediaEntity
 @Database(
     entities = [
         MediaEntity::class,
-        DeviceFolderEntity::class
+        DeviceFolderEntity::class,
     ],
-    version = 1,
-    exportSchema = false
+    version = AppDatabase.VERSION,
+    exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
 
@@ -23,17 +23,18 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun deviceFolderDao(): DeviceFolderDao
 
     companion object {
+        /** Bumping this drops every table, so callers caching derived state include it. */
+        const val VERSION = 2
+
         private const val DATABASE_NAME = "photos.db"
 
-        fun create(context: Context): AppDatabase {
-            return Room.databaseBuilder(
-                context.applicationContext,
-                AppDatabase::class.java,
-                DATABASE_NAME
-            )
-                .setJournalMode(JournalMode.WRITE_AHEAD_LOGGING)
-                .fallbackToDestructiveMigration(dropAllTables = true)
-                .build()
-        }
+        fun create(context: Context): AppDatabase = Room.databaseBuilder(
+            context.applicationContext,
+            AppDatabase::class.java,
+            DATABASE_NAME,
+        )
+            .setJournalMode(JournalMode.WRITE_AHEAD_LOGGING)
+            .fallbackToDestructiveMigration(dropAllTables = true)
+            .build()
     }
 }
