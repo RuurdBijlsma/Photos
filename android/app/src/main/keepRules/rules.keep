@@ -4,17 +4,11 @@
 # For more details, see
 #   https://d.android.com/r/tools/r8/keep-rules
 
-# If your project uses WebView with JS, uncomment the following
-# and specify the fully qualified class name to the JavaScript interface
-# class:
-#-keepclassmembers class fqcn.of.javascript.interface.for.webview {
-#   public *;
-#}
+# JNI callbacks into AvifDecoder and AvifDecoder$Info.
 -keep class org.aomedia.avif.android.** { *; }
-# Protobuf JavaLite looks up generated message fields (e.g. `upserted_`, `PARSER`) by name via reflection.
--keep class * extends com.google.protobuf.GeneratedMessageLite { *; }
 
-# Kotlinx Serialization
--keepclassmembers class * {
-    @kotlinx.serialization.Serializable <fields>;
-}
+# Protobuf JavaLite looks up generated message fields (e.g. `upserted_`, `PARSER`) by name via reflection.
+-keepclassmembers class * extends com.google.protobuf.GeneratedMessageLite { <fields>; }
+
+# Keep Navigation Compose type-safe @Serializable route classes/objects and their serializers under R8 full mode.
+-keep,includedescriptorclasses @kotlinx.serialization.Serializable class dev.ruurd.photos.core.navigation.** { *; }

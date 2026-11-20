@@ -27,6 +27,7 @@ spotless {
 }
 
 val spotlessApplyTask = tasks.named("spotlessApply")
+val spotlessCheckTask = tasks.named("spotlessCheck")
 
 subprojects {
     tasks.configureEach {
@@ -41,15 +42,17 @@ subprojects {
     }
 }
 
-tasks.register("qualityCheck") {
-    group = "verification"
-    description = "Auto-formats code, then runs Android lint, JVM unit tests, and debug/release/benchmark builds."
-    dependsOn(
-        spotlessApplyTask,
+val verificationTasks =
+    listOf(
         ":app:lintDebug",
         ":app:testDebugUnitTest",
         ":app:assembleDebug",
         ":app:assembleRelease",
         ":benchmark:compileBenchmarkKotlin",
     )
+
+tasks.register("qualityCheck") {
+    group = "verification"
+    description = "Auto-formats code, then runs Android lint, JVM unit tests, and debug/release/benchmark builds."
+    dependsOn(spotlessApplyTask, verificationTasks)
 }

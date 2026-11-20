@@ -28,10 +28,6 @@ android {
     buildTypes {
         release {
             optimization {
-                // Note: currently scoped to androidx.**, kotlin.**, and kotlinx.**.
-                // If we ever broaden R8 shrinking to all packages,
-                // add -keep class org.aomedia.avif.android.** { *; } to app/src/main/keepRules/rules.keep
-                // so JNI callbacks into AvifDecoder.Info aren't stripped
                 enable = true
             }
         }
@@ -63,6 +59,8 @@ android {
         // and uncomment the line below so only new issues fail CI:
         // baseline = file("lint-baseline.xml")
     }
+    // Workaround for protobuf-gradle-plugin 0.10.x under AGP 9 built-in Kotlin (issue #814)
+    // so generated proto Java sources are visible to Kotlin compilation and IDE indexing.
     sourceSets {
         getByName("debug") {
             java.directories.add("build/generated/java/generateDebugProto/java")
@@ -78,6 +76,7 @@ android {
 
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
     compilerOptions {
+        // Test removing once all dependencies/KSP align with the active Kotlin metadata version.
         freeCompilerArgs.add("-Xskip-metadata-version-check")
     }
 }
