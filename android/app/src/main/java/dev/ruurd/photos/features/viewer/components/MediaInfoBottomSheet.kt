@@ -661,7 +661,6 @@ private fun ExifMetric(
 private fun copyFilenameToClipboard(context: Context, fileName: String) {
     val clipboard = context.getSystemService(ClipboardManager::class.java) ?: return
     clipboard.setPrimaryClip(ClipData.newPlainText("Filename", fileName))
-    Toast.makeText(context, "Filename copied", Toast.LENGTH_SHORT).show()
 }
 
 /** `geo:` first; devices without a maps app get the OpenStreetMap web page. */
