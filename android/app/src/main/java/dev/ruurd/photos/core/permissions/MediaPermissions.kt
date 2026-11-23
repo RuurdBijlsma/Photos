@@ -18,7 +18,14 @@ object MediaPermissions {
         Manifest.permission.READ_MEDIA_IMAGES,
         Manifest.permission.READ_MEDIA_VIDEO,
         Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED,
+        Manifest.permission.ACCESS_MEDIA_LOCATION,
     )
+
+    /**
+     * Phase 1 upgraders already granted the media permissions, so the combined request above is a
+     * no-op for them. Asked on demand the first time the info sheet needs original-file EXIF.
+     */
+    fun hasLocationAccess(context: Context): Boolean = isGranted(context, Manifest.permission.ACCESS_MEDIA_LOCATION)
 
     fun read(context: Context): MediaAccessState = MediaAccessState(
         images = accessFor(context, Manifest.permission.READ_MEDIA_IMAGES),

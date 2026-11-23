@@ -1,7 +1,15 @@
 package dev.ruurd.photos.features.viewer
+import android.content.Intent
 import androidx.lifecycle.viewModelScope
+import dev.ruurd.photos.core.common.MediaFileSharer
 import dev.ruurd.photos.core.database.entity.MediaEntity
+import dev.ruurd.photos.core.database.entity.TimelineMediaProjection
+import dev.ruurd.photos.core.image.FullResFileStore
+import dev.ruurd.photos.data.datasource.local.LocalMediaInfoSource
 import dev.ruurd.photos.data.repository.TimelineProjectionStore
+import dev.ruurd.photos.domain.model.LocalMediaInfo
+import dev.ruurd.photos.domain.model.MediaDetails
+import dev.ruurd.photos.domain.repository.MediaDetailsRepository
 import dev.ruurd.photos.testing.FakeMediaRepository
 import dev.ruurd.photos.testing.TestAppDispatchers
 import kotlinx.coroutines.Dispatchers
@@ -19,6 +27,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import java.io.File
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class MediaViewerViewModelTest {
@@ -27,6 +36,14 @@ class MediaViewerViewModelTest {
     private val testScope = TestScope(testDispatcher)
 
     private val dispatchers = TestAppDispatchers(testDispatcher)
+
+    private val detailsRepository = FakeMediaDetailsRepository(
+        mapOf(
+            "c1" to MediaDetails(cloudId = "c1", fileName = "one.jpg"),
+            "c2" to MediaDetails(cloudId = "c2", fileName = "two.jpg"),
+            "c3" to MediaDetails(cloudId = "c3", fileName = "three.jpg"),
+        ),
+    )
 
     @Before
     fun setUp() {
@@ -60,6 +77,10 @@ class MediaViewerViewModelTest {
             initialMediaId = "p2",
             timelineProjectionStore = store,
             mediaRepository = repo,
+            mediaDetailsRepository = detailsRepository,
+            fullResFileCache = FakeFullResFileStore(),
+            localMediaInfoReader = FakeLocalMediaInfoSource(),
+            mediaFileSharer = FakeMediaFileSharer(),
             dispatchers = dispatchers,
         )
         runCurrent()
@@ -105,6 +126,10 @@ class MediaViewerViewModelTest {
             initialMediaId = "p2",
             timelineProjectionStore = store,
             mediaRepository = repo,
+            mediaDetailsRepository = detailsRepository,
+            fullResFileCache = FakeFullResFileStore(),
+            localMediaInfoReader = FakeLocalMediaInfoSource(),
+            mediaFileSharer = FakeMediaFileSharer(),
             dispatchers = dispatchers,
         )
         runCurrent()
@@ -141,6 +166,10 @@ class MediaViewerViewModelTest {
             initialMediaId = "p2",
             timelineProjectionStore = store,
             mediaRepository = repo,
+            mediaDetailsRepository = detailsRepository,
+            fullResFileCache = FakeFullResFileStore(),
+            localMediaInfoReader = FakeLocalMediaInfoSource(),
+            mediaFileSharer = FakeMediaFileSharer(),
             dispatchers = dispatchers,
         )
         runCurrent()
@@ -180,6 +209,10 @@ class MediaViewerViewModelTest {
             initialMediaId = "p2",
             timelineProjectionStore = store,
             mediaRepository = repo,
+            mediaDetailsRepository = detailsRepository,
+            fullResFileCache = FakeFullResFileStore(),
+            localMediaInfoReader = FakeLocalMediaInfoSource(),
+            mediaFileSharer = FakeMediaFileSharer(),
             dispatchers = dispatchers,
         )
         runCurrent()
@@ -200,4 +233,86 @@ class MediaViewerViewModelTest {
         viewModel.viewModelScope.cancel()
         store.stop()
     }
+
+    @Test
+    fun `settling loads item details for the page and prefetches its neighbors`() = testScope.runTest {
+        val repo = FakeMediaRepository()
+        repo.upsertAll(
+            listOf(
+                MediaEntity(id = "p1", cloudId = "c1", sortTimestamp = 3000L, yearMonth = 202611),
+                MediaEntity(id = "p2", cloudId = "c2", sortTimestamp = 2000L, yearMonth = 202611),
+                MediaEntity(id = "p3", cloudId = "c3", sortTimestamp = 1000L, yearMonth = 202611),
+            ),
+        )
+
+        val store = TimelineProjectionStore(
+            mediaRepository = repo,
+            scope = backgroundScope,
+            dispatchers = dispatchers,
+        )
+        runCurrent()
+
+        val viewModel = MediaViewerViewModel(
+            initialMediaId = "p2",
+            timelineProjectionStore = store,
+            mediaRepository = repo,
+            mediaDetailsRepository = detailsRepository,
+            fullResFileCache = FakeFullResFileStore(),
+            localMediaInfoReader = FakeLocalMediaInfoSource(),
+            mediaFileSharer = FakeMediaFileSharer(),
+            dispatchers = dispatchers,
+        )
+        runCurrent()
+
+        viewModel.onSettledPage("p2")
+        runCurrent()
+
+        assertEquals("c2", viewModel.uiState.value.details?.cloudId)
+        assertTrue(detailsRepository.requested.containsAll(listOf("c2", "c1", "c3")))
+
+        viewModel.openInfoSheet()
+        assertTrue(viewModel.uiState.value.isInfoSheetOpen)
+        viewModel.closeInfoSheet()
+        assertFalse(viewModel.uiState.value.isInfoSheetOpen)
+
+        viewModel.viewModelScope.cancel()
+        store.stop()
+    }
+}
+
+private class FakeMediaDetailsRepository(
+    private val items: Map<String, MediaDetails> = emptyMap(),
+) : MediaDetailsRepository {
+    val requested = mutableListOf<String>()
+
+    override fun peek(cloudId: String): MediaDetails? = items[cloudId]
+
+    override suspend fun get(cloudId: String): MediaDetails? {
+        requested += cloudId
+        return items[cloudId]
+    }
+
+    override fun evict(cloudIds: Collection<String>) = Unit
+
+    override fun clear() = Unit
+}
+
+private class FakeFullResFileStore : FullResFileStore {
+    override fun peek(cloudId: String): File? = null
+
+    override suspend fun get(cloudId: String, fileName: String): File? = null
+
+    override suspend fun evict(cloudId: String) = Unit
+
+    override suspend fun clear() = Unit
+}
+
+private class FakeLocalMediaInfoSource : LocalMediaInfoSource {
+    override suspend fun read(contentUri: String, isVideo: Boolean): LocalMediaInfo? = null
+}
+
+private class FakeMediaFileSharer : MediaFileSharer {
+    override suspend fun shareIntent(item: TimelineMediaProjection, details: MediaDetails?): Intent? = null
+
+    override suspend fun copyToClipboard(item: TimelineMediaProjection, details: MediaDetails?): Boolean = false
 }

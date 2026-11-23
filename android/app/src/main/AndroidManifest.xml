@@ -10,6 +10,8 @@
     <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
     <!-- Android 14+ "Select photos and videos" partial access -->
     <uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED" />
+    <!-- Reads the original file (with GPS EXIF) behind a MediaStore URI for the info sheet. -->
+    <uses-permission android:name="android.permission.ACCESS_MEDIA_LOCATION" />
 
     <application
         android:name=".PhotosApplication"
@@ -34,6 +36,17 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Shares/copies staged files from cacheDir/share_cache with a real filename + extension. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
     </application>
 
 </manifest>

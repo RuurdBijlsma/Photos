@@ -81,6 +81,7 @@ class MediaViewerTransitionState(
     internal var openSourceRect: Rect? = null
     internal var onHiddenTimelineMediaChanged: (String?) -> Unit = onHiddenTimelineMediaChanged
     internal var onPreSyncScroll: (String) -> Unit = onPreSyncScroll
+    internal var onSwipeUp: () -> Unit = {}
     internal var onDismissFinished: () -> Unit = onDismissFinished
 
     var viewerSize by mutableStateOf(initialSize)
@@ -353,10 +354,14 @@ class MediaViewerTransitionState(
                             isActivelyDragging = true
                             velocityTracker.addPosition(change.uptimeMillis, change.position)
                             change.consume()
-                        } else if (abs(totalDx) > touchSlopPx ||
-                            (abs(totalDy) > touchSlopPx && totalDy < 0f)
-                        ) {
-                            // Horizontal swipe belongs to HorizontalPager; upward swipe is not dismiss.
+                        } else if (abs(totalDx) > touchSlopPx) {
+                            // Horizontal swipe belongs to HorizontalPager.
+                            break
+                        } else if (abs(totalDy) > touchSlopPx) {
+                            // Unzoomed single-pointer swipe up reveals the Media Info sheet.
+                            if (totalDy < 0f && abs(totalDy) > abs(totalDx)) {
+                                onSwipeUp()
+                            }
                             break
                         }
                     } else {
@@ -417,6 +422,7 @@ fun rememberMediaViewerTransitionState(
     isChromeVisible: Boolean,
     onHiddenTimelineMediaChanged: (String?) -> Unit,
     onPreSyncScroll: (String) -> Unit,
+    onSwipeUp: () -> Unit,
     onDismissFinished: () -> Unit,
 ): MediaViewerTransitionState {
     val scope = rememberCoroutineScope()
@@ -470,6 +476,7 @@ fun rememberMediaViewerTransitionState(
     state.openSourceRect = openSourceRect
     state.onHiddenTimelineMediaChanged = onHiddenTimelineMediaChanged
     state.onPreSyncScroll = onPreSyncScroll
+    state.onSwipeUp = onSwipeUp
     state.onDismissFinished = onDismissFinished
 
     return state

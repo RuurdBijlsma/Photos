@@ -68,7 +68,12 @@ fun ViewerChromeOverlay(
     activeMediaId: String,
     currentPage: Int,
     isProjectionLoading: Boolean,
+    isShareEnabled: Boolean,
+    isCopyEnabled: Boolean,
     onBack: () -> Unit,
+    onAbout: () -> Unit,
+    onCopy: () -> Unit,
+    onShare: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     // Ignoring visibility keeps the top bar anchored when statusBars() animates back in on tap.
@@ -151,9 +156,12 @@ fun ViewerChromeOverlay(
                                 contentDescription = null,
                             )
                         },
-                        onClick = { isMenuExpanded = false },
+                        onClick = {
+                            isMenuExpanded = false
+                            onAbout()
+                        },
                     )
-                    if (currentItem != null && !currentItem.isVideo) {
+                    if (currentItem != null && !currentItem.isVideo && isCopyEnabled) {
                         DropdownMenuItem(
                             text = { Text("Copy") },
                             leadingIcon = {
@@ -162,7 +170,10 @@ fun ViewerChromeOverlay(
                                     contentDescription = null,
                                 )
                             },
-                            onClick = { isMenuExpanded = false },
+                            onClick = {
+                                isMenuExpanded = false
+                                onCopy()
+                            },
                         )
                         DropdownMenuItem(
                             text = { Text("Rotate clockwise") },
@@ -210,7 +221,12 @@ fun ViewerChromeOverlay(
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                ViewerPillAction(imageVector = Icons.Default.Share, label = "Share", enabled = false)
+                ViewerPillAction(
+                    imageVector = Icons.Default.Share,
+                    label = "Share",
+                    enabled = isShareEnabled,
+                    onClick = onShare,
+                )
                 ViewerPillAction(imageVector = Icons.Default.Add, label = "Add to", enabled = false)
                 ViewerPillAction(imageVector = Icons.Outlined.Delete, label = "Bin", enabled = false)
             }
@@ -273,11 +289,19 @@ private fun ViewerPillAction(
     imageVector: ImageVector,
     label: String,
     enabled: Boolean = true,
+    onClick: () -> Unit = {},
 ) {
     val contentTint = if (enabled) Color.White else Color.White.copy(alpha = 0.5f)
     Row(
         modifier = Modifier
             .clip(CircleShape)
+            .then(
+                if (enabled) {
+                    Modifier.clickable(onClick = onClick)
+                } else {
+                    Modifier
+                },
+            )
             .padding(horizontal = 12.dp, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {

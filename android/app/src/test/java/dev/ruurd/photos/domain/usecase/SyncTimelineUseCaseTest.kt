@@ -1,9 +1,11 @@
 package dev.ruurd.photos.domain.usecase
 
+import dev.ruurd.photos.core.common.MediaRefreshCoordinator
 import dev.ruurd.photos.core.database.entity.MediaEntity
 import dev.ruurd.photos.core.database.entity.SyncStatus
 import dev.ruurd.photos.core.network.SyncTimestampStore
 import dev.ruurd.photos.core.network.api.PhotosApiService
+import dev.ruurd.photos.core.network.dto.MediaItemWithAlbumsDto
 import dev.ruurd.photos.core.network.proto.CompactTimelineItem
 import dev.ruurd.photos.core.network.proto.TimelineSyncResponse
 import dev.ruurd.photos.domain.model.SyncState
@@ -58,6 +60,8 @@ class SyncTimelineUseCaseTest {
             lastRequestedSince = since
             return response
         }
+
+        override suspend fun getMediaItem(cloudId: String): Response<MediaItemWithAlbumsDto> = Response.success(MediaItemWithAlbumsDto())
     }
 
     private fun item(id: String, sortTimestamp: Long = 1_730_000_000_000L) = CompactTimelineItem.newBuilder()
@@ -70,11 +74,22 @@ class SyncTimelineUseCaseTest {
         .setTimezoneOffsetMinutes(120)
         .build()
 
+    private class FakeMediaRefreshCoordinator : MediaRefreshCoordinator {
+        val upserted = mutableListOf<String>()
+        val deleted = mutableListOf<String>()
+
+        override fun onCloudItemsChanged(upserted: Collection<String>, deleted: Collection<String>) {
+            this.upserted += upserted
+            this.deleted += deleted
+        }
+    }
+
     private fun useCase(
         api: FakePhotosApiService,
         repo: FakeMediaRepository,
         store: FakeSyncTimestampStore,
-    ) = SyncTimelineUseCase(api, repo, store, dispatchers)
+        coordinator: MediaRefreshCoordinator = FakeMediaRefreshCoordinator(),
+    ) = SyncTimelineUseCase(api, repo, store, dispatchers, coordinator)
 
     @Test
     fun `full snapshot upserts cloud items and persists the sync timestamp`() = runTest(testDispatcher) {

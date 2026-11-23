@@ -9,11 +9,17 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import coil3.ImageLoader
 import dev.ruurd.photos.core.common.AppDispatchers
 import dev.ruurd.photos.core.common.DefaultAppDispatchers
+import dev.ruurd.photos.core.common.DefaultMediaFileSharer
+import dev.ruurd.photos.core.common.DefaultMediaRefreshCoordinator
+import dev.ruurd.photos.core.common.MediaFileSharer
+import dev.ruurd.photos.core.common.MediaRefreshCoordinator
 import dev.ruurd.photos.core.database.AppDatabase
 import dev.ruurd.photos.core.database.dao.DeviceFolderDao
 import dev.ruurd.photos.core.database.dao.MediaDao
+import dev.ruurd.photos.core.image.FullResFileCache
 import dev.ruurd.photos.core.image.MemoryCacheKeyRegistry
 import dev.ruurd.photos.core.image.PhotosImageLoader
+import dev.ruurd.photos.core.image.ShareCache
 import dev.ruurd.photos.core.network.NetworkMonitor
 import dev.ruurd.photos.core.network.SessionManager
 import dev.ruurd.photos.core.network.api.PhotosApiService
@@ -22,14 +28,17 @@ import dev.ruurd.photos.core.network.cookie.PersistentCookieJar
 import dev.ruurd.photos.core.network.discovery.LanServerScanner
 import dev.ruurd.photos.core.network.interceptor.DynamicBaseUrlInterceptor
 import dev.ruurd.photos.core.state.BootstrapState
+import dev.ruurd.photos.data.datasource.local.LocalMediaInfoReader
 import dev.ruurd.photos.data.datasource.local.MediaStoreDataSource
 import dev.ruurd.photos.data.repository.AuthRepositoryImpl
 import dev.ruurd.photos.data.repository.DeviceFolderRepositoryImpl
+import dev.ruurd.photos.data.repository.MediaDetailsRepositoryImpl
 import dev.ruurd.photos.data.repository.MediaRepositoryImpl
 import dev.ruurd.photos.data.repository.TimelineProjectionStore
 import dev.ruurd.photos.domain.repository.AuthRepository
 import dev.ruurd.photos.domain.repository.DeviceFolderRepository
 import dev.ruurd.photos.domain.repository.LocalMediaStore
+import dev.ruurd.photos.domain.repository.MediaDetailsRepository
 import dev.ruurd.photos.domain.repository.MediaRepository
 import dev.ruurd.photos.domain.usecase.CalculateTimelineLayoutUseCase
 import dev.ruurd.photos.domain.usecase.ObserveTimelineUseCase
@@ -43,10 +52,13 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.Json
 import okhttp3.Dispatcher
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
+import retrofit2.converter.kotlinx.serialization.asConverterFactory
 import retrofit2.converter.protobuf.ProtoConverterFactory
 import retrofit2.converter.scalars.ScalarsConverterFactory
 import java.util.concurrent.TimeUnit
@@ -74,6 +86,11 @@ interface AppContainer {
     val memoryCacheKeyRegistry: MemoryCacheKeyRegistry
     val timelineProjectionStore: TimelineProjectionStore
     val bootstrapState: BootstrapState
+    val mediaDetailsRepository: MediaDetailsRepository
+    val fullResFileCache: FullResFileCache
+    val shareCache: ShareCache
+    val localMediaInfoReader: LocalMediaInfoReader
+    val mediaFileSharer: MediaFileSharer
 
     fun authViewModelFactory(): ViewModelProvider.Factory
     fun mainViewModelFactory(): ViewModelProvider.Factory
@@ -113,6 +130,9 @@ class DefaultAppContainer(private val context: Context) : AppContainer {
                     imageLoader.diskCache?.clear()
                     timelineProjectionStore.clear()
                     memoryCacheKeyRegistry.clear()
+                    mediaDetailsRepository.clear()
+                    fullResFileCache.clear()
+                    shareCache.clear()
                 }
             },
         )
@@ -165,6 +185,10 @@ class DefaultAppContainer(private val context: Context) : AppContainer {
             .baseUrl("http://localhost:5272/") // DynamicBaseUrlInterceptor rewrites this
             .client(okHttpClient)
             .addConverterFactory(ScalarsConverterFactory.create())
+            .addConverterFactory(
+                Json { ignoreUnknownKeys = true }
+                    .asConverterFactory("application/json".toMediaType()),
+            )
             .addConverterFactory(ProtoConverterFactory.create())
             .build()
             .create(PhotosApiService::class.java)
@@ -210,6 +234,51 @@ class DefaultAppContainer(private val context: Context) : AppContainer {
         MediaStoreDataSource(context)
     }
 
+    override val mediaDetailsRepository: MediaDetailsRepository by lazy {
+        MediaDetailsRepositoryImpl(
+            apiService = photosApiService,
+            scope = applicationScope,
+            dispatchers = dispatchers,
+        )
+    }
+
+    override val fullResFileCache: FullResFileCache by lazy {
+        FullResFileCache(
+            context = context,
+            okHttpClient = okHttpClient,
+            sessionManager = sessionManager,
+            scope = applicationScope,
+            dispatchers = dispatchers,
+        )
+    }
+
+    override val shareCache: ShareCache by lazy {
+        ShareCache(context = context, dispatchers = dispatchers)
+    }
+
+    override val localMediaInfoReader: LocalMediaInfoReader by lazy {
+        LocalMediaInfoReader(context = context, dispatchers = dispatchers)
+    }
+
+    override val mediaFileSharer: MediaFileSharer by lazy {
+        DefaultMediaFileSharer(
+            context = context,
+            shareCache = shareCache,
+            fullResFileCache = fullResFileCache,
+            okHttpClient = okHttpClient,
+            sessionManager = sessionManager,
+            dispatchers = dispatchers,
+        )
+    }
+
+    private val mediaRefreshCoordinator: MediaRefreshCoordinator by lazy {
+        DefaultMediaRefreshCoordinator(
+            mediaDetailsRepository = mediaDetailsRepository,
+            fullResFileCache = fullResFileCache,
+            scope = applicationScope,
+        )
+    }
+
     override val scanLocalMediaUseCase: ScanLocalMediaUseCase by lazy {
         ScanLocalMediaUseCase(
             localMediaStore = localMediaStore,
@@ -226,6 +295,7 @@ class DefaultAppContainer(private val context: Context) : AppContainer {
             mediaRepository = mediaRepository,
             sessionManager = sessionManager,
             dispatchers = dispatchers,
+            mediaRefreshCoordinator = mediaRefreshCoordinator,
         )
     }
 
@@ -306,6 +376,10 @@ class DefaultAppContainer(private val context: Context) : AppContainer {
                 initialMediaId = initialMediaId,
                 timelineProjectionStore = timelineProjectionStore,
                 mediaRepository = mediaRepository,
+                mediaDetailsRepository = mediaDetailsRepository,
+                fullResFileCache = fullResFileCache,
+                localMediaInfoReader = localMediaInfoReader,
+                mediaFileSharer = mediaFileSharer,
                 dispatchers = dispatchers,
             )
         }

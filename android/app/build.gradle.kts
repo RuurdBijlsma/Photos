@@ -94,6 +94,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.datastore.preferences)
+    implementation(libs.androidx.exifinterface)
     implementation(libs.aomedia.avif)
 
     // Room
@@ -107,6 +108,7 @@ dependencies {
         exclude(group = "com.google.protobuf", module = "protobuf-java")
     }
     implementation(libs.retrofit.converter.scalars)
+    implementation(libs.retrofit.converter.kotlinx.serialization)
     implementation(libs.okhttp)
     implementation(libs.okhttp.logging.interceptor)
 

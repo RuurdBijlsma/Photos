@@ -3,6 +3,7 @@
     <!-- A newer release exists is not a defect, and the checks query the network on every run. -->
     <issue id="GradleDependency" severity="ignore" />
     <issue id="NewerVersionAvailable" severity="ignore" />
+    <issue id="AndroidGradlePluginVersion" severity="ignore" />
 
     <!--
       Self-hosted client: the server address is user supplied, so plain http and self-signed

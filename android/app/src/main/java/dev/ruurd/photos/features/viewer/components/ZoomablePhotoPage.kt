@@ -18,6 +18,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import coil3.SingletonImageLoader
 import coil3.compose.asPainter
+import coil3.request.CachePolicy
 import coil3.request.ImageRequest
 import dev.ruurd.photos.core.database.entity.TimelineMediaProjection
 import dev.ruurd.photos.core.image.LocalMemoryCacheKeyRegistry
@@ -28,6 +29,7 @@ import me.saket.telephoto.zoomable.ZoomSpec
 import me.saket.telephoto.zoomable.coil3.ZoomableAsyncImage
 import me.saket.telephoto.zoomable.rememberZoomableImageState
 import me.saket.telephoto.zoomable.rememberZoomableState
+import java.io.File
 
 @Composable
 fun ZoomablePhotoPage(
@@ -38,6 +40,9 @@ fun ZoomablePhotoPage(
     isOpeningTransition: Boolean,
     onTap: () -> Unit,
     modifier: Modifier = Modifier,
+    /** Downloaded `/download` original for a cloud-only photo; `null` while it is not ready. */
+    fullResFile: File? = null,
+    onFullResRequested: () -> Unit = {},
     onZoomFractionChanged: (Float) -> Unit = {},
 ) {
     val context = LocalContext.current
@@ -48,7 +53,8 @@ fun ZoomablePhotoPage(
     val previewImageState = rememberZoomableImageState(previewZoomableState)
 
     val localUri = remember(item.localContentUri) { item.localContentUri?.let(Uri::parse) }
-    val canUpgradeLocal = localUri != null && !item.isVideo
+    // Local photos upgrade after settling; cloud-only photos upgrade once /download has landed.
+    val canUpgrade = !item.isVideo && (localUri != null || fullResFile != null)
     var isUpgradedToFullRes by remember(item.id) { mutableStateOf(false) }
 
     val previewZoomFraction = previewZoomableState.zoomFraction ?: 0f
@@ -57,7 +63,7 @@ fun ZoomablePhotoPage(
     // Use a separate ZoomableState for full-res so Telephoto never transitions one ZoomableState
     // from PainterDelegate (scaledInsideAndCenterAligned) to SubSamplingDelegate
     // (unscaledAndTopLeftAligned), avoiding the 2-frame vertical shift and low-res flash.
-    val fullResZoomableState = if (canUpgradeLocal && isUpgradedToFullRes) {
+    val fullResZoomableState = if (canUpgrade && isUpgradedToFullRes) {
         rememberZoomableState(zoomSpec = zoomSpec)
     } else {
         null
@@ -76,7 +82,7 @@ fun ZoomablePhotoPage(
         }
     }
 
-    val fullResReady = canUpgradeLocal &&
+    val fullResReady = canUpgrade &&
         isUpgradedToFullRes &&
         hasDisplayedFullResInFullQuality &&
         !isPreviewZoomed
@@ -105,16 +111,19 @@ fun ZoomablePhotoPage(
     }
 
     // Two-tier loading: keep N ± 1 offscreen neighbors, opening transitions, and mid-swipe pages
-    // on lightweight previews, upgrading local/synced photos to raw full-res only after settling or on zoom.
+    // on lightweight previews, upgrading local/synced photos to raw full-res only after settling or
+    // on zoom. Cloud-only photos are requested from the ViewModel, which waits for /item first.
     LaunchedEffect(
         item.id,
-        canUpgradeLocal,
+        canUpgrade,
+        localUri,
+        fullResFile,
         isSettledPage,
         isPreviewZoomed,
         isActivePage,
         isOpeningTransition,
     ) {
-        if (!canUpgradeLocal) {
+        if (!canUpgrade) {
             isUpgradedToFullRes = false
             return@LaunchedEffect
         }
@@ -122,10 +131,16 @@ fun ZoomablePhotoPage(
             return@LaunchedEffect
         }
         if (isPreviewZoomed && isActivePage) {
+            if (fullResFile == null) onFullResRequested()
             isUpgradedToFullRes = true
         } else if (isSettledPage) {
-            delay(FULL_RES_SETTLE_DELAY_MS)
-            isUpgradedToFullRes = true
+            if (localUri == null) {
+                // The ViewModel already waited for its own settle delay before downloading.
+                isUpgradedToFullRes = fullResFile != null
+            } else {
+                delay(FULL_RES_SETTLE_DELAY_MS)
+                isUpgradedToFullRes = true
+            }
         } else {
             isUpgradedToFullRes = false
         }
@@ -151,9 +166,14 @@ fun ZoomablePhotoPage(
         )
     }
 
-    val fullResRequest = remember(item.id, localUri) {
+    val fullResData = fullResFile?.let(Uri::fromFile) ?: localUri
+    val fullResRequest = remember(item.id, fullResData) {
         ImageRequest.Builder(context)
-            .data(localUri)
+            .data(fullResData)
+            .apply {
+                // Full-res originals live in full_res_cache/, never in Coil's 1 GB image cache.
+                if (fullResFile != null) diskCachePolicy(CachePolicy.DISABLED)
+            }
             // Omit placeholderMemoryCacheKey so CoilImageSource doesn't emit a PainterDelegate
             // before SubSamplingDelegate on fullResZoomableState; the preview layer covers it.
             .listener(
@@ -179,7 +199,7 @@ fun ZoomablePhotoPage(
             )
         }
 
-        if (canUpgradeLocal && isUpgradedToFullRes && fullResImageState != null) {
+        if (canUpgrade && isUpgradedToFullRes && fullResImageState != null) {
             ZoomableAsyncImage(
                 model = fullResRequest,
                 contentDescription = null,

@@ -1,5 +1,7 @@
 ﻿package dev.ruurd.photos.features.viewer
 
+import android.content.Intent
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -15,6 +17,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
@@ -25,15 +28,20 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.IntSize
 import dev.ruurd.photos.features.viewer.components.HeroImageOverlay
+import dev.ruurd.photos.features.viewer.components.MediaInfoBottomSheet
 import dev.ruurd.photos.features.viewer.components.VideoPlayBadge
 import dev.ruurd.photos.features.viewer.components.ViewerChromeOverlay
 import dev.ruurd.photos.features.viewer.components.ViewerPreSyncScrollEffect
 import dev.ruurd.photos.features.viewer.components.ViewerPrefetchEffect
 import dev.ruurd.photos.features.viewer.components.ZoomablePhotoPage
 import dev.ruurd.photos.features.viewer.components.rememberMediaViewerTransitionState
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.launch
 
 /**
  * Full-screen media pager with the tile↔fullscreen hero transition, drag-to-dismiss and floating
@@ -54,6 +62,11 @@ fun MediaViewerScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val items = uiState.items
+    val context = LocalContext.current
+    val actionScope = rememberCoroutineScope()
+
+    val activeItem = items.firstOrNull { it.id == uiState.activeMediaId }
+    val activeDetails = uiState.details?.takeIf { it.cloudId == activeItem?.cloudId }
 
     val currentItems by rememberUpdatedState(items)
     val currentActiveId by rememberUpdatedState(uiState.activeMediaId)
@@ -85,6 +98,7 @@ fun MediaViewerScreen(
         isChromeVisible = uiState.isChromeVisible,
         onHiddenTimelineMediaChanged = onHiddenTimelineMediaChanged,
         onPreSyncScroll = onPreSyncScroll,
+        onSwipeUp = viewModel::openInfoSheet,
         onDismissFinished = onDismissFinished,
     )
 
@@ -152,6 +166,16 @@ fun MediaViewerScreen(
         items = items,
         baseUrl = baseUrl,
     )
+
+    // ~130 ms after settling, load /item (plus neighbors) and the local/offline info fallback.
+    LaunchedEffect(pagerState) {
+        snapshotFlow { if (currentItems.isEmpty()) null else pagerState.settledPage }
+            .filterNotNull()
+            .collectLatest { page ->
+                delay(SETTLED_DETAILS_DELAY_MS)
+                currentItems.getOrNull(page)?.let { viewModel.onSettledPage(it.id) }
+            }
+    }
 
     // Keep enabled throughout the closing animation so rapid double-back taps don't leak underneath.
     BackHandler {
@@ -225,6 +249,8 @@ fun MediaViewerScreen(
                                             activePageZoomFraction = fraction
                                         }
                                     },
+                                    fullResFile = uiState.fullResFiles[item.id],
+                                    onFullResRequested = { viewModel.requestFullRes(item) },
                                     modifier = Modifier.fillMaxSize(),
                                 )
                                 // Phase 2C swaps this slot for a real VideoPlayerPage.
@@ -274,12 +300,46 @@ fun MediaViewerScreen(
                 activeMediaId = uiState.activeMediaId,
                 currentPage = pagerState.currentPage,
                 isProjectionLoading = uiState.isProjectionLoading,
+                isShareEnabled = activeItem != null && activeDetails?.isMissing != true,
+                isCopyEnabled = activeDetails?.isMissing != true,
                 onBack = {
                     transition.startClosing(Offset.Zero, 1f, transition.backdropAlpha)
                 },
+                onAbout = viewModel::openInfoSheet,
+                onCopy = {
+                    actionScope.launch {
+                        val copied = viewModel.copyToClipboard()
+                        Toast.makeText(
+                            context,
+                            if (copied) "Copied to clipboard" else "Can't copy this photo",
+                            Toast.LENGTH_SHORT,
+                        ).show()
+                    }
+                },
+                onShare = {
+                    actionScope.launch {
+                        val intent = viewModel.shareIntent()
+                        if (intent == null) {
+                            Toast.makeText(context, "Can't share this item", Toast.LENGTH_SHORT)
+                                .show()
+                        } else {
+                            context.startActivity(Intent.createChooser(intent, "Share"))
+                        }
+                    }
+                },
+            )
+        }
+
+        if (uiState.isInfoSheetOpen) {
+            MediaInfoBottomSheet(
+                details = activeDetails,
+                localInfo = uiState.localInfo,
+                item = activeItem,
+                onDismissRequest = viewModel::closeInfoSheet,
             )
         }
     }
 }
 
 private const val CHROME_FADE_MS = 180
+private const val SETTLED_DETAILS_DELAY_MS = 130L

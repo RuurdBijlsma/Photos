@@ -1,6 +1,7 @@
 package dev.ruurd.photos.domain.usecase
 
 import dev.ruurd.photos.core.common.AppDispatchers
+import dev.ruurd.photos.core.common.MediaRefreshCoordinator
 import dev.ruurd.photos.core.database.entity.MediaEntity
 import dev.ruurd.photos.core.database.entity.SyncStatus
 import dev.ruurd.photos.core.network.SyncTimestampStore
@@ -26,6 +27,7 @@ class SyncTimelineUseCase(
     private val mediaRepository: MediaRepository,
     private val sessionManager: SyncTimestampStore,
     private val dispatchers: AppDispatchers,
+    private val mediaRefreshCoordinator: MediaRefreshCoordinator,
 ) {
     private val syncMutex = Mutex()
 
@@ -140,6 +142,11 @@ class SyncTimelineUseCase(
                                 mediaRepository.upsertAll(chunk)
                             }
                         }
+
+                        mediaRefreshCoordinator.onCloudItemsChanged(
+                            upserted = syncResponse.upsertedList.map { it.id },
+                            deleted = cloudIdsToRemove,
+                        )
 
                         // 3. Persist server sync timestamp
                         sessionManager.setLatestSyncTimestamp(syncResponse.syncTimestamp)

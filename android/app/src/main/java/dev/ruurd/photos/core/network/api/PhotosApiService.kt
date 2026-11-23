@@ -1,5 +1,6 @@
 package dev.ruurd.photos.core.network.api
 
+import dev.ruurd.photos.core.network.dto.MediaItemWithAlbumsDto
 import dev.ruurd.photos.core.network.proto.TimelineSyncResponse
 import okhttp3.RequestBody
 import okhttp3.ResponseBody
@@ -8,6 +9,7 @@ import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.Headers
 import retrofit2.http.POST
+import retrofit2.http.Path
 import retrofit2.http.Query
 
 interface PhotosApiService {
@@ -34,4 +36,9 @@ interface PhotosApiService {
     suspend fun getTimelineSync(
         @Query("since") since: Long? = null,
     ): Response<TimelineSyncResponse>
+
+    @GET("api/photos/{cloudId}/item")
+    suspend fun getMediaItem(
+        @Path("cloudId") cloudId: String,
+    ): Response<MediaItemWithAlbumsDto>
 }
