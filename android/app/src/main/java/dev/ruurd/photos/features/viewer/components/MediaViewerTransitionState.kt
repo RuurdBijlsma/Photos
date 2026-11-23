@@ -85,6 +85,9 @@ class MediaViewerTransitionState(
     initialSize: IntSize,
     initiallyHasOpenSource: Boolean,
     private val touchSlopPx: Float,
+    private val doubleTapSlopPx: Float,
+    private val doubleTapTimeoutMs: Long,
+    private val longPressTimeoutMs: Long,
     private val dismissThresholdPx: Float,
     private val fastFlickMinDistancePx: Float,
     private val infoCommitThresholdPx: Float,
@@ -133,7 +136,8 @@ class MediaViewerTransitionState(
     private var settleJob: Job? = null
 
     // Unified swipe-up Media Info panel state
-    private var isDraggingInfo by mutableStateOf(false)
+    var isDraggingInfo by mutableStateOf(false)
+        private set
     private var isAnimatingInfoOpen by mutableStateOf(false)
     private var isClosingInfoPanel by mutableStateOf(false)
     private var infoOpenFraction by mutableFloatStateOf(0f)
@@ -143,6 +147,10 @@ class MediaViewerTransitionState(
     private val infoTravelAnim = Animatable(0f)
     private var infoSettleJob: Job? = null
     private val infoContentHeights = HashMap<String, Int>()
+
+    // Tracks the previous clean single tap so double-tap + drag yields to Telephoto quick-zoom.
+    private var lastTapUpTimeMs: Long = 0L
+    private var lastTapUpPosition: Offset = Offset.Zero
 
     val isInfoPanelActive: Boolean by derivedStateOf {
         infoOpenFraction > 0.005f || sheetScrollPx > 0.5f || isDraggingInfo || isAnimatingInfoOpen
@@ -549,24 +557,36 @@ class MediaViewerTransitionState(
     }
 
     /**
-     * Unified vertical gesture handler on the untransformed viewer root:
-     * - Swipe down from rest drags the viewer over the timeline to dismiss.
-     * - Swipe up from rest opens the info panel on the active page and scrolls its details.
-     * - Horizontal swipes yield to HorizontalPager whether the info panel is open or closed.
+     * Unified vertical gesture handler on the untransformed viewer root, running on
+     * [PointerEventPass.Main] so child detectors (Telephoto quick-zoom / pinch / pan and
+     * HorizontalPager) always take precedence before viewer dismiss or info-sheet drag activates.
      */
     fun Modifier.dismissDragModifier(): Modifier = pointerInput(Unit) {
         val velocityTracker = VelocityTracker()
 
         awaitEachGesture {
-            val down = awaitFirstDown(requireUnconsumed = false)
+            val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Main)
             if (isClosing || isOpeningHero || isZoomed) {
+                return@awaitEachGesture
+            }
+
+            val panelAlreadyActive = infoOpenFraction > 0.005f || sheetScrollPx > 0.5f
+            val isQuickZoomCandidate = !panelAlreadyActive &&
+                    lastTapUpTimeMs > 0L &&
+                    (down.uptimeMillis - lastTapUpTimeMs) in 0L..doubleTapTimeoutMs &&
+                    (down.position - lastTapUpPosition).getDistance() <= doubleTapSlopPx
+            if (isQuickZoomCandidate) {
+                // Consume the tap memory and yield the entire second press + drag to Telephoto.
+                lastTapUpTimeMs = 0L
                 return@awaitEachGesture
             }
 
             // Catch an ongoing info-panel fling right under the finger so touching stops momentum
             // immediately without jumping once the drag passes touch slop.
-            if (infoSettleJob?.isActive == true && !isAnimatingInfoOpen && !isClosingInfoPanel &&
-                (infoOpenFraction > 0.005f || sheetScrollPx > 0.5f)
+            if (infoSettleJob?.isActive == true &&
+                !isAnimatingInfoOpen &&
+                !isClosingInfoPanel &&
+                panelAlreadyActive
             ) {
                 infoSettleJob?.cancel()
                 infoSettleJob = null
@@ -575,9 +595,10 @@ class MediaViewerTransitionState(
             val pointerId = down.id
             var totalDx = 0f
             var totalDy = 0f
+            var maxDisplacementPx = 0f
+            var wasMultiTouch = false
             var gestureMode = VerticalGestureMode.NONE
             var gestureItem: TimelineMediaProjection? = null
-            val panelAlreadyActive = infoOpenFraction > 0.005f || sheetScrollPx > 0.5f
             val gestureStartTravel = currentActiveItem?.let(::pageTravelPx) ?: 0f
             var lastEventTimeMs = down.uptimeMillis
             var lastSampleTimeMs = down.uptimeMillis
@@ -587,12 +608,42 @@ class MediaViewerTransitionState(
 
             try {
                 while (true) {
-                    val event = awaitPointerEvent(PointerEventPass.Initial)
+                    val event = awaitPointerEvent(PointerEventPass.Main)
                     val change = event.changes.firstOrNull { it.id == pointerId } ?: break
                     lastEventTimeMs = change.uptimeMillis
 
-                    val multiTouch = event.changes.count { it.pressed } > 1
-                    if (multiTouch) break
+                    if (event.changes.count { it.pressed } > 1) {
+                        wasMultiTouch = true
+                        break
+                    }
+
+                    if (isClosing || isOpeningHero || isZoomed) {
+                        break
+                    }
+
+                    val displacement = (change.position - down.position).getDistance()
+                    if (displacement > maxDisplacementPx) {
+                        maxDisplacementPx = displacement
+                    }
+
+                    if (!change.pressed) {
+                        // Record clean single-taps (note Telephoto consumes the up event on tap).
+                        if (gestureMode == VerticalGestureMode.NONE &&
+                            !wasMultiTouch &&
+                            !panelAlreadyActive &&
+                            maxDisplacementPx <= touchSlopPx &&
+                            (change.uptimeMillis - down.uptimeMillis) < longPressTimeoutMs
+                        ) {
+                            lastTapUpTimeMs = change.uptimeMillis
+                            lastTapUpPosition = change.position
+                        }
+                        break
+                    }
+
+                    if (gestureMode == VerticalGestureMode.NONE && change.isConsumed) {
+                        // A child (Telephoto quick-zoom / pan or HorizontalPager) claimed it.
+                        break
+                    }
 
                     velocityTracker.addPointerInputChange(change)
                     if (!change.changedToUpIgnoreConsumed() &&
@@ -612,6 +663,7 @@ class MediaViewerTransitionState(
                                     abs(totalDy) > abs(totalDx) * VERTICAL_AXIS_BIAS
 
                             if (isVerticalDrag) {
+                                lastTapUpTimeMs = 0L
                                 if (panelAlreadyActive || totalDy < 0f) {
                                     val targetItem = currentActiveItem
                                     if (targetItem != null) {
@@ -643,6 +695,7 @@ class MediaViewerTransitionState(
                                     change.consume()
                                 }
                             } else if (abs(totalDx) > touchSlopPx && abs(totalDx) >= abs(totalDy)) {
+                                lastTapUpTimeMs = 0L
                                 // Horizontal swipe belongs to HorizontalPager (open or closed).
                                 break
                             }
@@ -664,8 +717,6 @@ class MediaViewerTransitionState(
                             }
                         }
                     }
-
-                    if (!change.pressed) break
                 }
             } finally {
                 val velocityY = if (lastEventTimeMs - lastSampleTimeMs > STALE_RELEASE_MS) {
@@ -680,8 +731,10 @@ class MediaViewerTransitionState(
                     VerticalGestureMode.DISMISS_VIEWER -> if (!isClosing) {
                         val releaseOffset = rawDragOffset
                         val releaseY = releaseOffset.y.coerceAtLeast(0f)
-                        val shouldDismiss = releaseY > dismissThresholdPx ||
-                                (velocityY > 1000f && releaseY > fastFlickMinDistancePx)
+                        val shouldDismiss = !isZoomed && (
+                                releaseY > dismissThresholdPx ||
+                                        (velocityY > 1000f && releaseY > fastFlickMinDistancePx)
+                                )
 
                         if (shouldDismiss) {
                             val releaseScale = (1f - (releaseY / 1400f)).coerceIn(0.55f, 1f)
@@ -710,6 +763,17 @@ class MediaViewerTransitionState(
                         val targetItem = gestureItem
                         if (isClosing || targetItem == null) {
                             isDraggingInfo = false
+                        } else if (isZoomed) {
+                            isDraggingInfo = false
+                            infoSettleJob?.cancel()
+                            infoSettleJob = scope.launch {
+                                animateInfoTo(
+                                    item = targetItem,
+                                    startTravel = rawPanelTravelPx,
+                                    targetTravel = 0f,
+                                    markOpen = false,
+                                )
+                            }
                         } else {
                             val releaseTravel = rawPanelTravelPx
                             // Positive travelVelocity means moving upward into the info panel.
@@ -836,6 +900,9 @@ fun rememberMediaViewerTransitionState(
                     containerSize.width > 0 &&
                     containerSize.height > 0,
             touchSlopPx = viewConfig.touchSlop,
+            doubleTapSlopPx = with(density) { DOUBLE_TAP_SLOP_DP.dp.toPx() },
+            doubleTapTimeoutMs = viewConfig.doubleTapTimeoutMillis,
+            longPressTimeoutMs = viewConfig.longPressTimeoutMillis,
             dismissThresholdPx = with(density) { DISMISS_THRESHOLD_DP.dp.toPx() },
             fastFlickMinDistancePx = with(density) { FAST_FLICK_MIN_DISTANCE_DP.dp.toPx() },
             infoCommitThresholdPx = with(density) { INFO_COMMIT_THRESHOLD_DP.dp.toPx() },
@@ -874,6 +941,7 @@ fun rememberMediaViewerTransitionState(
     return state
 }
 
+private const val DOUBLE_TAP_SLOP_DP = 100f
 private const val DISMISS_THRESHOLD_DP = 110f
 private const val FAST_FLICK_MIN_DISTANCE_DP = 40f
 private const val INFO_COMMIT_THRESHOLD_DP = 44f
