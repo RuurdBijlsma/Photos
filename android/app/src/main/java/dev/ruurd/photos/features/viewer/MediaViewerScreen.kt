@@ -357,7 +357,8 @@ fun MediaViewerScreen(
                                             minHeight = minSheetHeight,
                                             maxHeight = Constraints.Infinity,
                                         )
-                                        val placeable = measurables.first().measure(childConstraints)
+                                        val placeable =
+                                            measurables.first().measure(childConstraints)
                                         layout(constraints.maxWidth, constraints.maxHeight) {
                                             placeable.placeRelative(
                                                 0,
@@ -422,11 +423,13 @@ fun MediaViewerScreen(
                 onCopy = {
                     actionScope.launch {
                         val copied = viewModel.copyToClipboard()
-                        Toast.makeText(
-                            context,
-                            if (copied) "Copied to clipboard" else "Can't copy this photo",
-                            Toast.LENGTH_SHORT,
-                        ).show()
+                        if (!copied) {
+                            Toast.makeText(
+                                context,
+                                "Can't copy this photo",
+                                Toast.LENGTH_SHORT,
+                            ).show()
+                        }
                     }
                 },
                 onShare = {
