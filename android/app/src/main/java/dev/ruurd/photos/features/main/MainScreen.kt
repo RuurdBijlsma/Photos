@@ -64,6 +64,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
+import dev.ruurd.photos.core.image.TileCornerRadii
 import dev.ruurd.photos.core.permissions.MediaPermissions
 import dev.ruurd.photos.domain.model.MediaAccessState
 import dev.ruurd.photos.domain.model.SyncState
@@ -88,7 +89,11 @@ fun MainScreen(
         cacheWindow = remember { LazyLayoutCacheWindow(aheadFraction = 0.75f, behindFraction = 0.4f) },
     ),
     hiddenTimelineMediaId: String? = null,
-    onMediaClick: (mediaId: String, sourceRect: Rect?) -> Unit = { _, _ -> },
+    onMediaClick: (
+        mediaId: String,
+        sourceRect: Rect?,
+        sourceCorners: TileCornerRadii,
+    ) -> Unit = { _, _, _ -> },
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val coroutineScope = rememberCoroutineScope()
@@ -176,7 +181,7 @@ fun MainScreen(
     val statusBarHeight = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val topInset = statusBarHeight + PhotosTopBarHeight
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() +
-        FloatingBottomNavHeight
+            FloatingBottomNavHeight
 
     // Hide on scroll-down, reveal on scroll-up or near the top; ignore non-scroll layout shifts.
     var topBarHidden by remember { mutableStateOf(false) }

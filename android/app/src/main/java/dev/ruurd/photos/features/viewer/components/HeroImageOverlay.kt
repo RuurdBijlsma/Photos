@@ -4,11 +4,11 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.graphicsLayer
@@ -17,17 +17,19 @@ import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.dp
 import coil3.SingletonImageLoader
 import coil3.compose.AsyncImage
 import coil3.compose.asPainter
 import dev.ruurd.photos.core.database.entity.TimelineMediaProjection
 import dev.ruurd.photos.core.image.LocalMemoryCacheKeyRegistry
 import dev.ruurd.photos.core.image.MediaImageRequests
+import dev.ruurd.photos.core.image.TileCornerRadii
 import kotlin.math.roundToInt
 
 /**
  * The tile↔viewer hero image: a single bitmap placed at [rect] and cropped to it, so the open and
- * close animations can interpolate geometry without the image re-laying out.
+ * close animations can interpolate geometry and corner radii without the image re-laying out.
  */
 @Composable
 fun HeroImageOverlay(
@@ -36,6 +38,7 @@ fun HeroImageOverlay(
     rect: Rect,
     alpha: Float,
     modifier: Modifier = Modifier,
+    cornerRadii: TileCornerRadii = TileCornerRadii.Zero,
     onImageReady: () -> Unit = {},
 ) {
     val context = LocalContext.current
@@ -66,6 +69,17 @@ fun HeroImageOverlay(
         )
     }
 
+    val shape = if (cornerRadii.isZero) {
+        RectangleShape
+    } else {
+        RoundedCornerShape(
+            topStart = cornerRadii.topStartDp.dp,
+            topEnd = cornerRadii.topEndDp.dp,
+            bottomEnd = cornerRadii.bottomEndDp.dp,
+            bottomStart = cornerRadii.bottomStartDp.dp,
+        )
+    }
+
     Box(
         modifier = modifier
             .offset { IntOffset(rect.left.roundToInt(), rect.top.roundToInt()) }
@@ -77,8 +91,11 @@ fun HeroImageOverlay(
                     placeable.place(0, 0)
                 }
             }
-            .graphicsLayer { this.alpha = alpha }
-            .clip(RectangleShape),
+            .graphicsLayer {
+                this.alpha = alpha
+                this.shape = shape
+                this.clip = true
+            },
     ) {
         if (cachedPainter != null) {
             Image(

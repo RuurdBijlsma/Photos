@@ -39,6 +39,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -82,6 +83,7 @@ import dev.ruurd.photos.core.database.entity.SyncStatus
 import dev.ruurd.photos.core.image.LocalMemoryCacheKeyRegistry
 import dev.ruurd.photos.core.image.LocalTimelineTileBoundsRegistry
 import dev.ruurd.photos.core.image.MediaImageRequests
+import dev.ruurd.photos.core.image.TileCornerRadii
 import dev.ruurd.photos.domain.model.MonthHeaderUiItem
 import dev.ruurd.photos.domain.model.TimelineGridItemUiModel
 import dev.ruurd.photos.domain.model.TimelineLayoutIndex
@@ -115,7 +117,11 @@ fun TimelineScreen(
     isSyncing: Boolean = false,
     pullToRefreshState: PullToRefreshState? = null,
     hiddenMediaId: String? = null,
-    onMediaClick: (mediaId: String, sourceRect: Rect?) -> Unit = { _, _ -> },
+    onMediaClick: (
+        mediaId: String,
+        sourceRect: Rect?,
+        sourceCorners: TileCornerRadii,
+    ) -> Unit = { _, _, _ -> },
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val layout = uiState.layout
@@ -357,7 +363,7 @@ private fun FloatingDatePillOverlay(
     val datePillLabel by remember(layout, listState, topBufferPx) {
         derivedStateOf {
             val isScrolledPastTop = listState.firstVisibleItemIndex > 0 ||
-                listState.firstVisibleItemScrollOffset > topBufferPx
+                    listState.firstVisibleItemScrollOffset > topBufferPx
             if (!isScrolledPastTop || layout.isEmpty) {
                 null
             } else {
@@ -450,7 +456,7 @@ private fun TimelineRow(
     baseUrl: String,
     isScrubbing: Boolean,
     hiddenMediaId: String?,
-    onMediaClick: (mediaId: String, sourceRect: Rect?) -> Unit,
+    onMediaClick: (mediaId: String, sourceRect: Rect?, sourceCorners: TileCornerRadii) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val shape = RoundedCornerShape(
@@ -459,6 +465,7 @@ private fun TimelineRow(
         bottomStart = if (item.isLastOfMonth) PhotosRadii.Card else 0.dp,
         bottomEnd = if (item.isLastOfMonth) PhotosRadii.Card else 0.dp,
     )
+    val cornerRadiusDp = PhotosRadii.Card.value
 
     // The row gap is part of the row box so its height matches the precomputed offsets.
     Box(
@@ -472,7 +479,23 @@ private fun TimelineRow(
                 .clip(shape),
             horizontalArrangement = Arrangement.spacedBy(ITEM_GAP_DP.dp),
         ) {
-            item.items.forEach { gridItem ->
+            item.items.forEachIndexed { index, gridItem ->
+                val isFirstInRow = index == 0
+                val isLastInRow = index == item.items.lastIndex
+                val cornerRadii = remember(
+                    item.isFirstOfMonth,
+                    item.isLastOfMonth,
+                    isFirstInRow,
+                    isLastInRow,
+                    cornerRadiusDp,
+                ) {
+                    TileCornerRadii(
+                        topStartDp = if (item.isFirstOfMonth && isFirstInRow) cornerRadiusDp else 0f,
+                        topEndDp = if (item.isFirstOfMonth && isLastInRow) cornerRadiusDp else 0f,
+                        bottomEndDp = if (item.isLastOfMonth && isLastInRow) cornerRadiusDp else 0f,
+                        bottomStartDp = if (item.isLastOfMonth && isFirstInRow) cornerRadiusDp else 0f,
+                    )
+                }
                 TimelineTile(
                     item = gridItem,
                     heightDp = item.heightDp,
@@ -480,7 +503,8 @@ private fun TimelineRow(
                     baseUrl = baseUrl,
                     isScrubbing = isScrubbing,
                     isHidden = hiddenMediaId == gridItem.id,
-                    onClick = { rect -> onMediaClick(gridItem.id, rect) },
+                    cornerRadii = cornerRadii,
+                    onClick = { rect -> onMediaClick(gridItem.id, rect, cornerRadii) },
                 )
             }
         }
@@ -495,6 +519,7 @@ private fun TimelineTile(
     baseUrl: String,
     isScrubbing: Boolean,
     isHidden: Boolean,
+    cornerRadii: TileCornerRadii,
     onClick: (sourceRect: Rect?) -> Unit,
 ) {
     val context = LocalContext.current
@@ -509,6 +534,13 @@ private fun TimelineTile(
         TileLoadState()
     }
     val coordsHolder = remember { arrayOfNulls<LayoutCoordinates>(1) }
+
+    SideEffect {
+        val coords = coordsHolder[0]
+        if (coords != null && coords.isAttached) {
+            boundsRegistry.register(item.id, coords, cornerRadii)
+        }
+    }
 
     DisposableEffect(item.id, boundsRegistry) {
         onDispose {
@@ -566,7 +598,7 @@ private fun TimelineTile(
             .background(MaterialTheme.colorScheme.surfaceContainerHigh)
             .onPlaced { coords ->
                 coordsHolder[0] = coords
-                boundsRegistry.register(item.id, coords)
+                boundsRegistry.register(item.id, coords, cornerRadii)
             }
             .clickable {
                 val rect = coordsHolder[0]?.takeIf { it.isAttached }?.boundsInRoot()

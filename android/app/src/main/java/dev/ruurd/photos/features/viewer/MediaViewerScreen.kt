@@ -32,6 +32,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.IntSize
+import dev.ruurd.photos.core.image.TileCornerRadii
 import dev.ruurd.photos.features.viewer.components.HeroImageOverlay
 import dev.ruurd.photos.features.viewer.components.MediaInfoPanel
 import dev.ruurd.photos.features.viewer.components.VideoPlayBadge
@@ -44,7 +45,12 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.launch
+import kotlin.collections.component1
+import kotlin.collections.component2
+import kotlin.collections.get
+import kotlin.compareTo
 import kotlin.math.roundToInt
+import kotlin.text.get
 
 /**
  * Full-screen media pager with the tile↔fullscreen hero transition, drag-to-dismiss, floating
@@ -61,6 +67,7 @@ fun MediaViewerScreen(
     onPreSyncScroll: (mediaId: String) -> Unit,
     onDismissFinished: () -> Unit,
     modifier: Modifier = Modifier,
+    openSourceCorners: TileCornerRadii = TileCornerRadii.Zero,
     onActiveMediaChanged: (String) -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -100,6 +107,7 @@ fun MediaViewerScreen(
     val transition = rememberMediaViewerTransitionState(
         pagerState = pagerState,
         openSourceRect = openSourceRect,
+        openSourceCorners = openSourceCorners,
         containerSize = containerSize,
         items = items,
         activeMediaId = uiState.activeMediaId,
@@ -388,6 +396,7 @@ fun MediaViewerScreen(
                     baseUrl = baseUrl,
                     rect = transition.openingRect(openSourceRect, openingItem),
                     alpha = 1f,
+                    cornerRadii = transition.openingCornerRadii(),
                     onImageReady = transition::onHeroImageReady,
                 )
             }
@@ -400,6 +409,7 @@ fun MediaViewerScreen(
                 baseUrl = baseUrl,
                 rect = transition.closingRect(closing),
                 alpha = transition.closingAlpha(closing),
+                cornerRadii = transition.closingCornerRadii(closing),
             )
         }
 

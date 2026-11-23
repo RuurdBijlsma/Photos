@@ -38,6 +38,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import dev.ruurd.photos.core.image.LocalMemoryCacheKeyRegistry
 import dev.ruurd.photos.core.image.LocalTimelineTileBoundsRegistry
+import dev.ruurd.photos.core.image.TileCornerRadii
 import dev.ruurd.photos.core.image.TimelineTileBoundsRegistry
 import dev.ruurd.photos.core.navigation.AlbumDetailRoute
 import dev.ruurd.photos.core.navigation.BackupSettingsRoute
@@ -140,6 +141,7 @@ private fun AuthenticatedSession(
             mutableStateOf<String?>(null)
         }
         var viewerOpenSourceRect by remember { mutableStateOf<Rect?>(null) }
+        var viewerOpenSourceCorners by remember { mutableStateOf(TileCornerRadii.Zero) }
         var hiddenTimelineMediaId by remember { mutableStateOf<String?>(null) }
 
         fun syncTimelineToMedia(mediaId: String) {
@@ -149,8 +151,8 @@ private fun AuthenticatedSession(
             val clearBottom = layoutInfo.viewportEndOffset - layoutInfo.afterContentPadding
             val itemInfo = layoutInfo.visibleItemsInfo.firstOrNull { it.index == rowIndex }
             val isFullyInClearViewport = itemInfo != null &&
-                itemInfo.offset >= clearTop &&
-                itemInfo.offset + itemInfo.size <= clearBottom
+                    itemInfo.offset >= clearTop &&
+                    itemInfo.offset + itemInfo.size <= clearBottom
             if (!isFullyInClearViewport) {
                 coroutineScope.launch {
                     timelineListState.scrollToItem(rowIndex)
@@ -189,9 +191,10 @@ private fun AuthenticatedSession(
                             timelineViewModel = timelineViewModel,
                             timelineListState = timelineListState,
                             hiddenTimelineMediaId = hiddenTimelineMediaId,
-                            onMediaClick = { mediaId, sourceRect ->
+                            onMediaClick = { mediaId, sourceRect, sourceCorners ->
                                 if (activeViewerMediaId == null) {
                                     viewerOpenSourceRect = sourceRect
+                                    viewerOpenSourceCorners = sourceCorners
                                     activeViewerMediaId = mediaId
                                 }
                             },
@@ -220,6 +223,7 @@ private fun AuthenticatedSession(
                     viewerMediaId = viewerMediaId,
                     baseUrl = mainUiState.serverUrl,
                     openSourceRect = viewerOpenSourceRect,
+                    openSourceCorners = viewerOpenSourceCorners,
                     containerSize = rootContainerSize,
                     onHiddenTimelineMediaChanged = { hiddenTimelineMediaId = it },
                     onPreSyncScroll = ::syncTimelineToMedia,
@@ -231,6 +235,7 @@ private fun AuthenticatedSession(
                     onDismissFinished = {
                         hiddenTimelineMediaId = null
                         viewerOpenSourceRect = null
+                        viewerOpenSourceCorners = TileCornerRadii.Zero
                         activeViewerMediaId = null
                         sessionHolder.clearViewerStore()
                     },
@@ -250,6 +255,7 @@ private fun SessionMediaViewer(
     viewerMediaId: String,
     baseUrl: String,
     openSourceRect: Rect?,
+    openSourceCorners: TileCornerRadii,
     containerSize: IntSize,
     onHiddenTimelineMediaChanged: (String?) -> Unit,
     onPreSyncScroll: (mediaId: String) -> Unit,
@@ -272,6 +278,7 @@ private fun SessionMediaViewer(
         viewModel = viewerViewModel,
         baseUrl = baseUrl,
         openSourceRect = openSourceRect,
+        openSourceCorners = openSourceCorners,
         containerSize = containerSize,
         onHiddenTimelineMediaChanged = onHiddenTimelineMediaChanged,
         onPreSyncScroll = onPreSyncScroll,

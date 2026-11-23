@@ -44,7 +44,9 @@ import dev.ruurd.photos.core.database.entity.TimelineMediaProjection
 import dev.ruurd.photos.core.image.LocalMemoryCacheKeyRegistry
 import dev.ruurd.photos.core.image.LocalTimelineTileBoundsRegistry
 import dev.ruurd.photos.core.image.MemoryCacheKeyRegistry
+import dev.ruurd.photos.core.image.TileCornerRadii
 import dev.ruurd.photos.core.image.TimelineTileBoundsRegistry
+import dev.ruurd.photos.core.image.lerp
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.CoroutineScope
@@ -58,6 +60,8 @@ data class ClosingHeroState(
     val item: TimelineMediaProjection,
     val startRect: Rect,
     val targetRect: Rect?,
+    val startCorners: TileCornerRadii,
+    val targetCorners: TileCornerRadii,
     val startBackdropAlpha: Float,
 )
 
@@ -107,6 +111,7 @@ class MediaViewerTransitionState(
     internal var activeMediaId: String = ""
     internal var isZoomed: Boolean = false
     internal var openSourceRect: Rect? = null
+    internal var openSourceCorners: TileCornerRadii = TileCornerRadii.Zero
     internal var statusBarHeightPx: Float = 0f
     internal var onHiddenTimelineMediaChanged: (String?) -> Unit = onHiddenTimelineMediaChanged
     internal var onPreSyncScroll: (String) -> Unit = onPreSyncScroll
@@ -239,6 +244,9 @@ class MediaViewerTransitionState(
     fun openingRect(sourceRect: Rect, item: TimelineMediaProjection): Rect =
         lerp(sourceRect, fittedRect(item), openProgress.value)
 
+    fun openingCornerRadii(): TileCornerRadii =
+        lerp(openSourceCorners, TileCornerRadii.Zero, openProgress.value)
+
     fun closingRect(closing: ClosingHeroState): Rect {
         val targetRect = closing.targetRect
         if (targetRect != null) {
@@ -251,6 +259,13 @@ class MediaViewerTransitionState(
         val h = closing.startRect.height * shrinkScale
         return Rect(cx - w / 2f, cy - h / 2f, cx + w / 2f, cy + h / 2f)
     }
+
+    fun closingCornerRadii(closing: ClosingHeroState): TileCornerRadii =
+        if (closing.targetRect != null) {
+            lerp(closing.startCorners, closing.targetCorners, closeProgress.value)
+        } else {
+            closing.startCorners
+        }
 
     fun closingAlpha(closing: ClosingHeroState): Float =
         if (closing.targetRect != null) 1f else (1f - closeProgress.value).coerceIn(0f, 1f)
@@ -508,11 +523,13 @@ class MediaViewerTransitionState(
         val fittedRect = computeFittedRect(w, h, resolvePhotoRatio(activeItem))
 
         val startRect: Rect
+        val startCorners: TileCornerRadii
         val startAlpha: Float
         val sourceRect = openSourceRect
         if (isOpeningHero && sourceRect != null) {
             val t = openProgress.value
             startRect = lerp(sourceRect, fittedRect, t)
+            startCorners = lerp(openSourceCorners, TileCornerRadii.Zero, t)
             startAlpha = t.coerceIn(0f, 1f)
         } else {
             val centerX = w / 2f + releaseOffset.x
@@ -525,10 +542,16 @@ class MediaViewerTransitionState(
                 right = centerX + startW / 2f,
                 bottom = centerY + startH / 2f,
             )
+            startCorners = TileCornerRadii.Zero
             startAlpha = releaseBackdropAlpha
         }
 
         val targetRect = boundsRegistry.boundsInRoot(activeItem.id)
+        val targetCorners = if (targetRect != null) {
+            boundsRegistry.cornerRadii(activeItem.id)
+        } else {
+            TileCornerRadii.Zero
+        }
         if (targetRect == null) {
             onPreSyncScroll(activeItem.id)
         }
@@ -540,6 +563,8 @@ class MediaViewerTransitionState(
             item = activeItem,
             startRect = startRect,
             targetRect = targetRect,
+            startCorners = startCorners,
+            targetCorners = targetCorners,
             startBackdropAlpha = startAlpha,
         )
     }
@@ -857,6 +882,7 @@ class MediaViewerTransitionState(
 fun rememberMediaViewerTransitionState(
     pagerState: PagerState,
     openSourceRect: Rect?,
+    openSourceCorners: TileCornerRadii,
     containerSize: IntSize,
     items: ImmutableList<TimelineMediaProjection>,
     activeMediaId: String,
@@ -932,6 +958,7 @@ fun rememberMediaViewerTransitionState(
     state.activeMediaId = activeMediaId
     state.isZoomed = isZoomed
     state.openSourceRect = openSourceRect
+    state.openSourceCorners = openSourceCorners
     state.statusBarHeightPx = statusBarHeightPx
     state.onHiddenTimelineMediaChanged = onHiddenTimelineMediaChanged
     state.onPreSyncScroll = onPreSyncScroll
