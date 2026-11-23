@@ -57,6 +57,7 @@ import okhttp3.Dispatcher
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
+import retrofit2.Converter
 import retrofit2.Retrofit
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
 import retrofit2.converter.protobuf.ProtoConverterFactory
@@ -181,17 +182,11 @@ class DefaultAppContainer(private val context: Context) : AppContainer {
     }
 
     override val photosApiService: PhotosApiService by lazy {
-        Retrofit.Builder()
+        val builder = Retrofit.Builder()
             .baseUrl("http://localhost:5272/") // DynamicBaseUrlInterceptor rewrites this
             .client(okHttpClient)
-            .addConverterFactory(ScalarsConverterFactory.create())
-            .addConverterFactory(
-                Json { ignoreUnknownKeys = true }
-                    .asConverterFactory("application/json".toMediaType()),
-            )
-            .addConverterFactory(ProtoConverterFactory.create())
-            .build()
-            .create(PhotosApiService::class.java)
+        photosApiConverterFactories().forEach { builder.addConverterFactory(it) }
+        builder.build().create(PhotosApiService::class.java)
     }
 
     override val networkMonitor: NetworkMonitor by lazy {
@@ -385,3 +380,13 @@ class DefaultAppContainer(private val context: Context) : AppContainer {
         }
     }
 }
+
+/**
+ * kotlinx-serialization claims every type and throws for the protobuf responses, so it must stay
+ * last; [retrofit2.Retrofit] only asks the factories in order.
+ */
+internal fun photosApiConverterFactories(): List<Converter.Factory> = listOf(
+    ScalarsConverterFactory.create(),
+    ProtoConverterFactory.create(),
+    Json { ignoreUnknownKeys = true }.asConverterFactory("application/json".toMediaType()),
+)
