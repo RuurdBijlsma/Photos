@@ -68,11 +68,6 @@ fun MediaViewerScreen(
     val context = LocalContext.current
     val actionScope = rememberCoroutineScope()
 
-    val activeItem = items.firstOrNull { it.id == uiState.activeMediaId }
-    val activeDetails = activeItem?.let { item ->
-        uiState.detailsById[item.id]?.takeIf { it.cloudId == item.cloudId }
-    }
-
     val currentItems by rememberUpdatedState(items)
     val currentActiveId by rememberUpdatedState(uiState.activeMediaId)
     val currentOnHiddenChanged by rememberUpdatedState(onHiddenTimelineMediaChanged)
@@ -88,6 +83,15 @@ fun MediaViewerScreen(
             initialPage = targetInitialIndex,
             pageCount = { currentItems.size },
         )
+    }
+
+    val activeItem = items.firstOrNull { it.id == uiState.activeMediaId }
+        ?: items.getOrNull(pagerState.currentPage)
+    val activeDetails = activeItem?.let { item ->
+        uiState.detailsById[item.id]?.takeIf { it.cloudId == item.cloudId }
+    }
+    val activeLocalInfo = activeItem?.let { item ->
+        uiState.localInfoById[item.id]
     }
 
     var activePageZoomFraction by remember { mutableFloatStateOf(0f) }
@@ -405,10 +409,9 @@ fun MediaViewerScreen(
             ViewerChromeOverlay(
                 alpha = chromeAlpha,
                 backButtonAlpha = backButtonAlpha,
-                items = items,
-                activeMediaId = uiState.activeMediaId,
-                currentPage = pagerState.currentPage,
-                isProjectionLoading = uiState.isProjectionLoading,
+                currentItem = activeItem,
+                currentDetails = activeDetails,
+                currentLocalInfo = activeLocalInfo,
                 isShareEnabled = activeItem != null && activeDetails?.isMissing != true,
                 isCopyEnabled = activeDetails?.isMissing != true,
                 onBack = {

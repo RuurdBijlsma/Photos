@@ -1,5 +1,6 @@
 package dev.ruurd.photos.domain.model
 
+import dev.ruurd.photos.core.database.entity.TimelineMediaProjection
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
@@ -10,17 +11,42 @@ import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /**
- * Pure formatting for the viewer's info sheet, so the Compose layer never formats on the main
- * thread during scrolls and the rules stay unit-testable.
+ * Pure formatting for the viewer's top bar and info sheet, so the Compose layer never formats on
+ * the main thread during scrolls and the rules stay unit-testable.
  */
 object MediaInfoFormat {
 
-    private const val FALLBACK_PATTERN = "EEEE d MMMM yyyy, HH:mm:ss"
+    private const val COMPACT_DATE_TIME_PATTERN = "EEE, d MMM yyyy '•' HH:mm"
+    private const val VIEWER_TOP_DATE_PATTERN = "d MMM yyyy"
+    private const val VIEWER_TOP_TIME_PATTERN = "HH:mm"
+
+    fun resolveLocalDateTime(
+        details: MediaDetails?,
+        item: TimelineMediaProjection?,
+        localInfo: LocalMediaInfo?,
+    ): LocalDateTime? {
+        details?.takenAtLocal?.let(::parseNaiveLocal)?.let { return it }
+        if (item != null && item.sortTimestamp > 0L) {
+            return LocalDateTime.ofInstant(
+                Instant.ofEpochMilli(item.sortTimestamp + item.timezoneOffsetMinutes * 60_000L),
+                ZoneOffset.UTC,
+            )
+        }
+        localInfo?.dateTakenMs?.takeIf { it > 0L }?.let { epoch ->
+            return LocalDateTime.ofInstant(Instant.ofEpochMilli(epoch), ZoneId.systemDefault())
+        }
+        return null
+    }
+
+    fun formatCompactDateTime(
+        dateTime: LocalDateTime,
+        locale: Locale = Locale.getDefault(),
+    ): String = dateTime.format(DateTimeFormatter.ofPattern(COMPACT_DATE_TIME_PATTERN, locale))
 
     fun captureDateTime(details: MediaDetails?, locale: Locale = Locale.getDefault()): String? {
         val local = details?.takenAtLocal ?: return null
         val parsed = parseNaiveLocal(local) ?: return null
-        return parsed.format(DateTimeFormatter.ofPattern(FALLBACK_PATTERN, locale))
+        return formatCompactDateTime(parsed, locale)
     }
 
     /** Offline wall clock: the UTC instant shifted by the item's stored capture-time offset. */
@@ -28,14 +54,48 @@ object MediaInfoFormat {
         sortTimestamp: Long,
         timezoneOffsetMinutes: Int,
         locale: Locale = Locale.getDefault(),
-    ): String = LocalDateTime.ofInstant(
-        Instant.ofEpochMilli(sortTimestamp + timezoneOffsetMinutes * 60_000L),
-        ZoneOffset.UTC,
-    ).format(DateTimeFormatter.ofPattern(FALLBACK_PATTERN, locale))
+    ): String = formatCompactDateTime(
+        LocalDateTime.ofInstant(
+            Instant.ofEpochMilli(sortTimestamp + timezoneOffsetMinutes * 60_000L),
+            ZoneOffset.UTC,
+        ),
+        locale,
+    )
 
     /** MediaStore `DATE_TAKEN` (UTC epoch) rendered in the device's timezone. */
-    fun epochDateTime(epochMillis: Long, locale: Locale = Locale.getDefault()): String = LocalDateTime.ofInstant(Instant.ofEpochMilli(epochMillis), ZoneId.systemDefault())
-        .format(DateTimeFormatter.ofPattern(FALLBACK_PATTERN, locale))
+    fun epochDateTime(epochMillis: Long, locale: Locale = Locale.getDefault()): String =
+        formatCompactDateTime(
+            LocalDateTime.ofInstant(Instant.ofEpochMilli(epochMillis), ZoneId.systemDefault()),
+            locale,
+        )
+
+    fun viewerTopTitle(
+        details: MediaDetails?,
+        item: TimelineMediaProjection?,
+        localInfo: LocalMediaInfo?,
+        locale: Locale = Locale.getDefault(),
+    ): String? {
+        val dateTime = resolveLocalDateTime(details, item, localInfo)
+        return dateTime?.format(DateTimeFormatter.ofPattern(VIEWER_TOP_DATE_PATTERN, locale))
+            ?: shortPlaceName(details?.place)
+    }
+
+    fun viewerTopSubtitle(
+        details: MediaDetails?,
+        item: TimelineMediaProjection?,
+        localInfo: LocalMediaInfo?,
+        locale: Locale = Locale.getDefault(),
+    ): String? {
+        val dateTime = resolveLocalDateTime(details, item, localInfo) ?: return null
+        val timeLabel = dateTime.format(DateTimeFormatter.ofPattern(VIEWER_TOP_TIME_PATTERN, locale))
+        val placeName = shortPlaceName(details?.place)
+        return if (placeName != null) "$timeLabel • $placeName" else timeLabel
+    }
+
+    fun shortPlaceName(place: PlaceDetails?): String? =
+        listOf(place?.name, place?.admin1, place?.countryName)
+            .firstOrNull { !it.isNullOrBlank() }
+            ?.trim()
 
     fun timezoneLabel(offsetSeconds: Int?, name: String?): String? {
         val offset = offsetSeconds?.let(::formatOffset)

@@ -81,12 +81,20 @@ class MediaViewerViewModel(
         val currentStore = timelineProjectionStore.state.value
         if (currentStore is TimelineProjectionState.Loaded) {
             val idx = currentStore.items.indexOfFirst { it.id == initialMediaId }
+            val initialDetails = currentStore.items.getOrNull(idx)
+                ?.cloudId
+                ?.let(mediaDetailsRepository::peek)
             _uiState.value = MediaViewerUiState(
                 items = currentStore.items,
                 activeMediaId = initialMediaId,
                 initialIndex = idx.coerceAtLeast(0),
                 isActiveItemMissing = currentStore.items.isEmpty() || idx < 0,
                 isProjectionLoading = false,
+                detailsById = if (initialDetails != null) {
+                    persistentMapOf(initialMediaId to initialDetails)
+                } else {
+                    persistentMapOf()
+                },
             )
         } else {
             _uiState.value = MediaViewerUiState(

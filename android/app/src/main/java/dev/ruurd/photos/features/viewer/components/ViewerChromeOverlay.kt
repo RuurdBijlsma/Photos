@@ -7,6 +7,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -50,11 +51,15 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import dev.ruurd.photos.core.database.entity.TimelineMediaProjection
+import dev.ruurd.photos.domain.model.LocalMediaInfo
+import dev.ruurd.photos.domain.model.MediaDetails
+import dev.ruurd.photos.domain.model.MediaInfoFormat
 import dev.ruurd.photos.ui.theme.MontserratFontFamily
-import kotlinx.collections.immutable.ImmutableList
 
 /**
  * Floating viewer chrome (top bar, overflow menu, bottom action pill) plus the status bar scrim.
@@ -65,10 +70,9 @@ import kotlinx.collections.immutable.ImmutableList
 @Composable
 fun ViewerChromeOverlay(
     alpha: Float,
-    items: ImmutableList<TimelineMediaProjection>,
-    activeMediaId: String,
-    currentPage: Int,
-    isProjectionLoading: Boolean,
+    currentItem: TimelineMediaProjection?,
+    currentDetails: MediaDetails?,
+    currentLocalInfo: LocalMediaInfo?,
     isShareEnabled: Boolean,
     isCopyEnabled: Boolean,
     onBack: () -> Unit,
@@ -83,6 +87,13 @@ fun ViewerChromeOverlay(
         .asPaddingValues()
         .calculateTopPadding()
     val navBarPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+
+    val topTitle = remember(currentItem, currentDetails, currentLocalInfo) {
+        MediaInfoFormat.viewerTopTitle(currentDetails, currentItem, currentLocalInfo)
+    }
+    val topSubtitle = remember(currentItem, currentDetails, currentLocalInfo) {
+        MediaInfoFormat.viewerTopSubtitle(currentDetails, currentItem, currentLocalInfo)
+    }
 
     Box(modifier = modifier.fillMaxSize()) {
         if (alpha > 0.01f) {
@@ -111,35 +122,62 @@ fun ViewerChromeOverlay(
 
             Spacer(modifier = Modifier.width(8.dp))
 
-            if (alpha > 0.01f && !isProjectionLoading && items.isNotEmpty()) {
-                Surface(
-                    shape = CircleShape,
-                    color = ViewerPillColor,
-                    border = ViewerPillBorder,
-                    modifier = Modifier
-                        .graphicsLayer { this.alpha = alpha }
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
-                            onClick = {},
-                        ),
-                ) {
-                    val activeIndex = items.indexOfFirst { it.id == activeMediaId }
-                    val displayIndex = ((if (activeIndex >= 0) activeIndex else currentPage) + 1)
-                        .coerceIn(1, items.size)
-                    Text(
-                        text = "$displayIndex of ${items.size}",
-                        style = MaterialTheme.typography.titleSmall.copy(
-                            fontFamily = MontserratFontFamily,
-                            fontWeight = FontWeight.SemiBold,
-                        ),
-                        color = Color.White,
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp),
-                    )
+            Box(
+                modifier = Modifier.weight(1f),
+                contentAlignment = Alignment.CenterStart,
+            ) {
+                if (alpha > 0.01f && (topTitle != null || topSubtitle != null)) {
+                    Surface(
+                        shape = CircleShape,
+                        color = ViewerPillColor,
+                        border = ViewerPillBorder,
+                        modifier = Modifier
+                            .graphicsLayer { this.alpha = alpha }
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null,
+                                onClick = {},
+                            ),
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(
+                                horizontal = 14.dp,
+                                vertical = if (topSubtitle != null) 6.dp else 9.dp,
+                            ),
+                        ) {
+                            topTitle?.let { title ->
+                                Text(
+                                    text = title,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    style = MaterialTheme.typography.labelLarge.copy(
+                                        fontFamily = MontserratFontFamily,
+                                        fontWeight = FontWeight.SemiBold,
+                                        fontSize = 13.sp,
+                                        lineHeight = 16.sp,
+                                    ),
+                                    color = Color.White,
+                                )
+                            }
+                            topSubtitle?.let { subtitle ->
+                                Text(
+                                    text = subtitle,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontWeight = FontWeight.Medium,
+                                        fontSize = 11.sp,
+                                        lineHeight = 14.sp,
+                                    ),
+                                    color = Color.White.copy(alpha = 0.8f),
+                                )
+                            }
+                        }
+                    }
                 }
             }
 
-            Spacer(modifier = Modifier.weight(1f))
+            Spacer(modifier = Modifier.width(8.dp))
 
             if (alpha > 0.01f) {
                 var isMenuExpanded by remember { mutableStateOf(false) }
@@ -150,8 +188,6 @@ fun ViewerChromeOverlay(
                         onClick = { isMenuExpanded = true },
                     )
 
-                    val currentItem = items.firstOrNull { it.id == activeMediaId }
-                        ?: items.getOrNull(currentPage)
                     DropdownMenu(
                         expanded = isMenuExpanded,
                         onDismissRequest = { isMenuExpanded = false },
