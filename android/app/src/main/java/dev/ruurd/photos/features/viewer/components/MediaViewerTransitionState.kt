@@ -125,6 +125,7 @@ class MediaViewerTransitionState(
     // Unified swipe-up Media Info panel state (moves 1:1 with the photo/video)
     private var isDraggingInfo by mutableStateOf(false)
     private var isAnimatingInfoOpen by mutableStateOf(false)
+    private var infoAnimationTargetPx by mutableFloatStateOf(0f)
     private var rawInfoTravelPx by mutableFloatStateOf(0f)
     private val settleInfoTravel = Animatable(0f)
     private var infoSettleJob: Job? = null
@@ -165,7 +166,17 @@ class MediaViewerTransitionState(
             val minSettledTop = containerH * 0.32f
             val maxSettledTop = containerH * 0.44f
             val desiredSettledTop = (statusBarHeightPx + fittedH).coerceIn(minSettledTop, maxSettledTop)
-            return (baseTop - desiredSettledTop).coerceAtLeast(containerH * 0.12f)
+            val desiredTravel = (baseTop - desiredSettledTop).coerceAtLeast(containerH * 0.12f)
+            val contentH = infoContentHeightPx.toFloat()
+            if (contentH <= 0f) return desiredTravel
+            val bottomAlignTravel = (baseTop + contentH - containerH).coerceAtLeast(0f)
+            // When the panel's content is shorter than the remaining open space, stop once its
+            // bottom reaches the bottom of the screen instead of leaving a black gap underneath.
+            return if (bottomAlignTravel > 0f) {
+                min(desiredTravel, bottomAlignTravel)
+            } else {
+                min(desiredTravel, containerH * 0.15f)
+            }
         }
 
     private val maxInfoTravelPx: Float
@@ -173,6 +184,7 @@ class MediaViewerTransitionState(
             val containerH = viewerSize.height.toFloat()
             if (containerH <= 0f) return settledInfoTravelPx
             val contentH = infoContentHeightPx.toFloat()
+            if (contentH <= 0f) return settledInfoTravelPx
             return (infoPanelBaseTopPx + contentH - containerH).coerceAtLeast(settledInfoTravelPx)
         }
 
@@ -289,8 +301,24 @@ class MediaViewerTransitionState(
     }
 
     fun onInfoContentHeightChanged(heightPx: Int) {
-        if (heightPx > 0 && heightPx != infoContentHeightPx) {
-            infoContentHeightPx = heightPx
+        if (heightPx <= 0 || heightPx == infoContentHeightPx) return
+        infoContentHeightPx = heightPx
+        if (isDraggingInfo || isClosing) return
+
+        // Retarget if the panel opened (e.g. via "About") before its real content height was known.
+        if (isAnimatingInfoOpen) {
+            val updatedTarget = settledInfoTravelPx
+            if (abs(updatedTarget - infoAnimationTargetPx) > 1f) {
+                infoSettleJob?.cancel()
+                infoSettleJob = scope.launch {
+                    animateInfoTo(target = updatedTarget, markOpen = true)
+                }
+            }
+        } else if (settleInfoTravel.value > maxInfoTravelPx) {
+            infoSettleJob?.cancel()
+            infoSettleJob = scope.launch {
+                settleInfoTravel.snapTo(maxInfoTravelPx)
+            }
         }
     }
 
@@ -340,7 +368,7 @@ class MediaViewerTransitionState(
         if (isClosing || isOpeningHero || isZoomed || isDraggingInfo) return
         val target = settledInfoTravelPx
         if (target <= 0f) return
-        if (infoTravelPx >= target - 1f) {
+        if (infoTravelPx >= target - 1f && !isAnimatingInfoOpen) {
             onInfoOpenChanged(true)
             return
         }
@@ -367,6 +395,7 @@ class MediaViewerTransitionState(
         infoSettleJob = null
         isDraggingInfo = false
         isAnimatingInfoOpen = false
+        infoAnimationTargetPx = 0f
         rawInfoTravelPx = 0f
         scope.launch {
             settleInfoTravel.updateBounds(lowerBound = 0f, upperBound = null)
@@ -377,6 +406,7 @@ class MediaViewerTransitionState(
 
     private suspend fun animateInfoTo(target: Float, markOpen: Boolean) {
         isAnimatingInfoOpen = markOpen
+        infoAnimationTargetPx = target
         try {
             settleInfoTravel.updateBounds(lowerBound = 0f, upperBound = null)
             settleInfoTravel.animateTo(
@@ -404,6 +434,7 @@ class MediaViewerTransitionState(
         infoSettleJob = null
         isDraggingInfo = false
         isAnimatingInfoOpen = false
+        infoAnimationTargetPx = 0f
         rawInfoTravelPx = 0f
 
         val activeItem = currentActiveItem
@@ -524,9 +555,8 @@ class MediaViewerTransitionState(
                                     infoSettleJob?.cancel()
                                     infoSettleJob = null
                                     isAnimatingInfoOpen = false
-                                    val base = settleInfoTravel.value
                                     val initialTravel = if (panelAlreadyActive) {
-                                        (base - totalDy).coerceIn(0f, maxInfoTravelPx)
+                                        (gestureStartInfoTravel - totalDy).coerceIn(0f, maxInfoTravelPx)
                                     } else {
                                         (-totalDy).coerceIn(0f, maxInfoTravelPx)
                                     }

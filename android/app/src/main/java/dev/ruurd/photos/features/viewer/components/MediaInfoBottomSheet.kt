@@ -43,11 +43,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import dev.ruurd.photos.core.database.entity.SyncStatus
@@ -59,7 +57,7 @@ import dev.ruurd.photos.ui.theme.PhotosRadii
 
 /**
  * Inline Media Info panel anchored directly beneath the active photo/video in shared vertical
- * coordinate space. Measures at its full unbounded height so dragging upward continuously scrolls
+ * coordinate space. Measured unbounded by the parent Layout so dragging upward continuously scrolls
  * the info content and pushes the photo smoothly off the top of the viewport.
  */
 @Composable
@@ -109,20 +107,7 @@ fun MediaInfoPanel(
         shape = RoundedCornerShape(topStart = PhotosRadii.Sheet, topEnd = PhotosRadii.Sheet),
         color = MaterialTheme.colorScheme.surfaceContainerLow,
         tonalElevation = 2.dp,
-        modifier = modifier
-            .fillMaxWidth()
-            // Measure at full content height (>= screen height) so outer vertical offset can
-            // scroll past the bottom without Compose clamping to the viewport height.
-            .layout { measurable, constraints ->
-                val unbounded = constraints.copy(
-                    minHeight = constraints.maxHeight,
-                    maxHeight = Constraints.Infinity,
-                )
-                val placeable = measurable.measure(unbounded)
-                layout(placeable.width, placeable.height) {
-                    placeable.place(0, 0)
-                }
-            },
+        modifier = modifier.fillMaxWidth(),
     ) {
         Column(
             modifier = Modifier

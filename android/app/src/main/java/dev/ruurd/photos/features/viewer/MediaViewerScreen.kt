@@ -8,7 +8,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.Composable
@@ -28,9 +27,10 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.IntSize
 import dev.ruurd.photos.features.viewer.components.HeroImageOverlay
 import dev.ruurd.photos.features.viewer.components.MediaInfoPanel
@@ -295,17 +295,32 @@ fun MediaViewerScreen(
             }
         }
 
-        // Inline Media Info Panel anchored directly underneath the active photo/video
+        // Inline Media Info Panel anchored directly underneath the active photo/video.
+        // Measured unbounded inside Layout so Compose never clamps height or shifts it upward.
         if (transition.shouldShowInfoPanel || infoPanelAlpha > 0.005f) {
-            MediaInfoPanel(
-                details = activeDetails,
-                localInfo = uiState.localInfo,
-                item = activeItem,
-                modifier = Modifier
-                    .onSizeChanged { transition.onInfoContentHeightChanged(it.height) }
-                    .offset { IntOffset(0, transition.infoPanelTopPx.roundToInt()) }
-                    .graphicsLayer { alpha = infoPanelAlpha },
-            )
+            Layout(
+                content = {
+                    MediaInfoPanel(
+                        details = activeDetails,
+                        localInfo = uiState.localInfo,
+                        item = activeItem,
+                        modifier = Modifier
+                            .onSizeChanged { transition.onInfoContentHeightChanged(it.height) }
+                            .graphicsLayer { alpha = infoPanelAlpha },
+                    )
+                },
+            ) { measurables, constraints ->
+                val minSheetHeight = (constraints.maxHeight - transition.infoPanelBaseTopPx.roundToInt())
+                    .coerceAtLeast(0)
+                val childConstraints = constraints.copy(
+                    minHeight = minSheetHeight,
+                    maxHeight = Constraints.Infinity,
+                )
+                val placeable = measurables.first().measure(childConstraints)
+                layout(constraints.maxWidth, constraints.maxHeight) {
+                    placeable.placeRelative(0, transition.infoPanelTopPx.roundToInt())
+                }
+            }
         }
 
         // Opening Hero Overlay: animates smoothly from tile's boundsInRoot to centered fitted rect
