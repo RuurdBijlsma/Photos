@@ -21,7 +21,8 @@
   `DefaultLoadControl` for fast remote start, and drive seekbar progress via state-read lambdas rather than legacy
   `media3-ui` Views).
 * **JSON Serialization & Local EXIF:** `org.jetbrains.kotlin.plugin.serialization` +
-  `org.jetbrains.kotlinx:kotlinx-serialization-json` + Retrofit `converter-kotlinx-serialization` (`2.11.0`) for
+  `org.jetbrains.kotlinx:kotlinx-serialization-json` + Retrofit `converter-kotlinx-serialization` (`3.0.0`, registered
+  after the protobuf converter because it claims every type and throws for protobuf responses) for
   type-safe `@Serializable` Navigation Compose routes and JSON endpoints (`/api/photos/{id}/item`, Phase 3–5 APIs),
   and `androidx.exifinterface:exifinterface:1.4.2` for offline local EXIF reading plus `LOCAL_ONLY` rotation and
   datetime editing.
