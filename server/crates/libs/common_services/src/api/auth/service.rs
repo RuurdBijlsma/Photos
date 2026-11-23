@@ -51,9 +51,12 @@ pub async fn create_user(
     }
     let hashed = hash_password(payload.password.as_ref())?;
     info!(
-        "Creating user email={}, name={}",
+        "Creating user email={}, name={}",C
         payload.email, payload.name
     );
+    if !payload.email.contains('@') {
+        return Err(AppError::BadRequest("Invalid email".to_owned()));
+    }
     let is_first_user = sqlx::query_scalar!("SELECT 1 FROM app_user")
         .fetch_optional(pool)
         .await?
