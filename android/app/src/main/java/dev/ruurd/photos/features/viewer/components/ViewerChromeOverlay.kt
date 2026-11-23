@@ -51,6 +51,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -124,7 +125,7 @@ fun ViewerChromeOverlay(
 
             Box(
                 modifier = Modifier.weight(1f),
-                contentAlignment = Alignment.CenterStart,
+                contentAlignment = Alignment.Center,
             ) {
                 if (alpha > 0.01f && (topTitle != null || topSubtitle != null)) {
                     Surface(
@@ -140,6 +141,7 @@ fun ViewerChromeOverlay(
                             ),
                     ) {
                         Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
                             modifier = Modifier.padding(
                                 horizontal = 14.dp,
                                 vertical = if (topSubtitle != null) 6.dp else 9.dp,
@@ -150,6 +152,7 @@ fun ViewerChromeOverlay(
                                     text = title,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
+                                    textAlign = TextAlign.Center,
                                     style = MaterialTheme.typography.labelLarge.copy(
                                         fontFamily = MontserratFontFamily,
                                         fontWeight = FontWeight.SemiBold,
@@ -164,6 +167,7 @@ fun ViewerChromeOverlay(
                                     text = subtitle,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
+                                    textAlign = TextAlign.Center,
                                     style = MaterialTheme.typography.labelSmall.copy(
                                         fontWeight = FontWeight.Medium,
                                         fontSize = 11.sp,

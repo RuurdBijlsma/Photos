@@ -27,7 +27,6 @@ import androidx.compose.material.icons.outlined.CameraAlt
 import androidx.compose.material.icons.outlined.CloudDone
 import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material.icons.outlined.CloudQueue
-import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.Nightlight
@@ -410,7 +409,21 @@ fun MediaInfoPanel(
                                     Surface(
                                         shape = shape,
                                         color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                                        modifier = Modifier.fillMaxWidth(),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(shape)
+                                            .then(
+                                                if (fileName != null) {
+                                                    Modifier.clickable {
+                                                        copyFilenameToClipboard(
+                                                            context = context,
+                                                            fileName = fileName,
+                                                        )
+                                                    }
+                                                } else {
+                                                    Modifier
+                                                },
+                                            ),
                                     ) {
                                         Row(
                                             modifier = Modifier.padding(16.dp),
@@ -425,39 +438,17 @@ fun MediaInfoPanel(
                                                     .size(22.dp),
                                             )
                                             Spacer(modifier = Modifier.width(14.dp))
-                                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                                 fileName?.let { name ->
-                                                    Row(
-                                                        modifier = Modifier
-                                                            .fillMaxWidth()
-                                                            .clip(RoundedCornerShape(8.dp))
-                                                            .clickable {
-                                                                copyFilenameToClipboard(
-                                                                    context = context,
-                                                                    fileName = name,
-                                                                )
-                                                            }
-                                                            .padding(vertical = 2.dp),
-                                                        verticalAlignment = Alignment.CenterVertically,
-                                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                                    ) {
-                                                        Text(
-                                                            text = name,
-                                                            style = MaterialTheme.typography.titleSmall.copy(
-                                                                fontWeight = FontWeight.Medium,
-                                                            ),
-                                                            color = MaterialTheme.colorScheme.onSurface,
-                                                            maxLines = 1,
-                                                            overflow = TextOverflow.Ellipsis,
-                                                            modifier = Modifier.weight(1f, fill = false),
-                                                        )
-                                                        Icon(
-                                                            imageVector = Icons.Outlined.ContentCopy,
-                                                            contentDescription = "Copy filename",
-                                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                            modifier = Modifier.size(15.dp),
-                                                        )
-                                                    }
+                                                    Text(
+                                                        text = name,
+                                                        style = MaterialTheme.typography.titleSmall.copy(
+                                                            fontWeight = FontWeight.Medium,
+                                                        ),
+                                                        color = MaterialTheme.colorScheme.onSurface,
+                                                        maxLines = 1,
+                                                        overflow = TextOverflow.Ellipsis,
+                                                    )
                                                 }
                                                 if (specChips.isNotEmpty()) {
                                                     Text(
