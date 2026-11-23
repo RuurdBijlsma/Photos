@@ -29,7 +29,6 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.lerp
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalViewConfiguration
@@ -512,7 +511,7 @@ class MediaViewerTransitionState(
      * - Once the info panel is open/active, both up and down drags move/scroll the photo & panel together.
      */
     fun Modifier.dismissDragModifier(): Modifier = pointerInput(Unit) {
-        val velocityTracker = VelocityTracker()
+        val velocityTracker = RecentVerticalVelocityTracker()
 
         awaitEachGesture {
             val down = awaitFirstDown(requireUnconsumed = false)
@@ -526,23 +525,23 @@ class MediaViewerTransitionState(
             var gestureMode = VerticalGestureMode.NONE
             val gestureStartInfoTravel = infoTravelPx
             val panelAlreadyActive = gestureStartInfoTravel > 0.5f
+            var lastEventTimeMs = down.uptimeMillis
 
-            velocityTracker.resetTracking()
-            velocityTracker.addPosition(down.uptimeMillis, down.position)
+            velocityTracker.reset()
+            velocityTracker.addPosition(down.uptimeMillis, down.position.y)
 
             try {
                 while (true) {
-                    val pass = if (gestureMode != VerticalGestureMode.NONE) {
-                        PointerEventPass.Initial
-                    } else {
-                        PointerEventPass.Main
-                    }
-                    val event = awaitPointerEvent(pass)
+                    val event = awaitPointerEvent(PointerEventPass.Initial)
                     val change = event.changes.firstOrNull { it.id == pointerId } ?: break
+                    lastEventTimeMs = change.uptimeMillis
 
                     val multiTouch = event.changes.count { it.pressed } > 1
                     if (multiTouch) break
-                    if (gestureMode == VerticalGestureMode.NONE && change.isConsumed) break
+
+                    if (change.pressed) {
+                        velocityTracker.addPosition(change.uptimeMillis, change.position.y)
+                    }
 
                     val dx = change.position.x - change.previousPosition.x
                     val dy = change.position.y - change.previousPosition.y
@@ -568,7 +567,6 @@ class MediaViewerTransitionState(
                                     }
                                     rawInfoTravelPx = initialTravel
                                     isDraggingInfo = true
-                                    velocityTracker.addPosition(change.uptimeMillis, change.position)
                                     change.consume()
                                 } else {
                                     gestureMode = VerticalGestureMode.DISMISS_VIEWER
@@ -579,7 +577,6 @@ class MediaViewerTransitionState(
                                     onHiddenTimelineMediaChanged(draggedId)
                                     rawDragOffset = settleDragOffset.value + Offset(totalDx, totalDy)
                                     isActivelyDragging = true
-                                    velocityTracker.addPosition(change.uptimeMillis, change.position)
                                     change.consume()
                                 }
                             } else if (abs(totalDx) > touchSlopPx) {
@@ -589,13 +586,11 @@ class MediaViewerTransitionState(
                         }
 
                         VerticalGestureMode.DISMISS_VIEWER -> {
-                            velocityTracker.addPosition(change.uptimeMillis, change.position)
                             change.consume()
                             rawDragOffset += Offset(dx, dy)
                         }
 
                         VerticalGestureMode.INFO_PANEL -> {
-                            velocityTracker.addPosition(change.uptimeMillis, change.position)
                             change.consume()
                             rawInfoTravelPx = (rawInfoTravelPx - dy).coerceIn(0f, maxInfoTravelPx)
                         }
@@ -608,7 +603,7 @@ class MediaViewerTransitionState(
                     VerticalGestureMode.DISMISS_VIEWER -> if (!isClosing) {
                         val releaseOffset = rawDragOffset
                         val releaseY = releaseOffset.y.coerceAtLeast(0f)
-                        val velocityY = velocityTracker.calculateVelocity().y
+                        val velocityY = velocityTracker.calculateVelocityY(lastEventTimeMs)
                         val shouldDismiss = releaseY > dismissThresholdPx ||
                                 (velocityY > 1000f && releaseY > fastFlickMinDistancePx)
 
@@ -638,7 +633,7 @@ class MediaViewerTransitionState(
                     VerticalGestureMode.INFO_PANEL -> if (!isClosing) {
                         val releaseTravel = rawInfoTravelPx
                         // Positive travelVelocity means moving upward into the info panel.
-                        val travelVelocity = -velocityTracker.calculateVelocity().y
+                        val travelVelocity = -velocityTracker.calculateVelocityY(lastEventTimeMs)
                         val settled = settledInfoTravelPx
                         val maxTravel = maxInfoTravelPx
 
@@ -668,9 +663,9 @@ class MediaViewerTransitionState(
                                 }
                             } else {
                                 val threshold = if (gestureStartInfoTravel <= 1f) {
-                                    min(settled * 0.16f, infoCommitThresholdPx)
+                                    min(settled * 0.18f, infoCommitThresholdPx)
                                 } else {
-                                    min(settled * 0.20f, infoCommitThresholdPx)
+                                    min(settled * 0.22f, infoCommitThresholdPx)
                                 }
                                 val shouldOpen = when {
                                     travelVelocity > infoFlickVelocityPx -> true
@@ -702,6 +697,74 @@ class MediaViewerTransitionState(
     private companion object {
         const val FALLBACK_FADE_MS = 180
         const val INFO_PANEL_SPRING_STIFFNESS = 1300f
+    }
+}
+
+/**
+ * Windowed linear vertical velocity over `pressed` move samples, avoiding quadratic polynomial
+ * sign-reversals when `ACTION_UP` repeats the last coordinates or a quick flick decelerates slightly.
+ */
+private class RecentVerticalVelocityTracker {
+    private val times = LongArray(CAPACITY)
+    private val ys = FloatArray(CAPACITY)
+    private var head = 0
+    private var count = 0
+
+    fun reset() {
+        head = 0
+        count = 0
+    }
+
+    fun addPosition(uptimeMillis: Long, y: Float) {
+        if (count > 0) {
+            val prevIdx = (head + count - 1) % CAPACITY
+            if (times[prevIdx] == uptimeMillis) {
+                ys[prevIdx] = y
+                return
+            }
+        }
+        val insertIdx = (head + count) % CAPACITY
+        times[insertIdx] = uptimeMillis
+        ys[insertIdx] = y
+        if (count == CAPACITY) {
+            head = (head + 1) % CAPACITY
+        } else {
+            count++
+        }
+    }
+
+    /** Vertical velocity in px/sec (positive = moving downward on screen). */
+    fun calculateVelocityY(releaseTimeMs: Long): Float {
+        if (count < 2) return 0f
+        val newestIdx = (head + count - 1) % CAPACITY
+        val newestTime = times[newestIdx]
+        if (releaseTimeMs - newestTime > STALE_RELEASE_MS) return 0f
+
+        val newestY = ys[newestIdx]
+        val windowStart = newestTime - WINDOW_MS
+        var oldestIdx = newestIdx
+        for (i in 0 until count - 1) {
+            val idx = (head + i) % CAPACITY
+            if (times[idx] >= windowStart) {
+                oldestIdx = idx
+                break
+            }
+        }
+        if (oldestIdx == newestIdx) {
+            val prevIdx = (head + count - 2) % CAPACITY
+            if (newestTime - times[prevIdx] > MAX_FALLBACK_SPAN_MS) return 0f
+            oldestIdx = prevIdx
+        }
+        val dtMs = newestTime - times[oldestIdx]
+        if (dtMs <= 0L) return 0f
+        return (newestY - ys[oldestIdx]) * 1000f / dtMs.toFloat()
+    }
+
+    private companion object {
+        const val CAPACITY = 20
+        const val WINDOW_MS = 80L
+        const val STALE_RELEASE_MS = 100L
+        const val MAX_FALLBACK_SPAN_MS = 150L
     }
 }
 
@@ -788,8 +851,8 @@ fun rememberMediaViewerTransitionState(
 
 private const val DISMISS_THRESHOLD_DP = 110f
 private const val FAST_FLICK_MIN_DISTANCE_DP = 40f
-private const val INFO_COMMIT_THRESHOLD_DP = 40f
-private const val INFO_FLICK_VELOCITY_DP_PER_SEC = 110f
+private const val INFO_COMMIT_THRESHOLD_DP = 44f
+private const val INFO_FLICK_VELOCITY_DP_PER_SEC = 100f
 
 /** The photo's rect when fitted (contained and centered) in the viewer. */
 private fun computeFittedRect(containerWidth: Float, containerHeight: Float, ratio: Float): Rect {
