@@ -1,11 +1,12 @@
 package dev.ruurd.photos.features.viewer.components
 
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.DecayAnimationSpec
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.VectorConverter
-import androidx.compose.animation.core.exponentialDecay
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.rememberSplineBasedDecay
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -28,11 +29,15 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.lerp
 import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.changedToUpIgnoreConsumed
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.util.VelocityTracker
+import androidx.compose.ui.input.pointer.util.addPointerInputChange
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import coil3.ImageLoader
 import coil3.SingletonImageLoader
@@ -43,7 +48,6 @@ import dev.ruurd.photos.core.image.MemoryCacheKeyRegistry
 import dev.ruurd.photos.core.image.TimelineTileBoundsRegistry
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -82,6 +86,9 @@ class MediaViewerTransitionState(
     private val fastFlickMinDistancePx: Float,
     private val infoCommitThresholdPx: Float,
     private val infoFlickVelocityPx: Float,
+    private val minFlingVelocityPx: Float,
+    private val maxFlingVelocityPx: Float,
+    private val flingDecay: DecayAnimationSpec<Float>,
     private val systemBars: ViewerSystemBars,
     onHiddenTimelineMediaChanged: (String?) -> Unit,
     onPreSyncScroll: (String) -> Unit,
@@ -511,12 +518,19 @@ class MediaViewerTransitionState(
      * - Once the info panel is open/active, both up and down drags move/scroll the photo & panel together.
      */
     fun Modifier.dismissDragModifier(): Modifier = pointerInput(Unit) {
-        val velocityTracker = RecentVerticalVelocityTracker()
+        val velocityTracker = VelocityTracker()
 
         awaitEachGesture {
             val down = awaitFirstDown(requireUnconsumed = false)
             if (isClosing || isOpeningHero || isZoomed) {
                 return@awaitEachGesture
+            }
+
+            // Catch an ongoing info-panel fling right under the finger so touching stops momentum
+            // immediately without jumping once the drag passes touch slop.
+            if (infoSettleJob?.isActive == true && !isAnimatingInfoOpen && infoTravelPx > 0.5f) {
+                infoSettleJob?.cancel()
+                infoSettleJob = null
             }
 
             val pointerId = down.id
@@ -526,9 +540,10 @@ class MediaViewerTransitionState(
             val gestureStartInfoTravel = infoTravelPx
             val panelAlreadyActive = gestureStartInfoTravel > 0.5f
             var lastEventTimeMs = down.uptimeMillis
+            var lastSampleTimeMs = down.uptimeMillis
 
-            velocityTracker.reset()
-            velocityTracker.addPosition(down.uptimeMillis, down.position.y)
+            velocityTracker.resetTracking()
+            velocityTracker.addPointerInputChange(down)
 
             try {
                 while (true) {
@@ -539,8 +554,11 @@ class MediaViewerTransitionState(
                     val multiTouch = event.changes.count { it.pressed } > 1
                     if (multiTouch) break
 
-                    if (change.pressed) {
-                        velocityTracker.addPosition(change.uptimeMillis, change.position.y)
+                    velocityTracker.addPointerInputChange(change)
+                    if (!change.changedToUpIgnoreConsumed() &&
+                        change.position != change.previousPosition
+                    ) {
+                        lastSampleTimeMs = change.uptimeMillis
                     }
 
                     val dx = change.position.x - change.previousPosition.x
@@ -550,7 +568,7 @@ class MediaViewerTransitionState(
 
                     when (gestureMode) {
                         VerticalGestureMode.NONE -> {
-                            val verticalAxisBias = if (panelAlreadyActive) 1.0f else 1.05f
+                            val verticalAxisBias = if (panelAlreadyActive) 0.5f else 1.05f
                             val isVerticalDrag = abs(totalDy) > touchSlopPx &&
                                     abs(totalDy) > abs(totalDx) * verticalAxisBias
 
@@ -561,7 +579,7 @@ class MediaViewerTransitionState(
                                     infoSettleJob = null
                                     isAnimatingInfoOpen = false
                                     val initialTravel = if (panelAlreadyActive) {
-                                        (gestureStartInfoTravel - totalDy).coerceIn(0f, maxInfoTravelPx)
+                                        (infoTravelPx - dy).coerceIn(0f, maxInfoTravelPx)
                                     } else {
                                         (-totalDy).coerceIn(0f, maxInfoTravelPx)
                                     }
@@ -579,8 +597,8 @@ class MediaViewerTransitionState(
                                     isActivelyDragging = true
                                     change.consume()
                                 }
-                            } else if (abs(totalDx) > touchSlopPx) {
-                                // Horizontal swipe belongs to HorizontalPager (or ignored when panel open).
+                            } else if (!panelAlreadyActive && abs(totalDx) > touchSlopPx) {
+                                // Horizontal swipe belongs to HorizontalPager when panel is closed.
                                 break
                             }
                         }
@@ -599,11 +617,18 @@ class MediaViewerTransitionState(
                     if (!change.pressed) break
                 }
             } finally {
+                val velocityY = if (lastEventTimeMs - lastSampleTimeMs > STALE_RELEASE_MS) {
+                    0f
+                } else {
+                    velocityTracker
+                        .calculateVelocity(Velocity(maxFlingVelocityPx, maxFlingVelocityPx))
+                        .y
+                }
+
                 when (gestureMode) {
                     VerticalGestureMode.DISMISS_VIEWER -> if (!isClosing) {
                         val releaseOffset = rawDragOffset
                         val releaseY = releaseOffset.y.coerceAtLeast(0f)
-                        val velocityY = velocityTracker.calculateVelocityY(lastEventTimeMs)
                         val shouldDismiss = releaseY > dismissThresholdPx ||
                                 (velocityY > 1000f && releaseY > fastFlickMinDistancePx)
 
@@ -633,7 +658,7 @@ class MediaViewerTransitionState(
                     VerticalGestureMode.INFO_PANEL -> if (!isClosing) {
                         val releaseTravel = rawInfoTravelPx
                         // Positive travelVelocity means moving upward into the info panel.
-                        val travelVelocity = -velocityTracker.calculateVelocityY(lastEventTimeMs)
+                        val travelVelocity = -velocityY
                         val settled = settledInfoTravelPx
                         val maxTravel = maxInfoTravelPx
 
@@ -645,7 +670,7 @@ class MediaViewerTransitionState(
 
                             if (releaseTravel >= settled) {
                                 onInfoOpenChanged(true)
-                                if (abs(travelVelocity) > 250f && maxTravel > settled) {
+                                if (abs(travelVelocity) > minFlingVelocityPx && maxTravel > settled) {
                                     try {
                                         settleInfoTravel.updateBounds(
                                             lowerBound = settled,
@@ -653,10 +678,8 @@ class MediaViewerTransitionState(
                                         )
                                         settleInfoTravel.animateDecay(
                                             initialVelocity = travelVelocity,
-                                            animationSpec = exponentialDecay(frictionMultiplier = 1.4f),
+                                            animationSpec = flingDecay,
                                         )
-                                    } catch (e: CancellationException) {
-                                        throw e
                                     } finally {
                                         settleInfoTravel.updateBounds(lowerBound = 0f, upperBound = null)
                                     }
@@ -697,74 +720,8 @@ class MediaViewerTransitionState(
     private companion object {
         const val FALLBACK_FADE_MS = 180
         const val INFO_PANEL_SPRING_STIFFNESS = 1300f
-    }
-}
-
-/**
- * Windowed linear vertical velocity over `pressed` move samples, avoiding quadratic polynomial
- * sign-reversals when `ACTION_UP` repeats the last coordinates or a quick flick decelerates slightly.
- */
-private class RecentVerticalVelocityTracker {
-    private val times = LongArray(CAPACITY)
-    private val ys = FloatArray(CAPACITY)
-    private var head = 0
-    private var count = 0
-
-    fun reset() {
-        head = 0
-        count = 0
-    }
-
-    fun addPosition(uptimeMillis: Long, y: Float) {
-        if (count > 0) {
-            val prevIdx = (head + count - 1) % CAPACITY
-            if (times[prevIdx] == uptimeMillis) {
-                ys[prevIdx] = y
-                return
-            }
-        }
-        val insertIdx = (head + count) % CAPACITY
-        times[insertIdx] = uptimeMillis
-        ys[insertIdx] = y
-        if (count == CAPACITY) {
-            head = (head + 1) % CAPACITY
-        } else {
-            count++
-        }
-    }
-
-    /** Vertical velocity in px/sec (positive = moving downward on screen). */
-    fun calculateVelocityY(releaseTimeMs: Long): Float {
-        if (count < 2) return 0f
-        val newestIdx = (head + count - 1) % CAPACITY
-        val newestTime = times[newestIdx]
-        if (releaseTimeMs - newestTime > STALE_RELEASE_MS) return 0f
-
-        val newestY = ys[newestIdx]
-        val windowStart = newestTime - WINDOW_MS
-        var oldestIdx = newestIdx
-        for (i in 0 until count - 1) {
-            val idx = (head + i) % CAPACITY
-            if (times[idx] >= windowStart) {
-                oldestIdx = idx
-                break
-            }
-        }
-        if (oldestIdx == newestIdx) {
-            val prevIdx = (head + count - 2) % CAPACITY
-            if (newestTime - times[prevIdx] > MAX_FALLBACK_SPAN_MS) return 0f
-            oldestIdx = prevIdx
-        }
-        val dtMs = newestTime - times[oldestIdx]
-        if (dtMs <= 0L) return 0f
-        return (newestY - ys[oldestIdx]) * 1000f / dtMs.toFloat()
-    }
-
-    private companion object {
-        const val CAPACITY = 20
-        const val WINDOW_MS = 80L
+        const val MIN_FLING_VELOCITY_DP_PER_SEC = 50f
         const val STALE_RELEASE_MS = 100L
-        const val MAX_FALLBACK_SPAN_MS = 150L
     }
 }
 
@@ -790,6 +747,7 @@ fun rememberMediaViewerTransitionState(
     val imageLoader = SingletonImageLoader.get(LocalContext.current)
     val memoryCacheKeyRegistry = LocalMemoryCacheKeyRegistry.current
     val boundsRegistry = LocalTimelineTileBoundsRegistry.current
+    val flingDecay = rememberSplineBasedDecay<Float>()
     val statusBarHeightPx = with(density) {
         WindowInsets.statusBarsIgnoringVisibility.getTop(density).toFloat()
     }
@@ -802,6 +760,7 @@ fun rememberMediaViewerTransitionState(
         viewConfig,
         density,
         systemBars,
+        flingDecay,
     ) {
         MediaViewerTransitionState(
             scope = scope,
@@ -818,6 +777,9 @@ fun rememberMediaViewerTransitionState(
             fastFlickMinDistancePx = with(density) { FAST_FLICK_MIN_DISTANCE_DP.dp.toPx() },
             infoCommitThresholdPx = with(density) { INFO_COMMIT_THRESHOLD_DP.dp.toPx() },
             infoFlickVelocityPx = with(density) { INFO_FLICK_VELOCITY_DP_PER_SEC.dp.toPx() },
+            minFlingVelocityPx = with(density) { MIN_FLING_VELOCITY_DP_PER_SEC.dp.toPx() },
+            maxFlingVelocityPx = viewConfig.maximumFlingVelocity,
+            flingDecay = flingDecay,
             systemBars = systemBars,
             onHiddenTimelineMediaChanged = onHiddenTimelineMediaChanged,
             onPreSyncScroll = onPreSyncScroll,
@@ -853,6 +815,7 @@ private const val DISMISS_THRESHOLD_DP = 110f
 private const val FAST_FLICK_MIN_DISTANCE_DP = 40f
 private const val INFO_COMMIT_THRESHOLD_DP = 44f
 private const val INFO_FLICK_VELOCITY_DP_PER_SEC = 100f
+private const val MIN_FLING_VELOCITY_DP_PER_SEC = 50f
 
 /** The photo's rect when fitted (contained and centered) in the viewer. */
 private fun computeFittedRect(containerWidth: Float, containerHeight: Float, ratio: Float): Rect {
