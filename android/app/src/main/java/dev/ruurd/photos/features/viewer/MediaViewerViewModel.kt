@@ -42,14 +42,20 @@ data class MediaViewerUiState(
     val isChromeVisible: Boolean = true,
     val isActiveItemMissing: Boolean = false,
     val isProjectionLoading: Boolean = false,
-    /** `GET /api/photos/{cloudId}/item` for the active item; `null` offline or before it loads. */
-    val details: MediaDetails? = null,
-    /** `MediaStore`/EXIF (or Room, for cloud-only items) fallback while [details] is unavailable. */
-    val localInfo: LocalMediaInfo? = null,
+    /** `GET /api/photos/{cloudId}/item` keyed by media id, warmed for active + neighbors. */
+    val detailsById: ImmutableMap<String, MediaDetails> = persistentMapOf(),
+    /** `MediaStore`/EXIF (or Room, for cloud-only items) fallbacks keyed by media id. */
+    val localInfoById: ImmutableMap<String, LocalMediaInfo> = persistentMapOf(),
     /** Downloaded originals for cloud-only photos, keyed by media id, so the pager can upgrade. */
     val fullResFiles: ImmutableMap<String, File> = persistentMapOf(),
     val isInfoSheetOpen: Boolean = false,
-)
+) {
+    val activeDetails: MediaDetails?
+        get() = detailsById[activeMediaId]
+
+    val activeLocalInfo: LocalMediaInfo?
+        get() = localInfoById[activeMediaId]
+}
 
 class MediaViewerViewModel(
     private val initialMediaId: String,
@@ -141,8 +147,6 @@ class MediaViewerViewModel(
                                 initialIndex = clampedIdx,
                                 isActiveItemMissing = false,
                                 isProjectionLoading = false,
-                                details = null,
-                                localInfo = null,
                             )
                         }
                     }
@@ -155,11 +159,20 @@ class MediaViewerViewModel(
         _uiState.update { current ->
             if (current.activeMediaId != mediaId) {
                 val newIndex = current.items.indexOfFirst { it.id == mediaId }
+                val newItem = if (newIndex >= 0) current.items[newIndex] else null
+                val peekedDetails = if (newItem != null && !current.detailsById.containsKey(mediaId)) {
+                    newItem.cloudId?.let(mediaDetailsRepository::peek)
+                } else {
+                    null
+                }
                 current.copy(
                     activeMediaId = mediaId,
                     initialIndex = if (newIndex >= 0) newIndex else current.initialIndex,
-                    details = null,
-                    localInfo = null,
+                    detailsById = if (peekedDetails != null) {
+                        (current.detailsById + (mediaId to peekedDetails)).toPersistentMap()
+                    } else {
+                        current.detailsById
+                    },
                 )
             } else {
                 current
@@ -168,25 +181,18 @@ class MediaViewerViewModel(
     }
 
     /**
-     * Called ~130 ms after the pager settles: loads `/item` for the page plus its neighbors and
-     * reads the local/offline fallback for the info sheet. A newer settle cancels the old one.
+     * Called ~130 ms after the pager settles: loads `/item` and local/offline info for the settled
+     * page plus its neighbors so swiping with the info panel open never blanks out metadata.
      */
     fun onSettledPage(mediaId: String) {
         settleJob?.cancel()
         settleJob = viewModelScope.launch {
             val item = _uiState.value.items.firstOrNull { it.id == mediaId } ?: return@launch
 
-            // Paint a warm /item immediately so About renders without waiting for the network.
-            item.cloudId?.let(mediaDetailsRepository::peek)?.let { publish(mediaId, details = it) }
-
-            val details = item.cloudId?.let { mediaDetailsRepository.get(it) }
-            val localInfo = readLocalInfo(item, hasDetails = details != null)
-            if (_uiState.value.activeMediaId != mediaId) return@launch
-            publish(mediaId, details, localInfo)
-
+            loadInfoForItem(item)
             requestFullRes(item)
-            trimFullResFiles(mediaId)
             prefetchNeighbors(mediaId)
+            trimWindowCaches(mediaId)
         }
     }
 
@@ -226,13 +232,13 @@ class MediaViewerViewModel(
     suspend fun shareIntent(): Intent? {
         val state = _uiState.value
         val item = state.items.firstOrNull { it.id == state.activeMediaId } ?: return null
-        return mediaFileSharer.shareIntent(item, state.details)
+        return mediaFileSharer.shareIntent(item, state.activeDetails)
     }
 
     suspend fun copyToClipboard(): Boolean {
         val state = _uiState.value
         val item = state.items.firstOrNull { it.id == state.activeMediaId } ?: return false
-        return mediaFileSharer.copyToClipboard(item, state.details)
+        return mediaFileSharer.copyToClipboard(item, state.activeDetails)
     }
 
     fun openInfoSheet() {
@@ -251,16 +257,37 @@ class MediaViewerViewModel(
         _uiState.update { it.copy(isChromeVisible = visible) }
     }
 
-    private fun publish(
+    private suspend fun loadInfoForItem(item: TimelineMediaProjection) {
+        item.cloudId?.let(mediaDetailsRepository::peek)?.let { cached ->
+            publishItemInfo(item.id, details = cached, localInfo = null)
+        }
+
+        val details = item.cloudId?.let { mediaDetailsRepository.get(it) }
+        val localInfo = readLocalInfo(item, hasDetails = details != null)
+        publishItemInfo(item.id, details = details, localInfo = localInfo)
+    }
+
+    private fun publishItemInfo(
         mediaId: String,
         details: MediaDetails?,
-        localInfo: LocalMediaInfo? = _uiState.value.localInfo,
+        localInfo: LocalMediaInfo?,
     ) {
         _uiState.update { current ->
-            if (current.activeMediaId != mediaId) {
+            if (current.items.none { it.id == mediaId }) return@update current
+            val nextDetails = if (details != null && current.detailsById[mediaId] != details) {
+                (current.detailsById + (mediaId to details)).toPersistentMap()
+            } else {
+                current.detailsById
+            }
+            val nextLocalInfo = if (localInfo != null && current.localInfoById[mediaId] != localInfo) {
+                (current.localInfoById + (mediaId to localInfo)).toPersistentMap()
+            } else {
+                current.localInfoById
+            }
+            if (nextDetails === current.detailsById && nextLocalInfo === current.localInfoById) {
                 current
             } else {
-                current.copy(details = details, localInfo = localInfo)
+                current.copy(detailsById = nextDetails, localInfoById = nextLocalInfo)
             }
         }
     }
@@ -289,27 +316,46 @@ class MediaViewerViewModel(
         coroutineScope {
             listOf(index - 1, index + 1)
                 .filter { it in items.indices }
-                .mapNotNull { items[it].cloudId }
-                .forEach { neighborId ->
-                    launch { mediaDetailsRepository.get(neighborId) }
+                .forEach { neighborIdx ->
+                    val neighbor = items[neighborIdx]
+                    launch { loadInfoForItem(neighbor) }
                 }
         }
     }
 
-    /** Keeps the in-memory pointer map to the settled page's neighbors; files stay on disk. */
-    private fun trimFullResFiles(mediaId: String) {
+    /** Keeps in-memory info/file maps bounded around the settled page; disk files stay cached. */
+    private fun trimWindowCaches(mediaId: String) {
         val items = _uiState.value.items
         val index = items.indexOfFirst { it.id == mediaId }
         if (index < 0) return
-        val keep = ((index - 1)..(index + 1)).mapNotNull { items.getOrNull(it)?.id }.toSet()
+        val fullResKeep = ((index - 1)..(index + 1)).mapNotNull { items.getOrNull(it)?.id }.toSet()
+        val infoKeep = ((index - 2)..(index + 2)).mapNotNull { items.getOrNull(it)?.id }.toSet()
         _uiState.update { current ->
-            if (current.fullResFiles.keys.all { it in keep }) {
+            val nextFullRes = if (current.fullResFiles.keys.all { it in fullResKeep }) {
+                current.fullResFiles
+            } else {
+                current.fullResFiles.filterKeys { it in fullResKeep }.toPersistentMap()
+            }
+            val nextDetails = if (current.detailsById.keys.all { it in infoKeep }) {
+                current.detailsById
+            } else {
+                current.detailsById.filterKeys { it in infoKeep }.toPersistentMap()
+            }
+            val nextLocalInfo = if (current.localInfoById.keys.all { it in infoKeep }) {
+                current.localInfoById
+            } else {
+                current.localInfoById.filterKeys { it in infoKeep }.toPersistentMap()
+            }
+            if (nextFullRes === current.fullResFiles &&
+                nextDetails === current.detailsById &&
+                nextLocalInfo === current.localInfoById
+            ) {
                 current
             } else {
                 current.copy(
-                    fullResFiles = current.fullResFiles
-                        .filterKeys { it in keep }
-                        .toPersistentMap(),
+                    fullResFiles = nextFullRes,
+                    detailsById = nextDetails,
+                    localInfoById = nextLocalInfo,
                 )
             }
         }

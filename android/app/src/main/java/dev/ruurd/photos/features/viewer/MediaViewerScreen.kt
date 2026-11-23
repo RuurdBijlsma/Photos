@@ -48,7 +48,8 @@ import kotlin.math.roundToInt
 
 /**
  * Full-screen media pager with the tile↔fullscreen hero transition, drag-to-dismiss, floating
- * chrome, and the inline swipe-up Media Info panel that shares vertical space with the active item.
+ * chrome, and the inline swipe-up Media Info panel anchored under each page so horizontal swipes
+ * move the media item and its info sheet together.
  */
 @Composable
 fun MediaViewerScreen(
@@ -68,7 +69,9 @@ fun MediaViewerScreen(
     val actionScope = rememberCoroutineScope()
 
     val activeItem = items.firstOrNull { it.id == uiState.activeMediaId }
-    val activeDetails = uiState.details?.takeIf { it.cloudId == activeItem?.cloudId }
+    val activeDetails = activeItem?.let { item ->
+        uiState.detailsById[item.id]?.takeIf { it.cloudId == item.cloudId }
+    }
 
     val currentItems by rememberUpdatedState(items)
     val currentActiveId by rememberUpdatedState(uiState.activeMediaId)
@@ -134,6 +137,14 @@ fun MediaViewerScreen(
         }
     }
 
+    // Close the info panel cleanly if the user pinches or double-taps to zoom in
+    LaunchedEffect(isZoomed) {
+        if (isZoomed && transition.isInfoPanelActive) {
+            viewModel.closeInfoSheet()
+            transition.requestCloseInfoPanel()
+        }
+    }
+
     // Dismiss automatically if the library becomes empty or active item no longer exists
     LaunchedEffect(uiState.isActiveItemMissing) {
         if (uiState.isActiveItemMissing && !transition.isClosing) {
@@ -166,6 +177,23 @@ fun MediaViewerScreen(
                 viewModel.onPageChanged(latestItems[page].id)
             }
         }
+    }
+
+    // Reset per-item sheet scroll overflow once a horizontal swipe finishes settling on a new page
+    LaunchedEffect(pagerState) {
+        snapshotFlow {
+            if (pagerState.isScrollInProgress || currentItems.isEmpty()) {
+                null
+            } else {
+                pagerState.settledPage
+            }
+        }
+            .filterNotNull()
+            .collect { page ->
+                currentItems.getOrNull(page)?.let { settledItem ->
+                    transition.onHorizontalPageSettled(settledItem.id)
+                }
+            }
     }
 
     ViewerPreSyncScrollEffect(
@@ -230,14 +258,14 @@ fun MediaViewerScreen(
         // Interactive Pager Layer (hidden only while ClosingHeroOverlay is flying back to the tile)
         if (transition.closingState == null && items.isNotEmpty()) {
             val isPagerScrollEnabled = !isZoomed && !transition.isDragging &&
-                    !transition.isOpeningHero && !transition.isInfoPanelActive
+                    !transition.isOpeningHero
 
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .graphicsLayer {
                         translationX = transition.dragOffset.x
-                        translationY = transition.contentTranslationY
+                        translationY = transition.dragOffset.y
                         scaleX = transition.viewerScale
                         scaleY = transition.viewerScale
                         alpha = transition.pagerAlpha
@@ -255,70 +283,92 @@ fun MediaViewerScreen(
                         key(item.id) {
                             val isCurrentPage = pagerState.currentPage == page
                             val isSettledPage = pagerState.settledPage == page
+                            val itemDetails = uiState.detailsById[item.id]
+                                ?.takeIf { it.cloudId == item.cloudId }
+                            val itemLocalInfo = uiState.localInfoById[item.id]
+
                             Box(modifier = Modifier.fillMaxSize()) {
-                                ZoomablePhotoPage(
-                                    item = item,
-                                    baseUrl = baseUrl,
-                                    isActivePage = isCurrentPage,
-                                    isSettledPage = isSettledPage,
-                                    isOpeningTransition = transition.isOpeningHero,
-                                    onTap = {
-                                        if (!transition.isOpeningHero && !transition.isClosing) {
-                                            if (transition.isInfoPanelActive) {
-                                                viewModel.closeInfoSheet()
-                                                transition.requestCloseInfoPanel()
-                                            } else {
-                                                viewModel.toggleChrome()
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .graphicsLayer {
+                                            translationY = -transition.pageTravelPx(item)
+                                        },
+                                ) {
+                                    ZoomablePhotoPage(
+                                        item = item,
+                                        baseUrl = baseUrl,
+                                        isActivePage = isCurrentPage,
+                                        isSettledPage = isSettledPage,
+                                        isOpeningTransition = transition.isOpeningHero,
+                                        onTap = {
+                                            if (!transition.isOpeningHero && !transition.isClosing) {
+                                                if (transition.isInfoPanelActive) {
+                                                    viewModel.closeInfoSheet()
+                                                    transition.requestCloseInfoPanel()
+                                                } else {
+                                                    viewModel.toggleChrome()
+                                                }
                                             }
-                                        }
-                                    },
-                                    onZoomFractionChanged = { fraction ->
-                                        if (page == pagerState.currentPage) {
-                                            activePageZoomFraction = fraction
-                                        }
-                                    },
-                                    fullResFile = uiState.fullResFiles[item.id],
-                                    onFullResRequested = { viewModel.requestFullRes(item) },
-                                    modifier = Modifier.fillMaxSize(),
-                                )
-                                // Phase 2C swaps this slot for a real VideoPlayerPage.
-                                if (item.isVideo) {
-                                    VideoPlayBadge(
-                                        durationMs = item.durationMs,
-                                        modifier = Modifier.align(Alignment.Center),
+                                        },
+                                        onZoomFractionChanged = { fraction ->
+                                            if (page == pagerState.currentPage) {
+                                                activePageZoomFraction = fraction
+                                            }
+                                        },
+                                        fullResFile = uiState.fullResFiles[item.id],
+                                        onFullResRequested = { viewModel.requestFullRes(item) },
+                                        modifier = Modifier.fillMaxSize(),
                                     )
+                                    // Phase 2C swaps this slot for a real VideoPlayerPage.
+                                    if (item.isVideo) {
+                                        VideoPlayBadge(
+                                            durationMs = item.durationMs,
+                                            modifier = Modifier.align(Alignment.Center),
+                                        )
+                                    }
+                                }
+
+                                // Inline Media Info panel anchored directly underneath each page's
+                                // media item so horizontal swipes slide photo + info together.
+                                if (transition.shouldShowInfoPanel || infoPanelAlpha > 0.005f) {
+                                    Layout(
+                                        content = {
+                                            MediaInfoPanel(
+                                                details = itemDetails,
+                                                localInfo = itemLocalInfo,
+                                                item = item,
+                                                modifier = Modifier
+                                                    .onSizeChanged {
+                                                        transition.onInfoContentHeightChanged(
+                                                            item.id,
+                                                            it.height,
+                                                        )
+                                                    }
+                                                    .graphicsLayer { alpha = infoPanelAlpha },
+                                            )
+                                        },
+                                    ) { measurables, constraints ->
+                                        val minSheetHeight = (
+                                                constraints.maxHeight -
+                                                        transition.sheetRestTopPx.roundToInt()
+                                                ).coerceAtLeast(0)
+                                        val childConstraints = constraints.copy(
+                                            minHeight = minSheetHeight,
+                                            maxHeight = Constraints.Infinity,
+                                        )
+                                        val placeable = measurables.first().measure(childConstraints)
+                                        layout(constraints.maxWidth, constraints.maxHeight) {
+                                            placeable.placeRelative(
+                                                0,
+                                                transition.pageInfoPanelTopPx(item).roundToInt(),
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }
                     }
-                }
-            }
-        }
-
-        // Inline Media Info Panel anchored directly underneath the active photo/video.
-        // Measured unbounded inside Layout so Compose never clamps height or shifts it upward.
-        if (transition.shouldShowInfoPanel || infoPanelAlpha > 0.005f) {
-            Layout(
-                content = {
-                    MediaInfoPanel(
-                        details = activeDetails,
-                        localInfo = uiState.localInfo,
-                        item = activeItem,
-                        modifier = Modifier
-                            .onSizeChanged { transition.onInfoContentHeightChanged(it.height) }
-                            .graphicsLayer { alpha = infoPanelAlpha },
-                    )
-                },
-            ) { measurables, constraints ->
-                val minSheetHeight = (constraints.maxHeight - transition.infoPanelBaseTopPx.roundToInt())
-                    .coerceAtLeast(0)
-                val childConstraints = constraints.copy(
-                    minHeight = minSheetHeight,
-                    maxHeight = Constraints.Infinity,
-                )
-                val placeable = measurables.first().measure(childConstraints)
-                layout(constraints.maxWidth, constraints.maxHeight) {
-                    placeable.placeRelative(0, transition.infoPanelTopPx.roundToInt())
                 }
             }
         }

@@ -1,4 +1,5 @@
 package dev.ruurd.photos.features.viewer
+
 import android.content.Intent
 import androidx.lifecycle.viewModelScope
 import dev.ruurd.photos.core.common.MediaFileSharer
@@ -267,8 +268,14 @@ class MediaViewerViewModelTest {
         viewModel.onSettledPage("p2")
         runCurrent()
 
-        assertEquals("c2", viewModel.uiState.value.details?.cloudId)
+        assertEquals("c2", viewModel.uiState.value.activeDetails?.cloudId)
+        assertEquals("c1", viewModel.uiState.value.detailsById["p1"]?.cloudId)
+        assertEquals("c3", viewModel.uiState.value.detailsById["p3"]?.cloudId)
         assertTrue(detailsRepository.requested.containsAll(listOf("c2", "c1", "c3")))
+
+        // Swiping to a prefetched neighbor keeps its details available immediately.
+        viewModel.onPageChanged("p3")
+        assertEquals("c3", viewModel.uiState.value.activeDetails?.cloudId)
 
         viewModel.openInfoSheet()
         assertTrue(viewModel.uiState.value.isInfoSheetOpen)

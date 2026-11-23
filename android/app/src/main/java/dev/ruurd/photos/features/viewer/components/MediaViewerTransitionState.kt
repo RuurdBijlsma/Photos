@@ -19,7 +19,6 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -69,8 +68,12 @@ private enum class VerticalGestureMode {
 }
 
 /**
- * Owns the viewer's hero open/close animation, the drag-to-dismiss gesture, and the unified
- * swipe-up Media Info panel that shares vertical space directly beneath the active photo/video.
+ * Owns the viewer's hero open/close animation, the drag-to-dismiss gesture, and the inline
+ * swipe-up Media Info panel anchored beneath each page in the horizontal pager.
+ *
+ * Open progress ([infoOpenFraction]) is normalized across all items so swiping horizontally while
+ * the panel is open keeps the sheet top level across differing photo aspect ratios, while
+ * detail scroll overflow ([sheetScrollPx]) tracks the currently scrolled page.
  */
 @Stable
 class MediaViewerTransitionState(
@@ -105,7 +108,7 @@ class MediaViewerTransitionState(
     internal var onHiddenTimelineMediaChanged: (String?) -> Unit = onHiddenTimelineMediaChanged
     internal var onPreSyncScroll: (String) -> Unit = onPreSyncScroll
     internal var onInfoOpenChanged: (Boolean) -> Unit = onInfoOpenChanged
-    internal var onDismissFinished: () -> Unit = onDismissFinished
+    internal var onDismissFinished: (Unit) -> Unit = { onDismissFinished() }
 
     var viewerSize by mutableStateOf(initialSize)
         private set
@@ -129,25 +132,27 @@ class MediaViewerTransitionState(
     private val settleDragOffset = Animatable(Offset.Zero, Offset.VectorConverter)
     private var settleJob: Job? = null
 
-    // Unified swipe-up Media Info panel state (moves 1:1 with the photo/video)
+    // Unified swipe-up Media Info panel state
     private var isDraggingInfo by mutableStateOf(false)
     private var isAnimatingInfoOpen by mutableStateOf(false)
-    private var infoAnimationTargetPx by mutableFloatStateOf(0f)
-    private var rawInfoTravelPx by mutableFloatStateOf(0f)
-    private val settleInfoTravel = Animatable(0f)
+    private var isClosingInfoPanel by mutableStateOf(false)
+    private var infoOpenFraction by mutableFloatStateOf(0f)
+    private var sheetScrollPx by mutableFloatStateOf(0f)
+    private var scrolledPageId by mutableStateOf<String?>(null)
+    private var rawPanelTravelPx by mutableFloatStateOf(0f)
+    private val infoTravelAnim = Animatable(0f)
     private var infoSettleJob: Job? = null
-    private var infoContentHeightPx by mutableIntStateOf(0)
-
-    val infoTravelPx: Float
-        get() = if (isDraggingInfo) rawInfoTravelPx else settleInfoTravel.value
+    private val infoContentHeights = HashMap<String, Int>()
 
     val isInfoPanelActive: Boolean by derivedStateOf {
-        infoTravelPx > 0.5f || isDraggingInfo || isAnimatingInfoOpen
+        infoOpenFraction > 0.005f || sheetScrollPx > 0.5f || isDraggingInfo || isAnimatingInfoOpen
     }
 
     /** True from the instant swipe-up starts until the photo settles back to its resting y-pos. */
     val shouldShowInfoPanel: Boolean by derivedStateOf {
-        (infoTravelPx > 0.5f || isAnimatingInfoOpen) && !isClosing && !isOpeningHero
+        (infoOpenFraction > 0.005f || sheetScrollPx > 0.5f || isAnimatingInfoOpen) &&
+                !isClosing &&
+                !isOpeningHero
     }
 
     private val currentActiveItem: TimelineMediaProjection?
@@ -155,58 +160,43 @@ class MediaViewerTransitionState(
             ?: items.firstOrNull { it.id == activeMediaId }
             ?: items.getOrNull(pagerState.currentPage)
 
-    val infoPanelBaseTopPx: Float
+    val sheetRestTopPx: Float
         get() {
             val containerH = viewerSize.height.toFloat()
-            if (containerH <= 0f || viewerSize.width <= 0) return 0f
-            val item = currentActiveItem ?: return containerH * 0.7f
-            return fittedRect(item).bottom.coerceIn(0f, containerH)
+            if (containerH <= 0f) return 0f
+            return (containerH * SHEET_REST_TOP_FRACTION).coerceAtLeast(statusBarHeightPx)
         }
 
-    val settledInfoTravelPx: Float
-        get() {
-            val containerH = viewerSize.height.toFloat()
-            if (containerH <= 0f || viewerSize.width <= 0) return 0f
-            val item = currentActiveItem
-            val fittedH = item?.let { fittedRect(it).height } ?: (containerH * 0.4f)
-            val baseTop = infoPanelBaseTopPx
-            val minSettledTop = containerH * 0.32f
-            val maxSettledTop = containerH * 0.44f
-            val desiredSettledTop = (statusBarHeightPx + fittedH).coerceIn(minSettledTop, maxSettledTop)
-            val desiredTravel = (baseTop - desiredSettledTop).coerceAtLeast(containerH * 0.12f)
-            val contentH = infoContentHeightPx.toFloat()
-            if (contentH <= 0f) return desiredTravel
-            val bottomAlignTravel = (baseTop + contentH - containerH).coerceAtLeast(0f)
-            // When the panel's content is shorter than the remaining open space, stop once its
-            // bottom reaches the bottom of the screen instead of leaving a black gap underneath.
-            return if (bottomAlignTravel > 0f) {
-                min(desiredTravel, bottomAlignTravel)
-            } else {
-                min(desiredTravel, containerH * 0.15f)
-            }
-        }
-
-    private val maxInfoTravelPx: Float
-        get() {
-            val containerH = viewerSize.height.toFloat()
-            if (containerH <= 0f) return settledInfoTravelPx
-            val contentH = infoContentHeightPx.toFloat()
-            if (contentH <= 0f) return settledInfoTravelPx
-            return (infoPanelBaseTopPx + contentH - containerH).coerceAtLeast(settledInfoTravelPx)
-        }
-
-    val infoPanelTopPx: Float
-        get() = infoPanelBaseTopPx - infoTravelPx
-
-    val isInfoCoveringStatusBar: Boolean by derivedStateOf {
-        shouldShowInfoPanel && infoPanelTopPx <= statusBarHeightPx * 0.5f
+    private fun baseTopPx(item: TimelineMediaProjection): Float {
+        val containerH = viewerSize.height.toFloat()
+        if (containerH <= 0f || viewerSize.width <= 0) return 0f
+        return fittedRect(item).bottom.coerceIn(0f, containerH)
     }
 
-    private val infoOpenFraction: Float
-        get() {
-            val settled = settledInfoTravelPx
-            return if (settled > 0f) (infoTravelPx / settled).coerceIn(0f, 1f) else 0f
-        }
+    private fun travelToRestPx(item: TimelineMediaProjection): Float =
+        (baseTopPx(item) - sheetRestTopPx).coerceAtLeast(0f)
+
+    private fun maxSheetScrollPx(item: TimelineMediaProjection): Float {
+        val containerH = viewerSize.height.toFloat()
+        if (containerH <= 0f) return 0f
+        val contentH = (infoContentHeights[item.id] ?: 0).toFloat()
+        if (contentH <= 0f) return 0f
+        return (sheetRestTopPx + contentH - containerH).coerceAtLeast(0f)
+    }
+
+    fun pageTravelPx(item: TimelineMediaProjection): Float {
+        val rest = travelToRestPx(item)
+        val scroll = if (scrolledPageId == item.id) sheetScrollPx else 0f
+        return rest * infoOpenFraction + scroll
+    }
+
+    fun pageInfoPanelTopPx(item: TimelineMediaProjection): Float =
+        baseTopPx(item) - pageTravelPx(item)
+
+    val isInfoCoveringStatusBar: Boolean by derivedStateOf {
+        val activeTop = currentActiveItem?.let(::pageInfoPanelTopPx) ?: sheetRestTopPx
+        shouldShowInfoPanel && activeTop <= statusBarHeightPx * 0.5f
+    }
 
     val hasValidOpenSource: Boolean
         get() = openSourceRect != null && viewerSize.width > 0 && viewerSize.height > 0
@@ -221,13 +211,14 @@ class MediaViewerTransitionState(
     val dragOffset: Offset
         get() = if (isActivelyDragging) rawDragOffset else settleDragOffset.value
 
-    val contentTranslationY: Float
-        get() = if (infoTravelPx > 0f) -infoTravelPx else dragOffset.y
-
     private val dragDistanceY: Float get() = dragOffset.y.coerceAtLeast(0f)
 
     val viewerScale: Float
-        get() = if (infoTravelPx > 0f) 1f else (1f - (dragDistanceY / 1400f)).coerceIn(0.55f, 1f)
+        get() = if (infoOpenFraction > 0f || sheetScrollPx > 0f) {
+            1f
+        } else {
+            (1f - (dragDistanceY / 1400f)).coerceIn(0.55f, 1f)
+        }
 
     /** The pager stays invisible until the opening hero has landed (or fades in without a source tile). */
     val pagerAlpha: Float
@@ -237,7 +228,8 @@ class MediaViewerTransitionState(
             else -> fallbackFadeIn.value
         }
 
-    fun openingRect(sourceRect: Rect, item: TimelineMediaProjection): Rect = lerp(sourceRect, fittedRect(item), openProgress.value)
+    fun openingRect(sourceRect: Rect, item: TimelineMediaProjection): Rect =
+        lerp(sourceRect, fittedRect(item), openProgress.value)
 
     fun closingRect(closing: ClosingHeroState): Rect {
         val targetRect = closing.targetRect
@@ -252,7 +244,8 @@ class MediaViewerTransitionState(
         return Rect(cx - w / 2f, cy - h / 2f, cx + w / 2f, cy + h / 2f)
     }
 
-    fun closingAlpha(closing: ClosingHeroState): Float = if (closing.targetRect != null) 1f else (1f - closeProgress.value).coerceIn(0f, 1f)
+    fun closingAlpha(closing: ClosingHeroState): Float =
+        if (closing.targetRect != null) 1f else (1f - closeProgress.value).coerceIn(0f, 1f)
 
     private fun fittedRect(item: TimelineMediaProjection): Rect = computeFittedRect(
         containerWidth = viewerSize.width.toFloat(),
@@ -273,7 +266,7 @@ class MediaViewerTransitionState(
 
                 isOpeningHero -> openProgress.value.coerceIn(0f, 1f)
 
-                infoTravelPx > 0f -> 1f
+                infoOpenFraction > 0f || sheetScrollPx > 0f -> 1f
 
                 hasValidOpenSource -> dragBackdropAlpha
 
@@ -307,25 +300,24 @@ class MediaViewerTransitionState(
         viewerSize = size
     }
 
-    fun onInfoContentHeightChanged(heightPx: Int) {
-        if (heightPx <= 0 || heightPx == infoContentHeightPx) return
-        infoContentHeightPx = heightPx
-        if (isDraggingInfo || isClosing) return
+    fun onInfoContentHeightChanged(mediaId: String, heightPx: Int) {
+        if (heightPx <= 0 || infoContentHeights[mediaId] == heightPx) return
+        infoContentHeights[mediaId] = heightPx
+        if (isDraggingInfo || isClosing || scrolledPageId != mediaId) return
 
-        // Retarget if the panel opened (e.g. via "About") before its real content height was known.
-        if (isAnimatingInfoOpen) {
-            val updatedTarget = settledInfoTravelPx
-            if (abs(updatedTarget - infoAnimationTargetPx) > 1f) {
-                infoSettleJob?.cancel()
-                infoSettleJob = scope.launch {
-                    animateInfoTo(target = updatedTarget, markOpen = true)
-                }
-            }
-        } else if (settleInfoTravel.value > maxInfoTravelPx) {
+        val item = items.firstOrNull { it.id == mediaId } ?: return
+        val maxScroll = maxSheetScrollPx(item)
+        if (sheetScrollPx > maxScroll) {
+            sheetScrollPx = maxScroll
+        }
+    }
+
+    fun onHorizontalPageSettled(mediaId: String) {
+        if (scrolledPageId != null && scrolledPageId != mediaId && !isDraggingInfo) {
             infoSettleJob?.cancel()
-            infoSettleJob = scope.launch {
-                settleInfoTravel.snapTo(maxInfoTravelPx)
-            }
+            infoSettleJob = null
+            sheetScrollPx = 0f
+            scrolledPageId = null
         }
     }
 
@@ -368,32 +360,48 @@ class MediaViewerTransitionState(
             closeProgress.animateTo(1f, tween(durationMillis = FALLBACK_FADE_MS))
         }
         onHiddenTimelineMediaChanged(null)
-        onDismissFinished()
+        onDismissFinished(Unit)
     }
 
     fun requestOpenInfoPanel() {
         if (isClosing || isOpeningHero || isZoomed || isDraggingInfo) return
-        val target = settledInfoTravelPx
-        if (target <= 0f) return
-        if (infoTravelPx >= target - 1f && !isAnimatingInfoOpen) {
+        if (infoOpenFraction >= 0.999f && !isAnimatingInfoOpen) {
             onInfoOpenChanged(true)
             return
         }
+        if (isAnimatingInfoOpen) return
+        val item = currentActiveItem ?: return
+        val target = travelToRestPx(item)
+        if (target <= 0f) return
         infoSettleJob?.cancel()
         infoSettleJob = scope.launch {
-            animateInfoTo(target = target, markOpen = true)
+            animateInfoTo(
+                item = item,
+                startTravel = pageTravelPx(item),
+                targetTravel = target,
+                markOpen = true,
+            )
         }
     }
 
     fun requestCloseInfoPanel() {
-        if (isDraggingInfo) return
-        if (infoTravelPx <= 0.5f && !isAnimatingInfoOpen) {
+        if (isDraggingInfo || isClosingInfoPanel) return
+        if (infoOpenFraction <= 0.005f && sheetScrollPx <= 0.5f && !isAnimatingInfoOpen) {
             onInfoOpenChanged(false)
+            return
+        }
+        val item = currentActiveItem ?: run {
+            resetInfoPanelImmediate()
             return
         }
         infoSettleJob?.cancel()
         infoSettleJob = scope.launch {
-            animateInfoTo(target = 0f, markOpen = false)
+            animateInfoTo(
+                item = item,
+                startTravel = pageTravelPx(item),
+                targetTravel = 0f,
+                markOpen = false,
+            )
         }
     }
 
@@ -402,35 +410,61 @@ class MediaViewerTransitionState(
         infoSettleJob = null
         isDraggingInfo = false
         isAnimatingInfoOpen = false
-        infoAnimationTargetPx = 0f
-        rawInfoTravelPx = 0f
+        isClosingInfoPanel = false
+        infoOpenFraction = 0f
+        sheetScrollPx = 0f
+        scrolledPageId = null
+        rawPanelTravelPx = 0f
         scope.launch {
-            settleInfoTravel.updateBounds(lowerBound = 0f, upperBound = null)
-            settleInfoTravel.snapTo(0f)
+            infoTravelAnim.updateBounds(lowerBound = 0f, upperBound = null)
+            infoTravelAnim.snapTo(0f)
         }
         onInfoOpenChanged(false)
     }
 
+    private fun applyTravel(item: TimelineMediaProjection, travelPx: Float) {
+        val clamped = travelPx.coerceAtLeast(0f)
+        val rest = travelToRestPx(item)
+        if (rest <= 0f) {
+            infoOpenFraction = if (clamped > 0f) 1f else 0f
+            sheetScrollPx = clamped.coerceIn(0f, maxSheetScrollPx(item))
+        } else if (clamped <= rest) {
+            infoOpenFraction = (clamped / rest).coerceIn(0f, 1f)
+            sheetScrollPx = 0f
+        } else {
+            infoOpenFraction = 1f
+            sheetScrollPx = (clamped - rest).coerceIn(0f, maxSheetScrollPx(item))
+        }
+        scrolledPageId = if (sheetScrollPx > 0.5f) item.id else null
+    }
+
     private suspend fun animateInfoTo(
-        target: Float,
+        item: TimelineMediaProjection,
+        startTravel: Float,
+        targetTravel: Float,
         markOpen: Boolean,
         initialVelocity: Float = 0f,
     ) {
         isAnimatingInfoOpen = markOpen
-        infoAnimationTargetPx = target
+        isClosingInfoPanel = !markOpen
         try {
-            settleInfoTravel.updateBounds(lowerBound = 0f, upperBound = null)
-            settleInfoTravel.animateTo(
-                targetValue = target,
+            infoTravelAnim.updateBounds(lowerBound = 0f, upperBound = null)
+            infoTravelAnim.snapTo(startTravel)
+            infoTravelAnim.animateTo(
+                targetValue = targetTravel,
                 initialVelocity = initialVelocity,
                 animationSpec = spring(
                     dampingRatio = 0.92f,
                     stiffness = INFO_PANEL_SPRING_STIFFNESS,
                 ),
-            )
+            ) {
+                applyTravel(item, value)
+            }
+            applyTravel(item, targetTravel)
             onInfoOpenChanged(markOpen)
         } finally {
             isAnimatingInfoOpen = false
+            isClosingInfoPanel = false
         }
     }
 
@@ -446,15 +480,18 @@ class MediaViewerTransitionState(
         infoSettleJob = null
         isDraggingInfo = false
         isAnimatingInfoOpen = false
-        infoAnimationTargetPx = 0f
-        rawInfoTravelPx = 0f
+        isClosingInfoPanel = false
+        infoOpenFraction = 0f
+        sheetScrollPx = 0f
+        scrolledPageId = null
+        rawPanelTravelPx = 0f
 
         val activeItem = currentActiveItem
 
         if (activeItem == null || viewerSize.width <= 0 || viewerSize.height <= 0) {
             systemBars.restoreForTimeline()
             onHiddenTimelineMediaChanged(null)
-            onDismissFinished()
+            onDismissFinished(Unit)
             return
         }
 
@@ -514,8 +551,8 @@ class MediaViewerTransitionState(
     /**
      * Unified vertical gesture handler on the untransformed viewer root:
      * - Swipe down from rest drags the viewer over the timeline to dismiss.
-     * - Swipe up from rest fades in the info panel right below the photo and moves both 1:1.
-     * - Once the info panel is open/active, both up and down drags move/scroll the photo & panel together.
+     * - Swipe up from rest opens the info panel on the active page and scrolls its details.
+     * - Horizontal swipes yield to HorizontalPager whether the info panel is open or closed.
      */
     fun Modifier.dismissDragModifier(): Modifier = pointerInput(Unit) {
         val velocityTracker = VelocityTracker()
@@ -528,7 +565,9 @@ class MediaViewerTransitionState(
 
             // Catch an ongoing info-panel fling right under the finger so touching stops momentum
             // immediately without jumping once the drag passes touch slop.
-            if (infoSettleJob?.isActive == true && !isAnimatingInfoOpen && infoTravelPx > 0.5f) {
+            if (infoSettleJob?.isActive == true && !isAnimatingInfoOpen && !isClosingInfoPanel &&
+                (infoOpenFraction > 0.005f || sheetScrollPx > 0.5f)
+            ) {
                 infoSettleJob?.cancel()
                 infoSettleJob = null
             }
@@ -537,8 +576,9 @@ class MediaViewerTransitionState(
             var totalDx = 0f
             var totalDy = 0f
             var gestureMode = VerticalGestureMode.NONE
-            val gestureStartInfoTravel = infoTravelPx
-            val panelAlreadyActive = gestureStartInfoTravel > 0.5f
+            var gestureItem: TimelineMediaProjection? = null
+            val panelAlreadyActive = infoOpenFraction > 0.005f || sheetScrollPx > 0.5f
+            val gestureStartTravel = currentActiveItem?.let(::pageTravelPx) ?: 0f
             var lastEventTimeMs = down.uptimeMillis
             var lastSampleTimeMs = down.uptimeMillis
 
@@ -568,24 +608,29 @@ class MediaViewerTransitionState(
 
                     when (gestureMode) {
                         VerticalGestureMode.NONE -> {
-                            val verticalAxisBias = if (panelAlreadyActive) 0.5f else 1.05f
                             val isVerticalDrag = abs(totalDy) > touchSlopPx &&
-                                    abs(totalDy) > abs(totalDx) * verticalAxisBias
+                                    abs(totalDy) > abs(totalDx) * VERTICAL_AXIS_BIAS
 
                             if (isVerticalDrag) {
                                 if (panelAlreadyActive || totalDy < 0f) {
-                                    gestureMode = VerticalGestureMode.INFO_PANEL
-                                    infoSettleJob?.cancel()
-                                    infoSettleJob = null
-                                    isAnimatingInfoOpen = false
-                                    val initialTravel = if (panelAlreadyActive) {
-                                        (infoTravelPx - dy).coerceIn(0f, maxInfoTravelPx)
-                                    } else {
-                                        (-totalDy).coerceIn(0f, maxInfoTravelPx)
+                                    val targetItem = currentActiveItem
+                                    if (targetItem != null) {
+                                        gestureMode = VerticalGestureMode.INFO_PANEL
+                                        gestureItem = targetItem
+                                        infoSettleJob?.cancel()
+                                        infoSettleJob = null
+                                        isAnimatingInfoOpen = false
+                                        isClosingInfoPanel = false
+                                        val baseTravel = pageTravelPx(targetItem)
+                                        val initialDelta = if (panelAlreadyActive) -dy else -totalDy
+                                        val maxTravel = travelToRestPx(targetItem) +
+                                                maxSheetScrollPx(targetItem)
+                                        rawPanelTravelPx = (baseTravel + initialDelta)
+                                            .coerceIn(0f, maxTravel)
+                                        applyTravel(targetItem, rawPanelTravelPx)
+                                        isDraggingInfo = true
+                                        change.consume()
                                     }
-                                    rawInfoTravelPx = initialTravel
-                                    isDraggingInfo = true
-                                    change.consume()
                                 } else {
                                     gestureMode = VerticalGestureMode.DISMISS_VIEWER
                                     settleJob?.cancel()
@@ -597,8 +642,8 @@ class MediaViewerTransitionState(
                                     isActivelyDragging = true
                                     change.consume()
                                 }
-                            } else if (!panelAlreadyActive && abs(totalDx) > touchSlopPx) {
-                                // Horizontal swipe belongs to HorizontalPager when panel is closed.
+                            } else if (abs(totalDx) > touchSlopPx && abs(totalDx) >= abs(totalDy)) {
+                                // Horizontal swipe belongs to HorizontalPager (open or closed).
                                 break
                             }
                         }
@@ -610,7 +655,13 @@ class MediaViewerTransitionState(
 
                         VerticalGestureMode.INFO_PANEL -> {
                             change.consume()
-                            rawInfoTravelPx = (rawInfoTravelPx - dy).coerceIn(0f, maxInfoTravelPx)
+                            val targetItem = gestureItem
+                            if (targetItem != null) {
+                                val maxTravel = travelToRestPx(targetItem) +
+                                        maxSheetScrollPx(targetItem)
+                                rawPanelTravelPx = (rawPanelTravelPx - dy).coerceIn(0f, maxTravel)
+                                applyTravel(targetItem, rawPanelTravelPx)
+                            }
                         }
                     }
 
@@ -655,58 +706,69 @@ class MediaViewerTransitionState(
                         }
                     }
 
-                    VerticalGestureMode.INFO_PANEL -> if (!isClosing) {
-                        val releaseTravel = rawInfoTravelPx
-                        // Positive travelVelocity means moving upward into the info panel.
-                        val travelVelocity = -velocityY
-                        val settled = settledInfoTravelPx
-                        val maxTravel = maxInfoTravelPx
-
-                        infoSettleJob?.cancel()
-                        infoSettleJob = scope.launch {
-                            settleInfoTravel.updateBounds(lowerBound = 0f, upperBound = null)
-                            settleInfoTravel.snapTo(releaseTravel)
+                    VerticalGestureMode.INFO_PANEL -> {
+                        val targetItem = gestureItem
+                        if (isClosing || targetItem == null) {
                             isDraggingInfo = false
+                        } else {
+                            val releaseTravel = rawPanelTravelPx
+                            // Positive travelVelocity means moving upward into the info panel.
+                            val travelVelocity = -velocityY
+                            val rest = travelToRestPx(targetItem)
+                            val maxTravel = rest + maxSheetScrollPx(targetItem)
 
-                            if (releaseTravel >= settled) {
-                                onInfoOpenChanged(true)
-                                if (abs(travelVelocity) > minFlingVelocityPx && maxTravel > settled) {
-                                    try {
-                                        settleInfoTravel.updateBounds(
-                                            lowerBound = settled,
-                                            upperBound = maxTravel,
-                                        )
-                                        settleInfoTravel.animateDecay(
-                                            initialVelocity = travelVelocity,
-                                            animationSpec = flingDecay,
-                                        )
-                                    } finally {
-                                        settleInfoTravel.updateBounds(lowerBound = 0f, upperBound = null)
+                            infoSettleJob?.cancel()
+                            infoSettleJob = scope.launch {
+                                isDraggingInfo = false
+
+                                if (releaseTravel >= rest) {
+                                    onInfoOpenChanged(true)
+                                    if (abs(travelVelocity) > minFlingVelocityPx && maxTravel > rest) {
+                                        try {
+                                            infoTravelAnim.updateBounds(
+                                                lowerBound = rest,
+                                                upperBound = maxTravel,
+                                            )
+                                            infoTravelAnim.snapTo(releaseTravel)
+                                            infoTravelAnim.animateDecay(
+                                                initialVelocity = travelVelocity,
+                                                animationSpec = flingDecay,
+                                            ) {
+                                                applyTravel(targetItem, value)
+                                            }
+                                        } finally {
+                                            infoTravelAnim.updateBounds(
+                                                lowerBound = 0f,
+                                                upperBound = null,
+                                            )
+                                        }
                                     }
-                                }
-                            } else {
-                                val threshold = if (gestureStartInfoTravel <= 1f) {
-                                    min(settled * 0.18f, infoCommitThresholdPx)
                                 } else {
-                                    min(settled * 0.22f, infoCommitThresholdPx)
+                                    val threshold = if (gestureStartTravel <= 1f) {
+                                        min(rest * 0.18f, infoCommitThresholdPx)
+                                    } else {
+                                        min(rest * 0.22f, infoCommitThresholdPx)
+                                    }
+                                    val shouldOpen = when {
+                                        travelVelocity > infoFlickVelocityPx -> true
+                                        travelVelocity < -infoFlickVelocityPx -> false
+                                        gestureStartTravel <= 1f -> releaseTravel > threshold
+                                        else -> releaseTravel >= rest - threshold
+                                    }
+                                    val target = if (shouldOpen) rest else 0f
+                                    val directedVelocity = if (shouldOpen) {
+                                        travelVelocity.coerceAtLeast(0f)
+                                    } else {
+                                        travelVelocity.coerceAtMost(0f)
+                                    }
+                                    animateInfoTo(
+                                        item = targetItem,
+                                        startTravel = releaseTravel,
+                                        targetTravel = target,
+                                        markOpen = shouldOpen,
+                                        initialVelocity = directedVelocity,
+                                    )
                                 }
-                                val shouldOpen = when {
-                                    travelVelocity > infoFlickVelocityPx -> true
-                                    travelVelocity < -infoFlickVelocityPx -> false
-                                    gestureStartInfoTravel <= 1f -> releaseTravel > threshold
-                                    else -> releaseTravel >= settled - threshold
-                                }
-                                val target = if (shouldOpen) settled else 0f
-                                val directedVelocity = if (shouldOpen) {
-                                    travelVelocity.coerceAtLeast(0f)
-                                } else {
-                                    travelVelocity.coerceAtMost(0f)
-                                }
-                                animateInfoTo(
-                                    target = target,
-                                    markOpen = shouldOpen,
-                                    initialVelocity = directedVelocity,
-                                )
                             }
                         }
                     }
@@ -720,7 +782,8 @@ class MediaViewerTransitionState(
     private companion object {
         const val FALLBACK_FADE_MS = 180
         const val INFO_PANEL_SPRING_STIFFNESS = 1300f
-        const val MIN_FLING_VELOCITY_DP_PER_SEC = 50f
+        const val SHEET_REST_TOP_FRACTION = 0.38f
+        const val VERTICAL_AXIS_BIAS = 1.05f
         const val STALE_RELEASE_MS = 100L
     }
 }
@@ -806,7 +869,7 @@ fun rememberMediaViewerTransitionState(
     state.onHiddenTimelineMediaChanged = onHiddenTimelineMediaChanged
     state.onPreSyncScroll = onPreSyncScroll
     state.onInfoOpenChanged = onInfoOpenChanged
-    state.onDismissFinished = onDismissFinished
+    state.onDismissFinished = { onDismissFinished() }
 
     return state
 }
