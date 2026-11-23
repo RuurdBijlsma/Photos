@@ -82,6 +82,7 @@ class MediaViewerTransitionState(
     private val dismissThresholdPx: Float,
     private val fastFlickMinDistancePx: Float,
     private val infoCommitThresholdPx: Float,
+    private val infoFlickVelocityPx: Float,
     private val systemBars: ViewerSystemBars,
     onHiddenTimelineMediaChanged: (String?) -> Unit,
     onPreSyncScroll: (String) -> Unit,
@@ -404,16 +405,21 @@ class MediaViewerTransitionState(
         onInfoOpenChanged(false)
     }
 
-    private suspend fun animateInfoTo(target: Float, markOpen: Boolean) {
+    private suspend fun animateInfoTo(
+        target: Float,
+        markOpen: Boolean,
+        initialVelocity: Float = 0f,
+    ) {
         isAnimatingInfoOpen = markOpen
         infoAnimationTargetPx = target
         try {
             settleInfoTravel.updateBounds(lowerBound = 0f, upperBound = null)
             settleInfoTravel.animateTo(
                 targetValue = target,
+                initialVelocity = initialVelocity,
                 animationSpec = spring(
-                    dampingRatio = 0.88f,
-                    stiffness = Spring.StiffnessMediumLow,
+                    dampingRatio = 0.92f,
+                    stiffness = INFO_PANEL_SPRING_STIFFNESS,
                 ),
             )
             onInfoOpenChanged(markOpen)
@@ -545,7 +551,7 @@ class MediaViewerTransitionState(
 
                     when (gestureMode) {
                         VerticalGestureMode.NONE -> {
-                            val verticalAxisBias = if (panelAlreadyActive) 1.1f else 1.25f
+                            val verticalAxisBias = if (panelAlreadyActive) 1.0f else 1.05f
                             val isVerticalDrag = abs(totalDy) > touchSlopPx &&
                                     abs(totalDy) > abs(totalDx) * verticalAxisBias
 
@@ -661,15 +667,28 @@ class MediaViewerTransitionState(
                                     }
                                 }
                             } else {
-                                val threshold = min(settled * 0.28f, infoCommitThresholdPx)
+                                val threshold = if (gestureStartInfoTravel <= 1f) {
+                                    min(settled * 0.16f, infoCommitThresholdPx)
+                                } else {
+                                    min(settled * 0.20f, infoCommitThresholdPx)
+                                }
                                 val shouldOpen = when {
-                                    travelVelocity > 650f -> true
-                                    travelVelocity < -650f -> false
+                                    travelVelocity > infoFlickVelocityPx -> true
+                                    travelVelocity < -infoFlickVelocityPx -> false
                                     gestureStartInfoTravel <= 1f -> releaseTravel > threshold
                                     else -> releaseTravel >= settled - threshold
                                 }
                                 val target = if (shouldOpen) settled else 0f
-                                animateInfoTo(target = target, markOpen = shouldOpen)
+                                val directedVelocity = if (shouldOpen) {
+                                    travelVelocity.coerceAtLeast(0f)
+                                } else {
+                                    travelVelocity.coerceAtMost(0f)
+                                }
+                                animateInfoTo(
+                                    target = target,
+                                    markOpen = shouldOpen,
+                                    initialVelocity = directedVelocity,
+                                )
                             }
                         }
                     }
@@ -682,6 +701,7 @@ class MediaViewerTransitionState(
 
     private companion object {
         const val FALLBACK_FADE_MS = 180
+        const val INFO_PANEL_SPRING_STIFFNESS = 1300f
     }
 }
 
@@ -734,6 +754,7 @@ fun rememberMediaViewerTransitionState(
             dismissThresholdPx = with(density) { DISMISS_THRESHOLD_DP.dp.toPx() },
             fastFlickMinDistancePx = with(density) { FAST_FLICK_MIN_DISTANCE_DP.dp.toPx() },
             infoCommitThresholdPx = with(density) { INFO_COMMIT_THRESHOLD_DP.dp.toPx() },
+            infoFlickVelocityPx = with(density) { INFO_FLICK_VELOCITY_DP_PER_SEC.dp.toPx() },
             systemBars = systemBars,
             onHiddenTimelineMediaChanged = onHiddenTimelineMediaChanged,
             onPreSyncScroll = onPreSyncScroll,
@@ -767,7 +788,8 @@ fun rememberMediaViewerTransitionState(
 
 private const val DISMISS_THRESHOLD_DP = 110f
 private const val FAST_FLICK_MIN_DISTANCE_DP = 40f
-private const val INFO_COMMIT_THRESHOLD_DP = 72f
+private const val INFO_COMMIT_THRESHOLD_DP = 40f
+private const val INFO_FLICK_VELOCITY_DP_PER_SEC = 110f
 
 /** The photo's rect when fitted (contained and centered) in the viewer. */
 private fun computeFittedRect(containerWidth: Float, containerHeight: Float, ratio: Float): Rect {

@@ -396,5 +396,5 @@ fun MediaViewerScreen(
 }
 
 private const val CHROME_FADE_MS = 180
-private const val INFO_PANEL_FADE_MS = 140
+private const val INFO_PANEL_FADE_MS = 90
 private const val SETTLED_DETAILS_DELAY_MS = 130L
