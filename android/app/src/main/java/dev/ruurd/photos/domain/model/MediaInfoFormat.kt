@@ -70,6 +70,12 @@ object MediaInfoFormat {
         return "$width × $height"
     }
 
+    fun formatMegapixels(width: Int?, height: Int?): String? {
+        if (width == null || height == null || width <= 0 || height <= 0) return null
+        val megapixels = (width.toLong() * height.toLong()) / 1_000_000.0
+        return if (megapixels >= 0.1) "%.1f MP".format(Locale.US, megapixels) else null
+    }
+
     fun formatDuration(durationMs: Long?): String? {
         if (durationMs == null || durationMs <= 0L) return null
         val totalSeconds = durationMs / 1000
@@ -115,6 +121,12 @@ object MediaInfoFormat {
     fun focalLabel(focalLength: Float?, focalLengthIn35mm: Float?): String? {
         val value = focalLength?.takeIf { it > 0f } ?: focalLengthIn35mm?.takeIf { it > 0f } ?: return null
         return "${value.roundToInt()} mm"
+    }
+
+    fun exposureCompensationLabel(exposureCompensation: Float?): String? {
+        if (exposureCompensation == null) return null
+        val rounded = String.format(Locale.US, "%.1f", exposureCompensation).removeSuffix(".0")
+        return if (exposureCompensation > 0f) "+$rounded EV" else "$rounded EV"
     }
 
     fun cameraName(camera: CameraDetails?): String? {

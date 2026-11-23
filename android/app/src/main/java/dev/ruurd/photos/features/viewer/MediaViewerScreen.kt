@@ -8,6 +8,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.Composable
@@ -29,9 +30,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import dev.ruurd.photos.features.viewer.components.HeroImageOverlay
-import dev.ruurd.photos.features.viewer.components.MediaInfoBottomSheet
+import dev.ruurd.photos.features.viewer.components.MediaInfoPanel
 import dev.ruurd.photos.features.viewer.components.VideoPlayBadge
 import dev.ruurd.photos.features.viewer.components.ViewerChromeOverlay
 import dev.ruurd.photos.features.viewer.components.ViewerPreSyncScrollEffect
@@ -42,11 +44,11 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 
 /**
- * Full-screen media pager with the tile↔fullscreen hero transition, drag-to-dismiss and floating
- * chrome. All transition state lives in [rememberMediaViewerTransitionState]; the chrome, the hero
- * bitmaps and the viewer-side effects are separate composables.
+ * Full-screen media pager with the tile↔fullscreen hero transition, drag-to-dismiss, floating
+ * chrome, and the inline swipe-up Media Info panel that shares vertical space with the active item.
  */
 @Composable
 fun MediaViewerScreen(
@@ -98,7 +100,9 @@ fun MediaViewerScreen(
         isChromeVisible = uiState.isChromeVisible,
         onHiddenTimelineMediaChanged = onHiddenTimelineMediaChanged,
         onPreSyncScroll = onPreSyncScroll,
-        onSwipeUp = viewModel::openInfoSheet,
+        onInfoOpenChanged = { open ->
+            if (open) viewModel.openInfoSheet() else viewModel.closeInfoSheet()
+        },
         onDismissFinished = onDismissFinished,
     )
 
@@ -121,9 +125,19 @@ fun MediaViewerScreen(
         transition.playClosing()
     }
 
+    // Sync programmatic info sheet opens/closes (e.g. "About" menu item) with transition state
+    LaunchedEffect(uiState.isInfoSheetOpen) {
+        if (uiState.isInfoSheetOpen) {
+            transition.requestOpenInfoPanel()
+        } else if (transition.isInfoPanelActive) {
+            transition.requestCloseInfoPanel()
+        }
+    }
+
     // Dismiss automatically if the library becomes empty or active item no longer exists
     LaunchedEffect(uiState.isActiveItemMissing) {
         if (uiState.isActiveItemMissing && !transition.isClosing) {
+            transition.resetInfoPanelImmediate()
             transition.startClosing(Offset.Zero, 1f, 1f)
         }
     }
@@ -179,7 +193,10 @@ fun MediaViewerScreen(
 
     // Keep enabled throughout the closing animation so rapid double-back taps don't leak underneath.
     BackHandler {
-        if (!transition.isClosing) {
+        if (transition.isInfoPanelActive) {
+            viewModel.closeInfoSheet()
+            transition.requestCloseInfoPanel()
+        } else if (!transition.isClosing) {
             transition.startClosing(Offset.Zero, 1f, transition.backdropAlpha)
         }
     }
@@ -190,7 +207,13 @@ fun MediaViewerScreen(
         label = "chrome_visibility_alpha",
     )
 
-    // Outer Box stays untransformed so pointerInput reads stable screen coordinates during 2D drag
+    val infoPanelAlpha by animateFloatAsState(
+        targetValue = if (transition.shouldShowInfoPanel) 1f else 0f,
+        animationSpec = tween(durationMillis = INFO_PANEL_FADE_MS),
+        label = "info_panel_alpha",
+    )
+
+    // Outer Box stays untransformed so pointerInput reads stable screen coordinates during gestures
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -207,14 +230,14 @@ fun MediaViewerScreen(
         // Interactive Pager Layer (hidden only while ClosingHeroOverlay is flying back to the tile)
         if (transition.closingState == null && items.isNotEmpty()) {
             val isPagerScrollEnabled = !isZoomed && !transition.isDragging &&
-                !transition.isOpeningHero
+                    !transition.isOpeningHero && !transition.isInfoPanelActive
 
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .graphicsLayer {
                         translationX = transition.dragOffset.x
-                        translationY = transition.dragOffset.y
+                        translationY = transition.contentTranslationY
                         scaleX = transition.viewerScale
                         scaleY = transition.viewerScale
                         alpha = transition.pagerAlpha
@@ -241,7 +264,12 @@ fun MediaViewerScreen(
                                     isOpeningTransition = transition.isOpeningHero,
                                     onTap = {
                                         if (!transition.isOpeningHero && !transition.isClosing) {
-                                            viewModel.toggleChrome()
+                                            if (transition.isInfoPanelActive) {
+                                                viewModel.closeInfoSheet()
+                                                transition.requestCloseInfoPanel()
+                                            } else {
+                                                viewModel.toggleChrome()
+                                            }
                                         }
                                     },
                                     onZoomFractionChanged = { fraction ->
@@ -265,6 +293,19 @@ fun MediaViewerScreen(
                     }
                 }
             }
+        }
+
+        // Inline Media Info Panel anchored directly underneath the active photo/video
+        if (transition.shouldShowInfoPanel || infoPanelAlpha > 0.005f) {
+            MediaInfoPanel(
+                details = activeDetails,
+                localInfo = uiState.localInfo,
+                item = activeItem,
+                modifier = Modifier
+                    .onSizeChanged { transition.onInfoContentHeightChanged(it.height) }
+                    .offset { IntOffset(0, transition.infoPanelTopPx.roundToInt()) }
+                    .graphicsLayer { alpha = infoPanelAlpha },
+            )
         }
 
         // Opening Hero Overlay: animates smoothly from tile's boundsInRoot to centered fitted rect
@@ -293,9 +334,11 @@ fun MediaViewerScreen(
         }
 
         val chromeAlpha = transition.chromeAlpha(chromeVisibilityAlpha)
-        if (chromeAlpha > 0.01f) {
+        val backButtonAlpha = transition.backButtonAlpha(chromeVisibilityAlpha)
+        if (chromeAlpha > 0.01f || backButtonAlpha > 0.01f) {
             ViewerChromeOverlay(
                 alpha = chromeAlpha,
+                backButtonAlpha = backButtonAlpha,
                 items = items,
                 activeMediaId = uiState.activeMediaId,
                 currentPage = pagerState.currentPage,
@@ -303,7 +346,12 @@ fun MediaViewerScreen(
                 isShareEnabled = activeItem != null && activeDetails?.isMissing != true,
                 isCopyEnabled = activeDetails?.isMissing != true,
                 onBack = {
-                    transition.startClosing(Offset.Zero, 1f, transition.backdropAlpha)
+                    if (transition.isInfoPanelActive) {
+                        viewModel.closeInfoSheet()
+                        transition.requestCloseInfoPanel()
+                    } else {
+                        transition.startClosing(Offset.Zero, 1f, transition.backdropAlpha)
+                    }
                 },
                 onAbout = viewModel::openInfoSheet,
                 onCopy = {
@@ -329,17 +377,9 @@ fun MediaViewerScreen(
                 },
             )
         }
-
-        if (uiState.isInfoSheetOpen) {
-            MediaInfoBottomSheet(
-                details = activeDetails,
-                localInfo = uiState.localInfo,
-                item = activeItem,
-                onDismissRequest = viewModel::closeInfoSheet,
-            )
-        }
     }
 }
 
 private const val CHROME_FADE_MS = 180
+private const val INFO_PANEL_FADE_MS = 140
 private const val SETTLED_DETAILS_DELAY_MS = 130L

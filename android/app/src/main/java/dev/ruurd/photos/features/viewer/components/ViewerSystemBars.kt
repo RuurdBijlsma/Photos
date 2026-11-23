@@ -14,8 +14,8 @@ import androidx.core.view.WindowInsetsCompat
 
 /**
  * Status/navigation bar appearance for the viewer. Kept out of the screen so the navigation bar
- * stays transparent edge to edge for predictive back, and so the timeline's light appearance is
- * restored both on dispose and when a close animation starts.
+ * stays transparent edge to edge for predictive back, adapts contrast when the info panel slides
+ * over system bars in light theme, and restores the timeline's light appearance on close/dispose.
  */
 @Stable
 class ViewerSystemBars(private val window: Window?, private val isDarkTheme: Boolean) {
@@ -34,6 +34,16 @@ class ViewerSystemBars(private val window: Window?, private val isDarkTheme: Boo
             controller?.show(WindowInsetsCompat.Type.statusBars())
         } else {
             controller?.hide(WindowInsetsCompat.Type.statusBars())
+        }
+    }
+
+    fun onInfoPanelAppearanceChanged(
+        isInfoVisible: Boolean,
+        isInfoCoveringStatusBar: Boolean,
+    ) {
+        controller?.apply {
+            isAppearanceLightStatusBars = !isDarkTheme && isInfoCoveringStatusBar
+            isAppearanceLightNavigationBars = !isDarkTheme && isInfoVisible
         }
     }
 
@@ -58,6 +68,8 @@ fun ViewerSystemBarsEffect(
     systemBars: ViewerSystemBars,
     isChromeVisible: Boolean,
     isClosing: Boolean,
+    isInfoVisible: Boolean,
+    isInfoCoveringStatusBar: Boolean,
     onHiddenTimelineMediaChanged: (String?) -> Unit,
 ) {
     val currentOnHiddenChanged = rememberUpdatedState(onHiddenTimelineMediaChanged)
@@ -70,7 +82,16 @@ fun ViewerSystemBarsEffect(
         }
     }
 
-    LaunchedEffect(isChromeVisible, isClosing) {
-        systemBars.onChromeVisibilityChanged(isChromeVisible || isClosing)
+    LaunchedEffect(isChromeVisible, isClosing, isInfoVisible) {
+        systemBars.onChromeVisibilityChanged(isChromeVisible || isClosing || isInfoVisible)
+    }
+
+    LaunchedEffect(isClosing, isInfoVisible, isInfoCoveringStatusBar) {
+        if (!isClosing) {
+            systemBars.onInfoPanelAppearanceChanged(
+                isInfoVisible = isInfoVisible,
+                isInfoCoveringStatusBar = isInfoCoveringStatusBar,
+            )
+        }
     }
 }

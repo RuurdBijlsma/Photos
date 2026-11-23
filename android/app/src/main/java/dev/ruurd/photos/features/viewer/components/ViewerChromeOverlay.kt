@@ -58,7 +58,8 @@ import kotlinx.collections.immutable.ImmutableList
 
 /**
  * Floating viewer chrome (top bar, overflow menu, bottom action pill) plus the status bar scrim.
- * Anchored to the screen edges and faded as one layer during open, drag and close.
+ * Anchored to the screen edges; the Back button can remain visible independently while the info
+ * panel is open.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -75,6 +76,7 @@ fun ViewerChromeOverlay(
     onCopy: () -> Unit,
     onShare: () -> Unit,
     modifier: Modifier = Modifier,
+    backButtonAlpha: Float = alpha,
 ) {
     // Ignoring visibility keeps the top bar anchored when statusBars() animates back in on tap.
     val statusBarPadding = WindowInsets.statusBarsIgnoringVisibility
@@ -82,15 +84,15 @@ fun ViewerChromeOverlay(
         .calculateTopPadding()
     val navBarPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
 
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            .graphicsLayer { this.alpha = alpha },
-    ) {
-        ViewerStatusBarScrim(
-            statusBarHeight = statusBarPadding,
-            modifier = Modifier.align(Alignment.TopCenter),
-        )
+    Box(modifier = modifier.fillMaxSize()) {
+        if (alpha > 0.01f) {
+            ViewerStatusBarScrim(
+                statusBarHeight = statusBarPadding,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .graphicsLayer { this.alpha = alpha },
+            )
+        }
 
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -98,24 +100,29 @@ fun ViewerChromeOverlay(
                 .align(Alignment.TopCenter)
                 .padding(top = statusBarPadding + 6.dp, start = 8.dp, end = 8.dp),
         ) {
-            ViewerCircleButton(
-                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = "Back",
-                onClick = onBack,
-            )
+            if (backButtonAlpha > 0.01f) {
+                ViewerCircleButton(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Back",
+                    onClick = onBack,
+                    modifier = Modifier.graphicsLayer { this.alpha = backButtonAlpha },
+                )
+            }
 
             Spacer(modifier = Modifier.width(8.dp))
 
-            if (!isProjectionLoading && items.isNotEmpty()) {
+            if (alpha > 0.01f && !isProjectionLoading && items.isNotEmpty()) {
                 Surface(
                     shape = CircleShape,
                     color = ViewerPillColor,
                     border = ViewerPillBorder,
-                    modifier = Modifier.clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                        onClick = {},
-                    ),
+                    modifier = Modifier
+                        .graphicsLayer { this.alpha = alpha }
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            onClick = {},
+                        ),
                 ) {
                     val activeIndex = items.indexOfFirst { it.id == activeMediaId }
                     val displayIndex = ((if (activeIndex >= 0) activeIndex else currentPage) + 1)
@@ -134,101 +141,106 @@ fun ViewerChromeOverlay(
 
             Spacer(modifier = Modifier.weight(1f))
 
-            var isMenuExpanded by remember { mutableStateOf(false) }
-            Box {
-                ViewerCircleButton(
-                    imageVector = Icons.Default.MoreVert,
-                    contentDescription = "Options",
-                    onClick = { isMenuExpanded = true },
-                )
-
-                val currentItem = items.firstOrNull { it.id == activeMediaId }
-                    ?: items.getOrNull(currentPage)
-                DropdownMenu(
-                    expanded = isMenuExpanded,
-                    onDismissRequest = { isMenuExpanded = false },
-                ) {
-                    DropdownMenuItem(
-                        text = { Text("About") },
-                        leadingIcon = {
-                            Icon(
-                                imageVector = Icons.Outlined.Info,
-                                contentDescription = null,
-                            )
-                        },
-                        onClick = {
-                            isMenuExpanded = false
-                            onAbout()
-                        },
+            if (alpha > 0.01f) {
+                var isMenuExpanded by remember { mutableStateOf(false) }
+                Box(modifier = Modifier.graphicsLayer { this.alpha = alpha }) {
+                    ViewerCircleButton(
+                        imageVector = Icons.Default.MoreVert,
+                        contentDescription = "Options",
+                        onClick = { isMenuExpanded = true },
                     )
-                    if (currentItem != null && !currentItem.isVideo && isCopyEnabled) {
+
+                    val currentItem = items.firstOrNull { it.id == activeMediaId }
+                        ?: items.getOrNull(currentPage)
+                    DropdownMenu(
+                        expanded = isMenuExpanded,
+                        onDismissRequest = { isMenuExpanded = false },
+                    ) {
                         DropdownMenuItem(
-                            text = { Text("Copy") },
+                            text = { Text("About") },
                             leadingIcon = {
                                 Icon(
-                                    imageVector = Icons.Outlined.ContentCopy,
+                                    imageVector = Icons.Outlined.Info,
                                     contentDescription = null,
                                 )
                             },
                             onClick = {
                                 isMenuExpanded = false
-                                onCopy()
+                                onAbout()
                             },
                         )
-                        DropdownMenuItem(
-                            text = { Text("Rotate clockwise") },
-                            leadingIcon = {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Outlined.RotateRight,
-                                    contentDescription = null,
-                                )
-                            },
-                            onClick = { isMenuExpanded = false },
-                        )
-                    }
-                    if (currentItem?.cloudId != null) {
-                        DropdownMenuItem(
-                            text = { Text("Reprocess") },
-                            leadingIcon = {
-                                Icon(
-                                    imageVector = Icons.Outlined.Refresh,
-                                    contentDescription = null,
-                                )
-                            },
-                            onClick = { isMenuExpanded = false },
-                        )
+                        if (currentItem != null && !currentItem.isVideo && isCopyEnabled) {
+                            DropdownMenuItem(
+                                text = { Text("Copy") },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Outlined.ContentCopy,
+                                        contentDescription = null,
+                                    )
+                                },
+                                onClick = {
+                                    isMenuExpanded = false
+                                    onCopy()
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Rotate clockwise") },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = Icons.AutoMirrored.Outlined.RotateRight,
+                                        contentDescription = null,
+                                    )
+                                },
+                                onClick = { isMenuExpanded = false },
+                            )
+                        }
+                        if (currentItem?.cloudId != null) {
+                            DropdownMenuItem(
+                                text = { Text("Reprocess") },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Outlined.Refresh,
+                                        contentDescription = null,
+                                    )
+                                },
+                                onClick = { isMenuExpanded = false },
+                            )
+                        }
                     }
                 }
             }
         }
 
-        Surface(
-            shape = CircleShape,
-            color = ViewerPillColor,
-            border = ViewerPillBorder,
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(bottom = navBarPadding + 14.dp)
-                // Consume taps until Share / Add to / Bin are wired in Phases 2B, 4 & 5.
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                    onClick = {},
-                ),
-        ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 7.dp, vertical = 5.dp),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                verticalAlignment = Alignment.CenterVertically,
+        if (alpha > 0.01f) {
+            Surface(
+                shape = CircleShape,
+                color = ViewerPillColor,
+                border = ViewerPillBorder,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = navBarPadding + 14.dp)
+                    .graphicsLayer { this.alpha = alpha }
+                    // Consume taps until Add to / Bin are wired in Phases 4 & 5.
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = {},
+                    ),
             ) {
-                ViewerPillAction(
-                    imageVector = Icons.Default.Share,
-                    label = "Share",
-                    enabled = isShareEnabled,
-                    onClick = onShare,
-                )
-                ViewerPillAction(imageVector = Icons.Default.Add, label = "Add to", enabled = false)
-                ViewerPillAction(imageVector = Icons.Outlined.Delete, label = "Bin", enabled = false)
+                Row(
+                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 5.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    ViewerPillAction(
+                        imageVector = Icons.Default.Share,
+                        label = "Share",
+                        enabled = isShareEnabled,
+                        onClick = onShare,
+                    )
+                    ViewerPillAction(imageVector = Icons.Default.Add, label = "Add to", enabled = false)
+                    ViewerPillAction(imageVector = Icons.Outlined.Delete, label = "Bin", enabled = false)
+                }
             }
         }
     }
@@ -265,9 +277,10 @@ private fun ViewerCircleButton(
     imageVector: ImageVector,
     contentDescription: String,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     Box(
-        modifier = Modifier
+        modifier = modifier
             .size(40.dp)
             .clip(CircleShape)
             .background(ViewerPillColor)
