@@ -25,8 +25,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.layout.LazyLayoutCacheWindow
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Collections
 import androidx.compose.material.icons.filled.Explore
@@ -85,9 +83,7 @@ fun MainScreen(
     viewModel: MainViewModel,
     timelineViewModel: TimelineViewModel,
     modifier: Modifier = Modifier,
-    timelineListState: LazyListState = rememberLazyListState(
-        cacheWindow = remember { LazyLayoutCacheWindow(aheadFraction = 0.75f, behindFraction = 0.4f) },
-    ),
+    timelineListState: LazyListState,
     hiddenTimelineMediaId: String? = null,
     onMediaClick: (
         mediaId: String,

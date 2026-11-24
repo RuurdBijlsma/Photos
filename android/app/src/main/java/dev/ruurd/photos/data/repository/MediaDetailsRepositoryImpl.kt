@@ -2,6 +2,7 @@ package dev.ruurd.photos.data.repository
 
 import androidx.collection.LruCache
 import dev.ruurd.photos.core.common.AppDispatchers
+import dev.ruurd.photos.core.common.SingleFlightGroup
 import dev.ruurd.photos.core.network.api.PhotosApiService
 import dev.ruurd.photos.core.network.dto.CameraSettingsDto
 import dev.ruurd.photos.core.network.dto.FullMediaItemDto
@@ -14,71 +15,36 @@ import dev.ruurd.photos.domain.model.WeatherDetails
 import dev.ruurd.photos.domain.repository.MediaDetailsRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.CoroutineStart
-import kotlinx.coroutines.Deferred
-import kotlinx.coroutines.async
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import java.io.IOException
-import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.atomic.AtomicInteger
-import java.util.concurrent.atomic.AtomicLong
 
 class MediaDetailsRepositoryImpl(
     private val apiService: PhotosApiService,
-    private val scope: CoroutineScope,
-    private val dispatchers: AppDispatchers,
+    scope: CoroutineScope,
+    dispatchers: AppDispatchers,
 ) : MediaDetailsRepository {
 
     private val cache = LruCache<String, MediaDetails>(MAX_CACHED_ITEMS)
-    private val generation = AtomicLong(0L)
-    private val inFlight = ConcurrentHashMap<String, InFlightFetch>()
+    private val fetches = SingleFlightGroup<String, MediaDetails?>(scope, dispatchers.io)
 
     override fun peek(cloudId: String): MediaDetails? = cache.get(cloudId)
 
     override suspend fun get(cloudId: String): MediaDetails? {
         peek(cloudId)?.let { return it }
-        val expectedGen = generation.get()
-        val entry = inFlight.compute(cloudId) { id, existing ->
-            val active = existing?.takeIf {
-                it.generation == expectedGen && !it.job.isCancelled && !it.job.isCompleted
-            } ?: InFlightFetch(
-                generation = expectedGen,
-                job = scope.async(dispatchers.io, start = CoroutineStart.LAZY) {
-                    fetch(id, expectedGen)
-                },
-            ).also { created ->
-                created.job.invokeOnCompletion { inFlight.remove(id, created) }
-            }
-            active.waiters.incrementAndGet()
-            active
-        }!!
-
-        return try {
-            entry.job.await()
-        } catch (_: CancellationException) {
-            currentCoroutineContext().ensureActive()
-            null
-        } finally {
-            if (entry.waiters.decrementAndGet() <= 0) {
-                inFlight.remove(cloudId, entry)
-                entry.job.cancel()
-            }
-        }
+        val generation = fetches.generation
+        return fetches.load(cloudId) { id -> fetch(id, generation) }
     }
 
     override fun evict(cloudIds: Collection<String>) {
         cloudIds.forEach { id ->
-            inFlight.remove(id)?.job?.cancel()
+            fetches.cancel(id)
             cache.remove(id)
         }
     }
 
     override fun clear() {
-        generation.incrementAndGet()
-        val pending = inFlight.values.toList()
-        inFlight.clear()
-        pending.forEach { it.job.cancel() }
+        fetches.clear()
         cache.evictAll()
     }
 
@@ -88,7 +54,7 @@ class MediaDetailsRepositoryImpl(
         if (response.isSuccessful && body != null) {
             body.toDomain(cloudId).also {
                 currentCoroutineContext().ensureActive()
-                if (generation.get() == expectedGeneration) {
+                if (fetches.generation == expectedGeneration) {
                     cache.put(cloudId, it)
                 }
             }
@@ -101,13 +67,6 @@ class MediaDetailsRepositoryImpl(
         null
     } catch (_: Exception) {
         null
-    }
-
-    private class InFlightFetch(
-        val generation: Long,
-        val job: Deferred<MediaDetails?>,
-    ) {
-        val waiters = AtomicInteger(0)
     }
 
     private companion object {

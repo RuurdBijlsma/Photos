@@ -64,8 +64,8 @@ data class CameraDetails(
 ) {
     val isEmpty: Boolean
         get() = make == null && model == null && lensMake == null && lensModel == null &&
-                exposureTime == null && aperture == null && iso == null && focalLength == null &&
-                focalLengthIn35mm == null && exposureCompensation == null
+            exposureTime == null && aperture == null && iso == null && focalLength == null &&
+            focalLengthIn35mm == null && exposureCompensation == null
 }
 
 @Immutable

@@ -1,7 +1,11 @@
 package dev.ruurd.photos.core.image
 
+import android.content.Context
 import androidx.collection.LruCache
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.graphics.painter.Painter
+import coil3.ImageLoader
+import coil3.compose.asPainter
 import coil3.memory.MemoryCache
 
 /**
@@ -18,6 +22,11 @@ class MemoryCacheKeyRegistry(maxSize: Int = 256) {
 
     @Synchronized
     fun get(key: String): MemoryCache.Key? = cache.get(key)
+
+    /** The decoded bitmap for [key] if it is still in the memory cache, for instant hero/preview paints. */
+    fun peekPainter(imageLoader: ImageLoader, context: Context, key: String): Painter? = get(key)
+        ?.let { memoryCacheKey -> imageLoader.memoryCache?.get(memoryCacheKey)?.image }
+        ?.asPainter(context)
 
     @Synchronized
     fun remove(key: String): MemoryCache.Key? = cache.remove(key)

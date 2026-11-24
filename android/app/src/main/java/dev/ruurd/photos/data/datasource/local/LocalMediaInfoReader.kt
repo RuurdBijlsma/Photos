@@ -63,23 +63,23 @@ class LocalMediaInfoReader(
 
         return cursor.use {
             if (!it.moveToFirst()) return null
-            val rawWidth = it.intOrNull(MediaStore.MediaColumns.WIDTH)?.takeIf { size -> size > 0 }
-            val rawHeight = it.intOrNull(MediaStore.MediaColumns.HEIGHT)?.takeIf { size -> size > 0 }
-            val orientation = if (isVideo) 0 else it.intOrNull(COLUMN_ORIENTATION) ?: 0
+            val rawWidth = it.getIntOrNull(MediaStore.MediaColumns.WIDTH)?.takeIf { size -> size > 0 }
+            val rawHeight = it.getIntOrNull(MediaStore.MediaColumns.HEIGHT)?.takeIf { size -> size > 0 }
+            val orientation = if (isVideo) 0 else it.getIntOrNull(COLUMN_ORIENTATION) ?: 0
             val (width, height) = if (orientation == 90 || orientation == 270) {
                 rawHeight to rawWidth
             } else {
                 rawWidth to rawHeight
             }
             LocalMediaInfo(
-                fileName = it.stringOrNull(MediaStore.MediaColumns.DISPLAY_NAME),
-                mimeType = it.stringOrNull(MediaStore.MediaColumns.MIME_TYPE),
-                sizeBytes = it.longOrNull(MediaStore.MediaColumns.SIZE)?.takeIf { size -> size > 0L },
+                fileName = it.getStringOrNull(MediaStore.MediaColumns.DISPLAY_NAME),
+                mimeType = it.getStringOrNull(MediaStore.MediaColumns.MIME_TYPE),
+                sizeBytes = it.getLongOrNull(MediaStore.MediaColumns.SIZE)?.takeIf { size -> size > 0L },
                 width = width,
                 height = height,
-                dateTakenMs = it.longOrNull(MediaStore.MediaColumns.DATE_TAKEN)?.takeIf { value -> value > 0L }
-                    ?: it.longOrNull(MediaStore.MediaColumns.DATE_MODIFIED)?.times(1000L),
-                durationMs = if (isVideo) it.longOrNull(MediaStore.Video.Media.DURATION) else null,
+                dateTakenMs = it.getLongOrNull(MediaStore.MediaColumns.DATE_TAKEN)?.takeIf { value -> value > 0L }
+                    ?: it.getLongOrNull(MediaStore.MediaColumns.DATE_MODIFIED)?.times(1000L),
+                durationMs = if (isVideo) it.getLongOrNull(MediaStore.Video.Media.DURATION) else null,
             )
         }
     }
@@ -168,14 +168,7 @@ class LocalMediaInfoReader(
         null
     }
 
-    private fun android.database.Cursor.stringOrNull(column: String): String? = getColumnIndex(column).takeIf { it >= 0 && !isNull(it) }?.let(::getString)
-
-    private fun android.database.Cursor.longOrNull(column: String): Long? = getColumnIndex(column).takeIf { it >= 0 && !isNull(it) }?.let(::getLong)
-
-    private fun android.database.Cursor.intOrNull(column: String): Int? = getColumnIndex(column).takeIf { it >= 0 && !isNull(it) }?.let(::getInt)
-
     private companion object {
-        const val COLUMN_ORIENTATION = "orientation"
         val EXIF_DATE_TIME: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy:MM:dd HH:mm:ss")
     }
 }

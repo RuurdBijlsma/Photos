@@ -295,7 +295,7 @@ fun MediaViewerScreen(
         // Interactive Pager Layer (hidden only while ClosingHeroOverlay is flying back to the tile)
         if (transition.closingState == null && items.isNotEmpty()) {
             val isPagerScrollEnabled = !isZoomed && !transition.isDragging &&
-                    !transition.isDraggingInfo && !transition.isOpeningHero
+                !transition.isDraggingInfo && !transition.isOpeningHero
 
             Box(
                 modifier = Modifier
@@ -323,10 +323,10 @@ fun MediaViewerScreen(
                             val isOffscreen by remember(pagerState, page) {
                                 derivedStateOf {
                                     (!pagerState.isScrollInProgress && pagerState.settledPage != page) ||
-                                            abs(
-                                                (page - pagerState.currentPage) -
-                                                        pagerState.currentPageOffsetFraction,
-                                            ) >= 1f
+                                        abs(
+                                            (page - pagerState.currentPage) -
+                                                pagerState.currentPageOffsetFraction,
+                                        ) >= 1f
                                 }
                             }
                             val itemDetails = uiState.detailsById[item.id]
@@ -411,9 +411,9 @@ fun MediaViewerScreen(
                                         },
                                     ) { measurables, constraints ->
                                         val minSheetHeight = (
-                                                constraints.maxHeight -
-                                                        transition.sheetRestTopPx.roundToInt()
-                                                ).coerceAtLeast(0)
+                                            constraints.maxHeight -
+                                                transition.sheetRestTopPx.roundToInt()
+                                            ).coerceAtLeast(0)
                                         val childConstraints = constraints.copy(
                                             minHeight = minSheetHeight,
                                             maxHeight = Constraints.Infinity,
@@ -466,7 +466,7 @@ fun MediaViewerScreen(
         val backButtonAlpha = transition.backButtonAlpha(chromeVisibilityAlpha)
         if (chromeAlpha > 0.01f || backButtonAlpha > 0.01f) {
             val hasLocalOrExistingServer = activeItem != null &&
-                    (activeItem.localContentUri != null || activeDetails?.isMissing != true)
+                (activeItem.localContentUri != null || activeDetails?.isMissing != true)
             ViewerChromeOverlay(
                 alpha = chromeAlpha,
                 backButtonAlpha = backButtonAlpha,

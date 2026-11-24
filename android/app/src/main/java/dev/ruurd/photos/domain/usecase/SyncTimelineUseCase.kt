@@ -10,6 +10,7 @@ import dev.ruurd.photos.core.network.proto.CompactTimelineItem
 import dev.ruurd.photos.core.network.proto.TimelineSyncResponse
 import dev.ruurd.photos.domain.model.PassOneDeduplication
 import dev.ruurd.photos.domain.model.SyncState
+import dev.ruurd.photos.domain.model.wallClockLocalDateTime
 import dev.ruurd.photos.domain.repository.MediaRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -19,8 +20,6 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.IOException
-import java.time.Instant
-import java.time.ZoneOffset
 
 class SyncTimelineUseCase(
     private val apiService: PhotosApiService,
@@ -137,10 +136,7 @@ class SyncTimelineUseCase(
                         }
 
                         if (itemsToUpsert.isNotEmpty()) {
-                            // Upsert in batches of 500 to stay well below SQLite bind limits
-                            itemsToUpsert.chunked(500).forEach { chunk ->
-                                mediaRepository.upsertAll(chunk)
-                            }
+                            mediaRepository.upsertAll(itemsToUpsert)
                         }
 
                         mediaRefreshCoordinator.onCloudItemsChanged(
@@ -225,10 +221,8 @@ class SyncTimelineUseCase(
     }
 
     private fun computeYearMonth(sortTimestamp: Long, timezoneOffsetMinutes: Int): Int {
-        val epochWithOffset = sortTimestamp + (timezoneOffsetMinutes * 60_000L)
-        val instant = Instant.ofEpochMilli(epochWithOffset)
-        val zdt = instant.atZone(ZoneOffset.UTC)
-        return zdt.year * 100 + zdt.monthValue
+        val local = wallClockLocalDateTime(sortTimestamp, timezoneOffsetMinutes)
+        return local.year * 100 + local.monthValue
     }
 
     private companion object {

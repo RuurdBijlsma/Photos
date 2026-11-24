@@ -4,7 +4,6 @@ import dev.ruurd.photos.core.database.entity.TimelineMediaProjection
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
-import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlin.math.abs
@@ -27,10 +26,7 @@ object MediaInfoFormat {
     ): LocalDateTime? {
         details?.takenAtLocal?.let(::parseNaiveLocal)?.let { return it }
         if (item != null && item.sortTimestamp > 0L) {
-            return LocalDateTime.ofInstant(
-                Instant.ofEpochMilli(item.sortTimestamp + item.timezoneOffsetMinutes * 60_000L),
-                ZoneOffset.UTC,
-            )
+            return wallClockLocalDateTime(item.sortTimestamp, item.timezoneOffsetMinutes)
         }
         localInfo?.dateTakenMs?.takeIf { it > 0L }?.let { epoch ->
             return LocalDateTime.ofInstant(Instant.ofEpochMilli(epoch), ZoneId.systemDefault())
@@ -55,10 +51,7 @@ object MediaInfoFormat {
         timezoneOffsetMinutes: Int,
         locale: Locale = Locale.getDefault(),
     ): String = formatCompactDateTime(
-        LocalDateTime.ofInstant(
-            Instant.ofEpochMilli(sortTimestamp + timezoneOffsetMinutes * 60_000L),
-            ZoneOffset.UTC,
-        ),
+        wallClockLocalDateTime(sortTimestamp, timezoneOffsetMinutes),
         locale,
     )
 
@@ -191,26 +184,22 @@ object MediaInfoFormat {
         return if (exposureCompensation > 0f) "+$rounded EV" else "$rounded EV"
     }
 
-    fun cameraName(camera: CameraDetails?): String? {
-        if (camera == null) return null
-        val make = camera.make?.trim()?.takeIf { it.isNotEmpty() }
-        val model = camera.model?.trim()?.takeIf { it.isNotEmpty() }
-        return when {
-            make != null && model != null && !model.contains(make, ignoreCase = true) -> "$make $model"
-            model != null -> model
-            make != null -> make
-            else -> null
-        }
-    }
+    fun cameraName(camera: CameraDetails?): String? = combineMakeAndModel(camera?.make, camera?.model)
 
-    fun lensName(camera: CameraDetails?): String? {
-        if (camera == null) return null
-        val make = camera.lensMake?.trim()?.takeIf { it.isNotEmpty() }
-        val model = camera.lensModel?.trim()?.takeIf { it.isNotEmpty() }
+    fun lensName(camera: CameraDetails?): String? = combineMakeAndModel(camera?.lensMake, camera?.lensModel)
+
+    /** `"Canon EOS R6"`, not `"Canon Canon EOS R6"` — models often already contain the make. */
+    private fun combineMakeAndModel(make: String?, model: String?): String? {
+        val trimmedMake = make?.trim()?.takeIf { it.isNotEmpty() }
+        val trimmedModel = model?.trim()?.takeIf { it.isNotEmpty() }
         return when {
-            make != null && model != null && !model.contains(make, ignoreCase = true) -> "$make $model"
-            model != null -> model
-            make != null -> make
+            trimmedMake != null && trimmedModel != null &&
+                !trimmedModel.contains(trimmedMake, ignoreCase = true) -> "$trimmedMake $trimmedModel"
+
+            trimmedModel != null -> trimmedModel
+
+            trimmedMake != null -> trimmedMake
+
             else -> null
         }
     }

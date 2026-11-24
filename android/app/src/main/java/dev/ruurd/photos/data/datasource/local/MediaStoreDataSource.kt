@@ -129,15 +129,7 @@ class MediaStoreDataSource(private val context: Context) : LocalMediaStore {
         )
     }
 
-    private fun Cursor.getLongOrNull(column: String): Long? = getColumnIndex(column).takeIf { it >= 0 && !isNull(it) }?.let { getLong(it) }
-
-    private fun Cursor.getIntOrNull(column: String): Int? = getColumnIndex(column).takeIf { it >= 0 && !isNull(it) }?.let { getInt(it) }
-
-    private fun Cursor.getStringOrNull(column: String): String? = getColumnIndex(column).takeIf { it >= 0 && !isNull(it) }?.let { getString(it) }
-
     private companion object {
-        // Column ids only: `MediaStore.MediaColumns.ORIENTATION` is deprecated and may be removed.
-        const val COLUMN_ORIENTATION = "orientation"
         const val CHANGE_DEBOUNCE_MS = 300L
 
         val BASE_PROJECTION = arrayOf(

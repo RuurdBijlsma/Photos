@@ -38,7 +38,11 @@ class MediaRepositoryImpl(
 
     override suspend fun getAllByCloudId(cloudId: String): List<MediaEntity> = mediaDao.getAllByCloudId(cloudId)
 
-    override suspend fun getAllByCloudIds(cloudIds: List<String>): List<MediaEntity> = if (cloudIds.isEmpty()) emptyList() else mediaDao.getAllByCloudIds(cloudIds)
+    override suspend fun getAllByCloudIds(cloudIds: List<String>): List<MediaEntity> = if (cloudIds.isEmpty()) {
+        emptyList()
+    } else {
+        cloudIds.chunked(BATCH_SIZE).flatMap { chunk -> mediaDao.getAllByCloudIds(chunk) }
+    }
 
     override suspend fun getAllCloudIds(): List<String> = mediaDao.getAllCloudIds()
 
@@ -49,11 +53,18 @@ class MediaRepositoryImpl(
     override suspend fun findBySizesAndStatus(
         sizeBytes: List<Long>,
         syncStatus: SyncStatus,
-    ): List<MediaEntity> = if (sizeBytes.isEmpty()) emptyList() else mediaDao.findBySizesAndStatus(sizeBytes, syncStatus)
+    ): List<MediaEntity> = if (sizeBytes.isEmpty()) {
+        emptyList()
+    } else {
+        sizeBytes.chunked(BATCH_SIZE).flatMap { chunk -> mediaDao.findBySizesAndStatus(chunk, syncStatus) }
+    }
 
     override suspend fun upsert(media: MediaEntity) = mediaDao.upsert(media)
 
-    override suspend fun upsertAll(mediaList: List<MediaEntity>) = mediaDao.upsertAll(mediaList)
+    override suspend fun upsertAll(mediaList: List<MediaEntity>) {
+        if (mediaList.isEmpty()) return
+        mediaList.chunked(BATCH_SIZE).forEach { chunk -> mediaDao.upsertAll(chunk) }
+    }
 
     override suspend fun deleteById(id: String) = mediaDao.deleteById(id)
 
@@ -85,6 +96,7 @@ class MediaRepositoryImpl(
     override suspend fun <T> withTransaction(block: suspend () -> T): T = database.withTransaction(block)
 
     private companion object {
+        /** Keeps `IN (…)` bind counts well below SQLite's limit. */
         const val BATCH_SIZE = 500
     }
 }

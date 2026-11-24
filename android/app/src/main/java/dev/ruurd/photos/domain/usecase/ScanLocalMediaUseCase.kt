@@ -268,9 +268,7 @@ class ScanLocalMediaUseCase(
             deviceFolderRepository.upsertAll(newFolders)
         }
         if (toUpsert.isNotEmpty()) {
-            toUpsert.chunked(500).forEach { chunk ->
-                mediaRepository.upsertAll(chunk)
-            }
+            mediaRepository.upsertAll(toUpsert)
         }
 
         return ScanResult(

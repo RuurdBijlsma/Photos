@@ -7,11 +7,11 @@ import dev.ruurd.photos.domain.model.TimelineLayoutIndex
 import dev.ruurd.photos.domain.model.TimelineListItem
 import dev.ruurd.photos.domain.model.TimelineRowUiItem
 import dev.ruurd.photos.domain.model.TimelineYearMark
+import dev.ruurd.photos.domain.model.wallClockEpochMillis
+import dev.ruurd.photos.domain.model.wallClockLocalDateTime
 import kotlinx.collections.immutable.toPersistentList
-import java.time.Instant
 import java.time.LocalDate
 import java.time.Month
-import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.util.Locale
@@ -71,7 +71,7 @@ class CalculateTimelineLayoutUseCase(
 
         fun dateLabelOf(item: TimelineMediaProjection): String {
             if (item.sortTimestamp <= 0L) return ""
-            val key = (item.sortTimestamp + item.timezoneOffsetMinutes * 60_000L).floorDiv(DAY_MS)
+            val key = wallClockEpochMillis(item.sortTimestamp, item.timezoneOffsetMinutes).floorDiv(DAY_MS)
             if (key != lastDateKey) {
                 lastDateKey = key
                 lastDateLabel = formatDateLabel(item, today, currentYear)
@@ -211,9 +211,7 @@ class CalculateTimelineLayoutUseCase(
         currentYear: Int,
     ): String {
         if (item.sortTimestamp <= 0L) return ""
-        val localDate = Instant.ofEpochMilli(
-            item.sortTimestamp + item.timezoneOffsetMinutes * 60_000L,
-        ).atZone(ZoneOffset.UTC).toLocalDate()
+        val localDate = wallClockLocalDateTime(item.sortTimestamp, item.timezoneOffsetMinutes).toLocalDate()
 
         return when {
             localDate == today -> "Today"

@@ -2,14 +2,12 @@ package dev.ruurd.photos.core.image
 
 import android.content.Context
 import dev.ruurd.photos.core.common.AppDispatchers
+import dev.ruurd.photos.core.common.SingleFlightGroup
 import dev.ruurd.photos.core.network.SessionManager
 import dev.ruurd.photos.core.network.await
 import dev.ruurd.photos.domain.model.MediaFileNames
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.CoroutineStart
-import kotlinx.coroutines.Deferred
-import kotlinx.coroutines.async
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.job
@@ -18,9 +16,6 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
 import java.io.IOException
-import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.atomic.AtomicInteger
-import java.util.concurrent.atomic.AtomicLong
 
 /**
  * `cacheDir/full_res_cache/` — a ~500 MB LRU of `/api/photos/{cloudId}/download` originals kept out
@@ -64,8 +59,7 @@ class FullResFileCache internal constructor(
         maxSizeBytes = maxSizeBytes,
     )
 
-    private val generation = AtomicLong(0L)
-    private val inFlight = ConcurrentHashMap<String, InFlightDownload>()
+    private val downloads = SingleFlightGroup<String, File?>(scope, dispatchers.io)
     private val trimLock = Any()
 
     override fun peek(cloudId: String): File? = directoryFor(cloudId)
@@ -77,39 +71,12 @@ class FullResFileCache internal constructor(
             cached.setLastModified(System.currentTimeMillis())
             return cached
         }
-        val expectedGen = generation.get()
-        val entry = inFlight.compute(cloudId) { id, existing ->
-            val active = existing?.takeIf {
-                it.generation == expectedGen && !it.job.isCancelled && !it.job.isCompleted
-            } ?: InFlightDownload(
-                generation = expectedGen,
-                job = scope.async(dispatchers.io, start = CoroutineStart.LAZY) {
-                    download(id, fileName, expectedGen)
-                },
-            ).also { created ->
-                created.job.invokeOnCompletion { inFlight.remove(id, created) }
-            }
-            active.waiters.incrementAndGet()
-            active
-        }!!
-
-        return try {
-            entry.job.await()
-        } catch (_: CancellationException) {
-            // Only rethrow if this caller's own coroutine was cancelled; evict()/clear()
-            // cancelling the shared job returns null without cancelling unrelated callers.
-            currentCoroutineContext().ensureActive()
-            null
-        } finally {
-            if (entry.waiters.decrementAndGet() <= 0) {
-                inFlight.remove(cloudId, entry)
-                entry.job.cancel()
-            }
-        }
+        val generation = downloads.generation
+        return downloads.load(cloudId) { id -> download(id, fileName, generation) }
     }
 
     override suspend fun evict(cloudId: String) {
-        inFlight.remove(cloudId)?.job?.cancel()
+        downloads.cancel(cloudId)
         withContext(dispatchers.io) {
             synchronized(trimLock) {
                 directoryFor(cloudId).deleteRecursively()
@@ -119,10 +86,7 @@ class FullResFileCache internal constructor(
     }
 
     override suspend fun clear() {
-        generation.incrementAndGet()
-        val pending = inFlight.values.toList()
-        inFlight.clear()
-        pending.forEach { it.job.cancel() }
+        downloads.clear()
         withContext(dispatchers.io) {
             synchronized(trimLock) {
                 directory.deleteRecursively()
@@ -183,7 +147,7 @@ class FullResFileCache internal constructor(
             val partFile = temp ?: return@withContext null
             synchronized(trimLock) {
                 job.ensureActive()
-                if (generation.get() != expectedGeneration ||
+                if (downloads.generation != expectedGeneration ||
                     !partFile.exists() ||
                     partFile.length() <= 0L
                 ) {
@@ -237,13 +201,6 @@ class FullResFileCache internal constructor(
     }
 
     private fun directoryFor(cloudId: String): File = directory.resolve(cloudId)
-
-    private class InFlightDownload(
-        val generation: Long,
-        val job: Deferred<File?>,
-    ) {
-        val waiters = AtomicInteger(0)
-    }
 
     private companion object {
         const val CACHE_DIR = "full_res_cache"

@@ -20,7 +20,6 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import coil3.SingletonImageLoader
 import coil3.compose.AsyncImage
-import coil3.compose.asPainter
 import dev.ruurd.photos.core.database.entity.TimelineMediaProjection
 import dev.ruurd.photos.core.image.LocalMemoryCacheKeyRegistry
 import dev.ruurd.photos.core.image.MediaImageRequests
@@ -46,9 +45,7 @@ fun HeroImageOverlay(
     val memoryCacheKeyRegistry = LocalMemoryCacheKeyRegistry.current
 
     val cachedPainter = remember(item.id, memoryCacheKeyRegistry, imageLoader, context) {
-        memoryCacheKeyRegistry.get(item.id)
-            ?.let { key -> imageLoader.memoryCache?.get(key)?.image }
-            ?.asPainter(context)
+        memoryCacheKeyRegistry.peekPainter(imageLoader, context, item.id)
     }
 
     LaunchedEffect(item.id, cachedPainter) {

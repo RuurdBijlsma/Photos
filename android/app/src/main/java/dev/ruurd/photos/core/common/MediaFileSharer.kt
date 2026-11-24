@@ -246,17 +246,29 @@ class DefaultMediaFileSharer(
         val ext = name.substringAfterLast('.', "").lowercase(Locale.US)
         return when (ext) {
             "jpg", "jpeg" -> "image/jpeg"
+
             "png" -> "image/png"
+
             "webp" -> "image/webp"
+
             "gif" -> "image/gif"
+
             "avif" -> "image/avif"
+
             "heic" -> "image/heic"
+
             "heif" -> "image/heif"
+
             "tiff", "tif" -> "image/tiff"
+
             "mp4" -> "video/mp4"
+
             "mov" -> "video/quicktime"
+
             "webm" -> "video/webm"
+
             "mkv" -> "video/x-matroska"
+
             else -> MimeTypeMap.getSingleton()
                 .getMimeTypeFromExtension(ext)
                 ?.takeIf { it.isNotBlank() }

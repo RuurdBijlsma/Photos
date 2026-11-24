@@ -24,7 +24,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.lazy.layout.LazyLayoutCacheWindow
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -106,11 +105,7 @@ fun TimelineScreen(
     viewModel: TimelineViewModel,
     baseUrl: String,
     modifier: Modifier = Modifier,
-    listState: LazyListState = rememberLazyListState(
-        cacheWindow = remember {
-            LazyLayoutCacheWindow(aheadFraction = 0.75f, behindFraction = 0.4f)
-        },
-    ),
+    listState: LazyListState,
     contentPadding: PaddingValues = PaddingValues(),
     topBarHeight: Dp = 0.dp,
     topBarVisible: Boolean = true,
