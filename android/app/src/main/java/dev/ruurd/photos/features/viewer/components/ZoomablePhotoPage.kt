@@ -37,6 +37,7 @@ fun ZoomablePhotoPage(
     baseUrl: String,
     isActivePage: Boolean,
     isSettledPage: Boolean,
+    isOffscreen: Boolean,
     isOpeningTransition: Boolean,
     onTap: () -> Unit,
     modifier: Modifier = Modifier,
@@ -87,8 +88,8 @@ fun ZoomablePhotoPage(
     }
 
     val fullResReady = showDualOverlay &&
-        hasDisplayedFullResInFullQuality &&
-        !isPreviewZoomed
+            hasDisplayedFullResInFullQuality &&
+            !isPreviewZoomed
 
     val activeZoomableState = if (fullResReady && fullResZoomableState != null) {
         fullResZoomableState
@@ -96,9 +97,9 @@ fun ZoomablePhotoPage(
         previewZoomableState
     }
 
-    // Reset zoom and revert offscreen pages back to lightweight previews.
-    LaunchedEffect(isActivePage) {
-        if (!isActivePage) {
+    // Reset zoom and revert offscreen pages back to lightweight previews once fully off screen.
+    LaunchedEffect(isOffscreen) {
+        if (isOffscreen) {
             previewZoomableState.resetZoom()
             fullResZoomableState?.resetZoom()
             upgradedInPreview = false
@@ -122,8 +123,10 @@ fun ZoomablePhotoPage(
         }
     }
 
-    // Two-tier loading: keep N ± 1 offscreen neighbors, opening transitions, and mid-swipe pages
-    // on lightweight previews, upgrading to full-res after settling or immediately on zoom.
+    // Two-tier loading: keep N ± 1 offscreen neighbors, opening transitions, and incoming pages
+    // on lightweight previews, upgrading to full-res after settling or immediately on zoom. Once
+    // upgraded, keep the full-res layer mounted until the page leaves the viewport so swiping
+    // away never drops HDR/gainmap mid-transition.
     LaunchedEffect(
         item.id,
         item.isVideo,
@@ -133,16 +136,17 @@ fun ZoomablePhotoPage(
         isSettledPage,
         isPreviewZoomed,
         isActivePage,
+        isOffscreen,
         isOpeningTransition,
     ) {
-        if (!isActivePage) {
+        if (isOffscreen) {
             isUpgradedToFullRes = false
             return@LaunchedEffect
         }
         if (isOpeningTransition) {
             return@LaunchedEffect
         }
-        if (!item.isVideo && isPreviewZoomed) {
+        if (isActivePage && !item.isVideo && isPreviewZoomed) {
             if (localUri == null && fullResFile == null) {
                 onFullResRequested()
             }
@@ -150,7 +154,7 @@ fun ZoomablePhotoPage(
                 isUpgradedToFullRes = true
                 upgradedInPreview = true
             }
-        } else if (canUpgrade && isSettledPage) {
+        } else if (isActivePage && canUpgrade && isSettledPage) {
             if (localUri == null) {
                 isUpgradedToFullRes = true
             } else {

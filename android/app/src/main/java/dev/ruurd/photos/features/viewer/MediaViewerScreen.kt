@@ -13,6 +13,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
@@ -45,6 +46,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.launch
+import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /**
@@ -269,7 +271,7 @@ fun MediaViewerScreen(
         // Interactive Pager Layer (hidden only while ClosingHeroOverlay is flying back to the tile)
         if (transition.closingState == null && items.isNotEmpty()) {
             val isPagerScrollEnabled = !isZoomed && !transition.isDragging &&
-                !transition.isDraggingInfo && !transition.isOpeningHero
+                    !transition.isDraggingInfo && !transition.isOpeningHero
 
             Box(
                 modifier = Modifier
@@ -294,6 +296,15 @@ fun MediaViewerScreen(
                         key(item.id) {
                             val isCurrentPage = pagerState.currentPage == page
                             val isSettledPage = pagerState.settledPage == page
+                            val isOffscreen by remember(pagerState, page) {
+                                derivedStateOf {
+                                    (!pagerState.isScrollInProgress && pagerState.settledPage != page) ||
+                                            abs(
+                                                (page - pagerState.currentPage) -
+                                                        pagerState.currentPageOffsetFraction,
+                                            ) >= 1f
+                                }
+                            }
                             val itemDetails = uiState.detailsById[item.id]
                                 ?.takeIf { it.cloudId == item.cloudId }
                             val itemLocalInfo = uiState.localInfoById[item.id]
@@ -311,6 +322,7 @@ fun MediaViewerScreen(
                                         baseUrl = baseUrl,
                                         isActivePage = isCurrentPage,
                                         isSettledPage = isSettledPage,
+                                        isOffscreen = isOffscreen,
                                         isOpeningTransition = transition.isOpeningHero,
                                         onTap = {
                                             if (!transition.isOpeningHero && !transition.isClosing) {
@@ -365,9 +377,9 @@ fun MediaViewerScreen(
                                         },
                                     ) { measurables, constraints ->
                                         val minSheetHeight = (
-                                            constraints.maxHeight -
-                                                transition.sheetRestTopPx.roundToInt()
-                                            ).coerceAtLeast(0)
+                                                constraints.maxHeight -
+                                                        transition.sheetRestTopPx.roundToInt()
+                                                ).coerceAtLeast(0)
                                         val childConstraints = constraints.copy(
                                             minHeight = minSheetHeight,
                                             maxHeight = Constraints.Infinity,
