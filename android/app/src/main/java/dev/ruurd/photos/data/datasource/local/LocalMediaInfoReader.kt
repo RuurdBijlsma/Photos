@@ -49,6 +49,7 @@ class LocalMediaInfoReader(
             add(MediaStore.MediaColumns.SIZE)
             add(MediaStore.MediaColumns.WIDTH)
             add(MediaStore.MediaColumns.HEIGHT)
+            if (!isVideo) add(COLUMN_ORIENTATION)
             add(MediaStore.MediaColumns.DATE_TAKEN)
             add(MediaStore.MediaColumns.DATE_MODIFIED)
             if (isVideo) add(MediaStore.Video.Media.DURATION)
@@ -62,12 +63,20 @@ class LocalMediaInfoReader(
 
         return cursor.use {
             if (!it.moveToFirst()) return null
+            val rawWidth = it.intOrNull(MediaStore.MediaColumns.WIDTH)?.takeIf { size -> size > 0 }
+            val rawHeight = it.intOrNull(MediaStore.MediaColumns.HEIGHT)?.takeIf { size -> size > 0 }
+            val orientation = if (isVideo) 0 else it.intOrNull(COLUMN_ORIENTATION) ?: 0
+            val (width, height) = if (orientation == 90 || orientation == 270) {
+                rawHeight to rawWidth
+            } else {
+                rawWidth to rawHeight
+            }
             LocalMediaInfo(
                 fileName = it.stringOrNull(MediaStore.MediaColumns.DISPLAY_NAME),
                 mimeType = it.stringOrNull(MediaStore.MediaColumns.MIME_TYPE),
                 sizeBytes = it.longOrNull(MediaStore.MediaColumns.SIZE)?.takeIf { size -> size > 0L },
-                width = it.intOrNull(MediaStore.MediaColumns.WIDTH)?.takeIf { size -> size > 0 },
-                height = it.intOrNull(MediaStore.MediaColumns.HEIGHT)?.takeIf { size -> size > 0 },
+                width = width,
+                height = height,
                 dateTakenMs = it.longOrNull(MediaStore.MediaColumns.DATE_TAKEN)?.takeIf { value -> value > 0L }
                     ?: it.longOrNull(MediaStore.MediaColumns.DATE_MODIFIED)?.times(1000L),
                 durationMs = if (isVideo) it.longOrNull(MediaStore.Video.Media.DURATION) else null,
@@ -102,13 +111,14 @@ class LocalMediaInfoReader(
 
     private fun LocalMediaInfo.withExif(uri: Uri): LocalMediaInfo {
         val exif = openExif(uri) ?: return this
-        val latitude = exif.latLong?.getOrNull(0)?.takeIf { it != 0.0 }
-        val longitude = exif.latLong?.getOrNull(1)?.takeIf { it != 0.0 }
+        val latLong = exif.latLong?.takeUnless { it.size >= 2 && it[0] == 0.0 && it[1] == 0.0 }
+        val latitude = latLong?.getOrNull(0)
+        val longitude = latLong?.getOrNull(1)
         return copy(
             dateTakenMs = dateTakenMs ?: (
-                exif.getAttribute(ExifInterface.TAG_DATETIME_ORIGINAL)
-                    ?: exif.getAttribute(ExifInterface.TAG_DATETIME)
-                )?.let(::parseExifDateTime),
+                    exif.getAttribute(ExifInterface.TAG_DATETIME_ORIGINAL)
+                        ?: exif.getAttribute(ExifInterface.TAG_DATETIME)
+                    )?.let(::parseExifDateTime),
             camera = CameraDetails(
                 make = exif.getAttribute(ExifInterface.TAG_MAKE),
                 model = exif.getAttribute(ExifInterface.TAG_MODEL),
@@ -165,11 +175,12 @@ class LocalMediaInfoReader(
     private fun android.database.Cursor.intOrNull(column: String): Int? = getColumnIndex(column).takeIf { it >= 0 && !isNull(it) }?.let(::getInt)
 
     private companion object {
+        const val COLUMN_ORIENTATION = "orientation"
         val EXIF_DATE_TIME: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy:MM:dd HH:mm:ss")
     }
 }
 
 private val LocalMediaInfo.isEmpty: Boolean
     get() = fileName == null && mimeType == null && sizeBytes == null && width == null &&
-        height == null && dateTakenMs == null && durationMs == null && camera == null &&
-        latitude == null && longitude == null
+            height == null && dateTakenMs == null && durationMs == null && camera == null &&
+            latitude == null && longitude == null

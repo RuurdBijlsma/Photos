@@ -5,7 +5,6 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
-import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -68,6 +67,9 @@ fun MediaInfoPanel(
     localInfo: LocalMediaInfo?,
     item: TimelineMediaProjection?,
     modifier: Modifier = Modifier,
+    isOnline: Boolean = true,
+    isDetailsLoading: Boolean = false,
+    hasDetailsFailed: Boolean = false,
 ) {
     val context = LocalContext.current
 
@@ -301,7 +303,11 @@ fun MediaInfoPanel(
                     if (item != null) {
                         SyncStatusCard(
                             syncStatus = item.syncStatus,
-                            isOfflineDetailsMissing = details == null && item.cloudId != null,
+                            hasCloudId = item.cloudId != null,
+                            hasServerDetails = details != null,
+                            isOnline = isOnline,
+                            isDetailsLoading = isDetailsLoading,
+                            hasDetailsFailed = hasDetailsFailed,
                         )
                     }
 
@@ -556,7 +562,11 @@ private fun AlbumPreviewRow(
 @Composable
 private fun SyncStatusCard(
     syncStatus: SyncStatus,
-    isOfflineDetailsMissing: Boolean,
+    hasCloudId: Boolean,
+    hasServerDetails: Boolean,
+    isOnline: Boolean,
+    isDetailsLoading: Boolean,
+    hasDetailsFailed: Boolean,
 ) {
     val (icon, title, subtitle) = when (syncStatus) {
         SyncStatus.SYNCED -> Triple(
@@ -578,8 +588,13 @@ private fun SyncStatusCard(
         )
     }
 
-    val effectiveSubtitle = if (isOfflineDetailsMissing) {
-        "$subtitle Offline — showing cached local and database details."
+    val effectiveSubtitle = if (hasCloudId && !hasServerDetails) {
+        when {
+            !isOnline -> "$subtitle Offline — showing cached local and database details."
+            isDetailsLoading -> "$subtitle Loading full server details…"
+            hasDetailsFailed -> "$subtitle Server details unavailable — showing cached details."
+            else -> subtitle
+        }
     } else {
         subtitle
     }

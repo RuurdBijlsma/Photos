@@ -3,17 +3,23 @@ package dev.ruurd.photos.core.image
 import android.content.Context
 import dev.ruurd.photos.core.common.AppDispatchers
 import dev.ruurd.photos.core.network.SessionManager
+import dev.ruurd.photos.core.network.await
 import dev.ruurd.photos.domain.model.MediaFileNames
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
 import java.io.IOException
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicLong
 
 /**
  * `cacheDir/full_res_cache/` — a ~500 MB LRU of `/api/photos/{cloudId}/download` originals kept out
@@ -25,7 +31,7 @@ interface FullResFileStore {
     fun peek(cloudId: String): File?
 
     /** Cached original, else downloads it. Concurrent callers for one item share one download. */
-    suspend fun get(cloudId: String, fileName: String): File?
+    suspend fun get(cloudId: String, fileName: String? = null): File?
 
     suspend fun evict(cloudId: String)
 
@@ -41,26 +47,46 @@ class FullResFileCache(
     private val maxSizeBytes: Long = DEFAULT_MAX_SIZE_BYTES,
 ) : FullResFileStore {
     private val directory: File = context.cacheDir.resolve(CACHE_DIR)
-
-    private val inFlight = ConcurrentHashMap<String, Deferred<File?>>()
+    private val generation = AtomicLong(0L)
+    private val inFlight = ConcurrentHashMap<String, InFlightDownload>()
 
     override fun peek(cloudId: String): File? = directoryFor(cloudId)
         .listFiles()
         ?.firstOrNull { it.isFile && it.length() > 0L }
 
-    override suspend fun get(cloudId: String, fileName: String): File? {
+    override suspend fun get(cloudId: String, fileName: String?): File? {
         peek(cloudId)?.let { cached ->
             cached.setLastModified(System.currentTimeMillis())
             return cached
         }
-        val deferred = inFlight.computeIfAbsent(cloudId) { id ->
-            scope.async(dispatchers.io) { download(id, fileName) }
-                .also { created -> created.invokeOnCompletion { inFlight.remove(id, created) } }
+        val expectedGen = generation.get()
+        val entry = inFlight.compute(cloudId) { id, existing ->
+            val active = existing?.takeIf {
+                it.generation == expectedGen && !it.job.isCancelled && !it.job.isCompleted
+            } ?: InFlightDownload(
+                generation = expectedGen,
+                job = scope.async(dispatchers.io, start = CoroutineStart.LAZY) {
+                    download(id, fileName, expectedGen)
+                },
+            ).also { created ->
+                created.job.invokeOnCompletion { inFlight.remove(id, created) }
+            }
+            active.waiters.incrementAndGet()
+            active
+        }!!
+
+        return try {
+            entry.job.await()
+        } finally {
+            if (entry.waiters.decrementAndGet() <= 0) {
+                inFlight.remove(cloudId, entry)
+                entry.job.cancel()
+            }
         }
-        return deferred.await()
     }
 
     override suspend fun evict(cloudId: String) {
+        inFlight.remove(cloudId)?.job?.cancel()
         withContext(dispatchers.io) {
             directoryFor(cloudId).deleteRecursively()
             Unit
@@ -68,48 +94,82 @@ class FullResFileCache(
     }
 
     override suspend fun clear() {
+        generation.incrementAndGet()
+        val pending = inFlight.values.toList()
+        inFlight.clear()
+        pending.forEach { it.job.cancel() }
         withContext(dispatchers.io) {
             directory.deleteRecursively()
             Unit
         }
     }
 
-    private suspend fun download(cloudId: String, fileName: String): File? = withContext(dispatchers.io) {
+    private suspend fun download(
+        cloudId: String,
+        fileName: String?,
+        expectedGeneration: Long,
+    ): File? = withContext(dispatchers.io) {
         val url = "${sessionManager.getServerUrl()}/api/photos/$cloudId/download"
         val targetDirectory = directoryFor(cloudId)
-        val target = File(targetDirectory, MediaFileNames.sanitize(fileName, isVideo = false, mimeType = null))
-        val temp = File(targetDirectory, "${target.name}$TEMP_SUFFIX")
+        var temp: File? = null
 
         try {
             val request = Request.Builder().url(url).build()
-            okHttpClient.newCall(request).execute().use { response ->
+            val resolvedName = okHttpClient.newCall(request).await().use { response ->
                 if (!response.isSuccessful) return@withContext null
+
+                val name = fileName?.takeIf { it.isNotBlank() }
+                    ?: MediaFileNames.parseContentDispositionFilename(
+                        response.header("Content-Disposition"),
+                    )
+                    ?: MediaFileNames.fallbackName(
+                        cloudId = cloudId,
+                        isVideo = false,
+                        mimeType = response.header("Content-Type")?.substringBefore(';')?.trim(),
+                    )
+                val sanitized = MediaFileNames.sanitize(name, isVideo = false, mimeType = null)
+
                 targetDirectory.mkdirs()
+                val partFile = File(targetDirectory, "$sanitized$TEMP_SUFFIX")
+                temp = partFile
+
+                val buffer = ByteArray(STREAM_BUFFER_BYTES)
                 response.body.byteStream().use { input ->
-                    temp.outputStream().use { output -> input.copyTo(output) }
+                    partFile.outputStream().use { output ->
+                        while (true) {
+                            currentCoroutineContext().ensureActive()
+                            val read = input.read(buffer)
+                            if (read < 0) break
+                            output.write(buffer, 0, read)
+                        }
+                    }
                 }
+                sanitized
             }
-            // Never truncate anything with an empty body: a 0-byte "original" would replace a good
-            // cached file with an unopenable one.
-            if (temp.length() <= 0L) {
-                temp.delete()
+
+            val partFile = temp ?: return@withContext null
+            if (generation.get() != expectedGeneration || partFile.length() <= 0L) {
+                partFile.delete()
                 return@withContext null
             }
+
+            val target = File(targetDirectory, resolvedName)
             target.delete()
-            if (!temp.renameTo(target)) {
-                temp.delete()
+            if (!partFile.renameTo(target)) {
+                partFile.delete()
                 return@withContext null
             }
             target.setLastModified(System.currentTimeMillis())
             trim()
             target
         } catch (e: CancellationException) {
+            temp?.delete()
             throw e
         } catch (_: IOException) {
-            temp.delete()
+            temp?.delete()
             null
         } catch (_: Exception) {
-            temp.delete()
+            temp?.delete()
             null
         }
     }
@@ -130,9 +190,17 @@ class FullResFileCache(
 
     private fun directoryFor(cloudId: String): File = directory.resolve(cloudId)
 
+    private class InFlightDownload(
+        val generation: Long,
+        val job: Deferred<File?>,
+    ) {
+        val waiters = AtomicInteger(0)
+    }
+
     private companion object {
         const val CACHE_DIR = "full_res_cache"
         const val TEMP_SUFFIX = ".part"
+        const val STREAM_BUFFER_BYTES = 16 * 1024
         const val DEFAULT_MAX_SIZE_BYTES = 500L * 1024 * 1024
     }
 }

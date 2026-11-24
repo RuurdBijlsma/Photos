@@ -32,6 +32,7 @@ import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -82,6 +83,8 @@ fun ViewerChromeOverlay(
     onShare: () -> Unit,
     modifier: Modifier = Modifier,
     backButtonAlpha: Float = alpha,
+    isSharing: Boolean = false,
+    isCopying: Boolean = false,
 ) {
     // Ignoring visibility keeps the top bar anchored when statusBars() animates back in on tap.
     val statusBarPadding = WindowInsets.statusBarsIgnoringVisibility
@@ -211,7 +214,8 @@ fun ViewerChromeOverlay(
                         )
                         if (currentItem != null && !currentItem.isVideo && isCopyEnabled) {
                             DropdownMenuItem(
-                                text = { Text("Copy") },
+                                text = { Text(if (isCopying) "Copying…" else "Copy") },
+                                enabled = !isCopying,
                                 leadingIcon = {
                                     Icon(
                                         imageVector = Icons.Outlined.ContentCopy,
@@ -274,8 +278,9 @@ fun ViewerChromeOverlay(
                 ) {
                     ViewerPillAction(
                         imageVector = Icons.Default.Share,
-                        label = "Share",
-                        enabled = isShareEnabled,
+                        label = if (isSharing) "Preparing…" else "Share",
+                        enabled = isShareEnabled && !isSharing,
+                        isLoading = isSharing,
                         onClick = onShare,
                     )
                     ViewerPillAction(imageVector = Icons.Default.Add, label = "Add to", enabled = false)
@@ -342,9 +347,10 @@ private fun ViewerPillAction(
     imageVector: ImageVector,
     label: String,
     enabled: Boolean = true,
+    isLoading: Boolean = false,
     onClick: () -> Unit = {},
 ) {
-    val contentTint = if (enabled) Color.White else Color.White.copy(alpha = 0.5f)
+    val contentTint = if (enabled || isLoading) Color.White else Color.White.copy(alpha = 0.5f)
     Row(
         modifier = Modifier
             .clip(CircleShape)
@@ -358,12 +364,20 @@ private fun ViewerPillAction(
             .padding(horizontal = 12.dp, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(
-            imageVector = imageVector,
-            contentDescription = label,
-            tint = contentTint,
-            modifier = Modifier.size(21.dp),
-        )
+        if (isLoading) {
+            CircularProgressIndicator(
+                color = contentTint,
+                strokeWidth = 2.dp,
+                modifier = Modifier.size(18.dp),
+            )
+        } else {
+            Icon(
+                imageVector = imageVector,
+                contentDescription = label,
+                tint = contentTint,
+                modifier = Modifier.size(21.dp),
+            )
+        }
         Spacer(modifier = Modifier.width(7.dp))
         Text(
             text = label,

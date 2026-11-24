@@ -1,7 +1,9 @@
+
 package dev.ruurd.photos.domain.model
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -21,6 +23,26 @@ class MediaFilePolicyTest {
         assertEquals("video_c1.mov", MediaFileNames.fallbackName("c1", isVideo = true, mimeType = "video/quicktime"))
         assertEquals("photo_c1.jpg", MediaFileNames.fallbackName("c1", isVideo = false, mimeType = null))
         assertEquals("video_c1.mp4", MediaFileNames.fallbackName("c1", isVideo = true, mimeType = null))
+    }
+
+    @Test
+    fun `parses plain and rfc5987 content disposition filenames`() {
+        assertEquals(
+            "IMG_1234.jpg",
+            MediaFileNames.parseContentDispositionFilename("""inline; filename="IMG_1234.jpg""""),
+        )
+        assertEquals(
+            "vacation.png",
+            MediaFileNames.parseContentDispositionFilename("attachment; filename=vacation.png"),
+        )
+        assertEquals(
+            "my photo+1.heic",
+            MediaFileNames.parseContentDispositionFilename(
+                """inline; filename="fallback.jpg"; filename*=UTF-8''my%20photo+1.heic""",
+            ),
+        )
+        assertNull(MediaFileNames.parseContentDispositionFilename(null))
+        assertNull(MediaFileNames.parseContentDispositionFilename("inline"))
     }
 
     @Test

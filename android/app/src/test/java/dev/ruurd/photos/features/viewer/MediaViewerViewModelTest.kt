@@ -4,6 +4,7 @@ import android.content.Intent
 import androidx.lifecycle.viewModelScope
 import dev.ruurd.photos.core.common.MediaFileSharer
 import dev.ruurd.photos.core.database.entity.MediaEntity
+import dev.ruurd.photos.core.database.entity.SyncStatus
 import dev.ruurd.photos.core.database.entity.TimelineMediaProjection
 import dev.ruurd.photos.core.image.FullResFileStore
 import dev.ruurd.photos.data.datasource.local.LocalMediaInfoSource
@@ -40,9 +41,9 @@ class MediaViewerViewModelTest {
 
     private val detailsRepository = FakeMediaDetailsRepository(
         mapOf(
-            "c1" to MediaDetails(cloudId = "c1", fileName = "one.jpg"),
-            "c2" to MediaDetails(cloudId = "c2", fileName = "two.jpg"),
-            "c3" to MediaDetails(cloudId = "c3", fileName = "three.jpg"),
+            "c1" to MediaDetails(cloudId = "c1", fileName = "one.jpg", mimeType = "image/jpeg"),
+            "c2" to MediaDetails(cloudId = "c2", fileName = "two.jpg", mimeType = "image/jpeg"),
+            "c3" to MediaDetails(cloudId = "c3", fileName = "three.jpg", mimeType = "image/jpeg"),
         ),
     )
 
@@ -236,7 +237,7 @@ class MediaViewerViewModelTest {
     }
 
     @Test
-    fun `settling loads item details for the page and prefetches its neighbors`() = testScope.runTest {
+    fun `loads active details immediately and prefetches neighbors on settle`() = testScope.runTest {
         val repo = FakeMediaRepository()
         repo.upsertAll(
             listOf(
@@ -253,25 +254,38 @@ class MediaViewerViewModelTest {
         )
         runCurrent()
 
+        val localDetailsRepo = FakeMediaDetailsRepository(
+            mapOf(
+                "c1" to MediaDetails(cloudId = "c1", fileName = "one.jpg", mimeType = "image/jpeg"),
+                "c2" to MediaDetails(cloudId = "c2", fileName = "two.jpg", mimeType = "image/jpeg"),
+                "c3" to MediaDetails(cloudId = "c3", fileName = "three.jpg", mimeType = "image/jpeg"),
+            ),
+        )
+        val fullResStore = FakeFullResFileStore()
+
         val viewModel = MediaViewerViewModel(
             initialMediaId = "p2",
             timelineProjectionStore = store,
             mediaRepository = repo,
-            mediaDetailsRepository = detailsRepository,
-            fullResFileCache = FakeFullResFileStore(),
+            mediaDetailsRepository = localDetailsRepo,
+            fullResFileCache = fullResStore,
             localMediaInfoReader = FakeLocalMediaInfoSource(),
             mediaFileSharer = FakeMediaFileSharer(),
             dispatchers = dispatchers,
         )
         runCurrent()
 
+        // Active page details load immediately without waiting for onSettledPage.
+        assertEquals("c2", viewModel.uiState.value.activeDetails?.cloudId)
+        assertEquals(listOf("c2"), localDetailsRepo.requested)
+
         viewModel.onSettledPage("p2")
         runCurrent()
 
-        assertEquals("c2", viewModel.uiState.value.activeDetails?.cloudId)
         assertEquals("c1", viewModel.uiState.value.detailsById["p1"]?.cloudId)
         assertEquals("c3", viewModel.uiState.value.detailsById["p3"]?.cloudId)
-        assertTrue(detailsRepository.requested.containsAll(listOf("c2", "c1", "c3")))
+        assertTrue(localDetailsRepo.requested.containsAll(listOf("c2", "c1", "c3")))
+        assertEquals(listOf("c2"), fullResStore.requestedCloudIds)
 
         // Swiping to a prefetched neighbor keeps its details available immediately.
         viewModel.onPageChanged("p3")
@@ -281,6 +295,49 @@ class MediaViewerViewModelTest {
         assertTrue(viewModel.uiState.value.isInfoSheetOpen)
         viewModel.closeInfoSheet()
         assertFalse(viewModel.uiState.value.isInfoSheetOpen)
+
+        viewModel.viewModelScope.cancel()
+        store.stop()
+    }
+
+    @Test
+    fun `synced item never fetches full res from cloud on settle`() = testScope.runTest {
+        val repo = FakeMediaRepository()
+        repo.upsert(
+            MediaEntity(
+                id = "local_1",
+                cloudId = "c1",
+                localContentUri = "content://media/external/images/media/1",
+                syncStatus = SyncStatus.SYNCED,
+                sortTimestamp = 3000L,
+                yearMonth = 202611,
+            ),
+        )
+
+        val store = TimelineProjectionStore(
+            mediaRepository = repo,
+            scope = backgroundScope,
+            dispatchers = dispatchers,
+        )
+        runCurrent()
+
+        val fullResStore = FakeFullResFileStore()
+        val viewModel = MediaViewerViewModel(
+            initialMediaId = "local_1",
+            timelineProjectionStore = store,
+            mediaRepository = repo,
+            mediaDetailsRepository = detailsRepository,
+            fullResFileCache = fullResStore,
+            localMediaInfoReader = FakeLocalMediaInfoSource(),
+            mediaFileSharer = FakeMediaFileSharer(),
+            dispatchers = dispatchers,
+        )
+        runCurrent()
+
+        viewModel.onSettledPage("local_1")
+        runCurrent()
+
+        assertTrue(fullResStore.requestedCloudIds.isEmpty())
 
         viewModel.viewModelScope.cancel()
         store.stop()
@@ -305,9 +362,14 @@ private class FakeMediaDetailsRepository(
 }
 
 private class FakeFullResFileStore : FullResFileStore {
+    val requestedCloudIds = mutableListOf<String>()
+
     override fun peek(cloudId: String): File? = null
 
-    override suspend fun get(cloudId: String, fileName: String): File? = null
+    override suspend fun get(cloudId: String, fileName: String?): File? {
+        requestedCloudIds += cloudId
+        return null
+    }
 
     override suspend fun evict(cloudId: String) = Unit
 
@@ -319,7 +381,15 @@ private class FakeLocalMediaInfoSource : LocalMediaInfoSource {
 }
 
 private class FakeMediaFileSharer : MediaFileSharer {
-    override suspend fun shareIntent(item: TimelineMediaProjection, details: MediaDetails?): Intent? = null
+    override suspend fun shareIntent(
+        item: TimelineMediaProjection,
+        details: MediaDetails?,
+        localInfo: LocalMediaInfo?,
+    ): Intent? = null
 
-    override suspend fun copyToClipboard(item: TimelineMediaProjection, details: MediaDetails?): Boolean = false
+    override suspend fun copyToClipboard(
+        item: TimelineMediaProjection,
+        details: MediaDetails?,
+        localInfo: LocalMediaInfo?,
+    ): Boolean = false
 }

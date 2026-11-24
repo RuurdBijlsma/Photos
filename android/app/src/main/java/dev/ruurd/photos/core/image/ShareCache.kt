@@ -24,10 +24,21 @@ class ShareCache(
 
     fun uriFor(file: File): Uri = FileProvider.getUriForFile(appContext, authority, file)
 
-    /** Any already staged file for this item, regardless of the filename it was staged under. */
-    fun peek(id: String): File? = directory.resolve(id)
-        .listFiles()
-        ?.firstOrNull { it.isFile && it.length() > 0L }
+    /**
+     * Any already staged file for this item. When [expectedFileName] is non-null, requires a
+     * matching filename so an earlier fallback-named file doesn't shadow the real filename.
+     */
+    fun peek(id: String, expectedFileName: String? = null): File? {
+        val candidates = directory.resolve(id)
+            .listFiles()
+            ?.filter { it.isFile && it.length() > 0L }
+            ?: return null
+        return if (expectedFileName != null) {
+            candidates.firstOrNull { it.name == expectedFileName }
+        } else {
+            candidates.firstOrNull()
+        }
+    }
 
     /**
      * Writes [write] to a `*.part` sibling and renames it in place, so a receiver never sees a
@@ -41,8 +52,9 @@ class ShareCache(
         write: (OutputStream) -> Unit,
     ): File? {
         val folder = directory.resolve(id).apply { mkdirs() }
-        val destination = File(folder, MediaFileNames.sanitize(fileName, isVideo, mimeType))
-        val temp = File(folder, "${destination.name}$TEMP_SUFFIX")
+        val sanitizedName = MediaFileNames.sanitize(fileName, isVideo, mimeType)
+        val destination = File(folder, sanitizedName)
+        val temp = File(folder, "$sanitizedName$TEMP_SUFFIX")
         return try {
             temp.outputStream().use(write)
             if (temp.length() <= 0L) {
@@ -51,6 +63,10 @@ class ShareCache(
             } else {
                 destination.delete()
                 if (temp.renameTo(destination)) {
+                    // Clean up older fallback-named files in the same item directory.
+                    folder.listFiles()
+                        ?.filter { it.isFile && it.name != sanitizedName && !it.name.endsWith(TEMP_SUFFIX) }
+                        ?.forEach { it.delete() }
                     destination.setLastModified(System.currentTimeMillis())
                     destination
                 } else {

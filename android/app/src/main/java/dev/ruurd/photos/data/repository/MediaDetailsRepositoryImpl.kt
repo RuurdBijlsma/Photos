@@ -14,10 +14,13 @@ import dev.ruurd.photos.domain.model.WeatherDetails
 import dev.ruurd.photos.domain.repository.MediaDetailsRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
 import java.io.IOException
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicLong
 
 class MediaDetailsRepositoryImpl(
     private val apiService: PhotosApiService,
@@ -26,34 +29,63 @@ class MediaDetailsRepositoryImpl(
 ) : MediaDetailsRepository {
 
     private val cache = LruCache<String, MediaDetails>(MAX_CACHED_ITEMS)
-
-    // Neighbors of the settled page ask for the same cloudId the pager itself asks for.
-    private val inFlight = ConcurrentHashMap<String, Deferred<MediaDetails?>>()
+    private val generation = AtomicLong(0L)
+    private val inFlight = ConcurrentHashMap<String, InFlightFetch>()
 
     override fun peek(cloudId: String): MediaDetails? = cache.get(cloudId)
 
     override suspend fun get(cloudId: String): MediaDetails? {
         peek(cloudId)?.let { return it }
-        val deferred = inFlight.computeIfAbsent(cloudId) { id ->
-            scope.async(dispatchers.io) { fetch(id) }
-                .also { created -> created.invokeOnCompletion { inFlight.remove(id, created) } }
+        val expectedGen = generation.get()
+        val entry = inFlight.compute(cloudId) { id, existing ->
+            val active = existing?.takeIf {
+                it.generation == expectedGen && !it.job.isCancelled && !it.job.isCompleted
+            } ?: InFlightFetch(
+                generation = expectedGen,
+                job = scope.async(dispatchers.io, start = CoroutineStart.LAZY) {
+                    fetch(id, expectedGen)
+                },
+            ).also { created ->
+                created.job.invokeOnCompletion { inFlight.remove(id, created) }
+            }
+            active.waiters.incrementAndGet()
+            active
+        }!!
+
+        return try {
+            entry.job.await()
+        } finally {
+            if (entry.waiters.decrementAndGet() <= 0) {
+                inFlight.remove(cloudId, entry)
+                entry.job.cancel()
+            }
         }
-        return deferred.await()
     }
 
     override fun evict(cloudIds: Collection<String>) {
-        cloudIds.forEach { cache.remove(it) }
+        cloudIds.forEach { id ->
+            cache.remove(id)
+            inFlight.remove(id)?.job?.cancel()
+        }
     }
 
     override fun clear() {
+        generation.incrementAndGet()
+        val pending = inFlight.values.toList()
+        inFlight.clear()
+        pending.forEach { it.job.cancel() }
         cache.evictAll()
     }
 
-    private suspend fun fetch(cloudId: String): MediaDetails? = try {
+    private suspend fun fetch(cloudId: String, expectedGeneration: Long): MediaDetails? = try {
         val response = apiService.getMediaItem(cloudId)
         val body = response.body()
         if (response.isSuccessful && body != null) {
-            body.toDomain(cloudId).also { cache.put(cloudId, it) }
+            body.toDomain(cloudId).also {
+                if (generation.get() == expectedGeneration) {
+                    cache.put(cloudId, it)
+                }
+            }
         } else {
             null
         }
@@ -63,6 +95,13 @@ class MediaDetailsRepositoryImpl(
         null
     } catch (_: Exception) {
         null
+    }
+
+    private class InFlightFetch(
+        val generation: Long,
+        val job: Deferred<MediaDetails?>,
+    ) {
+        val waiters = AtomicInteger(0)
     }
 
     private companion object {

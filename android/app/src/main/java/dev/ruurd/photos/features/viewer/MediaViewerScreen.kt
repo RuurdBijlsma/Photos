@@ -45,12 +45,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.launch
-import kotlin.collections.component1
-import kotlin.collections.component2
-import kotlin.collections.get
-import kotlin.compareTo
 import kotlin.math.roundToInt
-import kotlin.text.get
 
 /**
  * Full-screen media pager with the tile↔fullscreen hero transition, drag-to-dismiss, floating
@@ -68,6 +63,7 @@ fun MediaViewerScreen(
     onDismissFinished: () -> Unit,
     modifier: Modifier = Modifier,
     openSourceCorners: TileCornerRadii = TileCornerRadii.Zero,
+    isOnline: Boolean = true,
     onActiveMediaChanged: (String) -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -221,7 +217,7 @@ fun MediaViewerScreen(
         baseUrl = baseUrl,
     )
 
-    // ~130 ms after settling, load /item (plus neighbors) and the local/offline info fallback.
+    // ~130 ms after settling, trigger neighbor prefetch + cloud-only full-res download.
     LaunchedEffect(pagerState) {
         snapshotFlow { if (currentItems.isEmpty()) null else pagerState.settledPage }
             .filterNotNull()
@@ -350,6 +346,9 @@ fun MediaViewerScreen(
                                                 details = itemDetails,
                                                 localInfo = itemLocalInfo,
                                                 item = item,
+                                                isOnline = isOnline,
+                                                isDetailsLoading = item.id in uiState.loadingDetailsIds,
+                                                hasDetailsFailed = item.id in uiState.failedDetailsIds,
                                                 modifier = Modifier
                                                     .onSizeChanged {
                                                         transition.onInfoContentHeightChanged(
@@ -419,6 +418,8 @@ fun MediaViewerScreen(
             ViewerChromeOverlay(
                 alpha = chromeAlpha,
                 backButtonAlpha = backButtonAlpha,
+                isSharing = uiState.isSharing,
+                isCopying = uiState.isCopying,
                 currentItem = activeItem,
                 currentDetails = activeDetails,
                 currentLocalInfo = activeLocalInfo,

@@ -222,6 +222,7 @@ private fun AuthenticatedSession(
                     userKey = userKey,
                     viewerMediaId = viewerMediaId,
                     baseUrl = mainUiState.serverUrl,
+                    isOnline = mainUiState.isOnline,
                     openSourceRect = viewerOpenSourceRect,
                     openSourceCorners = viewerOpenSourceCorners,
                     containerSize = rootContainerSize,
@@ -254,6 +255,7 @@ private fun SessionMediaViewer(
     userKey: String,
     viewerMediaId: String,
     baseUrl: String,
+    isOnline: Boolean,
     openSourceRect: Rect?,
     openSourceCorners: TileCornerRadii,
     containerSize: IntSize,
@@ -277,6 +279,7 @@ private fun SessionMediaViewer(
     MediaViewerScreen(
         viewModel = viewerViewModel,
         baseUrl = baseUrl,
+        isOnline = isOnline,
         openSourceRect = openSourceRect,
         openSourceCorners = openSourceCorners,
         containerSize = containerSize,

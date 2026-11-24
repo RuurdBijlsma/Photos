@@ -9,8 +9,14 @@ import dev.ruurd.photos.core.database.entity.TimelineMediaProjection
 import dev.ruurd.photos.core.image.FullResFileStore
 import dev.ruurd.photos.core.image.ShareCache
 import dev.ruurd.photos.core.network.SessionManager
+import dev.ruurd.photos.core.network.await
+import dev.ruurd.photos.domain.model.LocalMediaInfo
 import dev.ruurd.photos.domain.model.MediaDetails
 import dev.ruurd.photos.domain.model.MediaFileNames
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.job
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -19,10 +25,18 @@ import java.io.IOException
 
 interface MediaFileSharer {
     /** `null` when the item is missing on the server or its bytes are unreachable. */
-    suspend fun shareIntent(item: TimelineMediaProjection, details: MediaDetails?): Intent?
+    suspend fun shareIntent(
+        item: TimelineMediaProjection,
+        details: MediaDetails?,
+        localInfo: LocalMediaInfo? = null,
+    ): Intent?
 
     /** Copies a photo's URI, staging local and cloud photos alike so paste targets can always read it. */
-    suspend fun copyToClipboard(item: TimelineMediaProjection, details: MediaDetails?): Boolean
+    suspend fun copyToClipboard(
+        item: TimelineMediaProjection,
+        details: MediaDetails?,
+        localInfo: LocalMediaInfo? = null,
+    ): Boolean
 }
 
 /**
@@ -45,60 +59,82 @@ class DefaultMediaFileSharer(
     override suspend fun shareIntent(
         item: TimelineMediaProjection,
         details: MediaDetails?,
+        localInfo: LocalMediaInfo?,
     ): Intent? = withContext(dispatchers.io) {
         if (details?.isMissing == true) return@withContext null
         shareCache.prune()
 
         val localUri = item.localContentUri?.let(Uri::parse)
         if (localUri != null && isReadable(localUri)) {
-            val mimeType = details?.mimeType ?: resolver.getType(localUri) ?: defaultMime(item.isVideo)
+            val mimeType = details?.mimeType
+                ?: localInfo?.mimeType
+                ?: resolver.getType(localUri)
+                ?: defaultMime(item.isVideo)
             return@withContext buildShareIntent(localUri, mimeType)
         }
 
         val cloudId = item.cloudId ?: return@withContext null
         val staged = stageCloudFile(cloudId, folderKey(item), details, item.isVideo)
             ?: return@withContext null
-        buildShareIntent(shareCache.uriFor(staged), details?.mimeType ?: defaultMime(item.isVideo))
+        val shareMime = details?.mimeType
+            ?: mimeFromFilename(staged.name, item.isVideo)
+        buildShareIntent(shareCache.uriFor(staged), shareMime)
     }
 
     /** Copies a photo's URI, staging local and cloud photos alike so paste targets can always read it. */
     override suspend fun copyToClipboard(
         item: TimelineMediaProjection,
         details: MediaDetails?,
+        localInfo: LocalMediaInfo?,
     ): Boolean = withContext(dispatchers.io) {
         if (item.isVideo || details?.isMissing == true) return@withContext false
         shareCache.prune()
 
-        val fileName = details?.fileName ?: MediaFileNames.fallbackName(
-            cloudId = item.cloudId ?: item.id,
-            isVideo = false,
-            mimeType = details?.mimeType,
-        )
-        val staged = stagedPhoto(item, details, fileName) ?: return@withContext false
+        val localUri = item.localContentUri?.let(Uri::parse)
+        val resolvedMime = details?.mimeType
+            ?: localInfo?.mimeType
+            ?: localUri?.let(resolver::getType)
+        val knownName = details?.fileName ?: localInfo?.fileName
+        val staged = stagedPhoto(
+            item = item,
+            localUri = localUri,
+            details = details,
+            knownFileName = knownName,
+            mimeType = resolvedMime,
+        ) ?: return@withContext false
         val uri = shareCache.uriFor(staged)
 
         withContext(dispatchers.main) {
             val clipboard = appContext.getSystemService(ClipboardManager::class.java)
                 ?: return@withContext false
-            clipboard.setPrimaryClip(ClipData.newUri(resolver, fileName, uri))
+            clipboard.setPrimaryClip(ClipData.newUri(resolver, staged.name, uri))
             true
         }
     }
 
     private suspend fun stagedPhoto(
         item: TimelineMediaProjection,
+        localUri: Uri?,
         details: MediaDetails?,
-        fileName: String,
+        knownFileName: String?,
+        mimeType: String?,
     ): File? {
-        shareCache.peek(folderKey(item))?.let { return it }
+        val expectedName = knownFileName?.let {
+            MediaFileNames.sanitize(it, isVideo = false, mimeType = mimeType)
+        }
+        shareCache.peek(folderKey(item), expectedFileName = expectedName)?.let { return it }
 
-        val localUri = item.localContentUri?.let(Uri::parse)
         if (localUri != null) {
+            val fileName = knownFileName ?: MediaFileNames.fallbackName(
+                cloudId = item.cloudId ?: item.id,
+                isVideo = false,
+                mimeType = mimeType,
+            )
             val staged = shareCache.stageInto(
                 id = folderKey(item),
                 fileName = fileName,
                 isVideo = false,
-                mimeType = details?.mimeType,
+                mimeType = mimeType,
             ) { output ->
                 resolver.openInputStream(localUri)?.use { input -> input.copyTo(output) }
                     ?: throw IOException("Unreadable local URI")
@@ -116,15 +152,22 @@ class DefaultMediaFileSharer(
         details: MediaDetails?,
         isVideo: Boolean,
     ): File? {
-        shareCache.peek(key)?.let { return it }
-        val fileName = details?.fileName
-            ?: MediaFileNames.fallbackName(cloudId, isVideo, details?.mimeType)
+        val expectedName = details?.fileName?.let {
+            MediaFileNames.sanitize(it, isVideo = isVideo, mimeType = details.mimeType)
+        }
+        shareCache.peek(key, expectedFileName = expectedName)?.let { return it }
 
         return if (isVideo) {
-            downloadToShareCache(cloudId, key, fileName, details?.mimeType)
+            downloadToShareCache(cloudId, key, details?.fileName, details?.mimeType)
         } else {
-            val cached = fullResFileCache.get(cloudId, fileName) ?: return null
-            shareCache.stageInto(key, fileName, isVideo = false, mimeType = details?.mimeType) { output ->
+            val cached = fullResFileCache.get(cloudId, details?.fileName) ?: return null
+            val targetName = details?.fileName ?: cached.name
+            shareCache.stageInto(
+                id = key,
+                fileName = targetName,
+                isVideo = false,
+                mimeType = details?.mimeType,
+            ) { output ->
                 cached.inputStream().use { it.copyTo(output) }
             }
         }
@@ -134,19 +177,46 @@ class DefaultMediaFileSharer(
     private suspend fun downloadToShareCache(
         cloudId: String,
         key: String,
-        fileName: String,
-        mimeType: String?,
+        knownFileName: String?,
+        knownMimeType: String?,
     ): File? = withContext(dispatchers.io) {
+        val job = currentCoroutineContext().job
         val request = Request.Builder()
             .url("${sessionManager.getServerUrl()}/api/photos/$cloudId/download")
             .build()
         try {
-            okHttpClient.newCall(request).execute().use { response ->
+            okHttpClient.newCall(request).await().use { response ->
                 if (!response.isSuccessful) return@withContext null
-                shareCache.stageInto(key, fileName, isVideo = true, mimeType = mimeType) { output ->
-                    response.body.byteStream().use { it.copyTo(output) }
+                val responseMime = knownMimeType
+                    ?: response.header("Content-Type")?.substringBefore(';')?.trim()
+                val fileName = knownFileName?.takeIf { it.isNotBlank() }
+                    ?: MediaFileNames.parseContentDispositionFilename(
+                        response.header("Content-Disposition"),
+                    )
+                    ?: MediaFileNames.fallbackName(
+                        cloudId = cloudId,
+                        isVideo = true,
+                        mimeType = responseMime,
+                    )
+                val buffer = ByteArray(STREAM_BUFFER_BYTES)
+                shareCache.stageInto(
+                    id = key,
+                    fileName = fileName,
+                    isVideo = true,
+                    mimeType = responseMime,
+                ) { output ->
+                    response.body.byteStream().use { input ->
+                        while (true) {
+                            job.ensureActive()
+                            val read = input.read(buffer)
+                            if (read < 0) break
+                            output.write(buffer, 0, read)
+                        }
+                    }
                 }
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (_: IOException) {
             null
         } catch (_: Exception) {
@@ -169,5 +239,28 @@ class DefaultMediaFileSharer(
 
     private fun folderKey(item: TimelineMediaProjection): String = item.cloudId ?: item.id
 
+    private fun mimeFromFilename(name: String, isVideo: Boolean): String {
+        val ext = name.substringAfterLast('.', "").lowercase()
+        return when (ext) {
+            "jpg", "jpeg" -> "image/jpeg"
+            "png" -> "image/png"
+            "webp" -> "image/webp"
+            "gif" -> "image/gif"
+            "avif" -> "image/avif"
+            "heic" -> "image/heic"
+            "heif" -> "image/heif"
+            "tiff", "tif" -> "image/tiff"
+            "mp4" -> "video/mp4"
+            "mov" -> "video/quicktime"
+            "webm" -> "video/webm"
+            "mkv" -> "video/x-matroska"
+            else -> defaultMime(isVideo)
+        }
+    }
+
     private fun defaultMime(isVideo: Boolean): String = if (isVideo) "video/*" else "image/*"
+
+    private companion object {
+        const val STREAM_BUFFER_BYTES = 16 * 1024
+    }
 }
