@@ -2,6 +2,7 @@ package dev.ruurd.photos.core.image
 
 import android.content.Context
 import android.net.Uri
+import coil3.Image
 import coil3.memory.MemoryCache
 import coil3.request.ImageRequest
 import coil3.size.Dimension
@@ -50,6 +51,7 @@ object MediaImageRequests {
     /**
      * @param placeholderKey previous key for the same item, so a re-request paints the cached frame.
      * @param onCacheKey receives the key the request resolved to, for [MemoryCacheKeyRegistry].
+     * @param onImageSuccess receives the decoded Coil [Image] (used e.g. to detect an HDR gainmap).
      */
     fun previewRequest(
         context: Context,
@@ -62,6 +64,7 @@ object MediaImageRequests {
         bypassPlatformThumbnail: Boolean = !isVideo,
         placeholderKey: MemoryCache.Key? = null,
         onCacheKey: ((MemoryCache.Key) -> Unit)? = null,
+        onImageSuccess: ((Image) -> Unit)? = null,
     ): ImageRequest? {
         val model = previewModel(
             localContentUri = localContentUri,
@@ -83,8 +86,13 @@ object MediaImageRequests {
                     size(CoilSize(Dimension.Undefined, Dimension.Pixels(heightPx)))
                 }
                 placeholderKey?.let(::placeholderMemoryCacheKey)
-                if (onCacheKey != null) {
-                    listener(onSuccess = { _, result -> result.memoryCacheKey?.let(onCacheKey) })
+                if (onCacheKey != null || onImageSuccess != null) {
+                    listener(
+                        onSuccess = { _, result ->
+                            result.memoryCacheKey?.let { key -> onCacheKey?.invoke(key) }
+                            onImageSuccess?.invoke(result.image)
+                        },
+                    )
                 }
             }
             .build()

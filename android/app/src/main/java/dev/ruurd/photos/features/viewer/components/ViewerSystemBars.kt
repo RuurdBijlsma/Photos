@@ -1,5 +1,6 @@
 package dev.ruurd.photos.features.viewer.components
 
+import android.content.pm.ActivityInfo
 import android.view.Window
 import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -13,9 +14,10 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 
 /**
- * Status/navigation bar appearance for the viewer. Kept out of the screen so the navigation bar
- * stays transparent edge to edge for predictive back, adapts contrast when the info panel slides
- * over system bars in light theme, and restores the timeline's light appearance on close/dispose.
+ * Status/navigation bar appearance and HDR color mode for the viewer. Kept out of the screen so
+ * the navigation bar stays transparent edge to edge for predictive back, adapts contrast when the
+ * info panel slides over system bars in light theme, and restores the timeline's light appearance
+ * and default color mode on close/dispose.
  */
 @Stable
 class ViewerSystemBars(private val window: Window?, private val isDarkTheme: Boolean) {
@@ -47,12 +49,20 @@ class ViewerSystemBars(private val window: Window?, private val isDarkTheme: Boo
         }
     }
 
+    fun setHdrColorMode(enabled: Boolean) {
+        val target = if (enabled) ActivityInfo.COLOR_MODE_HDR else ActivityInfo.COLOR_MODE_DEFAULT
+        if (window != null && window.colorMode != target) {
+            window.colorMode = target
+        }
+    }
+
     fun restoreForTimeline() {
         if (!isDarkTheme) {
             controller?.isAppearanceLightStatusBars = true
             controller?.isAppearanceLightNavigationBars = true
         }
         controller?.show(WindowInsetsCompat.Type.statusBars())
+        setHdrColorMode(false)
     }
 }
 

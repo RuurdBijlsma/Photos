@@ -5,10 +5,13 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -16,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import coil3.BitmapImage
 import coil3.SingletonImageLoader
 import coil3.compose.asPainter
 import coil3.request.CachePolicy
@@ -46,6 +50,9 @@ fun ZoomablePhotoPage(
     isInfoSheetOpen: Boolean = false,
     onFullResRequested: () -> Unit = {},
     onZoomFractionChanged: (Float) -> Unit = {},
+    onHdrStateChanged: (hasPreviewGainmap: Boolean, hasSubSamplingLayer: Boolean) -> Unit = { _, _ -> },
+    onSyncWindowColorMode: () -> Unit = {},
+    onPageDisposed: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val imageLoader = SingletonImageLoader.get(context)
@@ -59,6 +66,15 @@ fun ZoomablePhotoPage(
     val canUpgrade = !item.isVideo && (localUri != null || fullResFile != null)
     var isUpgradedToFullRes by remember(item.id) { mutableStateOf(false) }
     var upgradedInPreview by remember(item.id) { mutableStateOf(false) }
+
+    var previewHasGainmap by remember(item.id, memoryCacheKeyRegistry, imageLoader) {
+        val cachedHasGainmap = memoryCacheKeyRegistry.get(item.id)
+            ?.let { key -> imageLoader.memoryCache?.get(key)?.image as? BitmapImage }
+            ?.bitmap
+            ?.hasGainmap()
+            ?: false
+        mutableStateOf(cachedHasGainmap)
+    }
 
     val previewZoomFraction = previewZoomableState.zoomFraction ?: 0f
     val isPreviewZoomed = previewZoomFraction > 0.01f
@@ -183,6 +199,9 @@ fun ZoomablePhotoPage(
             baseUrl = baseUrl,
             placeholderKey = memoryCacheKeyRegistry.get(item.id),
             onCacheKey = { memoryCacheKeyRegistry.put(item.id, it) },
+            onImageSuccess = { image ->
+                previewHasGainmap = (image as? BitmapImage)?.bitmap?.hasGainmap() == true
+            },
         )
     }
 
@@ -232,6 +251,26 @@ fun ZoomablePhotoPage(
                 .build()
         } else {
             previewRequest
+        }
+    }
+
+    val hasSubSamplingLayer = showDualOverlay || (upgradedInPreview && fullResData != null)
+    val currentOnHdrStateChanged by rememberUpdatedState(onHdrStateChanged)
+    val currentOnSyncWindowColorMode by rememberUpdatedState(onSyncWindowColorMode)
+    val currentOnPageDisposed by rememberUpdatedState(onPageDisposed)
+
+    // SideEffect runs after all DisposableEffect.onDispose blocks in the same frame, so an
+    // outgoing page disposing its SubSamplingImage cannot leave window.colorMode in SDR when
+    // the incoming visible page already carries an HDR gainmap preview.
+    SideEffect {
+        currentOnHdrStateChanged(previewHasGainmap, hasSubSamplingLayer)
+        currentOnSyncWindowColorMode()
+    }
+
+    DisposableEffect(item.id) {
+        onDispose {
+            currentOnPageDisposed()
+            currentOnSyncWindowColorMode()
         }
     }
 

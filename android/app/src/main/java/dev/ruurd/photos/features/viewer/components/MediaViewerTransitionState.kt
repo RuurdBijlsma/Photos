@@ -925,11 +925,11 @@ fun rememberMediaViewerTransitionState(
     onPreSyncScroll: (String) -> Unit,
     onInfoOpenChanged: (Boolean) -> Unit,
     onDismissFinished: () -> Unit,
+    systemBars: ViewerSystemBars = rememberViewerSystemBars(),
 ): MediaViewerTransitionState {
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
     val viewConfig = LocalViewConfiguration.current
-    val systemBars = rememberViewerSystemBars()
     val imageLoader = SingletonImageLoader.get(LocalContext.current)
     val memoryCacheKeyRegistry = LocalMemoryCacheKeyRegistry.current
     val boundsRegistry = LocalTimelineTileBoundsRegistry.current

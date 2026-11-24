@@ -12,6 +12,8 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -40,8 +42,10 @@ import dev.ruurd.photos.features.viewer.components.VideoPlayBadge
 import dev.ruurd.photos.features.viewer.components.ViewerChromeOverlay
 import dev.ruurd.photos.features.viewer.components.ViewerPreSyncScrollEffect
 import dev.ruurd.photos.features.viewer.components.ViewerPrefetchEffect
+import dev.ruurd.photos.features.viewer.components.ViewerSystemBars
 import dev.ruurd.photos.features.viewer.components.ZoomablePhotoPage
 import dev.ruurd.photos.features.viewer.components.rememberMediaViewerTransitionState
+import dev.ruurd.photos.features.viewer.components.rememberViewerSystemBars
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.filterNotNull
@@ -72,6 +76,8 @@ fun MediaViewerScreen(
     val items = uiState.items
     val context = LocalContext.current
     val actionScope = rememberCoroutineScope()
+    val systemBars = rememberViewerSystemBars()
+    val hdrCoordinator = remember(systemBars) { ViewerHdrCoordinator(systemBars) }
 
     val currentItems by rememberUpdatedState(items)
     val currentActiveId by rememberUpdatedState(uiState.activeMediaId)
@@ -117,7 +123,16 @@ fun MediaViewerScreen(
             if (open) viewModel.openInfoSheet() else viewModel.closeInfoSheet()
         },
         onDismissFinished = onDismissFinished,
+        systemBars = systemBars,
     )
+
+    val isHdrCoordinatorActive = !transition.isOpeningHero && !transition.isClosing
+    SideEffect {
+        hdrCoordinator.isViewerActive = isHdrCoordinatorActive
+        if (isHdrCoordinatorActive) {
+            hdrCoordinator.syncWindowColorMode()
+        }
+    }
 
     LaunchedEffect(uiState.activeMediaId) {
         currentOnActiveMediaChanged(uiState.activeMediaId)
@@ -342,6 +357,16 @@ fun MediaViewerScreen(
                                                 activePageZoomFraction = fraction
                                             }
                                         },
+                                        onHdrStateChanged = { hasPreviewGainmap, hasSubSamplingLayer ->
+                                            hdrCoordinator.updatePage(
+                                                mediaId = item.id,
+                                                isVisible = !isOffscreen,
+                                                previewHasGainmap = hasPreviewGainmap,
+                                                hasSubSamplingLayer = hasSubSamplingLayer,
+                                            )
+                                        },
+                                        onSyncWindowColorMode = hdrCoordinator::syncWindowColorMode,
+                                        onPageDisposed = { hdrCoordinator.removePage(item.id) },
                                         modifier = Modifier.fillMaxSize(),
                                     )
                                     // Phase 2C swaps this slot for a real VideoPlayerPage.
@@ -474,6 +499,52 @@ fun MediaViewerScreen(
                     }
                 },
             )
+        }
+    }
+}
+
+/**
+ * Coordinates `window.colorMode` across pager transitions so disposing an outgoing page's
+ * `SubSamplingImage` does not briefly drop HDR before the incoming page upgrades to full-res.
+ */
+@Stable
+private class ViewerHdrCoordinator(
+    private val systemBars: ViewerSystemBars,
+) {
+    private val visiblePreviewHdrPages = HashSet<String>()
+    private val visibleSubSamplingPages = HashSet<String>()
+    var isViewerActive: Boolean = false
+
+    fun updatePage(
+        mediaId: String,
+        isVisible: Boolean,
+        previewHasGainmap: Boolean,
+        hasSubSamplingLayer: Boolean,
+    ) {
+        if (isVisible && previewHasGainmap) {
+            visiblePreviewHdrPages.add(mediaId)
+        } else {
+            visiblePreviewHdrPages.remove(mediaId)
+        }
+        if (isVisible && hasSubSamplingLayer) {
+            visibleSubSamplingPages.add(mediaId)
+        } else {
+            visibleSubSamplingPages.remove(mediaId)
+        }
+    }
+
+    fun removePage(mediaId: String) {
+        visiblePreviewHdrPages.remove(mediaId)
+        visibleSubSamplingPages.remove(mediaId)
+    }
+
+    fun syncWindowColorMode() {
+        if (!isViewerActive) return
+        when {
+            visiblePreviewHdrPages.isNotEmpty() -> systemBars.setHdrColorMode(true)
+            visibleSubSamplingPages.isEmpty() -> systemBars.setHdrColorMode(false)
+            // When a visible page has a SubSamplingImage mounted and no visible preview carries a
+            // gainmap (e.g., cloud-only HDR JPEG whose AVIF preview is SDR), Telephoto owns HDR.
         }
     }
 }
