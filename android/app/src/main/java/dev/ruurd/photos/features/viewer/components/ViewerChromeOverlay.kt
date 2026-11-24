@@ -229,6 +229,8 @@ fun ViewerChromeOverlay(
                             )
                             DropdownMenuItem(
                                 text = { Text("Rotate clockwise") },
+                                // Wired in Phase 2D.
+                                enabled = false,
                                 leadingIcon = {
                                     Icon(
                                         imageVector = Icons.AutoMirrored.Outlined.RotateRight,
@@ -241,6 +243,8 @@ fun ViewerChromeOverlay(
                         if (currentItem?.cloudId != null) {
                             DropdownMenuItem(
                                 text = { Text("Reprocess") },
+                                // Wired in Phase 2D.
+                                enabled = false,
                                 leadingIcon = {
                                     Icon(
                                         imageVector = Icons.Outlined.Refresh,

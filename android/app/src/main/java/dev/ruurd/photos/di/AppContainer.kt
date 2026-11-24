@@ -376,6 +376,7 @@ class DefaultAppContainer(private val context: Context) : AppContainer {
                 localMediaInfoReader = localMediaInfoReader,
                 mediaFileSharer = mediaFileSharer,
                 dispatchers = dispatchers,
+                mediaRefreshCoordinator = mediaRefreshCoordinator,
             )
         }
     }

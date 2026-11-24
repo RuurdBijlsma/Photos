@@ -42,6 +42,7 @@ fun ZoomablePhotoPage(
     modifier: Modifier = Modifier,
     /** Downloaded `/download` original for a cloud-only photo; `null` while it is not ready. */
     fullResFile: File? = null,
+    isInfoSheetOpen: Boolean = false,
     onFullResRequested: () -> Unit = {},
     onZoomFractionChanged: (Float) -> Unit = {},
 ) {
@@ -102,6 +103,14 @@ fun ZoomablePhotoPage(
             fullResZoomableState?.resetZoom()
             upgradedInPreview = false
             onZoomFractionChanged(0f)
+        }
+    }
+
+    // Programmatic info open (e.g. "About" while zoomed in) resets zoom so the panel can slide up.
+    LaunchedEffect(isActivePage, isInfoSheetOpen) {
+        if (isActivePage && isInfoSheetOpen) {
+            previewZoomableState.resetZoom()
+            fullResZoomableState?.resetZoom()
         }
     }
 

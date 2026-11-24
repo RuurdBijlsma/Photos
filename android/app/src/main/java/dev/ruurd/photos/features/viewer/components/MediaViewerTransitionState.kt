@@ -153,6 +153,7 @@ class MediaViewerTransitionState(
     private var rawPanelTravelPx by mutableFloatStateOf(0f)
     private val infoTravelAnim = Animatable(0f)
     private var infoSettleJob: Job? = null
+    private var infoAnimToken: Long = 0L
     private val infoContentHeights = HashMap<String, Int>()
 
     // Tracks the previous clean single tap so double-tap + drag yields to Telephoto quick-zoom.
@@ -166,8 +167,8 @@ class MediaViewerTransitionState(
     /** True from the instant swipe-up starts until the photo settles back to its resting y-pos. */
     val shouldShowInfoPanel: Boolean by derivedStateOf {
         (infoOpenFraction > 0.005f || sheetScrollPx > 0.5f || isAnimatingInfoOpen) &&
-                !isClosing &&
-                !isOpeningHero
+            !isClosing &&
+            !isOpeningHero
     }
 
     private val currentActiveItem: TimelineMediaProjection?
@@ -346,6 +347,7 @@ class MediaViewerTransitionState(
 
     fun onHorizontalPageSettled(mediaId: String) {
         if (scrolledPageId != null && scrolledPageId != mediaId && !isDraggingInfo) {
+            infoAnimToken++
             infoSettleJob?.cancel()
             infoSettleJob = null
             sheetScrollPx = 0f
@@ -405,9 +407,11 @@ class MediaViewerTransitionState(
         val item = currentActiveItem ?: return
         val target = sheetTravelToRestPx(item)
         if (target <= 0f) return
+        val token = ++infoAnimToken
         infoSettleJob?.cancel()
         infoSettleJob = scope.launch {
             animateInfoTo(
+                token = token,
                 item = item,
                 startTravel = pageInfoPanelTravelPx(item),
                 targetTravel = target,
@@ -426,9 +430,11 @@ class MediaViewerTransitionState(
             resetInfoPanelImmediate()
             return
         }
+        val token = ++infoAnimToken
         infoSettleJob?.cancel()
         infoSettleJob = scope.launch {
             animateInfoTo(
+                token = token,
                 item = item,
                 startTravel = pageInfoPanelTravelPx(item),
                 targetTravel = 0f,
@@ -438,6 +444,7 @@ class MediaViewerTransitionState(
     }
 
     fun resetInfoPanelImmediate() {
+        infoAnimToken++
         infoSettleJob?.cancel()
         infoSettleJob = null
         isDraggingInfo = false
@@ -471,6 +478,7 @@ class MediaViewerTransitionState(
     }
 
     private suspend fun animateInfoTo(
+        token: Long,
         item: TimelineMediaProjection,
         startTravel: Float,
         targetTravel: Float,
@@ -490,13 +498,19 @@ class MediaViewerTransitionState(
                     stiffness = INFO_PANEL_SPRING_STIFFNESS,
                 ),
             ) {
-                applyTravel(item, value)
+                if (token == infoAnimToken) {
+                    applyTravel(item, value)
+                }
             }
-            applyTravel(item, targetTravel)
-            onInfoOpenChanged(markOpen)
+            if (token == infoAnimToken) {
+                applyTravel(item, targetTravel)
+                onInfoOpenChanged(markOpen)
+            }
         } finally {
-            isAnimatingInfoOpen = false
-            isClosingInfoPanel = false
+            if (token == infoAnimToken) {
+                isAnimatingInfoOpen = false
+                isClosingInfoPanel = false
+            }
         }
     }
 
@@ -508,6 +522,7 @@ class MediaViewerTransitionState(
         if (isClosing) return
         settleJob?.cancel()
         settleJob = null
+        infoAnimToken++
         infoSettleJob?.cancel()
         infoSettleJob = null
         isDraggingInfo = false
@@ -606,9 +621,9 @@ class MediaViewerTransitionState(
 
             val panelAlreadyActive = infoOpenFraction > 0.005f || sheetScrollPx > 0.5f
             val isQuickZoomCandidate = !panelAlreadyActive &&
-                    lastTapUpTimeMs > 0L &&
-                    (down.uptimeMillis - lastTapUpTimeMs) in 0L..doubleTapTimeoutMs &&
-                    (down.position - lastTapUpPosition).getDistance() <= doubleTapSlopPx
+                lastTapUpTimeMs > 0L &&
+                (down.uptimeMillis - lastTapUpTimeMs) in 0L..doubleTapTimeoutMs &&
+                (down.position - lastTapUpPosition).getDistance() <= doubleTapSlopPx
             if (isQuickZoomCandidate) {
                 // Consume the tap memory and yield the entire second press + drag to Telephoto.
                 lastTapUpTimeMs = 0L
@@ -622,6 +637,7 @@ class MediaViewerTransitionState(
                 !isClosingInfoPanel &&
                 panelAlreadyActive
             ) {
+                infoAnimToken++
                 infoSettleJob?.cancel()
                 infoSettleJob = null
             }
@@ -694,7 +710,7 @@ class MediaViewerTransitionState(
                     when (gestureMode) {
                         VerticalGestureMode.NONE -> {
                             val isVerticalDrag = abs(totalDy) > touchSlopPx &&
-                                    abs(totalDy) > abs(totalDx) * VERTICAL_AXIS_BIAS
+                                abs(totalDy) > abs(totalDx) * VERTICAL_AXIS_BIAS
 
                             if (isVerticalDrag) {
                                 lastTapUpTimeMs = 0L
@@ -703,6 +719,7 @@ class MediaViewerTransitionState(
                                     if (targetItem != null) {
                                         gestureMode = VerticalGestureMode.INFO_PANEL
                                         gestureItem = targetItem
+                                        infoAnimToken++
                                         infoSettleJob?.cancel()
                                         infoSettleJob = null
                                         isAnimatingInfoOpen = false
@@ -710,7 +727,7 @@ class MediaViewerTransitionState(
                                         val baseTravel = pageInfoPanelTravelPx(targetItem)
                                         val initialDelta = if (panelAlreadyActive) -dy else -totalDy
                                         val maxTravel = sheetTravelToRestPx(targetItem) +
-                                                maxSheetScrollPx(targetItem)
+                                            maxSheetScrollPx(targetItem)
                                         rawPanelTravelPx = (baseTravel + initialDelta)
                                             .coerceIn(0f, maxTravel)
                                         applyTravel(targetItem, rawPanelTravelPx)
@@ -745,7 +762,7 @@ class MediaViewerTransitionState(
                             val targetItem = gestureItem
                             if (targetItem != null) {
                                 val maxTravel = sheetTravelToRestPx(targetItem) +
-                                        maxSheetScrollPx(targetItem)
+                                    maxSheetScrollPx(targetItem)
                                 rawPanelTravelPx = (rawPanelTravelPx - dy).coerceIn(0f, maxTravel)
                                 applyTravel(targetItem, rawPanelTravelPx)
                             }
@@ -766,9 +783,9 @@ class MediaViewerTransitionState(
                         val releaseOffset = rawDragOffset
                         val releaseY = releaseOffset.y.coerceAtLeast(0f)
                         val shouldDismiss = !isZoomed && (
-                                releaseY > dismissThresholdPx ||
-                                        (velocityY > 1000f && releaseY > fastFlickMinDistancePx)
-                                )
+                            releaseY > dismissThresholdPx ||
+                                (velocityY > 1000f && releaseY > fastFlickMinDistancePx)
+                            )
 
                         if (shouldDismiss) {
                             val releaseScale = (1f - (releaseY / 1400f)).coerceIn(0.55f, 1f)
@@ -799,9 +816,11 @@ class MediaViewerTransitionState(
                             isDraggingInfo = false
                         } else if (isZoomed) {
                             isDraggingInfo = false
+                            val token = ++infoAnimToken
                             infoSettleJob?.cancel()
                             infoSettleJob = scope.launch {
                                 animateInfoTo(
+                                    token = token,
                                     item = targetItem,
                                     startTravel = rawPanelTravelPx,
                                     targetTravel = 0f,
@@ -815,6 +834,7 @@ class MediaViewerTransitionState(
                             val rest = sheetTravelToRestPx(targetItem)
                             val maxTravel = rest + maxSheetScrollPx(targetItem)
 
+                            val token = ++infoAnimToken
                             infoSettleJob?.cancel()
                             infoSettleJob = scope.launch {
                                 isDraggingInfo = false
@@ -832,7 +852,9 @@ class MediaViewerTransitionState(
                                                 initialVelocity = travelVelocity,
                                                 animationSpec = flingDecay,
                                             ) {
-                                                applyTravel(targetItem, value)
+                                                if (token == infoAnimToken) {
+                                                    applyTravel(targetItem, value)
+                                                }
                                             }
                                         } finally {
                                             infoTravelAnim.updateBounds(
@@ -860,6 +882,7 @@ class MediaViewerTransitionState(
                                         travelVelocity.coerceAtMost(0f)
                                     }
                                     animateInfoTo(
+                                        token = token,
                                         item = targetItem,
                                         startTravel = releaseTravel,
                                         targetTravel = target,
@@ -933,8 +956,8 @@ fun rememberMediaViewerTransitionState(
             initialPagerState = pagerState,
             initialSize = containerSize,
             initiallyHasOpenSource = openSourceRect != null &&
-                    containerSize.width > 0 &&
-                    containerSize.height > 0,
+                containerSize.width > 0 &&
+                containerSize.height > 0,
             touchSlopPx = viewConfig.touchSlop,
             doubleTapSlopPx = with(density) { DOUBLE_TAP_SLOP_DP.dp.toPx() },
             doubleTapTimeoutMs = viewConfig.doubleTapTimeoutMillis,

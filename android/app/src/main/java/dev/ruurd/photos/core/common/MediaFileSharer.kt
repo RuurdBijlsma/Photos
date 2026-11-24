@@ -225,7 +225,7 @@ class DefaultMediaFileSharer(
     }
 
     private fun isReadable(uri: Uri): Boolean = try {
-        resolver.openInputStream(uri)?.use { it.read() } != null
+        resolver.openInputStream(uri)?.use { true } ?: false
     } catch (_: Exception) {
         false
     }

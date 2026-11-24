@@ -10,6 +10,8 @@ object MediaFileNames {
         Regex("""filename\*\s*=\s*(?:[^']*'[^']*')?([^;]+)""", RegexOption.IGNORE_CASE)
     private val FILENAME_REGEX =
         Regex("""filename\s*=\s*("[^"]+"|[^;]+)""", RegexOption.IGNORE_CASE)
+    private val UNSAFE_STEM_CHARS_REGEX = Regex("[^\\p{L}\\p{N}._-]")
+    private val UNSAFE_EXT_CHARS_REGEX = Regex("[^A-Za-z0-9]")
 
     private val MIME_EXTENSIONS = mapOf(
         "image/jpeg" to "jpg",
@@ -51,13 +53,30 @@ object MediaFileNames {
         return plain?.takeIf { it.isNotBlank() }
     }
 
-    /** Strips path separators so a server-supplied name can never escape the cache directory. */
+    /** Strips path separators and unsafe characters so a server-supplied name stays inside the cache directory. */
     fun sanitize(fileName: String, isVideo: Boolean, mimeType: String?): String {
-        val cleaned = fileName.substringAfterLast('/').substringAfterLast('\\')
-            .replace(Regex("[^A-Za-z0-9._-]"), "_")
+        val raw = fileName.substringAfterLast('/').substringAfterLast('\\').trim()
+        if (raw.isEmpty()) return fallbackName("media", isVideo, mimeType)
+
+        val dotIndex = raw.lastIndexOf('.')
+        val hasExtension = dotIndex > 0 && dotIndex < raw.lastIndex
+        val rawStem = if (hasExtension) raw.substring(0, dotIndex) else raw
+        val rawExt = if (hasExtension) raw.substring(dotIndex + 1) else null
+
+        val cleanStem = rawStem
+            .replace(UNSAFE_STEM_CHARS_REGEX, "_")
             .trim('.', '_')
-        if (cleaned.isEmpty()) return fallbackName("media", isVideo, mimeType)
-        return if (cleaned.contains('.') && !cleaned.startsWith('.')) cleaned else "$cleaned.${extensionFor(mimeType) ?: "bin"}"
+        val cleanExt = rawExt
+            ?.replace(UNSAFE_EXT_CHARS_REGEX, "")
+            ?.takeIf { it.isNotEmpty() }
+            ?: extensionFor(mimeType)
+            ?: "bin"
+
+        if (cleanStem.isEmpty()) {
+            val prefix = if (isVideo) "video" else "photo"
+            return "${prefix}_media.$cleanExt"
+        }
+        return "$cleanStem.$cleanExt"
     }
 }
 

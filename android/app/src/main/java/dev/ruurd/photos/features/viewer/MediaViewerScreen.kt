@@ -136,10 +136,13 @@ fun MediaViewerScreen(
         transition.playClosing()
     }
 
-    // Sync programmatic info sheet opens/closes (e.g. "About" menu item) with transition state
-    LaunchedEffect(uiState.isInfoSheetOpen) {
+    // Sync programmatic info sheet opens/closes (e.g. "About" menu item) with transition state.
+    // If "About" was tapped while zoomed in, wait for ZoomablePhotoPage to finish resetting zoom.
+    LaunchedEffect(uiState.isInfoSheetOpen, isZoomed, transition.isOpeningHero) {
         if (uiState.isInfoSheetOpen) {
-            transition.requestOpenInfoPanel()
+            if (!isZoomed && !transition.isOpeningHero) {
+                transition.requestOpenInfoPanel()
+            }
         } else if (transition.isInfoPanelActive) {
             transition.requestCloseInfoPanel()
         }
@@ -229,7 +232,7 @@ fun MediaViewerScreen(
 
     // Keep enabled throughout the closing animation so rapid double-back taps don't leak underneath.
     BackHandler {
-        if (transition.isInfoPanelActive) {
+        if (transition.isInfoPanelActive || uiState.isInfoSheetOpen) {
             viewModel.closeInfoSheet()
             transition.requestCloseInfoPanel()
         } else if (!transition.isClosing) {
@@ -266,7 +269,7 @@ fun MediaViewerScreen(
         // Interactive Pager Layer (hidden only while ClosingHeroOverlay is flying back to the tile)
         if (transition.closingState == null && items.isNotEmpty()) {
             val isPagerScrollEnabled = !isZoomed && !transition.isDragging &&
-                    !transition.isDraggingInfo && !transition.isOpeningHero
+                !transition.isDraggingInfo && !transition.isOpeningHero
 
             Box(
                 modifier = Modifier
@@ -319,13 +322,14 @@ fun MediaViewerScreen(
                                                 }
                                             }
                                         },
+                                        fullResFile = uiState.fullResFiles[item.id],
+                                        isInfoSheetOpen = isCurrentPage && uiState.isInfoSheetOpen,
+                                        onFullResRequested = { viewModel.requestFullRes(item) },
                                         onZoomFractionChanged = { fraction ->
                                             if (page == pagerState.currentPage) {
                                                 activePageZoomFraction = fraction
                                             }
                                         },
-                                        fullResFile = uiState.fullResFiles[item.id],
-                                        onFullResRequested = { viewModel.requestFullRes(item) },
                                         modifier = Modifier.fillMaxSize(),
                                     )
                                     // Phase 2C swaps this slot for a real VideoPlayerPage.
@@ -361,9 +365,9 @@ fun MediaViewerScreen(
                                         },
                                     ) { measurables, constraints ->
                                         val minSheetHeight = (
-                                                constraints.maxHeight -
-                                                        transition.sheetRestTopPx.roundToInt()
-                                                ).coerceAtLeast(0)
+                                            constraints.maxHeight -
+                                                transition.sheetRestTopPx.roundToInt()
+                                            ).coerceAtLeast(0)
                                         val childConstraints = constraints.copy(
                                             minHeight = minSheetHeight,
                                             maxHeight = Constraints.Infinity,
@@ -426,7 +430,7 @@ fun MediaViewerScreen(
                 isShareEnabled = activeItem != null && activeDetails?.isMissing != true,
                 isCopyEnabled = activeDetails?.isMissing != true,
                 onBack = {
-                    if (transition.isInfoPanelActive) {
+                    if (transition.isInfoPanelActive || uiState.isInfoSheetOpen) {
                         viewModel.closeInfoSheet()
                         transition.requestCloseInfoPanel()
                     } else {

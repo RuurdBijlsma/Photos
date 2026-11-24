@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.ruurd.photos.core.common.AppDispatchers
 import dev.ruurd.photos.core.common.MediaFileSharer
+import dev.ruurd.photos.core.common.MediaRefreshCoordinator
 import dev.ruurd.photos.core.database.entity.TimelineMediaProjection
 import dev.ruurd.photos.core.database.entity.toTimelineProjection
 import dev.ruurd.photos.core.image.FullResFileStore
@@ -72,6 +73,7 @@ class MediaViewerViewModel(
     private val localMediaInfoReader: LocalMediaInfoSource,
     private val mediaFileSharer: MediaFileSharer,
     private val dispatchers: AppDispatchers,
+    mediaRefreshCoordinator: MediaRefreshCoordinator? = null,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(
@@ -171,6 +173,12 @@ class MediaViewerViewModel(
                         }
                     }
                 }
+            }
+        }
+
+        if (mediaRefreshCoordinator != null) {
+            viewModelScope.launch {
+                mediaRefreshCoordinator.changedCloudIds.collect(::invalidateCloudIds)
             }
         }
     }
@@ -303,6 +311,34 @@ class MediaViewerViewModel(
 
     fun setChromeVisible(visible: Boolean) {
         _uiState.update { it.copy(isChromeVisible = visible) }
+    }
+
+    private fun invalidateCloudIds(changedCloudIds: Set<String>) {
+        if (changedCloudIds.isEmpty()) return
+        var activeToReload: TimelineMediaProjection? = null
+
+        _uiState.update { current ->
+            val affectedIds = buildSet {
+                for (item in current.items) {
+                    if (item.cloudId in changedCloudIds) add(item.id)
+                }
+                for ((mediaId, details) in current.detailsById) {
+                    if (details.cloudId in changedCloudIds) add(mediaId)
+                }
+            }
+            if (affectedIds.isEmpty()) return@update current
+
+            if (current.activeMediaId in affectedIds) {
+                activeToReload = current.items.firstOrNull { it.id == current.activeMediaId }
+            }
+            current.copy(
+                detailsById = current.detailsById.filterKeys { it !in affectedIds }.toPersistentMap(),
+                loadingDetailsIds = current.loadingDetailsIds.filter { it !in affectedIds }.toPersistentSet(),
+                failedDetailsIds = current.failedDetailsIds.filter { it !in affectedIds }.toPersistentSet(),
+            )
+        }
+
+        activeToReload?.let(::loadActiveItemInfo)
     }
 
     private fun loadActiveItemInfo(item: TimelineMediaProjection) {
