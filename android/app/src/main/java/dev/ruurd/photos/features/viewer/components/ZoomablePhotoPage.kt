@@ -86,8 +86,8 @@ fun ZoomablePhotoPage(
     }
 
     val fullResReady = showDualOverlay &&
-            hasDisplayedFullResInFullQuality &&
-            !isPreviewZoomed
+        hasDisplayedFullResInFullQuality &&
+        !isPreviewZoomed
 
     val activeZoomableState = if (fullResReady && fullResZoomableState != null) {
         fullResZoomableState

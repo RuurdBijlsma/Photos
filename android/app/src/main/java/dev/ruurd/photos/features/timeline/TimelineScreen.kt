@@ -363,7 +363,7 @@ private fun FloatingDatePillOverlay(
     val datePillLabel by remember(layout, listState, topBufferPx) {
         derivedStateOf {
             val isScrolledPastTop = listState.firstVisibleItemIndex > 0 ||
-                    listState.firstVisibleItemScrollOffset > topBufferPx
+                listState.firstVisibleItemScrollOffset > topBufferPx
             if (!isScrolledPastTop || layout.isEmpty) {
                 null
             } else {

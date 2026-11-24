@@ -181,7 +181,7 @@ fun MainScreen(
     val statusBarHeight = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val topInset = statusBarHeight + PhotosTopBarHeight
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() +
-            FloatingBottomNavHeight
+        FloatingBottomNavHeight
 
     // Hide on scroll-down, reveal on scroll-up or near the top; ignore non-scroll layout shifts.
     var topBarHidden by remember { mutableStateOf(false) }

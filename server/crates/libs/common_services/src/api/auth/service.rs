@@ -51,7 +51,7 @@ pub async fn create_user(
     }
     let hashed = hash_password(payload.password.as_ref())?;
     info!(
-        "Creating user email={}, name={}",C
+        "Creating user email={}, name={}",
         payload.email, payload.name
     );
     if !payload.email.contains('@') {

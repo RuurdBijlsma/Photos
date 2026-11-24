@@ -116,9 +116,9 @@ class LocalMediaInfoReader(
         val longitude = latLong?.getOrNull(1)
         return copy(
             dateTakenMs = dateTakenMs ?: (
-                    exif.getAttribute(ExifInterface.TAG_DATETIME_ORIGINAL)
-                        ?: exif.getAttribute(ExifInterface.TAG_DATETIME)
-                    )?.let(::parseExifDateTime),
+                exif.getAttribute(ExifInterface.TAG_DATETIME_ORIGINAL)
+                    ?: exif.getAttribute(ExifInterface.TAG_DATETIME)
+                )?.let(::parseExifDateTime),
             camera = CameraDetails(
                 make = exif.getAttribute(ExifInterface.TAG_MAKE),
                 model = exif.getAttribute(ExifInterface.TAG_MODEL),
@@ -182,5 +182,5 @@ class LocalMediaInfoReader(
 
 private val LocalMediaInfo.isEmpty: Boolean
     get() = fileName == null && mimeType == null && sizeBytes == null && width == null &&
-            height == null && dateTakenMs == null && durationMs == null && camera == null &&
-            latitude == null && longitude == null
+        height == null && dateTakenMs == null && durationMs == null && camera == null &&
+        latitude == null && longitude == null

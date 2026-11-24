@@ -164,8 +164,8 @@ class MediaViewerTransitionState(
     /** True from the instant swipe-up starts until the photo settles back to its resting y-pos. */
     val shouldShowInfoPanel: Boolean by derivedStateOf {
         (infoOpenFraction > 0.005f || sheetScrollPx > 0.5f || isAnimatingInfoOpen) &&
-                !isClosing &&
-                !isOpeningHero
+            !isClosing &&
+            !isOpeningHero
     }
 
     private val currentActiveItem: TimelineMediaProjection?
@@ -186,8 +186,7 @@ class MediaViewerTransitionState(
         return fittedRect(item).bottom.coerceIn(0f, containerH)
     }
 
-    private fun travelToRestPx(item: TimelineMediaProjection): Float =
-        (baseTopPx(item) - sheetRestTopPx).coerceAtLeast(0f)
+    private fun travelToRestPx(item: TimelineMediaProjection): Float = (baseTopPx(item) - sheetRestTopPx).coerceAtLeast(0f)
 
     private fun maxSheetScrollPx(item: TimelineMediaProjection): Float {
         val containerH = viewerSize.height.toFloat()
@@ -203,8 +202,7 @@ class MediaViewerTransitionState(
         return rest * infoOpenFraction + scroll
     }
 
-    fun pageInfoPanelTopPx(item: TimelineMediaProjection): Float =
-        baseTopPx(item) - pageTravelPx(item)
+    fun pageInfoPanelTopPx(item: TimelineMediaProjection): Float = baseTopPx(item) - pageTravelPx(item)
 
     val isInfoCoveringStatusBar: Boolean by derivedStateOf {
         val activeTop = currentActiveItem?.let(::pageInfoPanelTopPx) ?: sheetRestTopPx
@@ -241,11 +239,9 @@ class MediaViewerTransitionState(
             else -> fallbackFadeIn.value
         }
 
-    fun openingRect(sourceRect: Rect, item: TimelineMediaProjection): Rect =
-        lerp(sourceRect, fittedRect(item), openProgress.value)
+    fun openingRect(sourceRect: Rect, item: TimelineMediaProjection): Rect = lerp(sourceRect, fittedRect(item), openProgress.value)
 
-    fun openingCornerRadii(): TileCornerRadii =
-        lerp(openSourceCorners, TileCornerRadii.Zero, openProgress.value)
+    fun openingCornerRadii(): TileCornerRadii = lerp(openSourceCorners, TileCornerRadii.Zero, openProgress.value)
 
     fun closingRect(closing: ClosingHeroState): Rect {
         val targetRect = closing.targetRect
@@ -260,15 +256,13 @@ class MediaViewerTransitionState(
         return Rect(cx - w / 2f, cy - h / 2f, cx + w / 2f, cy + h / 2f)
     }
 
-    fun closingCornerRadii(closing: ClosingHeroState): TileCornerRadii =
-        if (closing.targetRect != null) {
-            lerp(closing.startCorners, closing.targetCorners, closeProgress.value)
-        } else {
-            closing.startCorners
-        }
+    fun closingCornerRadii(closing: ClosingHeroState): TileCornerRadii = if (closing.targetRect != null) {
+        lerp(closing.startCorners, closing.targetCorners, closeProgress.value)
+    } else {
+        closing.startCorners
+    }
 
-    fun closingAlpha(closing: ClosingHeroState): Float =
-        if (closing.targetRect != null) 1f else (1f - closeProgress.value).coerceIn(0f, 1f)
+    fun closingAlpha(closing: ClosingHeroState): Float = if (closing.targetRect != null) 1f else (1f - closeProgress.value).coerceIn(0f, 1f)
 
     private fun fittedRect(item: TimelineMediaProjection): Rect = computeFittedRect(
         containerWidth = viewerSize.width.toFloat(),
@@ -597,9 +591,9 @@ class MediaViewerTransitionState(
 
             val panelAlreadyActive = infoOpenFraction > 0.005f || sheetScrollPx > 0.5f
             val isQuickZoomCandidate = !panelAlreadyActive &&
-                    lastTapUpTimeMs > 0L &&
-                    (down.uptimeMillis - lastTapUpTimeMs) in 0L..doubleTapTimeoutMs &&
-                    (down.position - lastTapUpPosition).getDistance() <= doubleTapSlopPx
+                lastTapUpTimeMs > 0L &&
+                (down.uptimeMillis - lastTapUpTimeMs) in 0L..doubleTapTimeoutMs &&
+                (down.position - lastTapUpPosition).getDistance() <= doubleTapSlopPx
             if (isQuickZoomCandidate) {
                 // Consume the tap memory and yield the entire second press + drag to Telephoto.
                 lastTapUpTimeMs = 0L
@@ -685,7 +679,7 @@ class MediaViewerTransitionState(
                     when (gestureMode) {
                         VerticalGestureMode.NONE -> {
                             val isVerticalDrag = abs(totalDy) > touchSlopPx &&
-                                    abs(totalDy) > abs(totalDx) * VERTICAL_AXIS_BIAS
+                                abs(totalDy) > abs(totalDx) * VERTICAL_AXIS_BIAS
 
                             if (isVerticalDrag) {
                                 lastTapUpTimeMs = 0L
@@ -701,7 +695,7 @@ class MediaViewerTransitionState(
                                         val baseTravel = pageTravelPx(targetItem)
                                         val initialDelta = if (panelAlreadyActive) -dy else -totalDy
                                         val maxTravel = travelToRestPx(targetItem) +
-                                                maxSheetScrollPx(targetItem)
+                                            maxSheetScrollPx(targetItem)
                                         rawPanelTravelPx = (baseTravel + initialDelta)
                                             .coerceIn(0f, maxTravel)
                                         applyTravel(targetItem, rawPanelTravelPx)
@@ -736,7 +730,7 @@ class MediaViewerTransitionState(
                             val targetItem = gestureItem
                             if (targetItem != null) {
                                 val maxTravel = travelToRestPx(targetItem) +
-                                        maxSheetScrollPx(targetItem)
+                                    maxSheetScrollPx(targetItem)
                                 rawPanelTravelPx = (rawPanelTravelPx - dy).coerceIn(0f, maxTravel)
                                 applyTravel(targetItem, rawPanelTravelPx)
                             }
@@ -757,9 +751,9 @@ class MediaViewerTransitionState(
                         val releaseOffset = rawDragOffset
                         val releaseY = releaseOffset.y.coerceAtLeast(0f)
                         val shouldDismiss = !isZoomed && (
-                                releaseY > dismissThresholdPx ||
-                                        (velocityY > 1000f && releaseY > fastFlickMinDistancePx)
-                                )
+                            releaseY > dismissThresholdPx ||
+                                (velocityY > 1000f && releaseY > fastFlickMinDistancePx)
+                            )
 
                         if (shouldDismiss) {
                             val releaseScale = (1f - (releaseY / 1400f)).coerceIn(0.55f, 1f)
@@ -923,8 +917,8 @@ fun rememberMediaViewerTransitionState(
             initialPagerState = pagerState,
             initialSize = containerSize,
             initiallyHasOpenSource = openSourceRect != null &&
-                    containerSize.width > 0 &&
-                    containerSize.height > 0,
+                containerSize.width > 0 &&
+                containerSize.height > 0,
             touchSlopPx = viewConfig.touchSlop,
             doubleTapSlopPx = with(density) { DOUBLE_TAP_SLOP_DP.dp.toPx() },
             doubleTapTimeoutMs = viewConfig.doubleTapTimeoutMillis,

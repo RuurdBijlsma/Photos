@@ -135,9 +135,9 @@ fun MediaInfoPanel(
     }
 
     val hasDetailsSection = item != null ||
-            detailCardTypes.isNotEmpty() ||
-            weather != null ||
-            windSummary != null
+        detailCardTypes.isNotEmpty() ||
+        weather != null ||
+        windSummary != null
 
     Surface(
         shape = RoundedCornerShape(topStart = PhotosRadii.Sheet, topEnd = PhotosRadii.Sheet),

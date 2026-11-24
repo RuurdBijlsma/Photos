@@ -63,11 +63,10 @@ object MediaInfoFormat {
     )
 
     /** MediaStore `DATE_TAKEN` (UTC epoch) rendered in the device's timezone. */
-    fun epochDateTime(epochMillis: Long, locale: Locale = Locale.getDefault()): String =
-        formatCompactDateTime(
-            LocalDateTime.ofInstant(Instant.ofEpochMilli(epochMillis), ZoneId.systemDefault()),
-            locale,
-        )
+    fun epochDateTime(epochMillis: Long, locale: Locale = Locale.getDefault()): String = formatCompactDateTime(
+        LocalDateTime.ofInstant(Instant.ofEpochMilli(epochMillis), ZoneId.systemDefault()),
+        locale,
+    )
 
     fun viewerTopTitle(
         details: MediaDetails?,
@@ -92,10 +91,9 @@ object MediaInfoFormat {
         return if (placeName != null) "$timeLabel • $placeName" else timeLabel
     }
 
-    fun shortPlaceName(place: PlaceDetails?): String? =
-        listOf(place?.name, place?.admin1, place?.countryName)
-            .firstOrNull { !it.isNullOrBlank() }
-            ?.trim()
+    fun shortPlaceName(place: PlaceDetails?): String? = listOf(place?.name, place?.admin1, place?.countryName)
+        .firstOrNull { !it.isNullOrBlank() }
+        ?.trim()
 
     fun timezoneLabel(offsetSeconds: Int?, name: String?): String? {
         val offset = offsetSeconds?.let(::formatOffset)
