@@ -266,7 +266,7 @@ fun MediaViewerScreen(
         // Interactive Pager Layer (hidden only while ClosingHeroOverlay is flying back to the tile)
         if (transition.closingState == null && items.isNotEmpty()) {
             val isPagerScrollEnabled = !isZoomed && !transition.isDragging &&
-                !transition.isDraggingInfo && !transition.isOpeningHero
+                    !transition.isDraggingInfo && !transition.isOpeningHero
 
             Box(
                 modifier = Modifier
@@ -300,7 +300,7 @@ fun MediaViewerScreen(
                                     modifier = Modifier
                                         .fillMaxSize()
                                         .graphicsLayer {
-                                            translationY = -transition.pageTravelPx(item)
+                                            translationY = -transition.pagePhotoTravelPx(item)
                                         },
                                 ) {
                                     ZoomablePhotoPage(
@@ -361,9 +361,9 @@ fun MediaViewerScreen(
                                         },
                                     ) { measurables, constraints ->
                                         val minSheetHeight = (
-                                            constraints.maxHeight -
-                                                transition.sheetRestTopPx.roundToInt()
-                                            ).coerceAtLeast(0)
+                                                constraints.maxHeight -
+                                                        transition.sheetRestTopPx.roundToInt()
+                                                ).coerceAtLeast(0)
                                         val childConstraints = constraints.copy(
                                             minHeight = minSheetHeight,
                                             maxHeight = Constraints.Infinity,

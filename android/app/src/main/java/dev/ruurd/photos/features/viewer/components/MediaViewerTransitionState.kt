@@ -47,6 +47,7 @@ import dev.ruurd.photos.core.image.MemoryCacheKeyRegistry
 import dev.ruurd.photos.core.image.TileCornerRadii
 import dev.ruurd.photos.core.image.TimelineTileBoundsRegistry
 import dev.ruurd.photos.core.image.lerp
+import dev.ruurd.photos.ui.theme.PhotosRadii
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.CoroutineScope
@@ -98,6 +99,7 @@ class MediaViewerTransitionState(
     private val infoFlickVelocityPx: Float,
     private val minFlingVelocityPx: Float,
     private val maxFlingVelocityPx: Float,
+    private val sheetCornerOverlapPx: Float,
     private val flingDecay: DecayAnimationSpec<Float>,
     private val systemBars: ViewerSystemBars,
     onHiddenTimelineMediaChanged: (String?) -> Unit,
@@ -164,8 +166,8 @@ class MediaViewerTransitionState(
     /** True from the instant swipe-up starts until the photo settles back to its resting y-pos. */
     val shouldShowInfoPanel: Boolean by derivedStateOf {
         (infoOpenFraction > 0.005f || sheetScrollPx > 0.5f || isAnimatingInfoOpen) &&
-            !isClosing &&
-            !isOpeningHero
+                !isClosing &&
+                !isOpeningHero
     }
 
     private val currentActiveItem: TimelineMediaProjection?
@@ -186,7 +188,14 @@ class MediaViewerTransitionState(
         return fittedRect(item).bottom.coerceIn(0f, containerH)
     }
 
-    private fun travelToRestPx(item: TimelineMediaProjection): Float = (baseTopPx(item) - sheetRestTopPx).coerceAtLeast(0f)
+    private fun sheetOverlapPx(item: TimelineMediaProjection): Float = min(
+        sheetCornerOverlapPx,
+        fittedRect(item).height * MAX_OVERLAP_HEIGHT_FRACTION,
+    ).coerceAtLeast(0f)
+
+    private fun sheetTravelToRestPx(item: TimelineMediaProjection): Float = (baseTopPx(item) - sheetRestTopPx).coerceAtLeast(0f)
+
+    private fun photoTravelToRestPx(item: TimelineMediaProjection): Float = (sheetTravelToRestPx(item) - sheetOverlapPx(item)).coerceAtLeast(0f)
 
     private fun maxSheetScrollPx(item: TimelineMediaProjection): Float {
         val containerH = viewerSize.height.toFloat()
@@ -196,13 +205,19 @@ class MediaViewerTransitionState(
         return (sheetRestTopPx + contentH - containerH).coerceAtLeast(0f)
     }
 
-    fun pageTravelPx(item: TimelineMediaProjection): Float {
-        val rest = travelToRestPx(item)
+    fun pagePhotoTravelPx(item: TimelineMediaProjection): Float {
+        val rest = photoTravelToRestPx(item)
         val scroll = if (scrolledPageId == item.id) sheetScrollPx else 0f
         return rest * infoOpenFraction + scroll
     }
 
-    fun pageInfoPanelTopPx(item: TimelineMediaProjection): Float = baseTopPx(item) - pageTravelPx(item)
+    fun pageInfoPanelTravelPx(item: TimelineMediaProjection): Float {
+        val rest = sheetTravelToRestPx(item)
+        val scroll = if (scrolledPageId == item.id) sheetScrollPx else 0f
+        return rest * infoOpenFraction + scroll
+    }
+
+    fun pageInfoPanelTopPx(item: TimelineMediaProjection): Float = baseTopPx(item) - pageInfoPanelTravelPx(item)
 
     val isInfoCoveringStatusBar: Boolean by derivedStateOf {
         val activeTop = currentActiveItem?.let(::pageInfoPanelTopPx) ?: sheetRestTopPx
@@ -388,13 +403,13 @@ class MediaViewerTransitionState(
         }
         if (isAnimatingInfoOpen) return
         val item = currentActiveItem ?: return
-        val target = travelToRestPx(item)
+        val target = sheetTravelToRestPx(item)
         if (target <= 0f) return
         infoSettleJob?.cancel()
         infoSettleJob = scope.launch {
             animateInfoTo(
                 item = item,
-                startTravel = pageTravelPx(item),
+                startTravel = pageInfoPanelTravelPx(item),
                 targetTravel = target,
                 markOpen = true,
             )
@@ -415,7 +430,7 @@ class MediaViewerTransitionState(
         infoSettleJob = scope.launch {
             animateInfoTo(
                 item = item,
-                startTravel = pageTravelPx(item),
+                startTravel = pageInfoPanelTravelPx(item),
                 targetTravel = 0f,
                 markOpen = false,
             )
@@ -441,7 +456,7 @@ class MediaViewerTransitionState(
 
     private fun applyTravel(item: TimelineMediaProjection, travelPx: Float) {
         val clamped = travelPx.coerceAtLeast(0f)
-        val rest = travelToRestPx(item)
+        val rest = sheetTravelToRestPx(item)
         if (rest <= 0f) {
             infoOpenFraction = if (clamped > 0f) 1f else 0f
             sheetScrollPx = clamped.coerceIn(0f, maxSheetScrollPx(item))
@@ -591,9 +606,9 @@ class MediaViewerTransitionState(
 
             val panelAlreadyActive = infoOpenFraction > 0.005f || sheetScrollPx > 0.5f
             val isQuickZoomCandidate = !panelAlreadyActive &&
-                lastTapUpTimeMs > 0L &&
-                (down.uptimeMillis - lastTapUpTimeMs) in 0L..doubleTapTimeoutMs &&
-                (down.position - lastTapUpPosition).getDistance() <= doubleTapSlopPx
+                    lastTapUpTimeMs > 0L &&
+                    (down.uptimeMillis - lastTapUpTimeMs) in 0L..doubleTapTimeoutMs &&
+                    (down.position - lastTapUpPosition).getDistance() <= doubleTapSlopPx
             if (isQuickZoomCandidate) {
                 // Consume the tap memory and yield the entire second press + drag to Telephoto.
                 lastTapUpTimeMs = 0L
@@ -618,7 +633,7 @@ class MediaViewerTransitionState(
             var wasMultiTouch = false
             var gestureMode = VerticalGestureMode.NONE
             var gestureItem: TimelineMediaProjection? = null
-            val gestureStartTravel = currentActiveItem?.let(::pageTravelPx) ?: 0f
+            val gestureStartTravel = currentActiveItem?.let(::pageInfoPanelTravelPx) ?: 0f
             var lastEventTimeMs = down.uptimeMillis
             var lastSampleTimeMs = down.uptimeMillis
 
@@ -679,7 +694,7 @@ class MediaViewerTransitionState(
                     when (gestureMode) {
                         VerticalGestureMode.NONE -> {
                             val isVerticalDrag = abs(totalDy) > touchSlopPx &&
-                                abs(totalDy) > abs(totalDx) * VERTICAL_AXIS_BIAS
+                                    abs(totalDy) > abs(totalDx) * VERTICAL_AXIS_BIAS
 
                             if (isVerticalDrag) {
                                 lastTapUpTimeMs = 0L
@@ -692,10 +707,10 @@ class MediaViewerTransitionState(
                                         infoSettleJob = null
                                         isAnimatingInfoOpen = false
                                         isClosingInfoPanel = false
-                                        val baseTravel = pageTravelPx(targetItem)
+                                        val baseTravel = pageInfoPanelTravelPx(targetItem)
                                         val initialDelta = if (panelAlreadyActive) -dy else -totalDy
-                                        val maxTravel = travelToRestPx(targetItem) +
-                                            maxSheetScrollPx(targetItem)
+                                        val maxTravel = sheetTravelToRestPx(targetItem) +
+                                                maxSheetScrollPx(targetItem)
                                         rawPanelTravelPx = (baseTravel + initialDelta)
                                             .coerceIn(0f, maxTravel)
                                         applyTravel(targetItem, rawPanelTravelPx)
@@ -729,8 +744,8 @@ class MediaViewerTransitionState(
                             change.consume()
                             val targetItem = gestureItem
                             if (targetItem != null) {
-                                val maxTravel = travelToRestPx(targetItem) +
-                                    maxSheetScrollPx(targetItem)
+                                val maxTravel = sheetTravelToRestPx(targetItem) +
+                                        maxSheetScrollPx(targetItem)
                                 rawPanelTravelPx = (rawPanelTravelPx - dy).coerceIn(0f, maxTravel)
                                 applyTravel(targetItem, rawPanelTravelPx)
                             }
@@ -751,9 +766,9 @@ class MediaViewerTransitionState(
                         val releaseOffset = rawDragOffset
                         val releaseY = releaseOffset.y.coerceAtLeast(0f)
                         val shouldDismiss = !isZoomed && (
-                            releaseY > dismissThresholdPx ||
-                                (velocityY > 1000f && releaseY > fastFlickMinDistancePx)
-                            )
+                                releaseY > dismissThresholdPx ||
+                                        (velocityY > 1000f && releaseY > fastFlickMinDistancePx)
+                                )
 
                         if (shouldDismiss) {
                             val releaseScale = (1f - (releaseY / 1400f)).coerceIn(0.55f, 1f)
@@ -797,7 +812,7 @@ class MediaViewerTransitionState(
                             val releaseTravel = rawPanelTravelPx
                             // Positive travelVelocity means moving upward into the info panel.
                             val travelVelocity = -velocityY
-                            val rest = travelToRestPx(targetItem)
+                            val rest = sheetTravelToRestPx(targetItem)
                             val maxTravel = rest + maxSheetScrollPx(targetItem)
 
                             infoSettleJob?.cancel()
@@ -866,6 +881,7 @@ class MediaViewerTransitionState(
         const val FALLBACK_FADE_MS = 180
         const val INFO_PANEL_SPRING_STIFFNESS = 1300f
         const val SHEET_REST_TOP_FRACTION = 0.38f
+        const val MAX_OVERLAP_HEIGHT_FRACTION = 0.5f
         const val VERTICAL_AXIS_BIAS = 1.05f
         const val STALE_RELEASE_MS = 100L
     }
@@ -917,8 +933,8 @@ fun rememberMediaViewerTransitionState(
             initialPagerState = pagerState,
             initialSize = containerSize,
             initiallyHasOpenSource = openSourceRect != null &&
-                containerSize.width > 0 &&
-                containerSize.height > 0,
+                    containerSize.width > 0 &&
+                    containerSize.height > 0,
             touchSlopPx = viewConfig.touchSlop,
             doubleTapSlopPx = with(density) { DOUBLE_TAP_SLOP_DP.dp.toPx() },
             doubleTapTimeoutMs = viewConfig.doubleTapTimeoutMillis,
@@ -929,6 +945,7 @@ fun rememberMediaViewerTransitionState(
             infoFlickVelocityPx = with(density) { INFO_FLICK_VELOCITY_DP_PER_SEC.dp.toPx() },
             minFlingVelocityPx = with(density) { MIN_FLING_VELOCITY_DP_PER_SEC.dp.toPx() },
             maxFlingVelocityPx = viewConfig.maximumFlingVelocity,
+            sheetCornerOverlapPx = with(density) { PhotosRadii.Sheet.toPx() },
             flingDecay = flingDecay,
             systemBars = systemBars,
             onHiddenTimelineMediaChanged = onHiddenTimelineMediaChanged,
