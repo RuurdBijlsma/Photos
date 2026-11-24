@@ -193,11 +193,16 @@ fun ZoomablePhotoPage(
             .build()
     }
 
-    val inPlaceUpgradeRequest = if (upgradedInPreview && fullResData != null) {
-        val placeholderKey = remember(item.id, memoryCacheKeyRegistry) {
-            memoryCacheKeyRegistry.get(item.id)
-        }
-        remember(item.id, fullResData, placeholderKey) {
+    val inPlaceUpgradeRequest = remember(
+        item.id,
+        upgradedInPreview,
+        fullResData,
+        fullResFile,
+        previewRequest,
+        memoryCacheKeyRegistry,
+    ) {
+        if (upgradedInPreview && fullResData != null) {
+            val placeholderKey = memoryCacheKeyRegistry.get(item.id)
             ImageRequest.Builder(context)
                 .data(fullResData)
                 .apply {
@@ -212,9 +217,9 @@ fun ZoomablePhotoPage(
                     },
                 )
                 .build()
+        } else {
+            previewRequest
         }
-    } else {
-        previewRequest
     }
 
     Box(

@@ -160,6 +160,10 @@ object MediaInfoFormat {
         }
     }
 
+    fun windSpeedLabel(windSpeed: Float?): String? = windSpeed?.takeIf { it.isFinite() && it >= 0f }?.let {
+        "Wind %.1f km/h".format(Locale.US, it)
+    }
+
     fun exposureLabel(exposureTime: Float?): String? {
         if (exposureTime == null || exposureTime <= 0f) return null
         if (exposureTime >= 1f) {

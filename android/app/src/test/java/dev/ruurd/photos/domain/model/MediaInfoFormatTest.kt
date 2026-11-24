@@ -104,12 +104,15 @@ class MediaInfoFormatTest {
     }
 
     @Test
-    fun `weather renders a freezing zero degrees reading and condition`() {
+    fun `weather renders a freezing zero degrees reading and wind speed`() {
         assertEquals(
             "0 °C · Clear",
             MediaInfoFormat.weatherSummary(WeatherDetails(temperature = 0f, condition = "Clear")),
         )
         assertNull(MediaInfoFormat.weatherSummary(WeatherDetails()))
+        assertEquals("Wind 12.3 km/h", MediaInfoFormat.windSpeedLabel(12.34f))
+        assertNull(MediaInfoFormat.windSpeedLabel(null))
+        assertNull(MediaInfoFormat.windSpeedLabel(-1f))
     }
 
     @Test

@@ -55,6 +55,7 @@ import dev.ruurd.photos.domain.model.LocalMediaInfo
 import dev.ruurd.photos.domain.model.MediaDetails
 import dev.ruurd.photos.domain.model.MediaInfoFormat
 import dev.ruurd.photos.ui.theme.PhotosRadii
+import kotlin.math.roundToInt
 
 /**
  * Inline Media Info panel anchored directly beneath the active photo/video in shared vertical
@@ -79,8 +80,10 @@ fun MediaInfoPanel(
     val captureDateTime = remember(resolvedDateTime) {
         resolvedDateTime?.let { MediaInfoFormat.formatCompactDateTime(it) }
     }
-    val timezone = remember(details) {
-        MediaInfoFormat.timezoneLabel(details?.timezoneOffsetSeconds, details?.timezoneName)
+    val timezone = remember(details, item) {
+        val offsetSeconds = details?.timezoneOffsetSeconds
+            ?: item?.takeIf { it.cloudId != null }?.timezoneOffsetMinutes?.times(60)
+        MediaInfoFormat.timezoneLabel(offsetSeconds, details?.timezoneName)
     }
     val fileName = details?.fileName ?: localInfo?.fileName
     val width = details?.width ?: localInfo?.width
@@ -99,7 +102,12 @@ fun MediaInfoPanel(
     val focal = MediaInfoFormat.focalLabel(camera?.focalLength, camera?.focalLengthIn35mm)
     val iso = MediaInfoFormat.isoLabel(camera?.iso)
     val exposureBias = MediaInfoFormat.exposureCompensationLabel(camera?.exposureCompensation)
-    val focal35mm = camera?.focalLengthIn35mm?.takeIf { it > 0f }?.let { "${it.toInt()} mm" }
+    val focal35mm = camera?.focalLengthIn35mm
+        ?.takeIf { equiv ->
+            equiv > 0f &&
+                camera.focalLength?.takeIf { it > 0f }?.let { it.roundToInt() != equiv.roundToInt() } == true
+        }
+        ?.let { "${it.roundToInt()} mm" }
 
     val primaryExifMetrics = listOfNotNull(
         aperture?.let { "Aperture" to it },
@@ -113,7 +121,7 @@ fun MediaInfoPanel(
     )
 
     val weather = MediaInfoFormat.weatherSummary(details?.weather)
-    val windSummary = details?.weather?.windSpeed?.let { "Wind %.1f km/h".format(it) }
+    val windSummary = MediaInfoFormat.windSpeedLabel(details?.weather?.windSpeed)
 
     val place = details?.place
     val latitude = place?.latitude ?: localInfo?.latitude

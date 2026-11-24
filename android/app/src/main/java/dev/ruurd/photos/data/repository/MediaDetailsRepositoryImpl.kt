@@ -17,6 +17,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import java.io.IOException
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
@@ -54,6 +56,9 @@ class MediaDetailsRepositoryImpl(
 
         return try {
             entry.job.await()
+        } catch (_: CancellationException) {
+            currentCoroutineContext().ensureActive()
+            null
         } finally {
             if (entry.waiters.decrementAndGet() <= 0) {
                 inFlight.remove(cloudId, entry)

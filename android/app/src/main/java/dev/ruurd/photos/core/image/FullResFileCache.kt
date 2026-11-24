@@ -38,21 +38,37 @@ interface FullResFileStore {
     suspend fun clear()
 }
 
-class FullResFileCache(
-    context: Context,
+class FullResFileCache internal constructor(
+    private val directory: File,
     private val okHttpClient: OkHttpClient,
-    private val sessionManager: SessionManager,
+    private val serverUrlProvider: () -> String,
     private val scope: CoroutineScope,
     private val dispatchers: AppDispatchers,
     private val maxSizeBytes: Long = DEFAULT_MAX_SIZE_BYTES,
 ) : FullResFileStore {
-    private val directory: File = context.cacheDir.resolve(CACHE_DIR)
+
+    constructor(
+        context: Context,
+        okHttpClient: OkHttpClient,
+        sessionManager: SessionManager,
+        scope: CoroutineScope,
+        dispatchers: AppDispatchers,
+        maxSizeBytes: Long = DEFAULT_MAX_SIZE_BYTES,
+    ) : this(
+        directory = context.cacheDir.resolve(CACHE_DIR),
+        okHttpClient = okHttpClient,
+        serverUrlProvider = sessionManager::getServerUrl,
+        scope = scope,
+        dispatchers = dispatchers,
+        maxSizeBytes = maxSizeBytes,
+    )
+
     private val generation = AtomicLong(0L)
     private val inFlight = ConcurrentHashMap<String, InFlightDownload>()
 
     override fun peek(cloudId: String): File? = directoryFor(cloudId)
         .listFiles()
-        ?.firstOrNull { it.isFile && it.length() > 0L }
+        ?.firstOrNull { it.isFile && !it.name.endsWith(TEMP_SUFFIX) && it.length() > 0L }
 
     override suspend fun get(cloudId: String, fileName: String?): File? {
         peek(cloudId)?.let { cached ->
@@ -77,6 +93,11 @@ class FullResFileCache(
 
         return try {
             entry.job.await()
+        } catch (_: CancellationException) {
+            // Only rethrow if this caller's own coroutine was cancelled; evict()/clear()
+            // cancelling the shared job returns null without cancelling unrelated callers.
+            currentCoroutineContext().ensureActive()
+            null
         } finally {
             if (entry.waiters.decrementAndGet() <= 0) {
                 inFlight.remove(cloudId, entry)
@@ -109,7 +130,7 @@ class FullResFileCache(
         fileName: String?,
         expectedGeneration: Long,
     ): File? = withContext(dispatchers.io) {
-        val url = "${sessionManager.getServerUrl()}/api/photos/$cloudId/download"
+        val url = "${serverUrlProvider()}/api/photos/$cloudId/download"
         val targetDirectory = directoryFor(cloudId)
         var temp: File? = null
 
@@ -177,14 +198,22 @@ class FullResFileCache(
     /** Drops the least recently used originals until the directory fits [maxSizeBytes]. */
     private fun trim() {
         val files = directory.listFiles()
-            ?.flatMap { item -> item.listFiles()?.filter { it.isFile } ?: emptyList() }
+            ?.flatMap { item ->
+                item.listFiles()?.filter { it.isFile && !it.name.endsWith(TEMP_SUFFIX) } ?: emptyList()
+            }
             ?.sortedBy { it.lastModified() }
             ?: return
         var total = files.sumOf { it.length() }
         for (file in files) {
             if (total <= maxSizeBytes) break
             val length = file.length()
-            if (file.delete()) total -= length
+            if (file.delete()) {
+                total -= length
+                val parent = file.parentFile
+                if (parent != null && parent.listFiles().isNullOrEmpty()) {
+                    parent.delete()
+                }
+            }
         }
     }
 

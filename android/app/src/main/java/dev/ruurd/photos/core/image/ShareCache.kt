@@ -31,7 +31,7 @@ class ShareCache(
     fun peek(id: String, expectedFileName: String? = null): File? {
         val candidates = directory.resolve(id)
             .listFiles()
-            ?.filter { it.isFile && it.length() > 0L }
+            ?.filter { it.isFile && !it.name.endsWith(TEMP_SUFFIX) && it.length() > 0L }
             ?: return null
         return if (expectedFileName != null) {
             candidates.firstOrNull { it.name == expectedFileName }

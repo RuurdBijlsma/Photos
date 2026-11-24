@@ -1,3 +1,4 @@
+
 package dev.ruurd.photos.features.viewer
 
 import android.content.Intent
@@ -17,8 +18,10 @@ import dev.ruurd.photos.testing.TestAppDispatchers
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -26,6 +29,7 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -301,16 +305,14 @@ class MediaViewerViewModelTest {
     }
 
     @Test
-    fun `synced item never fetches full res from cloud on settle`() = testScope.runTest {
+    fun `swiping away cancels pending settle neighbor prefetch`() = testScope.runTest {
         val repo = FakeMediaRepository()
-        repo.upsert(
-            MediaEntity(
-                id = "local_1",
-                cloudId = "c1",
-                localContentUri = "content://media/external/images/media/1",
-                syncStatus = SyncStatus.SYNCED,
-                sortTimestamp = 3000L,
-                yearMonth = 202611,
+        repo.upsertAll(
+            listOf(
+                MediaEntity(id = "p1", cloudId = "c1", sortTimestamp = 3000L, yearMonth = 202611),
+                MediaEntity(id = "p2", cloudId = "c2", sortTimestamp = 2000L, yearMonth = 202611),
+                MediaEntity(id = "p3", cloudId = "c3", sortTimestamp = 1000L, yearMonth = 202611),
+                MediaEntity(id = "p4", cloudId = "c4", sortTimestamp = 500L, yearMonth = 202611),
             ),
         )
 
@@ -321,6 +323,78 @@ class MediaViewerViewModelTest {
         )
         runCurrent()
 
+        val slowDetailsRepo = FakeMediaDetailsRepository(
+            items = mapOf(
+                "c1" to MediaDetails(cloudId = "c1"),
+                "c2" to MediaDetails(cloudId = "c2"),
+                "c3" to MediaDetails(cloudId = "c3"),
+                "c4" to MediaDetails(cloudId = "c4"),
+            ),
+            delayMs = 500L,
+        )
+        val viewModel = MediaViewerViewModel(
+            initialMediaId = "p2",
+            timelineProjectionStore = store,
+            mediaRepository = repo,
+            mediaDetailsRepository = slowDetailsRepo,
+            fullResFileCache = FakeFullResFileStore(),
+            localMediaInfoReader = FakeLocalMediaInfoSource(),
+            mediaFileSharer = FakeMediaFileSharer(),
+            dispatchers = dispatchers,
+        )
+        advanceTimeBy(500L)
+        runCurrent()
+
+        viewModel.onSettledPage("p2")
+        advanceTimeBy(100L)
+        runCurrent()
+
+        // Swipe to p3 before p2's neighbor prefetch finishes: c1 should never be published.
+        viewModel.onPageChanged("p3")
+        advanceTimeBy(500L)
+        runCurrent()
+
+        assertNull(viewModel.uiState.value.detailsById["p1"])
+        assertEquals("c3", viewModel.uiState.value.activeDetails?.cloudId)
+
+        viewModel.viewModelScope.cancel()
+        store.stop()
+    }
+
+    @Test
+    fun `synced item skips local exif read when server details succeed and falls back when offline`() = testScope.runTest {
+        val repo = FakeMediaRepository()
+        repo.upsertAll(
+            listOf(
+                MediaEntity(
+                    id = "local_1",
+                    cloudId = "c1",
+                    localContentUri = "content://media/external/images/media/1",
+                    syncStatus = SyncStatus.SYNCED,
+                    sortTimestamp = 3000L,
+                    yearMonth = 202611,
+                ),
+                MediaEntity(
+                    id = "local_2",
+                    cloudId = "c_missing",
+                    localContentUri = "content://media/external/images/media/2",
+                    syncStatus = SyncStatus.SYNCED,
+                    sortTimestamp = 2000L,
+                    yearMonth = 202611,
+                ),
+            ),
+        )
+
+        val store = TimelineProjectionStore(
+            mediaRepository = repo,
+            scope = backgroundScope,
+            dispatchers = dispatchers,
+        )
+        runCurrent()
+
+        val localSource = FakeLocalMediaInfoSource(
+            LocalMediaInfo(fileName = "local_fallback.jpg", sizeBytes = 4096L),
+        )
         val fullResStore = FakeFullResFileStore()
         val viewModel = MediaViewerViewModel(
             initialMediaId = "local_1",
@@ -328,16 +402,21 @@ class MediaViewerViewModelTest {
             mediaRepository = repo,
             mediaDetailsRepository = detailsRepository,
             fullResFileCache = fullResStore,
-            localMediaInfoReader = FakeLocalMediaInfoSource(),
+            localMediaInfoReader = localSource,
             mediaFileSharer = FakeMediaFileSharer(),
             dispatchers = dispatchers,
         )
         runCurrent()
 
+        assertTrue(localSource.requestedUris.isEmpty())
+
         viewModel.onSettledPage("local_1")
         runCurrent()
-
         assertTrue(fullResStore.requestedCloudIds.isEmpty())
+
+        // local_2 has no server details (offline/missing) -> falls back to local EXIF/MediaStore.
+        assertEquals(listOf("content://media/external/images/media/2"), localSource.requestedUris)
+        assertEquals("local_fallback.jpg", viewModel.uiState.value.localInfoById["local_2"]?.fileName)
 
         viewModel.viewModelScope.cancel()
         store.stop()
@@ -346,13 +425,15 @@ class MediaViewerViewModelTest {
 
 private class FakeMediaDetailsRepository(
     private val items: Map<String, MediaDetails> = emptyMap(),
+    private val delayMs: Long = 0L,
 ) : MediaDetailsRepository {
     val requested = mutableListOf<String>()
 
-    override fun peek(cloudId: String): MediaDetails? = items[cloudId]
+    override fun peek(cloudId: String): MediaDetails? = if (delayMs == 0L) items[cloudId] else null
 
     override suspend fun get(cloudId: String): MediaDetails? {
         requested += cloudId
+        if (delayMs > 0L) delay(delayMs)
         return items[cloudId]
     }
 
@@ -376,8 +457,15 @@ private class FakeFullResFileStore : FullResFileStore {
     override suspend fun clear() = Unit
 }
 
-private class FakeLocalMediaInfoSource : LocalMediaInfoSource {
-    override suspend fun read(contentUri: String, isVideo: Boolean): LocalMediaInfo? = null
+private class FakeLocalMediaInfoSource(
+    private val response: LocalMediaInfo? = null,
+) : LocalMediaInfoSource {
+    val requestedUris = mutableListOf<String>()
+
+    override suspend fun read(contentUri: String, isVideo: Boolean): LocalMediaInfo? {
+        requestedUris += contentUri
+        return response
+    }
 }
 
 private class FakeMediaFileSharer : MediaFileSharer {

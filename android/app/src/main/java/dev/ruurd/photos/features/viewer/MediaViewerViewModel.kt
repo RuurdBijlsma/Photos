@@ -205,6 +205,8 @@ class MediaViewerViewModel(
         }
 
         if (changed) {
+            settleJob?.cancel()
+            settleJob = null
             val activeCloudId = newActiveItem?.cloudId
             cancelFullResExcept(activeCloudId)
             newActiveItem?.let(::loadActiveItemInfo)
@@ -406,11 +408,11 @@ class MediaViewerViewModel(
         item: TimelineMediaProjection,
         hasDetails: Boolean,
     ): LocalMediaInfo? {
+        if (hasDetails) return null
         item.localContentUri?.let { uri ->
             return localMediaInfoReader.read(uri, item.isVideo)
         }
         // Cloud-only and offline: Room still knows the size, duration and capture time.
-        if (hasDetails) return null
         val entity = mediaRepository.getById(item.id) ?: return null
         return LocalMediaInfo(
             sizeBytes = entity.sizeBytes.takeIf { it > 0L },
