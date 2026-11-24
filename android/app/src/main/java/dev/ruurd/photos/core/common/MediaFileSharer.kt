@@ -5,6 +5,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.webkit.MimeTypeMap
 import dev.ruurd.photos.core.database.entity.TimelineMediaProjection
 import dev.ruurd.photos.core.image.FullResFileStore
 import dev.ruurd.photos.core.image.ShareCache
@@ -22,9 +23,10 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
 import java.io.IOException
+import java.util.Locale
 
 interface MediaFileSharer {
-    /** `null` when the item is missing on the server or its bytes are unreachable. */
+    /** `null` when the item is missing on the server and its local bytes are unreachable. */
     suspend fun shareIntent(
         item: TimelineMediaProjection,
         details: MediaDetails?,
@@ -61,7 +63,6 @@ class DefaultMediaFileSharer(
         details: MediaDetails?,
         localInfo: LocalMediaInfo?,
     ): Intent? = withContext(dispatchers.io) {
-        if (details?.isMissing == true) return@withContext null
         shareCache.prune()
 
         val localUri = item.localContentUri?.let(Uri::parse)
@@ -73,6 +74,7 @@ class DefaultMediaFileSharer(
             return@withContext buildShareIntent(localUri, mimeType)
         }
 
+        if (details?.isMissing == true) return@withContext null
         val cloudId = item.cloudId ?: return@withContext null
         val staged = stageCloudFile(cloudId, folderKey(item), details, item.isVideo)
             ?: return@withContext null
@@ -87,7 +89,7 @@ class DefaultMediaFileSharer(
         details: MediaDetails?,
         localInfo: LocalMediaInfo?,
     ): Boolean = withContext(dispatchers.io) {
-        if (item.isVideo || details?.isMissing == true) return@withContext false
+        if (item.isVideo) return@withContext false
         shareCache.prune()
 
         val localUri = item.localContentUri?.let(Uri::parse)
@@ -142,6 +144,7 @@ class DefaultMediaFileSharer(
             if (staged != null) return staged
         }
 
+        if (details?.isMissing == true) return null
         val cloudId = item.cloudId ?: return null
         return stageCloudFile(cloudId, folderKey(item), details, isVideo = false)
     }
@@ -240,7 +243,7 @@ class DefaultMediaFileSharer(
     private fun folderKey(item: TimelineMediaProjection): String = item.cloudId ?: item.id
 
     private fun mimeFromFilename(name: String, isVideo: Boolean): String {
-        val ext = name.substringAfterLast('.', "").lowercase()
+        val ext = name.substringAfterLast('.', "").lowercase(Locale.US)
         return when (ext) {
             "jpg", "jpeg" -> "image/jpeg"
             "png" -> "image/png"
@@ -254,7 +257,10 @@ class DefaultMediaFileSharer(
             "mov" -> "video/quicktime"
             "webm" -> "video/webm"
             "mkv" -> "video/x-matroska"
-            else -> defaultMime(isVideo)
+            else -> MimeTypeMap.getSingleton()
+                .getMimeTypeFromExtension(ext)
+                ?.takeIf { it.isNotBlank() }
+                ?: defaultMime(isVideo)
         }
     }
 

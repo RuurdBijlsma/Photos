@@ -69,8 +69,8 @@ class MediaDetailsRepositoryImpl(
 
     override fun evict(cloudIds: Collection<String>) {
         cloudIds.forEach { id ->
-            cache.remove(id)
             inFlight.remove(id)?.job?.cancel()
+            cache.remove(id)
         }
     }
 
@@ -87,6 +87,7 @@ class MediaDetailsRepositoryImpl(
         val body = response.body()
         if (response.isSuccessful && body != null) {
             body.toDomain(cloudId).also {
+                currentCoroutineContext().ensureActive()
                 if (generation.get() == expectedGeneration) {
                     cache.put(cloudId, it)
                 }
@@ -131,6 +132,7 @@ internal fun MediaItemWithAlbumsDto.toDomain(cloudId: String): MediaDetails {
         missingSince = item.missingSince,
         userCaption = item.userCaption?.takeIf { it.isNotBlank() },
         orientation = item.orientation,
+        usePanoramaViewer = item.usePanoramaViewer,
         camera = item.cameraSettings?.toDomain(),
         weather = item.weather?.let { WeatherDetails(it.temperature, it.condition, it.windSpeed, it.isDaytime) },
         place = item.toPlace(),

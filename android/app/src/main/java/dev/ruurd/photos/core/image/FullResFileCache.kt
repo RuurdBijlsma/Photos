@@ -12,6 +12,7 @@ import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.job
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -65,6 +66,7 @@ class FullResFileCache internal constructor(
 
     private val generation = AtomicLong(0L)
     private val inFlight = ConcurrentHashMap<String, InFlightDownload>()
+    private val trimLock = Any()
 
     override fun peek(cloudId: String): File? = directoryFor(cloudId)
         .listFiles()
@@ -109,7 +111,9 @@ class FullResFileCache internal constructor(
     override suspend fun evict(cloudId: String) {
         inFlight.remove(cloudId)?.job?.cancel()
         withContext(dispatchers.io) {
-            directoryFor(cloudId).deleteRecursively()
+            synchronized(trimLock) {
+                directoryFor(cloudId).deleteRecursively()
+            }
             Unit
         }
     }
@@ -120,7 +124,9 @@ class FullResFileCache internal constructor(
         inFlight.clear()
         pending.forEach { it.job.cancel() }
         withContext(dispatchers.io) {
-            directory.deleteRecursively()
+            synchronized(trimLock) {
+                directory.deleteRecursively()
+            }
             Unit
         }
     }
@@ -130,6 +136,7 @@ class FullResFileCache internal constructor(
         fileName: String?,
         expectedGeneration: Long,
     ): File? = withContext(dispatchers.io) {
+        val job = currentCoroutineContext().job
         val url = "${serverUrlProvider()}/api/photos/$cloudId/download"
         val targetDirectory = directoryFor(cloudId)
         var temp: File? = null
@@ -139,6 +146,7 @@ class FullResFileCache internal constructor(
             val resolvedName = okHttpClient.newCall(request).await().use { response ->
                 if (!response.isSuccessful) return@withContext null
 
+                val responseMime = response.header("Content-Type")?.substringBefore(';')?.trim()
                 val name = fileName?.takeIf { it.isNotBlank() }
                     ?: MediaFileNames.parseContentDispositionFilename(
                         response.header("Content-Disposition"),
@@ -146,9 +154,13 @@ class FullResFileCache internal constructor(
                     ?: MediaFileNames.fallbackName(
                         cloudId = cloudId,
                         isVideo = false,
-                        mimeType = response.header("Content-Type")?.substringBefore(';')?.trim(),
+                        mimeType = responseMime,
                     )
-                val sanitized = MediaFileNames.sanitize(name, isVideo = false, mimeType = null)
+                val sanitized = MediaFileNames.sanitize(
+                    fileName = name,
+                    isVideo = false,
+                    mimeType = responseMime,
+                )
 
                 targetDirectory.mkdirs()
                 val partFile = File(targetDirectory, "$sanitized$TEMP_SUFFIX")
@@ -158,7 +170,7 @@ class FullResFileCache internal constructor(
                 response.body.byteStream().use { input ->
                     partFile.outputStream().use { output ->
                         while (true) {
-                            currentCoroutineContext().ensureActive()
+                            job.ensureActive()
                             val read = input.read(buffer)
                             if (read < 0) break
                             output.write(buffer, 0, read)
@@ -169,20 +181,26 @@ class FullResFileCache internal constructor(
             }
 
             val partFile = temp ?: return@withContext null
-            if (generation.get() != expectedGeneration || partFile.length() <= 0L) {
-                partFile.delete()
-                return@withContext null
-            }
+            synchronized(trimLock) {
+                job.ensureActive()
+                if (generation.get() != expectedGeneration ||
+                    !partFile.exists() ||
+                    partFile.length() <= 0L
+                ) {
+                    partFile.delete()
+                    return@withContext null
+                }
 
-            val target = File(targetDirectory, resolvedName)
-            target.delete()
-            if (!partFile.renameTo(target)) {
-                partFile.delete()
-                return@withContext null
+                val target = File(targetDirectory, resolvedName)
+                target.delete()
+                if (!partFile.renameTo(target)) {
+                    partFile.delete()
+                    return@withContext null
+                }
+                target.setLastModified(System.currentTimeMillis())
+                trimLocked()
+                target
             }
-            target.setLastModified(System.currentTimeMillis())
-            trim()
-            target
         } catch (e: CancellationException) {
             temp?.delete()
             throw e
@@ -196,10 +214,11 @@ class FullResFileCache internal constructor(
     }
 
     /** Drops the least recently used originals until the directory fits [maxSizeBytes]. */
-    private fun trim() {
+    private fun trimLocked() {
         val files = directory.listFiles()
             ?.flatMap { item ->
-                item.listFiles()?.filter { it.isFile && !it.name.endsWith(TEMP_SUFFIX) } ?: emptyList()
+                item.listFiles()?.filter { it.isFile && !it.name.endsWith(TEMP_SUFFIX) }
+                    ?: emptyList()
             }
             ?.sortedBy { it.lastModified() }
             ?: return

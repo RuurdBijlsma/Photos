@@ -80,6 +80,11 @@ class ShareCache(
         }
     }
 
+    suspend fun evict(id: String) = withContext(dispatchers.io) {
+        directory.resolve(id).deleteRecursively()
+        Unit
+    }
+
     /** Drops files older than a day so shared originals do not accumulate in the cache. */
     suspend fun prune() = withContext(dispatchers.io) {
         val cutoff = System.currentTimeMillis() - MAX_AGE_MS

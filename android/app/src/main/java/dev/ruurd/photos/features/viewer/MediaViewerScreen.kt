@@ -19,6 +19,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
@@ -132,6 +133,14 @@ fun MediaViewerScreen(
         if (isHdrCoordinatorActive) {
             hdrCoordinator.syncWindowColorMode()
         }
+    }
+
+    var wasOnline by remember { mutableStateOf(isOnline) }
+    LaunchedEffect(isOnline) {
+        if (isOnline && !wasOnline) {
+            viewModel.retryActiveItemIfNeeded()
+        }
+        wasOnline = isOnline
     }
 
     LaunchedEffect(uiState.activeMediaId) {
@@ -286,7 +295,7 @@ fun MediaViewerScreen(
         // Interactive Pager Layer (hidden only while ClosingHeroOverlay is flying back to the tile)
         if (transition.closingState == null && items.isNotEmpty()) {
             val isPagerScrollEnabled = !isZoomed && !transition.isDragging &&
-                !transition.isDraggingInfo && !transition.isOpeningHero
+                    !transition.isDraggingInfo && !transition.isOpeningHero
 
             Box(
                 modifier = Modifier
@@ -314,10 +323,10 @@ fun MediaViewerScreen(
                             val isOffscreen by remember(pagerState, page) {
                                 derivedStateOf {
                                     (!pagerState.isScrollInProgress && pagerState.settledPage != page) ||
-                                        abs(
-                                            (page - pagerState.currentPage) -
-                                                pagerState.currentPageOffsetFraction,
-                                        ) >= 1f
+                                            abs(
+                                                (page - pagerState.currentPage) -
+                                                        pagerState.currentPageOffsetFraction,
+                                            ) >= 1f
                                 }
                             }
                             val itemDetails = uiState.detailsById[item.id]
@@ -402,9 +411,9 @@ fun MediaViewerScreen(
                                         },
                                     ) { measurables, constraints ->
                                         val minSheetHeight = (
-                                            constraints.maxHeight -
-                                                transition.sheetRestTopPx.roundToInt()
-                                            ).coerceAtLeast(0)
+                                                constraints.maxHeight -
+                                                        transition.sheetRestTopPx.roundToInt()
+                                                ).coerceAtLeast(0)
                                         val childConstraints = constraints.copy(
                                             minHeight = minSheetHeight,
                                             maxHeight = Constraints.Infinity,
@@ -456,6 +465,8 @@ fun MediaViewerScreen(
         val chromeAlpha = transition.chromeAlpha(chromeVisibilityAlpha)
         val backButtonAlpha = transition.backButtonAlpha(chromeVisibilityAlpha)
         if (chromeAlpha > 0.01f || backButtonAlpha > 0.01f) {
+            val hasLocalOrExistingServer = activeItem != null &&
+                    (activeItem.localContentUri != null || activeDetails?.isMissing != true)
             ViewerChromeOverlay(
                 alpha = chromeAlpha,
                 backButtonAlpha = backButtonAlpha,
@@ -464,8 +475,8 @@ fun MediaViewerScreen(
                 currentItem = activeItem,
                 currentDetails = activeDetails,
                 currentLocalInfo = activeLocalInfo,
-                isShareEnabled = activeItem != null && activeDetails?.isMissing != true,
-                isCopyEnabled = activeDetails?.isMissing != true,
+                isShareEnabled = hasLocalOrExistingServer,
+                isCopyEnabled = hasLocalOrExistingServer,
                 onBack = {
                     if (transition.isInfoPanelActive || uiState.isInfoSheetOpen) {
                         viewModel.closeInfoSheet()

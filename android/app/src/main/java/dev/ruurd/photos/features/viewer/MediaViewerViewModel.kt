@@ -213,11 +213,13 @@ class MediaViewerViewModel(
         }
 
         if (changed) {
-            settleJob?.cancel()
-            settleJob = null
             val activeCloudId = newActiveItem?.cloudId
             cancelFullResExcept(activeCloudId)
+            // Start/join active item fetch before cancelling settleJob so an already-in-flight
+            // neighbor prefetch for this item is reused instead of aborted and restarted.
             newActiveItem?.let(::loadActiveItemInfo)
+            settleJob?.cancel()
+            settleJob = null
         }
     }
 
@@ -239,9 +241,23 @@ class MediaViewerViewModel(
         }
     }
 
-    /** Loads a cloud-only original, e.g. after settle or when the user pinches in early. */
+    /** Retries `/item` and full-res download when connectivity returns while viewing a cloud item. */
+    fun retryActiveItemIfNeeded() {
+        val state = _uiState.value
+        val item = state.items.firstOrNull { it.id == state.activeMediaId } ?: return
+        val cloudId = item.cloudId ?: return
+        val hasFreshDetails = state.detailsById[item.id]?.cloudId == cloudId &&
+                item.id !in state.failedDetailsIds
+        if (!hasFreshDetails && currentItemInfoJob?.isActive != true) {
+            loadActiveItemInfo(item)
+        }
+        if (item.localContentUri == null && !item.isVideo && !state.fullResFiles.containsKey(item.id)) {
+            requestFullRes(item)
+        }
+    }
+
+    /** Loads a cloud-only (or fallback) original, e.g. after settle or when pinching in early. */
     fun requestFullRes(item: TimelineMediaProjection) {
-        if (item.localContentUri != null) return
         val cloudId = item.cloudId ?: return
         if (item.isVideo || _uiState.value.fullResFiles.containsKey(item.id)) return
         if (fullResJobs.containsKey(cloudId)) return

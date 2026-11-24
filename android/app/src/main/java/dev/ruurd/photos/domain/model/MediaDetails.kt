@@ -22,6 +22,7 @@ data class MediaDetails(
     val missingSince: String? = null,
     val userCaption: String? = null,
     val orientation: Int = 1,
+    val usePanoramaViewer: Boolean = false,
     val camera: CameraDetails? = null,
     val weather: WeatherDetails? = null,
     val place: PlaceDetails? = null,
@@ -63,8 +64,8 @@ data class CameraDetails(
 ) {
     val isEmpty: Boolean
         get() = make == null && model == null && lensMake == null && lensModel == null &&
-            exposureTime == null && aperture == null && iso == null && focalLength == null &&
-            focalLengthIn35mm == null && exposureCompensation == null
+                exposureTime == null && aperture == null && iso == null && focalLength == null &&
+                focalLengthIn35mm == null && exposureCompensation == null
 }
 
 @Immutable
