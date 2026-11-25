@@ -46,7 +46,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
@@ -73,6 +72,7 @@ import dev.ruurd.photos.features.main.components.MainNavTab
 import dev.ruurd.photos.features.main.components.PhotosTopBar
 import dev.ruurd.photos.features.main.components.PhotosTopBarHeight
 import dev.ruurd.photos.features.main.components.rememberPullToRefreshState
+import dev.ruurd.photos.features.main.components.rememberTopBarVisibilityState
 import dev.ruurd.photos.features.timeline.TimelineScreen
 import dev.ruurd.photos.features.timeline.TimelineViewModel
 import kotlinx.coroutines.launch
@@ -180,45 +180,8 @@ fun MainScreen(
         FloatingBottomNavHeight
 
     // Hide on scroll-down, reveal on scroll-up or near the top; ignore non-scroll layout shifts.
-    var topBarHidden by remember { mutableStateOf(false) }
-    LaunchedEffect(timelineListState) {
-        var lastIndex = timelineListState.firstVisibleItemIndex
-        var lastOffset = timelineListState.firstVisibleItemScrollOffset
-        var travelled = 0f
-        snapshotFlow {
-            Triple(
-                timelineListState.isScrollInProgress,
-                timelineListState.firstVisibleItemIndex,
-                timelineListState.firstVisibleItemScrollOffset,
-            )
-        }.collect { (isScrolling, index, offset) ->
-            if (index == 0 && offset <= TOP_BAR_HIDE_THRESHOLD_PX.toInt()) {
-                topBarHidden = false
-                if (offset == 0) {
-                    travelled = 0f
-                    lastIndex = 0
-                    lastOffset = 0
-                    return@collect
-                }
-            }
-            if (!isScrolling) {
-                lastIndex = index
-                lastOffset = offset
-                travelled = 0f
-                return@collect
-            }
-            // An index change also resets the offset, so weight it far above any real offset delta.
-            val delta = (index - lastIndex) * INDEX_WEIGHT_PX + (offset - lastOffset)
-            lastIndex = index
-            lastOffset = offset
-            if (delta == 0f) return@collect
-            if (travelled * delta < 0f) travelled = 0f
-            travelled += delta
-            if (travelled > TOP_BAR_HIDE_THRESHOLD_PX) topBarHidden = true
-            if (travelled < -TOP_BAR_HIDE_THRESHOLD_PX) topBarHidden = false
-        }
-    }
-    val hideTopBar = uiState.destination == MainDestination.PHOTOS && topBarHidden
+    val topBarVisibility = rememberTopBarVisibilityState(timelineListState)
+    val hideTopBar = uiState.destination == MainDestination.PHOTOS && topBarVisibility.hidden
 
     Box(
         modifier = modifier
@@ -313,7 +276,7 @@ fun MainScreen(
             showSearchButton = uiState.destination != MainDestination.SEARCH,
             onTabSelected = { tab ->
                 if (tab == MainNavTab.PHOTOS && uiState.destination == MainDestination.PHOTOS) {
-                    topBarHidden = false
+                    topBarVisibility.reveal()
                     coroutineScope.launch {
                         timelineListState.animateScrollToItem(0)
                     }
@@ -401,5 +364,3 @@ private fun PlaceholderTabContent(
 }
 
 private val STATUS_BAR_SCRIM_TAIL = 24.dp
-private const val TOP_BAR_HIDE_THRESHOLD_PX = 96f
-private const val INDEX_WEIGHT_PX = 100_000f

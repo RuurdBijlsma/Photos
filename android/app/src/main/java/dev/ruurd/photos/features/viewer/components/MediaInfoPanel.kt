@@ -51,11 +51,12 @@ import androidx.compose.ui.unit.sp
 import androidx.core.net.toUri
 import dev.ruurd.photos.core.database.entity.SyncStatus
 import dev.ruurd.photos.core.database.entity.TimelineMediaProjection
+import dev.ruurd.photos.domain.model.DetailGroupCard
 import dev.ruurd.photos.domain.model.LocalMediaInfo
 import dev.ruurd.photos.domain.model.MediaDetails
 import dev.ruurd.photos.domain.model.MediaInfoFormat
+import dev.ruurd.photos.domain.model.mediaInfoUiModel
 import dev.ruurd.photos.ui.theme.PhotosRadii
-import kotlin.math.roundToInt
 
 /**
  * Inline Media Info panel anchored directly beneath the active photo/video in shared vertical
@@ -73,79 +74,18 @@ fun MediaInfoPanel(
     hasDetailsFailed: Boolean = false,
 ) {
     val context = LocalContext.current
-
-    val resolvedDateTime = remember(details, item, localInfo) {
-        MediaInfoFormat.resolveLocalDateTime(details, item, localInfo)
+    val model = remember(details, localInfo, item, isOnline, isDetailsLoading, hasDetailsFailed) {
+        mediaInfoUiModel(
+            details = details,
+            localInfo = localInfo,
+            item = item,
+            isOnline = isOnline,
+            isDetailsLoading = isDetailsLoading,
+            hasDetailsFailed = hasDetailsFailed,
+        )
     }
-    val captureDateTime = remember(resolvedDateTime) {
-        resolvedDateTime?.let { MediaInfoFormat.formatCompactDateTime(it) }
-    }
-    val timezone = remember(details, item) {
-        val offsetSeconds = details?.timezoneOffsetSeconds
-            ?: item?.takeIf { it.cloudId != null }?.timezoneOffsetMinutes?.times(60)
-        MediaInfoFormat.timezoneLabel(offsetSeconds, details?.timezoneName)
-    }
-    val fileName = details?.fileName ?: localInfo?.fileName
-    val width = details?.width ?: localInfo?.width
-    val height = details?.height ?: localInfo?.height
-    val megapixels = MediaInfoFormat.formatMegapixels(width, height)
-    val resolution = MediaInfoFormat.formatResolution(width, height)
-    val fileSize = MediaInfoFormat.formatSize(details?.sizeBytes ?: localInfo?.sizeBytes)
-    val duration = MediaInfoFormat.formatDuration(details?.durationMs ?: localInfo?.durationMs)
-    val mimeType = details?.mimeType ?: localInfo?.mimeType
-
-    val camera = details?.camera ?: localInfo?.camera
-    val cameraName = MediaInfoFormat.cameraName(camera)
-    val lensName = MediaInfoFormat.lensName(camera)
-    val aperture = MediaInfoFormat.apertureLabel(camera?.aperture)
-    val shutter = MediaInfoFormat.exposureLabel(camera?.exposureTime)
-    val focal = MediaInfoFormat.focalLabel(camera?.focalLength, camera?.focalLengthIn35mm)
-    val iso = MediaInfoFormat.isoLabel(camera?.iso)
-    val exposureBias = MediaInfoFormat.exposureCompensationLabel(camera?.exposureCompensation)
-    val focal35mm = camera?.focalLengthIn35mm
-        ?.takeIf { equiv ->
-            equiv > 0f &&
-                camera.focalLength?.takeIf { it > 0f }?.let { it.roundToInt() != equiv.roundToInt() } == true
-        }
-        ?.let { "${it.roundToInt()} mm" }
-
-    val primaryExifMetrics = listOfNotNull(
-        aperture?.let { "Aperture" to it },
-        shutter?.let { "Shutter" to it },
-        focal?.let { "Focal" to it },
-        iso?.let { "ISO" to it },
-    )
-    val secondaryExifMetrics = listOfNotNull(
-        exposureBias?.let { "Exposure bias" to it },
-        focal35mm?.let { "35mm equiv." to it },
-    )
-
-    val weather = MediaInfoFormat.weatherSummary(details?.weather)
-    val windSummary = MediaInfoFormat.windSpeedLabel(details?.weather?.windSpeed)
-
-    val place = details?.place
-    val latitude = place?.latitude ?: localInfo?.latitude
-    val longitude = place?.longitude ?: localInfo?.longitude
-    val placeLabel = MediaInfoFormat.locationLabel(place)
-    val coordinates = MediaInfoFormat.coordinates(latitude, longitude)
-
-    val albums = details?.albums.orEmpty()
-    val specChips = listOfNotNull(megapixels, resolution, fileSize, duration, mimeType)
-
-    val hasCameraHeader = cameraName != null || lensName != null
-    val hasExifMetrics = primaryExifMetrics.isNotEmpty() || secondaryExifMetrics.isNotEmpty()
-    val hasFileSpecs = fileName != null || specChips.isNotEmpty()
-
-    val detailCardTypes = buildList {
-        if (hasCameraHeader) add(DetailGroupCard.CAMERA_HEADER)
-        if (hasExifMetrics) add(DetailGroupCard.EXIF_METRICS)
-        if (hasFileSpecs) add(DetailGroupCard.FILE_SPECS)
-    }
-
-    val hasDetailsSection = item != null ||
-        detailCardTypes.isNotEmpty() ||
-        weather != null ||
-        windSummary != null
+    val latitude = model.latitude
+    val longitude = model.longitude
 
     Surface(
         shape = RoundedCornerShape(topStart = PhotosRadii.Sheet, topEnd = PhotosRadii.Sheet),
@@ -175,12 +115,12 @@ fun MediaInfoPanel(
             }
 
             // Capture Date & Time + Timezone
-            if (captureDateTime != null || timezone != null) {
+            if (model.captureDateTime != null || model.timezone != null) {
                 Column(
                     modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(2.dp),
                 ) {
-                    captureDateTime?.let { dateTimeLabel ->
+                    model.captureDateTime?.let { dateTimeLabel ->
                         Text(
                             text = dateTimeLabel,
                             style = MaterialTheme.typography.bodyLarge.copy(
@@ -192,7 +132,7 @@ fun MediaInfoPanel(
                             color = MaterialTheme.colorScheme.onSurface,
                         )
                     }
-                    timezone?.let { tz ->
+                    model.timezone?.let { tz ->
                         Text(
                             text = tz,
                             style = MaterialTheme.typography.bodySmall,
@@ -203,7 +143,7 @@ fun MediaInfoPanel(
             }
 
             // User Caption
-            details?.userCaption?.let { caption ->
+            model.caption?.let { caption ->
                 Surface(
                     shape = RoundedCornerShape(PhotosRadii.NestedCard),
                     color = MaterialTheme.colorScheme.surfaceContainer,
@@ -219,10 +159,10 @@ fun MediaInfoPanel(
             }
 
             // Albums Section
-            if (albums.isNotEmpty()) {
+            if (model.albums.isNotEmpty()) {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     SectionTitle("Albums")
-                    albums.forEach { album ->
+                    model.albums.forEach { album ->
                         AlbumPreviewRow(
                             title = album.name,
                             subtitle = "In album",
@@ -232,7 +172,7 @@ fun MediaInfoPanel(
             }
 
             // Location Section
-            if ((latitude != null && longitude != null) || placeLabel != null) {
+            if ((latitude != null && longitude != null) || model.placeLabel != null) {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     SectionTitle("Location")
                     Surface(
@@ -273,13 +213,13 @@ fun MediaInfoPanel(
                                 verticalArrangement = Arrangement.spacedBy(2.dp),
                             ) {
                                 Text(
-                                    text = placeLabel ?: "Pinned location",
+                                    text = model.placeLabel ?: "Pinned location",
                                     style = MaterialTheme.typography.titleSmall.copy(
                                         fontWeight = FontWeight.SemiBold,
                                     ),
                                     color = MaterialTheme.colorScheme.onSurface,
                                 )
-                                coordinates?.let { coords ->
+                                model.coordinates?.let { coords ->
                                     Text(
                                         text = coords,
                                         style = MaterialTheme.typography.bodySmall,
@@ -304,27 +244,27 @@ fun MediaInfoPanel(
             }
 
             // Details Section
-            if (hasDetailsSection) {
+            if (model.hasDetailsSection) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     SectionTitle("Details")
 
-                    if (item != null) {
+                    if (model.syncStatus != null) {
                         SyncStatusCard(
-                            syncStatus = item.syncStatus,
-                            hasCloudId = item.cloudId != null,
-                            hasServerDetails = details != null,
-                            isOnline = isOnline,
-                            isDetailsLoading = isDetailsLoading,
-                            hasDetailsFailed = hasDetailsFailed,
+                            syncStatus = model.syncStatus,
+                            hasCloudId = model.hasCloudId,
+                            hasServerDetails = model.hasServerDetails,
+                            isOnline = model.isOnline,
+                            isDetailsLoading = model.isDetailsLoading,
+                            hasDetailsFailed = model.hasDetailsFailed,
                         )
                     }
 
-                    if (detailCardTypes.isNotEmpty()) {
-                        if (item != null) {
+                    if (model.detailCardTypes.isNotEmpty()) {
+                        if (model.syncStatus != null) {
                             Spacer(modifier = Modifier.height(2.dp))
                         }
-                        detailCardTypes.forEachIndexed { index, cardType ->
-                            val shape = groupedCardShape(index, detailCardTypes.size)
+                        model.detailCardTypes.forEachIndexed { index, cardType ->
+                            val shape = groupedCardShape(index, model.detailCardTypes.size)
                             when (cardType) {
                                 DetailGroupCard.CAMERA_HEADER -> {
                                     Surface(
@@ -344,7 +284,7 @@ fun MediaInfoPanel(
                                             )
                                             Spacer(modifier = Modifier.width(14.dp))
                                             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                                cameraName?.let { name ->
+                                                model.cameraName?.let { name ->
                                                     Text(
                                                         text = name,
                                                         style = MaterialTheme.typography.titleSmall.copy(
@@ -353,7 +293,7 @@ fun MediaInfoPanel(
                                                         color = MaterialTheme.colorScheme.onSurface,
                                                     )
                                                 }
-                                                lensName?.let { lens ->
+                                                model.lensName?.let { lens ->
                                                     Text(
                                                         text = lens,
                                                         style = MaterialTheme.typography.bodySmall,
@@ -378,12 +318,12 @@ fun MediaInfoPanel(
                                             ),
                                             verticalArrangement = Arrangement.spacedBy(12.dp),
                                         ) {
-                                            if (primaryExifMetrics.isNotEmpty()) {
+                                            if (model.primaryExifMetrics.isNotEmpty()) {
                                                 Row(
                                                     modifier = Modifier.fillMaxWidth(),
                                                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                                                 ) {
-                                                    primaryExifMetrics.forEach { (label, value) ->
+                                                    model.primaryExifMetrics.forEach { (label, value) ->
                                                         ExifMetric(
                                                             label = label,
                                                             value = value,
@@ -392,8 +332,8 @@ fun MediaInfoPanel(
                                                     }
                                                 }
                                             }
-                                            if (primaryExifMetrics.isNotEmpty() &&
-                                                secondaryExifMetrics.isNotEmpty()
+                                            if (model.primaryExifMetrics.isNotEmpty() &&
+                                                model.secondaryExifMetrics.isNotEmpty()
                                             ) {
                                                 HorizontalDivider(
                                                     color = MaterialTheme.colorScheme.outlineVariant.copy(
@@ -401,12 +341,12 @@ fun MediaInfoPanel(
                                                     ),
                                                 )
                                             }
-                                            if (secondaryExifMetrics.isNotEmpty()) {
+                                            if (model.secondaryExifMetrics.isNotEmpty()) {
                                                 Row(
                                                     modifier = Modifier.fillMaxWidth(),
                                                     horizontalArrangement = Arrangement.spacedBy(16.dp),
                                                 ) {
-                                                    secondaryExifMetrics.forEach { (label, value) ->
+                                                    model.secondaryExifMetrics.forEach { (label, value) ->
                                                         ExifMetric(
                                                             label = label,
                                                             value = value,
@@ -427,11 +367,11 @@ fun MediaInfoPanel(
                                             .fillMaxWidth()
                                             .clip(shape)
                                             .then(
-                                                if (fileName != null) {
+                                                if (model.fileName != null) {
                                                     Modifier.clickable {
                                                         copyFilenameToClipboard(
                                                             context = context,
-                                                            fileName = fileName,
+                                                            fileName = model.fileName,
                                                         )
                                                     }
                                                 } else {
@@ -453,7 +393,7 @@ fun MediaInfoPanel(
                                             )
                                             Spacer(modifier = Modifier.width(14.dp))
                                             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                                fileName?.let { name ->
+                                                model.fileName?.let { name ->
                                                     Text(
                                                         text = name,
                                                         style = MaterialTheme.typography.titleSmall.copy(
@@ -464,9 +404,9 @@ fun MediaInfoPanel(
                                                         overflow = TextOverflow.Ellipsis,
                                                     )
                                                 }
-                                                if (specChips.isNotEmpty()) {
+                                                if (model.specChips.isNotEmpty()) {
                                                     Text(
-                                                        text = specChips.joinToString(" · "),
+                                                        text = model.specChips.joinToString(" · "),
                                                         style = MaterialTheme.typography.bodySmall,
                                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                     )
@@ -479,28 +419,22 @@ fun MediaInfoPanel(
                         }
                     }
 
-                    if (weather != null || windSummary != null) {
+                    if (model.weather != null || model.windSummary != null) {
                         Spacer(modifier = Modifier.height(2.dp))
                         InfoSummaryRowCard(
-                            icon = if (details?.weather?.isDaytime == false) {
-                                Icons.Outlined.Nightlight
-                            } else {
+                            icon = if (model.isDaytime) {
                                 Icons.Outlined.WbSunny
+                            } else {
+                                Icons.Outlined.Nightlight
                             },
-                            title = weather ?: windSummary.orEmpty(),
-                            subtitle = if (weather != null) windSummary else null,
+                            title = model.weather ?: model.windSummary.orEmpty(),
+                            subtitle = if (model.weather != null) model.windSummary else null,
                         )
                     }
                 }
             }
         }
     }
-}
-
-private enum class DetailGroupCard {
-    CAMERA_HEADER,
-    EXIF_METRICS,
-    FILE_SPECS,
 }
 
 private fun groupedCardShape(index: Int, count: Int): RoundedCornerShape {

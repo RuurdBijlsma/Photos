@@ -3,6 +3,7 @@ package dev.ruurd.photos.features.main.components
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.spring
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.derivedStateOf
@@ -11,10 +12,17 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -166,6 +174,62 @@ fun rememberPullToRefreshState(
     state.currentOnOfflineRefresh = onOfflineRefresh
 
     return state
+}
+
+/**
+ * Routes vertical drags to [state]: a downward drag at the top of [listState] pulls, and an upward
+ * drag cancels a pull already in progress. [isEmpty] lets an empty timeline pull without a
+ * scrollable list, and [isScrubbing] keeps the scrubber from triggering refreshes.
+ */
+@Composable
+fun Modifier.pullToRefresh(
+    state: PullToRefreshState?,
+    listState: LazyListState,
+    isEmpty: Boolean,
+    isScrubbing: Boolean,
+): Modifier {
+    val currentIsEmpty by rememberUpdatedState(isEmpty)
+    val currentIsScrubbing by rememberUpdatedState(isScrubbing)
+    val connection = remember(state, listState) {
+        state?.let { pullState ->
+            object : NestedScrollConnection {
+                override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                    if (source == NestedScrollSource.UserInput &&
+                        available.y < 0f &&
+                        pullState.isPulled
+                    ) {
+                        val consumedY = pullState.onPullDelta(available.y)
+                        return Offset(0f, consumedY)
+                    }
+                    return Offset.Zero
+                }
+
+                override fun onPostScroll(
+                    consumed: Offset,
+                    available: Offset,
+                    source: NestedScrollSource,
+                ): Offset {
+                    val atTop = currentIsEmpty || !listState.canScrollBackward
+                    if (source == NestedScrollSource.UserInput &&
+                        available.y > 0f &&
+                        !currentIsScrubbing &&
+                        atTop
+                    ) {
+                        val consumedY = pullState.onPullDelta(available.y)
+                        return Offset(0f, consumedY)
+                    }
+                    return Offset.Zero
+                }
+
+                override suspend fun onPreFling(available: Velocity): Velocity {
+                    val wasPulled = pullState.isPulled
+                    pullState.onRelease()
+                    return if (wasPulled) available else Velocity.Zero
+                }
+            }
+        }
+    }
+    return if (connection == null) this else nestedScroll(connection)
 }
 
 private const val PULL_THRESHOLD_RAW_DP = 140f
