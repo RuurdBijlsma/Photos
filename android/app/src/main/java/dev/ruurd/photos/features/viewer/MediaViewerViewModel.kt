@@ -55,7 +55,6 @@ data class MediaViewerUiState(
     val failedDetailsIds: ImmutableSet<String> = persistentSetOf(),
     val isSharing: Boolean = false,
     val isCopying: Boolean = false,
-    val isInfoSheetOpen: Boolean = false,
 ) {
     val activeDetails: MediaDetails?
         get() = detailsById[activeMediaId]
@@ -313,20 +312,8 @@ class MediaViewerViewModel(
         }
     }
 
-    fun openInfoSheet() {
-        _uiState.update { it.copy(isInfoSheetOpen = true) }
-    }
-
-    fun closeInfoSheet() {
-        _uiState.update { it.copy(isInfoSheetOpen = false) }
-    }
-
     fun toggleChrome() {
         _uiState.update { it.copy(isChromeVisible = !it.isChromeVisible) }
-    }
-
-    fun setChromeVisible(visible: Boolean) {
-        _uiState.update { it.copy(isChromeVisible = visible) }
     }
 
     private fun invalidateCloudIds(changedCloudIds: Set<String>) {

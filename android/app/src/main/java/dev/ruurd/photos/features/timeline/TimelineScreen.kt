@@ -75,8 +75,8 @@ import dev.ruurd.photos.ui.theme.PhotosRadii
 fun TimelineScreen(
     viewModel: TimelineViewModel,
     baseUrl: String,
-    modifier: Modifier = Modifier,
     listState: LazyListState,
+    modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(),
     topBarHeight: Dp = 0.dp,
     topBarVisible: Boolean = true,

@@ -82,8 +82,8 @@ import kotlinx.coroutines.launch
 fun MainScreen(
     viewModel: MainViewModel,
     timelineViewModel: TimelineViewModel,
-    modifier: Modifier = Modifier,
     timelineListState: LazyListState,
+    modifier: Modifier = Modifier,
     hiddenTimelineMediaId: String? = null,
     onMediaClick: (
         mediaId: String,

@@ -44,6 +44,7 @@ import dev.ruurd.photos.features.viewer.components.ViewerChromeOverlay
 import dev.ruurd.photos.features.viewer.components.ViewerPreSyncScrollEffect
 import dev.ruurd.photos.features.viewer.components.ViewerPrefetchEffect
 import dev.ruurd.photos.features.viewer.components.ViewerSystemBars
+import dev.ruurd.photos.features.viewer.components.ViewerSystemBarsEffect
 import dev.ruurd.photos.features.viewer.components.ZoomablePhotoPage
 import dev.ruurd.photos.features.viewer.components.rememberMediaViewerTransitionState
 import dev.ruurd.photos.features.viewer.components.rememberViewerSystemBars
@@ -117,14 +118,19 @@ fun MediaViewerScreen(
         items = items,
         activeMediaId = uiState.activeMediaId,
         isZoomed = isZoomed,
-        isChromeVisible = uiState.isChromeVisible,
         onHiddenTimelineMediaChanged = onHiddenTimelineMediaChanged,
         onPreSyncScroll = onPreSyncScroll,
-        onInfoOpenChanged = { open ->
-            if (open) viewModel.openInfoSheet() else viewModel.closeInfoSheet()
-        },
         onDismissFinished = onDismissFinished,
         systemBars = systemBars,
+    )
+
+    ViewerSystemBarsEffect(
+        systemBars = systemBars,
+        isChromeVisible = uiState.isChromeVisible,
+        isClosing = transition.isClosing,
+        isInfoVisible = transition.shouldShowInfoPanel,
+        isInfoCoveringStatusBar = transition.isInfoCoveringStatusBar,
+        onHiddenTimelineMediaChanged = onHiddenTimelineMediaChanged,
     )
 
     val isHdrCoordinatorActive = !transition.isOpeningHero && !transition.isClosing
@@ -162,22 +168,14 @@ fun MediaViewerScreen(
         transition.playClosing()
     }
 
-    // Sync programmatic info sheet opens/closes (e.g. "About" menu item) with transition state.
-    // If "About" was tapped while zoomed in, wait for ZoomablePhotoPage to finish resetting zoom.
-    LaunchedEffect(uiState.isInfoSheetOpen, isZoomed, transition.isOpeningHero) {
-        if (uiState.isInfoSheetOpen) {
-            if (!isZoomed && !transition.isOpeningHero) {
-                transition.requestOpenInfoPanel()
-            }
-        } else if (transition.isInfoPanelActive) {
-            transition.requestCloseInfoPanel()
-        }
+    // Retry an "About" tap that arrived while zoomed or mid hero-open.
+    LaunchedEffect(isZoomed, transition.isOpeningHero) {
+        transition.retryPendingInfoRequest()
     }
 
     // Close the info panel cleanly if the user pinches or double-taps to zoom in
     LaunchedEffect(isZoomed) {
         if (isZoomed && transition.isInfoPanelActive) {
-            viewModel.closeInfoSheet()
             transition.requestCloseInfoPanel()
         }
     }
@@ -258,8 +256,7 @@ fun MediaViewerScreen(
 
     // Keep enabled throughout the closing animation so rapid double-back taps don't leak underneath.
     BackHandler {
-        if (transition.isInfoPanelActive || uiState.isInfoSheetOpen) {
-            viewModel.closeInfoSheet()
+        if (transition.isInfoPanelActive) {
             transition.requestCloseInfoPanel()
         } else if (!transition.isClosing) {
             transition.startClosing(Offset.Zero, 1f, transition.backdropAlpha)
@@ -351,7 +348,6 @@ fun MediaViewerScreen(
                                         onTap = {
                                             if (!transition.isOpeningHero && !transition.isClosing) {
                                                 if (transition.isInfoPanelActive) {
-                                                    viewModel.closeInfoSheet()
                                                     transition.requestCloseInfoPanel()
                                                 } else {
                                                     viewModel.toggleChrome()
@@ -359,7 +355,8 @@ fun MediaViewerScreen(
                                             }
                                         },
                                         fullResFile = uiState.fullResFiles[item.id],
-                                        isInfoSheetOpen = isCurrentPage && uiState.isInfoSheetOpen,
+                                        isInfoPanelRequested = isCurrentPage &&
+                                            transition.isInfoPanelRequested,
                                         onFullResRequested = { viewModel.requestFullRes(item) },
                                         onZoomFractionChanged = { fraction ->
                                             if (page == pagerState.currentPage) {
@@ -478,14 +475,13 @@ fun MediaViewerScreen(
                 isShareEnabled = hasLocalOrExistingServer,
                 isCopyEnabled = hasLocalOrExistingServer,
                 onBack = {
-                    if (transition.isInfoPanelActive || uiState.isInfoSheetOpen) {
-                        viewModel.closeInfoSheet()
+                    if (transition.isInfoPanelActive) {
                         transition.requestCloseInfoPanel()
                     } else {
                         transition.startClosing(Offset.Zero, 1f, transition.backdropAlpha)
                     }
                 },
-                onAbout = viewModel::openInfoSheet,
+                onAbout = transition::requestOpenInfoPanel,
                 onCopy = {
                     actionScope.launch {
                         val copied = viewModel.copyToClipboard()

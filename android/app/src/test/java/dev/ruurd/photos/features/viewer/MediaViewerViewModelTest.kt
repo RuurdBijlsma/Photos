@@ -295,11 +295,6 @@ class MediaViewerViewModelTest {
         viewModel.onPageChanged("p3")
         assertEquals("c3", viewModel.uiState.value.activeDetails?.cloudId)
 
-        viewModel.openInfoSheet()
-        assertTrue(viewModel.uiState.value.isInfoSheetOpen)
-        viewModel.closeInfoSheet()
-        assertFalse(viewModel.uiState.value.isInfoSheetOpen)
-
         viewModel.viewModelScope.cancel()
         store.stop()
     }

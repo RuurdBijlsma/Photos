@@ -52,7 +52,8 @@ fun ZoomablePhotoPage(
     modifier: Modifier = Modifier,
     /** Downloaded `/download` original for a cloud-only photo; `null` while it is not ready. */
     fullResFile: File? = null,
-    isInfoSheetOpen: Boolean = false,
+    /** A programmatic info-panel open waiting on this page, so it can reset zoom first. */
+    isInfoPanelRequested: Boolean = false,
     onFullResRequested: () -> Unit = {},
     onZoomFractionChanged: (Float) -> Unit = {},
     onHdrStateChanged: (hasPreviewGainmap: Boolean, hasSubSamplingLayer: Boolean) -> Unit = { _, _ -> },
@@ -147,8 +148,8 @@ fun ZoomablePhotoPage(
     }
 
     // Programmatic info open (e.g. "About" while zoomed in) resets zoom so the panel can slide up.
-    LaunchedEffect(isActivePage, isInfoSheetOpen) {
-        if (isActivePage && isInfoSheetOpen) {
+    LaunchedEffect(isActivePage, isInfoPanelRequested) {
+        if (isActivePage && isInfoPanelRequested) {
             previewZoomableState.resetZoom()
             fullResZoomableState?.resetZoom()
         }
@@ -212,80 +213,35 @@ fun ZoomablePhotoPage(
             ?.asPainter(context)
     }
 
-    val previewRequest = remember(item, baseUrl, memoryCacheKeyRegistry) {
-        MediaImageRequests.previewRequest(
-            context = context,
-            localContentUri = item.localContentUri,
-            cloudId = item.cloudId,
-            isVideo = item.isVideo,
-            hasThumbnails = item.hasThumbnails,
-            baseUrl = baseUrl,
-            placeholderKey = memoryCacheKeyRegistry.get(item.id),
-            onCacheKey = { memoryCacheKeyRegistry.put(item.id, it) },
-            onImageSuccess = { image ->
-                previewHasGainmap = (image as? BitmapImage)?.bitmap?.hasGainmap() == true
-            },
-        )
+    val previewRequest = rememberPhotoPreviewRequest(
+        item = item,
+        baseUrl = baseUrl,
+        memoryCacheKeyRegistry = memoryCacheKeyRegistry,
+    ) { hasGainmap ->
+        previewHasGainmap = hasGainmap
     }
 
     val fullResData = fullResFile?.let(Uri::fromFile) ?: effectiveLocalUri
-    val fullResRequest = remember(item.id, fullResData, fullResFile, localUri) {
-        ImageRequest.Builder(context)
-            .data(fullResData)
-            .apply {
-                // Full-res originals live in full_res_cache/, never in Coil's 1 GB image cache.
-                if (fullResFile != null) diskCachePolicy(CachePolicy.DISABLED)
-            }
-            // Omit placeholderMemoryCacheKey on the dual-layer fullResZoomableState so it doesn't
-            // emit a PainterDelegate before SubSamplingDelegate; the preview layer covers it.
-            .listener(
-                onSuccess = { _, result ->
-                    result.memoryCacheKey?.let { key ->
-                        memoryCacheKeyRegistry.put(item.id, key)
-                    }
-                },
-                onError = { _, _ ->
-                    if (fullResFile == null && localUri != null) {
-                        localFullResFailed = true
-                    }
-                },
-            )
-            .build()
+    val fullResRequest = rememberPhotoFullResRequest(
+        item = item,
+        data = fullResData,
+        fullResFile = fullResFile,
+        localUri = localUri,
+        memoryCacheKeyRegistry = memoryCacheKeyRegistry,
+    ) {
+        localFullResFailed = true
     }
 
-    val inPlaceUpgradeRequest = remember(
-        item.id,
-        upgradedInPreview,
-        fullResData,
-        fullResFile,
-        localUri,
-        previewRequest,
-        memoryCacheKeyRegistry,
+    val inPlaceUpgradeRequest = rememberPhotoInPlaceUpgradeRequest(
+        item = item,
+        upgradedInPreview = upgradedInPreview,
+        data = fullResData,
+        fullResFile = fullResFile,
+        localUri = localUri,
+        previewRequest = previewRequest,
+        memoryCacheKeyRegistry = memoryCacheKeyRegistry,
     ) {
-        if (upgradedInPreview && fullResData != null) {
-            val placeholderKey = memoryCacheKeyRegistry.get(item.id)
-            ImageRequest.Builder(context)
-                .data(fullResData)
-                .apply {
-                    if (fullResFile != null) diskCachePolicy(CachePolicy.DISABLED)
-                    placeholderKey?.let(::placeholderMemoryCacheKey)
-                }
-                .listener(
-                    onSuccess = { _, result ->
-                        result.memoryCacheKey?.let { key ->
-                            memoryCacheKeyRegistry.put(item.id, key)
-                        }
-                    },
-                    onError = { _, _ ->
-                        if (fullResFile == null && localUri != null) {
-                            localFullResFailed = true
-                        }
-                    },
-                )
-                .build()
-        } else {
-            previewRequest
-        }
+        localFullResFailed = true
     }
 
     // Cloud-only 1440p.avif previews stay on AsyncImage + Modifier.zoomable so Telephoto does not
