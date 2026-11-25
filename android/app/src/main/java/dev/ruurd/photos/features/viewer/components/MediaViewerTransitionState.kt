@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -64,7 +65,8 @@ internal class MediaViewerTransitionState(
     private val metrics: ViewerMetrics,
     initialPagerState: PagerState,
     initialSize: IntSize,
-    initiallyHasOpenSource: Boolean,
+    initialOpenSourceRect: Rect?,
+    initialOpenSourceCorners: TileCornerRadii,
     private val systemBars: ViewerSystemBars,
     onHiddenTimelineMediaChanged: (String?) -> Unit,
     onPreSyncScroll: (String) -> Unit,
@@ -75,7 +77,11 @@ internal class MediaViewerTransitionState(
         memoryCacheKeyRegistry = memoryCacheKeyRegistry,
         sheetCornerOverlapPx = metrics.sheetCornerOverlapPx,
     )
-    private val hero = ViewerHeroTransition(initiallyHasOpenSource)
+    private val hero = ViewerHeroTransition(
+        initiallyHasOpenSource = initialOpenSourceRect != null &&
+            initialSize.width > 0 &&
+            initialSize.height > 0,
+    )
     private val panel = ViewerInfoPanelState(scope, geometry, metrics)
     private val drag = ViewerDragState(scope)
 
@@ -88,8 +94,8 @@ internal class MediaViewerTransitionState(
     internal var items: ImmutableList<TimelineMediaProjection> = persistentListOf()
     internal var activeMediaId: String = ""
     internal var isZoomed: Boolean = false
-    internal var openSourceRect: Rect? = null
-    internal var openSourceCorners: TileCornerRadii = TileCornerRadii.Zero
+    internal var openSourceRect: Rect? = initialOpenSourceRect
+    internal var openSourceCorners: TileCornerRadii = initialOpenSourceCorners
     internal var onHiddenTimelineMediaChanged: (String?) -> Unit = onHiddenTimelineMediaChanged
     internal var onPreSyncScroll: (String) -> Unit = onPreSyncScroll
     internal var onDismissFinished: (Unit) -> Unit = { onDismissFinished() }
@@ -578,9 +584,8 @@ internal fun rememberMediaViewerTransitionState(
             metrics = metrics,
             initialPagerState = pagerState,
             initialSize = containerSize,
-            initiallyHasOpenSource = openSourceRect != null &&
-                containerSize.width > 0 &&
-                containerSize.height > 0,
+            initialOpenSourceRect = openSourceRect,
+            initialOpenSourceCorners = openSourceCorners,
             systemBars = systemBars,
             onHiddenTimelineMediaChanged = onHiddenTimelineMediaChanged,
             onPreSyncScroll = onPreSyncScroll,
@@ -588,16 +593,20 @@ internal fun rememberMediaViewerTransitionState(
         )
     }
 
-    state.pagerState = pagerState
-    state.items = items
-    state.activeMediaId = activeMediaId
-    state.isZoomed = isZoomed
-    state.openSourceRect = openSourceRect
-    state.openSourceCorners = openSourceCorners
-    state.onHiddenTimelineMediaChanged = onHiddenTimelineMediaChanged
-    state.onPreSyncScroll = onPreSyncScroll
-    state.onDismissFinished = { onDismissFinished() }
-    state.setStatusBarHeight(statusBarHeightPx)
+    // These feed gestures and drawing rather than composition, so publish them after the
+    // composition succeeds instead of writing to the long-lived state while it is running.
+    SideEffect {
+        state.pagerState = pagerState
+        state.items = items
+        state.activeMediaId = activeMediaId
+        state.isZoomed = isZoomed
+        state.openSourceRect = openSourceRect
+        state.openSourceCorners = openSourceCorners
+        state.onHiddenTimelineMediaChanged = onHiddenTimelineMediaChanged
+        state.onPreSyncScroll = onPreSyncScroll
+        state.onDismissFinished = { onDismissFinished() }
+        state.setStatusBarHeight(statusBarHeightPx)
+    }
 
     return state
 }

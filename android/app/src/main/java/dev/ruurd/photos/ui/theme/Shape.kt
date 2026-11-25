@@ -2,7 +2,6 @@ package dev.ruurd.photos.ui.theme
 
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Shapes
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 object PhotosRadii {
@@ -14,8 +13,6 @@ object PhotosRadii {
     val GridTile = 0.dp // Sharp inner photo grid items
     val GridGap = 2.dp
 }
-
-fun concentricRadius(outer: Dp, padding: Dp, min: Dp = 8.dp): Dp = (outer - padding).coerceAtLeast(min)
 
 val PhotosShapes = Shapes(
     extraSmall = RoundedCornerShape(8.dp),

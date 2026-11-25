@@ -17,6 +17,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -137,11 +138,9 @@ private fun AuthenticatedSession(
         val coroutineScope = rememberCoroutineScope()
 
         var rootContainerSize by remember { mutableStateOf(IntSize.Zero) }
-        var activeViewerMediaId by rememberSaveable(user.id) {
-            mutableStateOf<String?>(null)
+        var viewerLaunch by rememberSaveable(user.id, stateSaver = ViewerLaunchRequestSaver) {
+            mutableStateOf<ViewerLaunchRequest?>(null)
         }
-        var viewerOpenSourceRect by remember { mutableStateOf<Rect?>(null) }
-        var viewerOpenSourceCorners by remember { mutableStateOf(TileCornerRadii.Zero) }
         var hiddenTimelineMediaId by remember { mutableStateOf<String?>(null) }
 
         fun syncTimelineToMedia(mediaId: String) {
@@ -171,7 +170,7 @@ private fun AuthenticatedSession(
                 modifier = Modifier
                     .fillMaxSize()
                     .then(
-                        if (activeViewerMediaId != null) {
+                        if (viewerLaunch != null) {
                             Modifier
                                 .semantics { hideFromAccessibility() }
                                 .focusProperties { canFocus = false }
@@ -192,10 +191,12 @@ private fun AuthenticatedSession(
                             timelineListState = timelineListState,
                             hiddenTimelineMediaId = hiddenTimelineMediaId,
                             onMediaClick = { mediaId, sourceRect, sourceCorners ->
-                                if (activeViewerMediaId == null) {
-                                    viewerOpenSourceRect = sourceRect
-                                    viewerOpenSourceCorners = sourceCorners
-                                    activeViewerMediaId = mediaId
+                                if (viewerLaunch == null) {
+                                    viewerLaunch = ViewerLaunchRequest(
+                                        mediaId = mediaId,
+                                        sourceRect = sourceRect,
+                                        sourceCorners = sourceCorners,
+                                    )
                                 }
                             },
                         )
@@ -213,31 +214,27 @@ private fun AuthenticatedSession(
             }
 
             // MediaViewerScreen translucent overlay above NavHost
-            val viewerMediaId = activeViewerMediaId
-            if (viewerMediaId != null) {
+            val launch = viewerLaunch
+            if (launch != null) {
                 SessionMediaViewer(
                     container = container,
                     sessionHolder = sessionHolder,
                     userId = user.id,
                     userKey = userKey,
-                    viewerMediaId = viewerMediaId,
+                    viewerMediaId = launch.mediaId,
                     baseUrl = mainUiState.serverUrl,
                     isOnline = mainUiState.isOnline,
-                    openSourceRect = viewerOpenSourceRect,
-                    openSourceCorners = viewerOpenSourceCorners,
+                    openSourceRect = launch.sourceRect,
+                    openSourceCorners = launch.sourceCorners,
                     containerSize = rootContainerSize,
                     onHiddenTimelineMediaChanged = { hiddenTimelineMediaId = it },
                     onPreSyncScroll = ::syncTimelineToMedia,
                     onActiveMediaChanged = { activeId ->
-                        if (activeViewerMediaId != null) {
-                            activeViewerMediaId = activeId
-                        }
+                        viewerLaunch = viewerLaunch?.copy(mediaId = activeId)
                     },
                     onDismissFinished = {
                         hiddenTimelineMediaId = null
-                        viewerOpenSourceRect = null
-                        viewerOpenSourceCorners = TileCornerRadii.Zero
-                        activeViewerMediaId = null
+                        viewerLaunch = null
                         sessionHolder.clearViewerStore()
                     },
                 )
@@ -245,6 +242,22 @@ private fun AuthenticatedSession(
         }
     }
 }
+
+/**
+ * The item the viewer was opened from, plus the timeline tile it flew out of. The bounds only
+ * describe this composition's tiles, so only the media id is saved: after process death the viewer
+ * reopens with a plain fade instead of trusting a stale tile rect.
+ */
+private data class ViewerLaunchRequest(
+    val mediaId: String,
+    val sourceRect: Rect? = null,
+    val sourceCorners: TileCornerRadii = TileCornerRadii.Zero,
+)
+
+private val ViewerLaunchRequestSaver: Saver<ViewerLaunchRequest?, String> = Saver(
+    save = { it?.mediaId },
+    restore = { ViewerLaunchRequest(mediaId = it) },
+)
 
 /** The viewer gets its own per-user store so reopening it always starts from the clicked item. */
 @Composable

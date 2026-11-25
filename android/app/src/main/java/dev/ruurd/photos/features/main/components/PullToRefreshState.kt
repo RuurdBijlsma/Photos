@@ -35,16 +35,11 @@ class PullToRefreshState(
     private val thresholdRawPx: Float,
     private val maxVisualOffsetPx: Float,
     private val performHaptic: (HapticFeedbackType) -> Unit,
-    isOnline: Boolean,
-    isRefreshing: Boolean,
-    onRefresh: () -> Unit,
-    onOfflineRefresh: () -> Unit,
+    private val isOnline: () -> Boolean,
+    private val isRefreshing: () -> Boolean,
+    private val onRefresh: () -> Unit,
+    private val onOfflineRefresh: () -> Unit,
 ) {
-    internal var currentIsOnline: Boolean = isOnline
-    internal var currentIsRefreshing: Boolean = isRefreshing
-    internal var currentOnRefresh: () -> Unit = onRefresh
-    internal var currentOnOfflineRefresh: () -> Unit = onOfflineRefresh
-
     private var rawPullPx by mutableFloatStateOf(0f)
     private var settleJob: Job? = null
     private var wasArmed: Boolean = false
@@ -85,7 +80,7 @@ class PullToRefreshState(
         rawPullPx = next
 
         val nowArmed = thresholdRawPx > 0f && next >= thresholdRawPx
-        if (nowArmed && !wasArmed && !currentIsRefreshing) {
+        if (nowArmed && !wasArmed && !isRefreshing()) {
             performHaptic(HapticFeedbackType.GestureThresholdActivate)
         }
         wasArmed = nowArmed
@@ -103,14 +98,14 @@ class PullToRefreshState(
         val armed = thresholdRawPx > 0f && rawPullPx >= thresholdRawPx
         wasArmed = false
 
-        if (armed && !currentIsRefreshing) {
-            if (currentIsOnline) {
+        if (armed && !isRefreshing()) {
+            if (isOnline()) {
                 performHaptic(HapticFeedbackType.Confirm)
-                currentOnRefresh()
+                onRefresh()
             } else {
                 performHaptic(HapticFeedbackType.Reject)
                 offlineFeedbackCount++
-                currentOnOfflineRefresh()
+                onOfflineRefresh()
             }
         }
 
@@ -155,23 +150,25 @@ fun rememberPullToRefreshState(
     val thresholdRawPx = with(density) { PULL_THRESHOLD_RAW_DP.dp.toPx() }
     val maxVisualOffsetPx = with(density) { MAX_VISUAL_OFFSET_DP.dp.toPx() }
 
+    val currentIsOnline by rememberUpdatedState(isOnline)
+    val currentIsRefreshing by rememberUpdatedState(isRefreshing)
+    val currentOnRefresh by rememberUpdatedState(onRefresh)
+    val currentOnOfflineRefresh by rememberUpdatedState(onOfflineRefresh)
+
     val state = remember(scope, haptic, thresholdRawPx, maxVisualOffsetPx) {
         PullToRefreshState(
             scope = scope,
             thresholdRawPx = thresholdRawPx,
             maxVisualOffsetPx = maxVisualOffsetPx,
             performHaptic = { type -> haptic.performHapticFeedback(type) },
-            isOnline = isOnline,
-            isRefreshing = isRefreshing,
-            onRefresh = onRefresh,
-            onOfflineRefresh = onOfflineRefresh,
+            // Read through updated-state holders: the state outlives recompositions, so it must not
+            // capture this composition's flags or lambdas.
+            isOnline = { currentIsOnline },
+            isRefreshing = { currentIsRefreshing },
+            onRefresh = { currentOnRefresh() },
+            onOfflineRefresh = { currentOnOfflineRefresh() },
         )
     }
-
-    state.currentIsOnline = isOnline
-    state.currentIsRefreshing = isRefreshing
-    state.currentOnRefresh = onRefresh
-    state.currentOnOfflineRefresh = onOfflineRefresh
 
     return state
 }

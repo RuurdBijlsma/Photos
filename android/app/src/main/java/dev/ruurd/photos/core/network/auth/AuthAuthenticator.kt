@@ -80,7 +80,6 @@ class AuthAuthenticator(
 
                         refreshResponse.code == 401 || refreshResponse.code == 403 -> {
                             // Refresh token invalid, expired, or revoked: clear session
-                            cookieJar.clear()
                             scope.launch {
                                 sessionManager.setUnauthenticated()
                             }

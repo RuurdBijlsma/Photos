@@ -125,7 +125,6 @@ class AuthRepositoryImpl(
             }
 
             // Clear local auth immediately so sign out never hangs when the server is offline.
-            cookieJar.clear()
             sessionManager.setUnauthenticated()
 
             if (logoutUrl != null) {
@@ -176,7 +175,6 @@ class AuthRepositoryImpl(
                 Result.success(user)
             } else {
                 if (response.code() == 401) {
-                    cookieJar.clear()
                     sessionManager.setUnauthenticated()
                 }
                 Result.failure(Exception("Failed to fetch user: HTTP ${response.code()}"))

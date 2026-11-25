@@ -35,8 +35,8 @@ class PullToRefreshStateTest {
         thresholdRawPx = 300f,
         maxVisualOffsetPx = 200f,
         performHaptic = { haptics.add(it) },
-        isOnline = isOnline,
-        isRefreshing = isRefreshing,
+        isOnline = { isOnline },
+        isRefreshing = { isRefreshing },
         onRefresh = onRefresh,
         onOfflineRefresh = onOfflineRefresh,
     )

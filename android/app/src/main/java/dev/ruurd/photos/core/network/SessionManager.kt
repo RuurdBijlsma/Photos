@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import dev.ruurd.photos.core.network.cookie.PersistentCookieJar
 import dev.ruurd.photos.domain.model.AuthState
 import dev.ruurd.photos.domain.model.User
 import dev.ruurd.photos.domain.repository.ScanStateStore
@@ -26,6 +27,7 @@ private val Context.sessionDataStore: DataStore<Preferences> by preferencesDataS
 
 class SessionManager(
     private val context: Context,
+    private val cookieJar: PersistentCookieJar,
     scope: CoroutineScope,
     private val onClearSessionData: suspend () -> Unit = {},
 ) : SyncTimestampStore,
@@ -124,10 +126,16 @@ class SessionManager(
         }
     }
 
+    /**
+     * The single sign-out path: callers decide *when* to sign out, and this drops everything that
+     * makes the session work. Clearing the cookies here keeps a caller from leaving the app signed
+     * in server-side while the UI shows the login screen.
+     */
     suspend fun setUnauthenticated() {
         initJob.join()
         sessionMutex.withLock {
             if (_authState.value is AuthState.Unauthenticated) return@withLock
+            cookieJar.clear()
             try {
                 onClearSessionData()
             } catch (e: CancellationException) {

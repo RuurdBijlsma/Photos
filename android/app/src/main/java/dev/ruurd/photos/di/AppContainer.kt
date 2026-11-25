@@ -17,6 +17,7 @@ import dev.ruurd.photos.core.database.AppDatabase
 import dev.ruurd.photos.core.database.dao.DeviceFolderDao
 import dev.ruurd.photos.core.database.dao.MediaDao
 import dev.ruurd.photos.core.image.FullResFileCache
+import dev.ruurd.photos.core.image.FullResFileStore
 import dev.ruurd.photos.core.image.MemoryCacheKeyRegistry
 import dev.ruurd.photos.core.image.PhotosImageLoader
 import dev.ruurd.photos.core.image.ShareCache
@@ -29,6 +30,7 @@ import dev.ruurd.photos.core.network.discovery.LanServerScanner
 import dev.ruurd.photos.core.network.interceptor.DynamicBaseUrlInterceptor
 import dev.ruurd.photos.core.state.BootstrapState
 import dev.ruurd.photos.data.datasource.local.LocalMediaInfoReader
+import dev.ruurd.photos.data.datasource.local.LocalMediaInfoSource
 import dev.ruurd.photos.data.datasource.local.MediaStoreDataSource
 import dev.ruurd.photos.data.repository.AuthRepositoryImpl
 import dev.ruurd.photos.data.repository.DeviceFolderRepositoryImpl
@@ -88,9 +90,9 @@ interface AppContainer {
     val timelineProjectionStore: TimelineProjectionStore
     val bootstrapState: BootstrapState
     val mediaDetailsRepository: MediaDetailsRepository
-    val fullResFileCache: FullResFileCache
+    val fullResFileCache: FullResFileStore
     val shareCache: ShareCache
-    val localMediaInfoReader: LocalMediaInfoReader
+    val localMediaInfoReader: LocalMediaInfoSource
     val mediaFileSharer: MediaFileSharer
 
     fun authViewModelFactory(): ViewModelProvider.Factory
@@ -122,6 +124,7 @@ class DefaultAppContainer(private val context: Context) : AppContainer {
     override val sessionManager: SessionManager by lazy {
         SessionManager(
             context = context,
+            cookieJar = cookieJar,
             scope = applicationScope,
             onClearSessionData = {
                 bootstrapState.reset()
