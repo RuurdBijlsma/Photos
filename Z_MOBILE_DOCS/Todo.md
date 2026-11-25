@@ -204,14 +204,16 @@ still photos.)*
 
 ### 2A: Navigation Shell, Photo Viewer & Dismiss Gestures (`Telephoto`)
 
-* [✅ Done] Add `org.jetbrains.kotlin.plugin.serialization` + `kotlinx-serialization-json` (for type-safe `@Serializable` routes;
+* [✅ Done] Add `org.jetbrains.kotlin.plugin.serialization` + `kotlinx-serialization-json` (for type-safe `@Serializable`
+  routes;
   `androidx.navigation:navigation-compose` is already in `gradle/libs.versions.toml`) and set up `NavHost` inside
   `SessionViewModelStoreHolder`: keep `MainScreen` mounted as the root destination (preserving `timelineListState`,
   tab state across `Photos`/`Collections`/`Explore`/`Search`, and `timeline_list` / `timeline_scrubber` test tags),
   with pushed routes (`DeviceFolders`, `AlbumDetail`, `BackupSettings`) and a generic `ViewerSource` contract (
   `Timeline`
   in Phase 2, reusable for `DeviceFolder` in Phase 3 and `Album` in Phase 5).
-* [✅ Done] Host `MediaViewerScreen` in a `SharedTransitionLayout` / translucent overlay above `NavHost` rather than an opaque
+* [✅ Done] Host `MediaViewerScreen` in a `SharedTransitionLayout` / translucent overlay above `NavHost` rather than an
+  opaque
   `NavHost` `composable` replacement so `TimelineScreen` stays live and visible underneath during shared-element
   transitions and interactive swipe-down dismiss:
     * Use `sharedElementWithCallerManagedVisibility` (or explicit bounds capture) since `MainScreen` inside `NavHost`
@@ -221,7 +223,8 @@ still photos.)*
       viewer item), and hoist a scroll-sync bridge/callback to `MainScreen`'s `timelineListState`.
     * Layer `BackHandler` precedence cleanly (`MediaInfoBottomSheet` / `DateTimeEditDialog` > `MediaViewerScreen` >
       `MainScreen` Search).
-* [✅ Done] Share Stage 2's `ImmutableList<TimelineMediaProjection>` (with `@Immutable` on `TimelineMediaProjection`) via a hot
+* [✅ Done] Share Stage 2's `ImmutableList<TimelineMediaProjection>` (with `@Immutable` on `TimelineMediaProjection`) via
+  a hot
   `TimelineProjectionStore` across `TimelineViewModel` and `MediaViewerViewModel`—modeled as `Loading` vs.
   `Loaded(items)` (never initialized to `persistentListOf()`) so `MediaViewerViewModel` doesn't mistake an uninitialized
   store for a deleted library—while keeping `ObserveTimelineUseCase` compatible with `MediaRepository` (preserving
@@ -232,7 +235,8 @@ still photos.)*
       date edits never jump `currentPage` to a different item.
     * Never run the Stage 1 top-2-months query in the viewer (which would miss older photos and trigger false deletions
       or page `0` jumps).
-* [✅ Done] Integrate `me.saket.telephoto:zoomable-image-coil3` (`ZoomableAsyncImage`) with double-tap, pinch-to-zoom, and
+* [✅ Done] Integrate `me.saket.telephoto:zoomable-image-coil3` (`ZoomableAsyncImage`) with double-tap, pinch-to-zoom,
+  and
   pan/Ultra HDR support:
     * Key the surrounding page via `HorizontalPager(key = ...)` / `key(mediaId)` (since `rememberZoomableState()` does
       not accept a `key` parameter directly), lock `HorizontalPager` (`userScrollEnabled` checks only the **active
@@ -292,23 +296,27 @@ still photos.)*
   including `<cache-path name="share_cache" path="share_cache/" />`). For existing Phase 1 upgraders who already granted
   `READ_MEDIA_IMAGES` / `READ_MEDIA_VIDEO` without `ACCESS_MEDIA_LOCATION`, request `ACCESS_MEDIA_LOCATION` once when
   needed or rely cleanly on the `try/catch` fallback around `MediaStore.setRequireOriginal(uri)`.
-* [✅ Done] Implement `GET /api/photos/{cloudId}/item` (`MediaItemWithAlbums` `snake_case` DTOs with nullable `panorama_config`,
+* [✅ Done] Implement `GET /api/photos/{cloudId}/item` (`MediaItemWithAlbums` `snake_case` DTOs with nullable
+  `panorama_config`,
   noting that every server photo endpoint takes `cloudId`) and `MediaDetailsRepository` (in-memory LRU cache, loading
   `currentPage` immediately while running `currentPage ± 1` neighbor prefetch inside the debounced/cancellable
   `settledPage` `collectLatest` alongside 2A's preview thumbnail prefetch). Hook `SyncTimelineUseCase` (via
   `MediaRefreshCoordinator`) to evict `upserted` and `deleted_ids` `cloudId`s from `MediaDetailsRepository` so edits
   made on the web client never leave stale metadata in the Info sheet.
-* [✅ Done] Add `full_res_cache/` (~500 MB LRU) and `share_cache/`, and extend `SessionManager`'s `onClearSessionData` to clear
+* [✅ Done] Add `full_res_cache/` (~500 MB LRU) and `share_cache/`, and extend `SessionManager`'s `onClearSessionData` to
+  clear
   `TimelineProjectionStore`, `MemoryCacheKeyRegistry`, `full_res_cache/`, `share_cache/`, and `MediaDetailsRepository`
   on sign-out / 401 token revocation.
-* [✅ Done] Upgrade `ZoomableAsyncImage` for `CLOUD_ONLY` **photos** (`!isVideo`, including panoramas): wait for `/item` so
+* [✅ Done] Upgrade `ZoomableAsyncImage` for `CLOUD_ONLY` **photos** (`!isVideo`, including panoramas): wait for `/item`
+  so
   `mime_type` and `missing_since == null` are known, then—only after `settledPage == pageIndex` settles for ~150–250ms
   (or immediately on zoom), cancelling on swipe away—fetch `/api/photos/{cloudId}/download` into `full_res_cache`
   (deduplicated per `cloudId` with temp-file atomic rename) and pass the `file://` URI (with
   `diskCachePolicy(CachePolicy.DISABLED)` and the captured `1440p` `MemoryCache.Key` placeholder) so JPEGs/PNGs/WebPs
   subsample with gainmaps while full-res AVIF/HEIC fall back to Coil without `BitmapRegionDecoder` failing; skip
   `/download` for videos, TIFF/TGA, or `missing_since != null`.
-* [✅ Done] Build the swipe-up **Media Info Bottom Sheet** (`30.dp` rounded `surfaceContainerHigh`, gated on single-pointer
+* [✅ Done] Build the swipe-up **Media Info Bottom Sheet** (`30.dp` rounded `surfaceContainerHigh`, gated on
+  single-pointer
   `zoomFraction <= 0.01f` on both photo and video pages and also opened via **About** in the top-right overflow menu):
     * Display capture date/time in photo's local timezone (parse naive `taken_at_local` via `LocalDateTime.parse(...)`
       online; `sortTimestamp + timezoneOffsetMinutes` offline), filename, resolution/size, user caption, weather
@@ -329,12 +337,21 @@ still photos.)*
   `"photo_$cloudId.jpg"`/`"video_$cloudId.mp4"` if `/item` isn't loaded yet, download `TIFF`/`TGA` on demand unlike
   automatic viewer prefetch, stream large `CLOUD_ONLY` videos directly to `share_cache` without evicting the 500 MB
   photo cache, disable/guard when `missing_since != null`, and prune stale `share_cache` files periodically).
-* [✅ Done] Implement **Copy** (top-right menu, photos only — hidden on videos and `missing_since != null`; copies image URI to
+* [✅ Done] Implement **Copy** (top-right menu, photos only — hidden on videos and `missing_since != null`; copies image
+  URI to
   Android clipboard via `ClipData.newUri`, staging via `share_cache` + `FileProvider` for both `CLOUD_ONLY` and
   local/synced photos so third-party paste targets without `READ_MEDIA_IMAGES` or under partial access can always read
   clipboard data).
 
 ### 2C: Video Playback (`Media3` / `ExoPlayer`)
+
+Desired UI:
+On timeline tile click = immediately play video with controls hidden.
+On media viewer swipe prev/next = immediately play video, but with control shown/hidden depending on whether UI pills
+and such are shown in the media viewer.
+on video end, dont loop
+on swipe down on video (return to timeline) -> pause video when drag starts. Same for swipe up for bottom sheet
+Tapping on the video should just hide/show controls. not play/pause.
 
 * Add `androidx.media3:media3-exoplayer`, `media3-datasource-okhttp`, and `media3-ui-compose` (plus optionally
   `media3-ui-compose-material3`).
