@@ -11,13 +11,15 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import dev.ruurd.photos.domain.model.VideoQuality
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.withContext
 
 private val Context.videoDataStore: DataStore<Preferences> by preferencesDataStore(name = "video_prefs")
 
@@ -40,7 +42,7 @@ interface VideoPreferencesSource {
 
 class VideoPreferencesStore(
     private val context: Context,
-    private val scope: CoroutineScope,
+    scope: CoroutineScope,
 ) : VideoPreferencesSource {
 
     private val _preferences = MutableStateFlow(VideoPreferences())
@@ -61,30 +63,30 @@ class VideoPreferencesStore(
     }
 
     override suspend fun setLoopEnabled(enabled: Boolean) {
-        _preferences.value = _preferences.value.copy(isLoopEnabled = enabled)
-        scope.launch {
+        _preferences.update { it.copy(isLoopEnabled = enabled) }
+        withContext(NonCancellable) {
             context.videoDataStore.edit { it[KEY_LOOP_ENABLED] = enabled }
         }
     }
 
     override suspend fun setPlaybackSpeed(speed: Float) {
         val clamped = speed.coerceIn(0.25f, 3.0f)
-        _preferences.value = _preferences.value.copy(playbackSpeed = clamped)
-        scope.launch {
+        _preferences.update { it.copy(playbackSpeed = clamped) }
+        withContext(NonCancellable) {
             context.videoDataStore.edit { it[KEY_PLAYBACK_SPEED] = clamped }
         }
     }
 
     override suspend fun setMuted(muted: Boolean) {
-        _preferences.value = _preferences.value.copy(isMuted = muted)
-        scope.launch {
+        _preferences.update { it.copy(isMuted = muted) }
+        withContext(NonCancellable) {
             context.videoDataStore.edit { it[KEY_MUTED] = muted }
         }
     }
 
     override suspend fun setPreferredQuality(quality: VideoQuality) {
-        _preferences.value = _preferences.value.copy(preferredQuality = quality)
-        scope.launch {
+        _preferences.update { it.copy(preferredQuality = quality) }
+        withContext(NonCancellable) {
             context.videoDataStore.edit { it[KEY_QUALITY] = quality.storageKey }
         }
     }

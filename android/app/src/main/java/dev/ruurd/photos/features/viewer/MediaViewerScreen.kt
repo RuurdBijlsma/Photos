@@ -24,7 +24,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
@@ -317,7 +316,7 @@ fun MediaViewerScreen(
         // Interactive Pager Layer (hidden only while ClosingHeroOverlay is flying back to the tile)
         if (transition.closingState == null && items.isNotEmpty()) {
             val isPagerScrollEnabled = !isZoomed && !transition.isDragging &&
-                !transition.isDraggingInfo && !transition.isOpeningHero
+                    !transition.isDraggingInfo && !transition.isOpeningHero
 
             Box(
                 modifier = Modifier
@@ -345,10 +344,10 @@ fun MediaViewerScreen(
                             val isOffscreen by remember(pagerState, page) {
                                 derivedStateOf {
                                     (!pagerState.isScrollInProgress && pagerState.settledPage != page) ||
-                                        abs(
-                                            (page - pagerState.currentPage) -
-                                                pagerState.currentPageOffsetFraction,
-                                        ) >= 1f
+                                            abs(
+                                                (page - pagerState.currentPage) -
+                                                        pagerState.currentPageOffsetFraction,
+                                            ) >= 1f
                                 }
                             }
                             val itemDetails = uiState.detailsById[item.id]
@@ -367,13 +366,14 @@ fun MediaViewerScreen(
                                         val isUnmetered = remember(
                                             item.id,
                                             uiState.videoPreferences.preferredQuality,
+                                            isOnline,
                                         ) {
                                             viewModel.isUnmeteredWithoutDataSaver()
                                         }
                                         val transientQuality = uiState.transientVideoQualityById[item.id]
                                         val localFailed = item.id in uiState.localVideoFallbackIds
                                         val isOriginalMissing = itemDetails?.isMissing == true ||
-                                            item.id in uiState.videoUnavailableOriginalIds
+                                                item.id in uiState.videoUnavailableOriginalIds
                                         val resolvedSource = remember(
                                             item.localContentUri,
                                             localFailed,
@@ -400,6 +400,7 @@ fun MediaViewerScreen(
                                         VideoPlayerPage(
                                             item = item,
                                             baseUrl = baseUrl,
+                                            isCurrentPage = isCurrentPage,
                                             isSettledPage = isSettledPage,
                                             isClosing = transition.isClosing,
                                             isInfoPanelActive = transition.isInfoPanelActive,
@@ -438,7 +439,7 @@ fun MediaViewerScreen(
                                             },
                                             fullResFile = uiState.fullResFiles[item.id],
                                             isInfoPanelRequested = isCurrentPage &&
-                                                transition.isInfoPanelRequested,
+                                                    transition.isInfoPanelRequested,
                                             onFullResRequested = { viewModel.requestFullRes(item) },
                                             onZoomFractionChanged = { fraction ->
                                                 if (page == pagerState.currentPage) {
@@ -484,9 +485,9 @@ fun MediaViewerScreen(
                                         },
                                     ) { measurables, constraints ->
                                         val minSheetHeight = (
-                                            constraints.maxHeight -
-                                                transition.sheetRestTopPx.roundToInt()
-                                            ).coerceAtLeast(0)
+                                                constraints.maxHeight -
+                                                        transition.sheetRestTopPx.roundToInt()
+                                                ).coerceAtLeast(0)
                                         val childConstraints = constraints.copy(
                                             minHeight = minSheetHeight,
                                             maxHeight = Constraints.Infinity,
@@ -539,7 +540,7 @@ fun MediaViewerScreen(
         val backButtonAlpha = transition.backButtonAlpha(chromeVisibilityAlpha)
         if (chromeAlpha > 0.01f || backButtonAlpha > 0.01f) {
             val hasLocalOrExistingServer = activeItem != null &&
-                (activeItem.localContentUri != null || activeDetails?.isMissing != true)
+                    (activeItem.localContentUri != null || activeDetails?.isMissing != true)
             val videoChromeState = if (activeItem?.isVideo == true) {
                 val activeSourceHeight = remember(activeDetails, activeLocalInfo) {
                     val w = activeDetails?.width ?: activeLocalInfo?.width
@@ -547,7 +548,7 @@ fun MediaViewerScreen(
                     if (w != null && h != null && w > 0 && h > 0) minOf(w, h) else null
                 }
                 val isOriginalMissing = activeDetails?.isMissing == true ||
-                    activeItem.id in uiState.videoUnavailableOriginalIds
+                        activeItem.id in uiState.videoUnavailableOriginalIds
                 val qualityOptions = remember(
                     activeItem.hasThumbnails,
                     isOriginalMissing,
@@ -568,7 +569,7 @@ fun MediaViewerScreen(
                     (activeItem.durationMs ?: 0).toLong()
                 }
                 val isCloudPlayback = activeItem.localContentUri == null ||
-                    activeItem.id in uiState.localVideoFallbackIds
+                        activeItem.id in uiState.localVideoFallbackIds
                 val activeQuality = if (isCloudPlayback && videoController.activeMediaId == activeItem.id) {
                     videoController.activeCloudQuality
                 } else {

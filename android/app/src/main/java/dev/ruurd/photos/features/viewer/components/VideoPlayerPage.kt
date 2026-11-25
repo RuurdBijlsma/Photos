@@ -55,6 +55,7 @@ import kotlinx.coroutines.delay
 fun VideoPlayerPage(
     item: TimelineMediaProjection,
     baseUrl: String,
+    isCurrentPage: Boolean,
     isSettledPage: Boolean,
     isClosing: Boolean,
     isInfoPanelActive: Boolean,
@@ -67,7 +68,7 @@ fun VideoPlayerPage(
     modifier: Modifier = Modifier,
 ) {
     val activeError = errorReason ?: (resolvedSource as? ResolvedVideoSource.Unavailable)?.reason
-    val canAttachPlayer = isSettledPage && !isClosing && activeError == null
+    val canAttachPlayer = isSettledPage && isCurrentPage && !isClosing && activeError == null
 
     LaunchedEffect(
         item.id,

@@ -29,6 +29,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -171,6 +172,9 @@ fun VideoControlsBar(
                 isScrubbing = false
                 onSeekTo(targetMs)
             },
+            onScrubCancel = {
+                isScrubbing = false
+            },
         )
     }
 }
@@ -181,10 +185,15 @@ private fun VideoTimeText(
     durationMs: Long,
     modifier: Modifier = Modifier,
 ) {
-    val currentLabel = VideoPlaybackPolicy.formatVideoTime(positionMsProvider())
-    val totalLabel = VideoPlaybackPolicy.formatVideoTime(durationMs)
+    val timeText by remember(durationMs, positionMsProvider) {
+        derivedStateOf {
+            val currentLabel = VideoPlaybackPolicy.formatVideoTime(positionMsProvider())
+            val totalLabel = VideoPlaybackPolicy.formatVideoTime(durationMs)
+            "$currentLabel / $totalLabel"
+        }
+    }
     Text(
-        text = "$currentLabel / $totalLabel",
+        text = timeText,
         style = MaterialTheme.typography.labelLarge.copy(
             fontFeatureSettings = "tnum",
             fontWeight = FontWeight.Medium,
@@ -265,12 +274,14 @@ private fun VideoSeekBar(
     onScrubStart: (Long) -> Unit,
     onScrubMove: (Long) -> Unit,
     onScrubEnd: (Long) -> Unit,
+    onScrubCancel: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val currentDuration by rememberUpdatedState(durationMs)
     val currentOnScrubStart by rememberUpdatedState(onScrubStart)
     val currentOnScrubMove by rememberUpdatedState(onScrubMove)
     val currentOnScrubEnd by rememberUpdatedState(onScrubEnd)
+    val currentOnScrubCancel by rememberUpdatedState(onScrubCancel)
 
     Canvas(
         modifier = modifier
@@ -287,21 +298,29 @@ private fun VideoSeekBar(
                         return (fraction * totalDuration).toLong()
                     }
 
-                    down.consume()
-                    var latestMs = xToMs(down.position.x)
-                    currentOnScrubStart(latestMs)
+                    var committed = false
+                    try {
+                        down.consume()
+                        var latestMs = xToMs(down.position.x)
+                        currentOnScrubStart(latestMs)
 
-                    while (true) {
-                        val event = awaitPointerEvent(PointerEventPass.Main)
-                        val change = event.changes.firstOrNull { it.id == down.id } ?: break
-                        if (!change.pressed) {
+                        while (true) {
+                            val event = awaitPointerEvent(PointerEventPass.Main)
+                            val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                            if (!change.pressed) {
+                                change.consume()
+                                committed = true
+                                currentOnScrubEnd(latestMs)
+                                break
+                            }
                             change.consume()
-                            currentOnScrubEnd(latestMs)
-                            break
+                            latestMs = xToMs(change.position.x)
+                            currentOnScrubMove(latestMs)
                         }
-                        change.consume()
-                        latestMs = xToMs(change.position.x)
-                        currentOnScrubMove(latestMs)
+                    } finally {
+                        if (!committed) {
+                            currentOnScrubCancel()
+                        }
                     }
                 }
             },
