@@ -32,8 +32,7 @@ class MediaDetailsRepositoryImpl(
 
     override suspend fun get(cloudId: String): MediaDetails? {
         peek(cloudId)?.let { return it }
-        val generation = fetches.generation
-        return fetches.load(cloudId) { id -> fetch(id, generation) }
+        return fetches.load(cloudId) { id, isCurrent -> fetch(id, isCurrent) }
     }
 
     override fun evict(cloudIds: Collection<String>) {
@@ -48,13 +47,13 @@ class MediaDetailsRepositoryImpl(
         cache.evictAll()
     }
 
-    private suspend fun fetch(cloudId: String, expectedGeneration: Long): MediaDetails? = try {
+    private suspend fun fetch(cloudId: String, isCurrent: () -> Boolean): MediaDetails? = try {
         val response = apiService.getMediaItem(cloudId)
         val body = response.body()
         if (response.isSuccessful && body != null) {
             body.toDomain(cloudId).also {
                 currentCoroutineContext().ensureActive()
-                if (fetches.generation == expectedGeneration) {
+                if (isCurrent()) {
                     cache.put(cloudId, it)
                 }
             }

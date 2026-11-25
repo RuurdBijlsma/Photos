@@ -28,16 +28,13 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -62,6 +59,7 @@ import dev.ruurd.photos.features.main.components.PullToRefreshState
 import dev.ruurd.photos.features.main.components.pullToRefresh
 import dev.ruurd.photos.features.timeline.components.TimelineScrubber
 import dev.ruurd.photos.features.timeline.components.TimelineTile
+import dev.ruurd.photos.features.timeline.components.TimelineTopPinEffect
 import dev.ruurd.photos.ui.theme.MontserratFontFamily
 import dev.ruurd.photos.ui.theme.PhotosRadii
 
@@ -100,41 +98,10 @@ fun TimelineScreen(
         onDispose { pullToRefreshState?.reset() }
     }
 
-    // Keep the viewport pinned to index 0 when newer months are prepended while already at the top;
-    // otherwise LazyColumn key-anchoring shifts the scroll position down to the previous top header.
-    val currentLayout by rememberUpdatedState(layout)
-    LaunchedEffect(listState) {
-        var lastTopRowId: String? = null
-        var atTopBeforeUpdate = true
-        var pinnedTopRowId: String? = null
-
-        snapshotFlow {
-            Triple(
-                currentLayout,
-                listState.firstVisibleItemIndex,
-                listState.firstVisibleItemScrollOffset,
-            )
-        }.collect { (activeLayout, firstIndex, firstOffset) ->
-            val topRowId = activeLayout.rows.firstOrNull()?.id
-            val topChanged = topRowId != null && lastTopRowId != null && topRowId != lastTopRowId
-            if (topChanged) {
-                pinnedTopRowId = if (atTopBeforeUpdate) topRowId else null
-            }
-            if (listState.isScrollInProgress) {
-                pinnedTopRowId = null
-            }
-            if (pinnedTopRowId != null && pinnedTopRowId == topRowId &&
-                !listState.isScrollInProgress && (firstIndex != 0 || firstOffset != 0)
-            ) {
-                listState.scrollToItem(0)
-                pinnedTopRowId = null
-                atTopBeforeUpdate = true
-            } else {
-                atTopBeforeUpdate = firstIndex == 0 && firstOffset == 0
-            }
-            lastTopRowId = topRowId
-        }
-    }
+    TimelineTopPinEffect(
+        listState = listState,
+        layout = layout,
+    )
 
     val isEmptyState = !uiState.isLoading && layout.isEmpty && !isSyncing
 

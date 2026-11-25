@@ -107,11 +107,11 @@ class ScanLocalMediaUseCase(
             // to CLOUD_ONLY before Pass 1 links the replacement MediaStore URI.
             val removed =
                 reconcileRemovalsFromFiles(access.isFull(images = true), images, initialImageRows) +
-                        reconcileRemovalsFromFiles(access.isFull(images = false), videos, initialVideoRows)
+                    reconcileRemovalsFromFiles(access.isFull(images = false), videos, initialVideoRows)
 
             val currentLocalRows = if (removed > 0) {
                 mediaRepository.getLocalRows(isVideo = false) +
-                        mediaRepository.getLocalRows(isVideo = true)
+                    mediaRepository.getLocalRows(isVideo = true)
             } else {
                 initialImageRows + initialVideoRows
             }
@@ -433,10 +433,10 @@ class ScanLocalMediaUseCase(
         val generation: Long,
     ) {
         fun matchesContext(other: ScanWatermark): Boolean = dbVersion == other.dbVersion &&
-                mediaStoreVersion == other.mediaStoreVersion &&
-                imageAccess == other.imageAccess &&
-                videoAccess == other.videoAccess &&
-                zoneId == other.zoneId
+            mediaStoreVersion == other.mediaStoreVersion &&
+            imageAccess == other.imageAccess &&
+            videoAccess == other.videoAccess &&
+            zoneId == other.zoneId
 
         fun serialize(): String = "$dbVersion|$mediaStoreVersion|$imageAccess|$videoAccess|$zoneId|$generation"
 

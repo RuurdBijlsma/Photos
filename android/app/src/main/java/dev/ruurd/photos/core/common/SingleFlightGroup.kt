@@ -17,8 +17,8 @@ import java.util.concurrent.atomic.AtomicLong
  * the same [Deferred] instead of starting a second one. The load is cancelled once its last waiter
  * leaves or [clear] is called.
  *
- * [generation] is captured before a load starts so a producer can discard a result that [clear]
- * invalidated in the meantime.
+ * `isCurrent` returns `false` if [clear] ran since the load was started, allowing the producer to
+ * discard stale results before writing them to a cache.
  */
 class SingleFlightGroup<K : Any, V>(
     private val scope: CoroutineScope,
@@ -27,17 +27,21 @@ class SingleFlightGroup<K : Any, V>(
     private val generationCounter = AtomicLong(0L)
     private val inFlight = ConcurrentHashMap<K, Entry<V>>()
 
-    val generation: Long get() = generationCounter.get()
-
     /** Result of the shared load, or `null` when it failed or was cancelled. */
-    suspend fun load(key: K, producer: suspend (K) -> V): V? {
+    suspend fun load(
+        key: K,
+        producer: suspend (key: K, isCurrent: () -> Boolean) -> V,
+    ): V? {
         val expectedGeneration = generationCounter.get()
+        val isCurrent = { generationCounter.get() == expectedGeneration }
         val entry = inFlight.compute(key) { id, existing ->
             val active = existing?.takeIf {
                 it.generation == expectedGeneration && !it.job.isCancelled && !it.job.isCompleted
             } ?: Entry(
                 generation = expectedGeneration,
-                job = scope.async(dispatcher, start = CoroutineStart.LAZY) { producer(id) },
+                job = scope.async(dispatcher, start = CoroutineStart.LAZY) {
+                    producer(id, isCurrent)
+                },
             ).also { created ->
                 created.job.invokeOnCompletion { inFlight.remove(id, created) }
             }

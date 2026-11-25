@@ -46,6 +46,7 @@ class LibrarySyncCoordinator(
 
     private var hasRefreshedProfile = false
     private var isFirstLaunchScan = true
+    private var profileRefreshJob: Job? = null
     private var syncJob: Job? = null
     private var scanJob: Job? = null
     private var pendingScanAccess: MediaAccessState? = null
@@ -65,13 +66,7 @@ class LibrarySyncCoordinator(
                     }
 
                     if (isOnline) {
-                        if (!hasRefreshedProfile) {
-                            scope.launch {
-                                if (authRepository.fetchCurrentUser().isSuccess) {
-                                    hasRefreshedProfile = true
-                                }
-                            }
-                        }
+                        refreshProfileIfNeeded()
                         syncNow(forceFullSnapshot = false)
                     } else {
                         bootstrapState.onSyncSettled()
@@ -80,11 +75,30 @@ class LibrarySyncCoordinator(
         }
     }
 
+    private fun refreshProfileIfNeeded() {
+        if (hasRefreshedProfile || profileRefreshJob?.isActive == true) return
+        lateinit var launchedJob: Job
+        launchedJob = scope.launch {
+            try {
+                if (authRepository.fetchCurrentUser().isSuccess) {
+                    hasRefreshedProfile = true
+                }
+            } finally {
+                if (profileRefreshJob === launchedJob) {
+                    profileRefreshJob = null
+                }
+            }
+        }
+        profileRefreshJob = launchedJob
+    }
+
     private fun resetForSignOut() {
         // Reset per-session state so a later login does not inherit it.
         hasRefreshedProfile = false
         isFirstLaunchScan = true
         pendingScanAccess = null
+        profileRefreshJob?.cancel()
+        profileRefreshJob = null
         syncJob?.cancel()
         syncJob = null
         scanJob?.cancel()

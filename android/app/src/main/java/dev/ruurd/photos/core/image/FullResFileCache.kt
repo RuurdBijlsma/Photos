@@ -69,8 +69,7 @@ class FullResFileCache internal constructor(
             cached.setLastModified(System.currentTimeMillis())
             return cached
         }
-        val generation = downloads.generation
-        return downloads.load(cloudId) { id -> download(id, fileName, generation) }
+        return downloads.load(cloudId) { id, isCurrent -> download(id, fileName, isCurrent) }
     }
 
     override suspend fun evict(cloudId: String) {
@@ -96,7 +95,7 @@ class FullResFileCache internal constructor(
     private suspend fun download(
         cloudId: String,
         fileName: String?,
-        expectedGeneration: Long,
+        isCurrent: () -> Boolean,
     ): File? = withContext(dispatchers.io) {
         val job = currentCoroutineContext().job
         val targetDirectory = directoryFor(cloudId)
@@ -126,7 +125,7 @@ class FullResFileCache internal constructor(
 
                 synchronized(trimLock) {
                     job.ensureActive()
-                    if (downloads.generation != expectedGeneration ||
+                    if (!isCurrent() ||
                         !partFile.exists() ||
                         partFile.length() <= 0L
                     ) {

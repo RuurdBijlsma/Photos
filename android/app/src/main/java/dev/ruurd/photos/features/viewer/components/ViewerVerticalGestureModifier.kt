@@ -42,9 +42,9 @@ internal fun Modifier.viewerVerticalGestures(
         val drag = transition.drag
         val panelAlreadyActive = panel.isOpenBeyondThreshold
         val isQuickZoomCandidate = !panelAlreadyActive &&
-                lastTapUpTimeMs > 0L &&
-                (down.uptimeMillis - lastTapUpTimeMs) in 0L..metrics.doubleTapTimeoutMs &&
-                (down.position - lastTapUpPosition).getDistance() <= metrics.doubleTapSlopPx
+            lastTapUpTimeMs > 0L &&
+            (down.uptimeMillis - lastTapUpTimeMs) in 0L..metrics.doubleTapTimeoutMs &&
+            (down.position - lastTapUpPosition).getDistance() <= metrics.doubleTapSlopPx
         if (isQuickZoomCandidate) {
             // Consume the tap memory and yield the entire second press + drag to Telephoto.
             lastTapUpTimeMs = 0L
@@ -123,7 +123,7 @@ internal fun Modifier.viewerVerticalGestures(
                 when (gestureMode) {
                     VerticalGestureMode.NONE -> {
                         val isVerticalDrag = abs(totalDy) > metrics.touchSlopPx &&
-                                abs(totalDy) > abs(totalDx) * VERTICAL_AXIS_BIAS
+                            abs(totalDy) > abs(totalDx) * VERTICAL_AXIS_BIAS
 
                         if (isVerticalDrag) {
                             lastTapUpTimeMs = 0L
@@ -183,9 +183,9 @@ internal fun Modifier.viewerVerticalGestures(
                 VerticalGestureMode.DISMISS_VIEWER -> if (!transition.isClosing) {
                     val releaseY = drag.rawDragOffset.y.coerceAtLeast(0f)
                     val shouldDismiss = !transition.isZoomed && (
-                            releaseY > metrics.dismissThresholdPx ||
-                                    (velocityY > 1000f && releaseY > metrics.fastFlickMinDistancePx)
-                            )
+                        releaseY > metrics.dismissThresholdPx ||
+                            (velocityY > 1000f && releaseY > metrics.fastFlickMinDistancePx)
+                        )
 
                     if (shouldDismiss) {
                         val releaseScale = (1f - (releaseY / 1400f)).coerceIn(0.55f, 1f)

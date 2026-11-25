@@ -127,8 +127,8 @@ fun ZoomablePhotoPage(
     }
 
     val fullResReady = showDualOverlay &&
-            hasDisplayedFullResInFullQuality &&
-            !isPreviewZoomed
+        hasDisplayedFullResInFullQuality &&
+        !isPreviewZoomed
 
     val activeZoomableState = if (fullResReady && fullResZoomableState != null) {
         fullResZoomableState
@@ -253,7 +253,7 @@ fun ZoomablePhotoPage(
     }
 
     val hasSubSamplingLayer = (showDualOverlay && fullResImageState?.isImageDisplayed == true) ||
-            (upgradedInPreview && fullResData != null)
+        (upgradedInPreview && fullResData != null)
     val currentOnHdrStateChanged by rememberUpdatedState(onHdrStateChanged)
     val currentOnSyncWindowColorMode by rememberUpdatedState(onSyncWindowColorMode)
     val currentOnPageDisposed by rememberUpdatedState(onPageDisposed)

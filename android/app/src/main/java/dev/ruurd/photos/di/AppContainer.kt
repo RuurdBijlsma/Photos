@@ -331,7 +331,7 @@ class DefaultAppContainer(private val context: Context) : AppContainer {
         // Reached only after `SessionManager` loaded its persisted state, since that gates auth.
         BootstrapState(
             needsBootstrap = sessionManager.latestSyncTimestamp.value <= 0L &&
-                    !sessionManager.hasScanSignature.value,
+                !sessionManager.hasScanSignature.value,
         )
     }
 

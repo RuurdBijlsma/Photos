@@ -105,7 +105,6 @@ class ViewerHdrCoordinator(
         if (!isViewerActive) return
         when {
             visiblePreviewHdrPages.isNotEmpty() -> systemBars.setHdrColorMode(true)
-
             visibleSubSamplingPages.isEmpty() -> systemBars.setHdrColorMode(false)
 
             // When a visible page has a SubSamplingImage mounted and no visible preview carries a

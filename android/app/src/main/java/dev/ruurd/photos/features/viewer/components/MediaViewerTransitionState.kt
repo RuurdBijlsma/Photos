@@ -61,8 +61,8 @@ internal class MediaViewerTransitionState(
     )
     private val hero = ViewerHeroTransition(
         initiallyHasOpenSource = initialOpenSourceRect != null &&
-                initialSize.width > 0 &&
-                initialSize.height > 0,
+            initialSize.width > 0 &&
+            initialSize.height > 0,
     )
     internal val panel = ViewerInfoPanelState(scope, geometry, metrics)
     internal val drag = ViewerDragState(scope)

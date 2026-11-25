@@ -246,7 +246,7 @@ class MediaViewerViewModel(
         val item = state.items.firstOrNull { it.id == state.activeMediaId } ?: return
         val cloudId = item.cloudId ?: return
         val hasFreshDetails = state.detailsById[item.id]?.cloudId == cloudId &&
-                item.id !in state.failedDetailsIds
+            item.id !in state.failedDetailsIds
         if (!hasFreshDetails && currentItemInfoJob?.isActive != true) {
             loadActiveItemInfo(item)
         }

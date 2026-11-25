@@ -40,12 +40,12 @@ object PassOneDeduplication {
         sortTimestamp: Long,
     ): MediaEntity? = candidates.firstOrNull { candidate ->
         candidate.id !in excludeIds &&
-                isMatch(
-                    cloudRatio = ratio,
-                    cloudSortTimestamp = sortTimestamp,
-                    localRatio = candidate.ratio,
-                    localTimestampMs = candidate.sortTimestamp,
-                )
+            isMatch(
+                cloudRatio = ratio,
+                cloudSortTimestamp = sortTimestamp,
+                localRatio = candidate.ratio,
+                localTimestampMs = candidate.sortTimestamp,
+            )
     }
 
     /**

@@ -53,10 +53,19 @@ class MediaRepositoryImpl(
     override suspend fun findBySizesAndStatus(
         sizeBytes: List<Long>,
         syncStatus: SyncStatus,
-    ): List<MediaEntity> = if (sizeBytes.isEmpty()) {
-        emptyList()
-    } else {
-        sizeBytes.chunked(BATCH_SIZE).flatMap { chunk -> mediaDao.findBySizesAndStatus(chunk, syncStatus) }
+    ): List<MediaEntity> {
+        if (sizeBytes.isEmpty()) return emptyList()
+        val distinctSizes = sizeBytes.distinct()
+        if (distinctSizes.size <= BATCH_SIZE) {
+            return mediaDao.findBySizesAndStatus(distinctSizes, syncStatus)
+        }
+        return distinctSizes
+            .chunked(BATCH_SIZE)
+            .flatMap { chunk -> mediaDao.findBySizesAndStatus(chunk, syncStatus) }
+            .sortedWith(
+                compareByDescending<MediaEntity> { it.isVisibleInTimeline }
+                    .thenBy { it.id },
+            )
     }
 
     override suspend fun upsert(media: MediaEntity) = mediaDao.upsert(media)
