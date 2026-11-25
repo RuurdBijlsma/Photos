@@ -234,7 +234,7 @@ class MediaViewerViewModel(
             if (currentItemInfoJob?.isActive != true) {
                 loadActiveItemInfo(item)
             }
-            requestFullRes(item)
+            requestCloudFullRes(item)
             prefetchNeighbors(mediaId)
             trimWindowCaches(mediaId)
         }
@@ -250,9 +250,15 @@ class MediaViewerViewModel(
         if (!hasFreshDetails && currentItemInfoJob?.isActive != true) {
             loadActiveItemInfo(item)
         }
-        if (item.localContentUri == null && !item.isVideo && !state.fullResFiles.containsKey(item.id)) {
-            requestFullRes(item)
-        }
+        requestCloudFullRes(item)
+    }
+
+    /**
+     * Background prefetch: cloud-only photos only. Synced items play from their local URI; if that
+     * fails, [ZoomablePhotoPage] calls [requestFullRes] directly.
+     */
+    private fun requestCloudFullRes(item: TimelineMediaProjection) {
+        if (item.localContentUri == null) requestFullRes(item)
     }
 
     /** Loads a cloud-only (or fallback) original, e.g. after settle or when pinching in early. */
