@@ -1,7 +1,6 @@
 package dev.ruurd.photos.features.viewer.components
 
 import android.content.Context
-import android.net.Uri
 import androidx.annotation.OptIn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -14,6 +13,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
+import androidx.core.net.toUri
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -43,8 +43,9 @@ import java.io.FileNotFoundException
  * streaming, quality-switch frame preservation, synchronous page-change stop, and isolated
  * high-frequency position state so 30Hz seekbar polling never recomposes the pager or video surface.
  */
+@OptIn(UnstableApi::class)
 @Stable
-class ViewerVideoController @OptIn(UnstableApi::class) constructor(
+class ViewerVideoController(
     context: Context,
     okHttpClient: OkHttpClient,
     private val isOnlineProvider: () -> Boolean,
@@ -132,6 +133,7 @@ class ViewerVideoController @OptIn(UnstableApi::class) constructor(
 
             when (source) {
                 is ResolvedVideoSource.Local -> {
+                    clearSourceForRetry()
                     if (hasLocalAccessOrMissingCause(error) ||
                         error.errorCode in CODEC_OR_PARSING_ERROR_CODES
                     ) {
@@ -161,6 +163,7 @@ class ViewerVideoController @OptIn(UnstableApi::class) constructor(
                             hasThumbnails = activeHasThumbnails,
                             isOnline = isOnlineProvider(),
                         )
+                        clearSourceForRetry()
                         onCloudVideoError(mediaId, reason)
                     }
                 }
@@ -225,8 +228,8 @@ class ViewerVideoController @OptIn(UnstableApi::class) constructor(
         }
 
         val uri = when (source) {
-            is ResolvedVideoSource.Local -> Uri.parse(source.uri)
-            is ResolvedVideoSource.Cloud -> Uri.parse(source.url)
+            is ResolvedVideoSource.Local -> source.uri.toUri()
+            is ResolvedVideoSource.Cloud -> source.url.toUri()
         }
         val sourceKey = "$mediaId|$uri"
         activeHasThumbnails = hasThumbnails
@@ -293,6 +296,17 @@ class ViewerVideoController @OptIn(UnstableApi::class) constructor(
         player.clearMediaItems()
     }
 
+    private fun clearSourceForRetry() {
+        activeSourceKey = null
+        activeSource = null
+        isQualitySwitch = false
+        hasRenderedFirstFrame = false
+        isPlaying = false
+        isBuffering = false
+        player.stop()
+        player.clearMediaItems()
+    }
+
     fun pause() {
         if (player.playWhenReady || player.isPlaying) {
             player.pause()
@@ -346,7 +360,7 @@ class ViewerVideoController @OptIn(UnstableApi::class) constructor(
         player.release()
     }
 
-    private fun findInvalidResponseCode(error: PlaybackException): Int? = generateSequence<Throwable?>(error.cause) { it.cause }
+    private fun findInvalidResponseCode(error: PlaybackException): Int? = generateSequence(error.cause) { it.cause }
         .take(MAX_CAUSE_DEPTH)
         .filterIsInstance<HttpDataSource.InvalidResponseCodeException>()
         .firstOrNull()
@@ -398,7 +412,7 @@ class ViewerVideoController @OptIn(UnstableApi::class) constructor(
             PlaybackException.ERROR_CODE_AUDIO_TRACK_OFFLOAD_INIT_FAILED,
         )
 
-        internal fun hasLocalAccessOrMissingCause(error: PlaybackException): Boolean = generateSequence<Throwable?>(error.cause) { it.cause }
+        internal fun hasLocalAccessOrMissingCause(error: PlaybackException): Boolean = generateSequence(error.cause) { it.cause }
             .take(MAX_CAUSE_DEPTH)
             .any { it is SecurityException || it is FileNotFoundException }
     }

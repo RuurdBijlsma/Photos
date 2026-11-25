@@ -2,7 +2,6 @@ package dev.ruurd.photos.features.viewer.components
 
 import androidx.annotation.OptIn
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -91,8 +90,8 @@ fun VideoPlayerPage(
 
     var showBufferingSpinner by remember(item.id) { mutableStateOf(false) }
     val isBufferingActive = canAttachPlayer &&
-        videoController.activeMediaId == item.id &&
-        videoController.isBuffering
+            videoController.activeMediaId == item.id &&
+            videoController.isBuffering
     LaunchedEffect(isBufferingActive, item.id) {
         if (isBufferingActive) {
             delay(BUFFERING_SPINNER_DELAY_MS)
@@ -130,7 +129,7 @@ fun VideoPlayerPage(
 
             // Guard against Video A's last frame flashing before Video B's first frame renders.
             val awaitingFirstFrame = videoController.activeMediaId != item.id ||
-                (!videoController.hasRenderedFirstFrame && !videoController.isQualitySwitch)
+                    (!videoController.hasRenderedFirstFrame && !videoController.isQualitySwitch)
             if (awaitingFirstFrame) {
                 VideoThumbnailShutter(
                     item = item,

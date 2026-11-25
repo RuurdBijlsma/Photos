@@ -54,7 +54,6 @@ import dev.ruurd.photos.features.timeline.TimelineViewModel
 import dev.ruurd.photos.features.viewer.MediaViewerScreen
 import dev.ruurd.photos.features.viewer.MediaViewerViewModel
 import kotlinx.coroutines.launch
-import okhttp3.OkHttpClient
 
 /**
  * The app's composition root: auth gate, per-user ViewModel stores, the navigation shell and the
@@ -151,8 +150,8 @@ private fun AuthenticatedSession(
             val clearBottom = layoutInfo.viewportEndOffset - layoutInfo.afterContentPadding
             val itemInfo = layoutInfo.visibleItemsInfo.firstOrNull { it.index == rowIndex }
             val isFullyInClearViewport = itemInfo != null &&
-                itemInfo.offset >= clearTop &&
-                itemInfo.offset + itemInfo.size <= clearBottom
+                    itemInfo.offset >= clearTop &&
+                    itemInfo.offset + itemInfo.size <= clearBottom
             if (!isFullyInClearViewport) {
                 coroutineScope.launch {
                     timelineListState.scrollToItem(rowIndex)

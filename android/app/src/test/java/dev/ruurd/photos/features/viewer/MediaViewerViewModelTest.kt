@@ -1,4 +1,3 @@
-
 package dev.ruurd.photos.features.viewer
 
 import android.content.Intent
@@ -12,6 +11,8 @@ import dev.ruurd.photos.data.datasource.local.LocalMediaInfoSource
 import dev.ruurd.photos.data.repository.TimelineProjectionStore
 import dev.ruurd.photos.domain.model.LocalMediaInfo
 import dev.ruurd.photos.domain.model.MediaDetails
+import dev.ruurd.photos.domain.model.VideoQuality
+import dev.ruurd.photos.domain.model.VideoUnavailableReason
 import dev.ruurd.photos.domain.repository.MediaDetailsRepository
 import dev.ruurd.photos.testing.FakeMediaRepository
 import dev.ruurd.photos.testing.TestAppDispatchers
@@ -412,6 +413,134 @@ class MediaViewerViewModelTest {
         // local_2 has no server details (offline/missing) -> falls back to local EXIF/MediaStore.
         assertEquals(listOf("content://media/external/images/media/2"), localSource.requestedUris)
         assertEquals("local_fallback.jpg", viewModel.uiState.value.localInfoById["local_2"]?.fileName)
+
+        viewModel.viewModelScope.cancel()
+        store.stop()
+    }
+
+    @Test
+    fun `opening directly on video hides chrome initially and supports video preferences`() = testScope.runTest {
+        val repo = FakeMediaRepository()
+        repo.upsert(
+            MediaEntity(
+                id = "v1",
+                cloudId = "c1",
+                isVideo = true,
+                durationMs = 15_000,
+                hasThumbnails = true,
+                sortTimestamp = 3000L,
+                yearMonth = 202611,
+            ),
+        )
+        val store = TimelineProjectionStore(
+            mediaRepository = repo,
+            scope = backgroundScope,
+            dispatchers = dispatchers,
+        )
+        runCurrent()
+
+        val viewModel = MediaViewerViewModel(
+            initialMediaId = "v1",
+            timelineProjectionStore = store,
+            mediaRepository = repo,
+            mediaDetailsRepository = detailsRepository,
+            fullResFileCache = FakeFullResFileStore(),
+            localMediaInfoReader = FakeLocalMediaInfoSource(),
+            mediaFileSharer = FakeMediaFileSharer(),
+            dispatchers = dispatchers,
+            videoPreferencesStore = InMemoryVideoPreferencesSource(),
+        )
+        runCurrent()
+
+        assertFalse(viewModel.uiState.value.isChromeVisible)
+
+        viewModel.toggleVideoMute()
+        viewModel.toggleVideoLoop()
+        viewModel.setVideoPlaybackSpeed(1.5f)
+        runCurrent()
+
+        val prefs = viewModel.uiState.value.videoPreferences
+        assertTrue(prefs.isMuted)
+        assertTrue(prefs.isLoopEnabled)
+        assertEquals(1.5f, prefs.playbackSpeed, 0.001f)
+
+        viewModel.viewModelScope.cancel()
+        store.stop()
+    }
+
+    @Test
+    fun `handles local fallback, 480p fallback, quality selection, and error retry`() = testScope.runTest {
+        val repo = FakeMediaRepository()
+        repo.upsertAll(
+            listOf(
+                MediaEntity(
+                    id = "v_synced",
+                    cloudId = "c1",
+                    localContentUri = "content://media/external/video/1",
+                    isVideo = true,
+                    hasThumbnails = true,
+                    syncStatus = SyncStatus.SYNCED,
+                    sortTimestamp = 3000L,
+                    yearMonth = 202611,
+                ),
+                MediaEntity(
+                    id = "v_local",
+                    cloudId = null,
+                    localContentUri = "content://media/external/video/2",
+                    isVideo = true,
+                    syncStatus = SyncStatus.LOCAL_ONLY,
+                    sortTimestamp = 2000L,
+                    yearMonth = 202611,
+                ),
+            ),
+        )
+        val store = TimelineProjectionStore(
+            mediaRepository = repo,
+            scope = backgroundScope,
+            dispatchers = dispatchers,
+        )
+        runCurrent()
+
+        val viewModel = MediaViewerViewModel(
+            initialMediaId = "v_synced",
+            timelineProjectionStore = store,
+            mediaRepository = repo,
+            mediaDetailsRepository = detailsRepository,
+            fullResFileCache = FakeFullResFileStore(),
+            localMediaInfoReader = FakeLocalMediaInfoSource(),
+            mediaFileSharer = FakeMediaFileSharer(),
+            dispatchers = dispatchers,
+            videoPreferencesStore = InMemoryVideoPreferencesSource(),
+        )
+        runCurrent()
+
+        // Synced video falls back to cloud when local URI fails; local-only sets an error.
+        viewModel.onLocalVideoFailed("v_synced")
+        viewModel.onLocalVideoFailed("v_local")
+        assertTrue("v_synced" in viewModel.uiState.value.localVideoFallbackIds)
+        assertNull(viewModel.uiState.value.videoErrorById["v_synced"])
+        assertEquals(
+            VideoUnavailableReason.PLAYBACK_FAILED,
+            viewModel.uiState.value.videoErrorById["v_local"],
+        )
+
+        // Cloud original failure triggers transient 480p override without changing saved pref.
+        viewModel.onCloudVideoFallbackTo480p("v_synced")
+        assertEquals(VideoQuality.P480, viewModel.uiState.value.transientVideoQualityById["v_synced"])
+        assertTrue("v_synced" in viewModel.uiState.value.videoUnavailableOriginalIds)
+        assertEquals(VideoQuality.AUTO, viewModel.uiState.value.videoPreferences.preferredQuality)
+
+        // Cloud error and retry clear videoErrorById.
+        viewModel.onCloudVideoError("v_synced", VideoUnavailableReason.OFFLINE)
+        assertEquals(VideoUnavailableReason.OFFLINE, viewModel.uiState.value.videoErrorById["v_synced"])
+        viewModel.retryActiveItemIfNeeded()
+        assertNull(viewModel.uiState.value.videoErrorById["v_synced"])
+
+        // Selecting a quality persists preference and clears transient override.
+        viewModel.selectVideoQuality("v_synced", VideoQuality.P144)
+        runCurrent()
+        assertNull(viewModel.uiState.value.transientVideoQualityById["v_synced"])
+        assertEquals(VideoQuality.P144, viewModel.uiState.value.videoPreferences.preferredQuality)
 
         viewModel.viewModelScope.cancel()
         store.stop()

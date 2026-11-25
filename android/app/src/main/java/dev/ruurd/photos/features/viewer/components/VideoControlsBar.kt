@@ -2,7 +2,6 @@ package dev.ruurd.photos.features.viewer.components
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -16,7 +15,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.VolumeOff
@@ -364,7 +362,8 @@ private fun VideoSeekBar(
         // Vertical pill thumb
         val thumbWidthPx = (if (isScrubbing) 5.dp else 4.dp).toPx()
         val thumbHeightPx = (if (isScrubbing) 28.dp else 24.dp).toPx()
-        val thumbCenterX = playedWidth.coerceIn(thumbWidthPx / 2f, (size.width - thumbWidthPx / 2f).coerceAtLeast(thumbWidthPx / 2f))
+        val maxThumbCenterX = (size.width - thumbWidthPx / 2f).coerceAtLeast(thumbWidthPx / 2f)
+        val thumbCenterX = playedWidth.coerceIn(thumbWidthPx / 2f, maxThumbCenterX)
         val thumbTop = (size.height - thumbHeightPx) / 2f
         drawRoundRect(
             color = Color.White,
