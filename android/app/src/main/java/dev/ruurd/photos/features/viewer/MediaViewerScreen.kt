@@ -36,22 +36,28 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.IntSize
 import dev.ruurd.photos.core.image.TileCornerRadii
+import dev.ruurd.photos.domain.model.ResolvedVideoSource
+import dev.ruurd.photos.domain.model.VideoPlaybackPolicy
 import dev.ruurd.photos.features.viewer.components.HeroImageOverlay
 import dev.ruurd.photos.features.viewer.components.MediaInfoPanel
-import dev.ruurd.photos.features.viewer.components.VideoPlayBadge
+import dev.ruurd.photos.features.viewer.components.VideoPlayerPage
 import dev.ruurd.photos.features.viewer.components.ViewerChromeOverlay
 import dev.ruurd.photos.features.viewer.components.ViewerHdrCoordinator
 import dev.ruurd.photos.features.viewer.components.ViewerPreSyncScrollEffect
 import dev.ruurd.photos.features.viewer.components.ViewerPrefetchEffect
 import dev.ruurd.photos.features.viewer.components.ViewerSystemBarsEffect
+import dev.ruurd.photos.features.viewer.components.ViewerVideoChromeState
 import dev.ruurd.photos.features.viewer.components.ZoomablePhotoPage
 import dev.ruurd.photos.features.viewer.components.rememberMediaViewerTransitionState
 import dev.ruurd.photos.features.viewer.components.rememberViewerSystemBars
+import dev.ruurd.photos.features.viewer.components.rememberViewerVideoController
 import dev.ruurd.photos.features.viewer.components.viewerVerticalGestures
+import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.launch
+import okhttp3.OkHttpClient
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -63,6 +69,7 @@ import kotlin.math.roundToInt
 @Composable
 fun MediaViewerScreen(
     viewModel: MediaViewerViewModel,
+    okHttpClient: OkHttpClient,
     baseUrl: String,
     openSourceRect: Rect?,
     containerSize: IntSize,
@@ -110,6 +117,16 @@ fun MediaViewerScreen(
     var activePageZoomFraction by remember { mutableFloatStateOf(0f) }
     val isZoomed = activePageZoomFraction > 0.01f
 
+    val videoController = rememberViewerVideoController(
+        okHttpClient = okHttpClient,
+        isOnline = isOnline,
+        preferences = uiState.videoPreferences,
+        isChromeVisible = uiState.isChromeVisible,
+        onLocalVideoFailed = viewModel::onLocalVideoFailed,
+        onCloudFallbackTo480p = viewModel::onCloudVideoFallbackTo480p,
+        onCloudVideoError = viewModel::onCloudVideoError,
+    )
+
     val transition = rememberMediaViewerTransitionState(
         pagerState = pagerState,
         openSourceRect = openSourceRect,
@@ -121,6 +138,7 @@ fun MediaViewerScreen(
         onHiddenTimelineMediaChanged = onHiddenTimelineMediaChanged,
         onPreSyncScroll = onPreSyncScroll,
         onDismissFinished = onDismissFinished,
+        onVerticalDragStart = videoController::pause,
         systemBars = systemBars,
     )
 
@@ -165,6 +183,9 @@ fun MediaViewerScreen(
     }
 
     LaunchedEffect(transition.closingState) {
+        if (transition.closingState != null) {
+            videoController.stopAndClear()
+        }
         transition.playClosing()
     }
 
@@ -203,13 +224,17 @@ fun MediaViewerScreen(
             }
     }
 
-    // Synchronize page changes with ViewModel activeMediaId
+    // Synchronize page changes with ViewModel activeMediaId and stop video playback synchronously
     LaunchedEffect(pagerState) {
         snapshotFlow { pagerState.currentPage }.collect { page ->
             activePageZoomFraction = 0f
             val latestItems = currentItems
             if (page in latestItems.indices) {
-                viewModel.onPageChanged(latestItems[page].id)
+                val nextId = latestItems[page].id
+                if (videoController.activeMediaId != null && videoController.activeMediaId != nextId) {
+                    videoController.stopAndClear()
+                }
+                viewModel.onPageChanged(nextId)
             }
         }
     }
@@ -338,48 +363,99 @@ fun MediaViewerScreen(
                                             translationY = -transition.pagePhotoTravelPx(item)
                                         },
                                 ) {
-                                    ZoomablePhotoPage(
-                                        item = item,
-                                        baseUrl = baseUrl,
-                                        isActivePage = isCurrentPage,
-                                        isSettledPage = isSettledPage,
-                                        isOffscreen = isOffscreen,
-                                        isOpeningTransition = transition.isOpeningHero,
-                                        onTap = {
-                                            if (!transition.isOpeningHero && !transition.isClosing) {
-                                                if (transition.isInfoPanelActive) {
-                                                    transition.requestCloseInfoPanel()
-                                                } else {
-                                                    viewModel.toggleChrome()
-                                                }
-                                            }
-                                        },
-                                        fullResFile = uiState.fullResFiles[item.id],
-                                        isInfoPanelRequested = isCurrentPage &&
-                                            transition.isInfoPanelRequested,
-                                        onFullResRequested = { viewModel.requestFullRes(item) },
-                                        onZoomFractionChanged = { fraction ->
-                                            if (page == pagerState.currentPage) {
-                                                activePageZoomFraction = fraction
-                                            }
-                                        },
-                                        onHdrStateChanged = { hasPreviewGainmap, hasSubSamplingLayer ->
-                                            hdrCoordinator.updatePage(
-                                                mediaId = item.id,
-                                                isVisible = !isOffscreen,
-                                                previewHasGainmap = hasPreviewGainmap,
-                                                hasSubSamplingLayer = hasSubSamplingLayer,
-                                            )
-                                        },
-                                        onSyncWindowColorMode = hdrCoordinator::syncWindowColorMode,
-                                        onPageDisposed = { hdrCoordinator.removePage(item.id) },
-                                        modifier = Modifier.fillMaxSize(),
-                                    )
-                                    // Phase 2C swaps this slot for a real VideoPlayerPage.
                                     if (item.isVideo) {
-                                        VideoPlayBadge(
-                                            durationMs = item.durationMs,
-                                            modifier = Modifier.align(Alignment.Center),
+                                        val isUnmetered = remember(
+                                            item.id,
+                                            uiState.videoPreferences.preferredQuality,
+                                        ) {
+                                            viewModel.isUnmeteredWithoutDataSaver()
+                                        }
+                                        val transientQuality = uiState.transientVideoQualityById[item.id]
+                                        val localFailed = item.id in uiState.localVideoFallbackIds
+                                        val isOriginalMissing = itemDetails?.isMissing == true ||
+                                            item.id in uiState.videoUnavailableOriginalIds
+                                        val resolvedSource = remember(
+                                            item.localContentUri,
+                                            localFailed,
+                                            item.cloudId,
+                                            baseUrl,
+                                            item.hasThumbnails,
+                                            isOriginalMissing,
+                                            uiState.videoPreferences.preferredQuality,
+                                            transientQuality,
+                                            isUnmetered,
+                                        ) {
+                                            VideoPlaybackPolicy.resolveSource(
+                                                localContentUri = item.localContentUri,
+                                                localFailed = localFailed,
+                                                cloudId = item.cloudId,
+                                                baseUrl = baseUrl,
+                                                hasThumbnails = item.hasThumbnails,
+                                                isOriginalMissing = isOriginalMissing,
+                                                savedQuality = uiState.videoPreferences.preferredQuality,
+                                                transientQualityOverride = transientQuality,
+                                                isUnmeteredWithoutDataSaver = isUnmetered,
+                                            )
+                                        }
+                                        VideoPlayerPage(
+                                            item = item,
+                                            baseUrl = baseUrl,
+                                            isSettledPage = isSettledPage,
+                                            isClosing = transition.isClosing,
+                                            isInfoPanelActive = transition.isInfoPanelActive,
+                                            isDragging = transition.isDragging || transition.isDraggingInfo,
+                                            videoController = videoController,
+                                            resolvedSource = resolvedSource,
+                                            errorReason = uiState.videoErrorById[item.id],
+                                            onTap = {
+                                                if (!transition.isOpeningHero && !transition.isClosing) {
+                                                    if (transition.isInfoPanelActive) {
+                                                        transition.requestCloseInfoPanel()
+                                                    } else {
+                                                        viewModel.toggleChrome()
+                                                    }
+                                                }
+                                            },
+                                            onRetry = { viewModel.retryVideoPlayback(item.id) },
+                                            modifier = Modifier.fillMaxSize(),
+                                        )
+                                    } else {
+                                        ZoomablePhotoPage(
+                                            item = item,
+                                            baseUrl = baseUrl,
+                                            isActivePage = isCurrentPage,
+                                            isSettledPage = isSettledPage,
+                                            isOffscreen = isOffscreen,
+                                            isOpeningTransition = transition.isOpeningHero,
+                                            onTap = {
+                                                if (!transition.isOpeningHero && !transition.isClosing) {
+                                                    if (transition.isInfoPanelActive) {
+                                                        transition.requestCloseInfoPanel()
+                                                    } else {
+                                                        viewModel.toggleChrome()
+                                                    }
+                                                }
+                                            },
+                                            fullResFile = uiState.fullResFiles[item.id],
+                                            isInfoPanelRequested = isCurrentPage &&
+                                                transition.isInfoPanelRequested,
+                                            onFullResRequested = { viewModel.requestFullRes(item) },
+                                            onZoomFractionChanged = { fraction ->
+                                                if (page == pagerState.currentPage) {
+                                                    activePageZoomFraction = fraction
+                                                }
+                                            },
+                                            onHdrStateChanged = { hasPreviewGainmap, hasSubSamplingLayer ->
+                                                hdrCoordinator.updatePage(
+                                                    mediaId = item.id,
+                                                    isVisible = !isOffscreen,
+                                                    previewHasGainmap = hasPreviewGainmap,
+                                                    hasSubSamplingLayer = hasSubSamplingLayer,
+                                                )
+                                            },
+                                            onSyncWindowColorMode = hdrCoordinator::syncWindowColorMode,
+                                            onPageDisposed = { hdrCoordinator.removePage(item.id) },
+                                            modifier = Modifier.fillMaxSize(),
                                         )
                                     }
                                 }
@@ -464,6 +540,61 @@ fun MediaViewerScreen(
         if (chromeAlpha > 0.01f || backButtonAlpha > 0.01f) {
             val hasLocalOrExistingServer = activeItem != null &&
                 (activeItem.localContentUri != null || activeDetails?.isMissing != true)
+            val videoChromeState = if (activeItem?.isVideo == true) {
+                val activeSourceHeight = remember(activeDetails, activeLocalInfo) {
+                    val w = activeDetails?.width ?: activeLocalInfo?.width
+                    val h = activeDetails?.height ?: activeLocalInfo?.height
+                    if (w != null && h != null && w > 0 && h > 0) minOf(w, h) else null
+                }
+                val isOriginalMissing = activeDetails?.isMissing == true ||
+                    activeItem.id in uiState.videoUnavailableOriginalIds
+                val qualityOptions = remember(
+                    activeItem.hasThumbnails,
+                    isOriginalMissing,
+                    activeSourceHeight,
+                ) {
+                    VideoPlaybackPolicy.availableQualities(
+                        hasThumbnails = activeItem.hasThumbnails,
+                        isOriginalMissing = isOriginalMissing,
+                        sourceHeight = activeSourceHeight,
+                    ).toImmutableList()
+                }
+                val isPlayingActive = videoController.activeMediaId == activeItem.id && videoController.isPlaying
+                val activeDurationMs = if (videoController.activeMediaId == activeItem.id &&
+                    videoController.durationMs > 0L
+                ) {
+                    videoController.durationMs
+                } else {
+                    (activeItem.durationMs ?: 0).toLong()
+                }
+                val isCloudPlayback = activeItem.localContentUri == null ||
+                    activeItem.id in uiState.localVideoFallbackIds
+                val activeQuality = if (isCloudPlayback && videoController.activeMediaId == activeItem.id) {
+                    videoController.activeCloudQuality
+                } else {
+                    null
+                }
+                ViewerVideoChromeState(
+                    isPlaying = isPlayingActive,
+                    isMuted = uiState.videoPreferences.isMuted,
+                    isLoopEnabled = uiState.videoPreferences.isLoopEnabled,
+                    playbackSpeed = uiState.videoPreferences.playbackSpeed,
+                    durationMs = activeDurationMs,
+                    positionMsProvider = videoController.positionMsProvider,
+                    bufferedMsProvider = videoController.bufferedPositionMsProvider,
+                    activeQuality = activeQuality,
+                    qualityOptions = qualityOptions,
+                    showQualitySelector = isCloudPlayback && activeItem.hasThumbnails,
+                    onTogglePlayPause = videoController::togglePlayPause,
+                    onToggleMute = viewModel::toggleVideoMute,
+                    onSeekTo = videoController::seekTo,
+                    onSelectQuality = { quality -> viewModel.selectVideoQuality(activeItem.id, quality) },
+                    onSelectSpeed = viewModel::setVideoPlaybackSpeed,
+                    onToggleLoop = viewModel::toggleVideoLoop,
+                )
+            } else {
+                null
+            }
             ViewerChromeOverlay(
                 alpha = chromeAlpha,
                 backButtonAlpha = backButtonAlpha,
@@ -474,6 +605,7 @@ fun MediaViewerScreen(
                 currentLocalInfo = activeLocalInfo,
                 isShareEnabled = hasLocalOrExistingServer,
                 isCopyEnabled = hasLocalOrExistingServer,
+                videoChromeState = videoChromeState,
                 onBack = {
                     if (transition.isInfoPanelActive) {
                         transition.requestCloseInfoPanel()

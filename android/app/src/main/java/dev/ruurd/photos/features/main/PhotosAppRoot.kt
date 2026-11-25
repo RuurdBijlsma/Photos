@@ -54,6 +54,7 @@ import dev.ruurd.photos.features.timeline.TimelineViewModel
 import dev.ruurd.photos.features.viewer.MediaViewerScreen
 import dev.ruurd.photos.features.viewer.MediaViewerViewModel
 import kotlinx.coroutines.launch
+import okhttp3.OkHttpClient
 
 /**
  * The app's composition root: auth gate, per-user ViewModel stores, the navigation shell and the
@@ -291,6 +292,7 @@ private fun SessionMediaViewer(
 
     MediaViewerScreen(
         viewModel = viewerViewModel,
+        okHttpClient = container.okHttpClient,
         baseUrl = baseUrl,
         isOnline = isOnline,
         openSourceRect = openSourceRect,

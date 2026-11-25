@@ -97,4 +97,11 @@ class NetworkMonitor(context: Context) {
         val capabilities = connectivityManager.getNetworkCapabilities(activeNetwork) ?: return false
         return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
     }
+
+    fun isUnmeteredWithoutDataSaver(): Boolean {
+        val isMetered = connectivityManager.isActiveNetworkMetered
+        val isDataSaver = connectivityManager.restrictBackgroundStatus ==
+            ConnectivityManager.RESTRICT_BACKGROUND_STATUS_ENABLED
+        return !isMetered && !isDataSaver
+    }
 }

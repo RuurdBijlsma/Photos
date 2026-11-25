@@ -23,6 +23,8 @@ import dev.ruurd.photos.core.image.PhotosImageLoader
 import dev.ruurd.photos.core.image.ShareCache
 import dev.ruurd.photos.core.network.NetworkMonitor
 import dev.ruurd.photos.core.network.SessionManager
+import dev.ruurd.photos.core.network.VideoPreferencesSource
+import dev.ruurd.photos.core.network.VideoPreferencesStore
 import dev.ruurd.photos.core.network.api.PhotosApiService
 import dev.ruurd.photos.core.network.auth.AuthAuthenticator
 import dev.ruurd.photos.core.network.cookie.PersistentCookieJar
@@ -95,6 +97,7 @@ interface AppContainer {
     val shareCache: ShareCache
     val localMediaInfoReader: LocalMediaInfoSource
     val mediaFileSharer: MediaFileSharer
+    val videoPreferencesStore: VideoPreferencesSource
 
     fun authViewModelFactory(): ViewModelProvider.Factory
     fun mainViewModelFactory(): ViewModelProvider.Factory
@@ -270,6 +273,10 @@ class DefaultAppContainer(private val context: Context) : AppContainer {
         )
     }
 
+    override val videoPreferencesStore: VideoPreferencesSource by lazy {
+        VideoPreferencesStore(context = context, scope = applicationScope)
+    }
+
     private val mediaRefreshCoordinator: MediaRefreshCoordinator by lazy {
         DefaultMediaRefreshCoordinator(
             mediaDetailsRepository = mediaDetailsRepository,
@@ -380,6 +387,8 @@ class DefaultAppContainer(private val context: Context) : AppContainer {
                 localMediaInfoReader = localMediaInfoReader,
                 mediaFileSharer = mediaFileSharer,
                 dispatchers = dispatchers,
+                videoPreferencesStore = videoPreferencesStore,
+                isUnmeteredWithoutDataSaverProvider = networkMonitor::isUnmeteredWithoutDataSaver,
                 mediaRefreshCoordinator = mediaRefreshCoordinator,
             )
         }

@@ -127,6 +127,7 @@ internal fun Modifier.viewerVerticalGestures(
 
                         if (isVerticalDrag) {
                             lastTapUpTimeMs = 0L
+                            transition.onVerticalDragStart()
                             if (panelAlreadyActive || totalDy < 0f) {
                                 val targetItem = transition.currentActiveItem
                                 if (targetItem != null) {

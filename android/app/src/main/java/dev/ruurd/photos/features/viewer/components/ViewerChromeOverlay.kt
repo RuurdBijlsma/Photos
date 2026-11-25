@@ -26,12 +26,15 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.RotateRight
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material.icons.outlined.Repeat
+import androidx.compose.material.icons.outlined.Speed
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -40,6 +43,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -61,12 +65,36 @@ import dev.ruurd.photos.core.database.entity.TimelineMediaProjection
 import dev.ruurd.photos.domain.model.LocalMediaInfo
 import dev.ruurd.photos.domain.model.MediaDetails
 import dev.ruurd.photos.domain.model.MediaInfoFormat
+import dev.ruurd.photos.domain.model.VideoPlaybackPolicy
+import dev.ruurd.photos.domain.model.VideoQuality
+import dev.ruurd.photos.domain.model.VideoQualityOption
 import dev.ruurd.photos.ui.theme.MontserratFontFamily
+import kotlinx.collections.immutable.ImmutableList
+
+@Immutable
+data class ViewerVideoChromeState(
+    val isPlaying: Boolean,
+    val isMuted: Boolean,
+    val isLoopEnabled: Boolean,
+    val playbackSpeed: Float,
+    val durationMs: Long,
+    val positionMsProvider: () -> Long,
+    val bufferedMsProvider: () -> Long,
+    val activeQuality: VideoQuality?,
+    val qualityOptions: ImmutableList<VideoQualityOption>,
+    val showQualitySelector: Boolean,
+    val onTogglePlayPause: () -> Unit,
+    val onToggleMute: () -> Unit,
+    val onSeekTo: (Long) -> Unit,
+    val onSelectQuality: (VideoQuality) -> Unit,
+    val onSelectSpeed: (Float) -> Unit,
+    val onToggleLoop: () -> Unit,
+)
 
 /**
- * Floating viewer chrome (top bar, overflow menu, bottom action pill) plus the status bar scrim.
- * Anchored to the screen edges; the Back button can remain visible independently while the info
- * panel is open.
+ * Floating viewer chrome (top bar, overflow menu, bottom action pill, and video controls) plus
+ * status/bottom scrims. Anchored to the screen edges; the Back button can remain visible
+ * independently while the info panel is open.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -85,6 +113,7 @@ fun ViewerChromeOverlay(
     backButtonAlpha: Float = alpha,
     isSharing: Boolean = false,
     isCopying: Boolean = false,
+    videoChromeState: ViewerVideoChromeState? = null,
 ) {
     // Ignoring visibility keeps the top bar anchored when statusBars() animates back in on tap.
     val statusBarPadding = WindowInsets.statusBarsIgnoringVisibility
@@ -188,6 +217,7 @@ fun ViewerChromeOverlay(
 
             if (alpha > 0.01f) {
                 var isMenuExpanded by remember { mutableStateOf(false) }
+                var showSpeedDialog by remember { mutableStateOf(false) }
                 Box(modifier = Modifier.graphicsLayer { this.alpha = alpha }) {
                     ViewerCircleButton(
                         imageVector = Icons.Default.MoreVert,
@@ -212,6 +242,52 @@ fun ViewerChromeOverlay(
                                 onAbout()
                             },
                         )
+                        if (currentItem?.isVideo == true && videoChromeState != null) {
+                            DropdownMenuItem(
+                                text = { Text("Playback speed") },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Outlined.Speed,
+                                        contentDescription = null,
+                                    )
+                                },
+                                trailingIcon = {
+                                    Text(
+                                        text = VideoPlaybackPolicy.formatSpeed(videoChromeState.playbackSpeed),
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                },
+                                onClick = {
+                                    isMenuExpanded = false
+                                    showSpeedDialog = true
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Loop video") },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Outlined.Repeat,
+                                        contentDescription = null,
+                                    )
+                                },
+                                trailingIcon = if (videoChromeState.isLoopEnabled) {
+                                    {
+                                        Icon(
+                                            imageVector = Icons.Default.Check,
+                                            contentDescription = "Enabled",
+                                            modifier = Modifier.size(18.dp),
+                                        )
+                                    }
+                                } else {
+                                    null
+                                },
+                                onClick = {
+                                    isMenuExpanded = false
+                                    videoChromeState.onToggleLoop()
+                                },
+                            )
+                        }
                         if (currentItem != null && !currentItem.isVideo && isCopyEnabled) {
                             DropdownMenuItem(
                                 text = { Text(if (isCopying) "Copying…" else "Copy") },
@@ -256,39 +332,78 @@ fun ViewerChromeOverlay(
                         }
                     }
                 }
+
+                if (showSpeedDialog && videoChromeState != null) {
+                    PlaybackSpeedDialog(
+                        currentSpeed = videoChromeState.playbackSpeed,
+                        onSelectSpeed = videoChromeState.onSelectSpeed,
+                        onDismiss = { showSpeedDialog = false },
+                    )
+                }
             }
         }
 
         if (alpha > 0.01f) {
-            Surface(
-                shape = CircleShape,
-                color = ViewerPillColor,
-                border = ViewerPillBorder,
+            if (currentItem?.isVideo == true && videoChromeState != null) {
+                ViewerBottomControlsScrim(
+                    navBarHeight = navBarPadding,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .graphicsLayer { this.alpha = alpha },
+                )
+            }
+
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .padding(bottom = navBarPadding + 14.dp)
-                    .graphicsLayer { this.alpha = alpha }
+                    .graphicsLayer { this.alpha = alpha },
+            ) {
+                if (currentItem?.isVideo == true && videoChromeState != null) {
+                    VideoControlsBar(
+                        isPlaying = videoChromeState.isPlaying,
+                        isMuted = videoChromeState.isMuted,
+                        durationMs = videoChromeState.durationMs,
+                        positionMsProvider = videoChromeState.positionMsProvider,
+                        bufferedMsProvider = videoChromeState.bufferedMsProvider,
+                        activeQuality = videoChromeState.activeQuality,
+                        qualityOptions = videoChromeState.qualityOptions,
+                        showQualitySelector = videoChromeState.showQualitySelector,
+                        onTogglePlayPause = videoChromeState.onTogglePlayPause,
+                        onToggleMute = videoChromeState.onToggleMute,
+                        onSeekTo = videoChromeState.onSeekTo,
+                        onSelectQuality = videoChromeState.onSelectQuality,
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                }
+
+                Surface(
+                    shape = CircleShape,
+                    color = ViewerPillColor,
+                    border = ViewerPillBorder,
                     // Consume taps until Add to / Bin are wired in Phases 4 & 5.
-                    .clickable(
+                    modifier = Modifier.clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,
                         onClick = {},
                     ),
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 5.dp),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    ViewerPillAction(
-                        imageVector = Icons.Default.Share,
-                        label = if (isSharing) "Preparing…" else "Share",
-                        enabled = isShareEnabled && !isSharing,
-                        isLoading = isSharing,
-                        onClick = onShare,
-                    )
-                    ViewerPillAction(imageVector = Icons.Default.Add, label = "Add to", enabled = false)
-                    ViewerPillAction(imageVector = Icons.Outlined.Delete, label = "Bin", enabled = false)
+                    Row(
+                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 5.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        ViewerPillAction(
+                            imageVector = Icons.Default.Share,
+                            label = if (isSharing) "Preparing…" else "Share",
+                            enabled = isShareEnabled && !isSharing,
+                            isLoading = isSharing,
+                            onClick = onShare,
+                        )
+                        ViewerPillAction(imageVector = Icons.Default.Add, label = "Add to", enabled = false)
+                        ViewerPillAction(imageVector = Icons.Outlined.Delete, label = "Bin", enabled = false)
+                    }
                 }
             }
         }
@@ -316,6 +431,27 @@ private fun ViewerStatusBarScrim(
 }
 
 private val VIEWER_STATUS_BAR_SCRIM_TAIL = 14.dp
+
+@Composable
+private fun ViewerBottomControlsScrim(
+    navBarHeight: Dp,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(navBarHeight + VIEWER_BOTTOM_SCRIM_HEIGHT)
+            .background(
+                Brush.verticalGradient(
+                    0.0f to Color.Transparent,
+                    0.38f to Color.Black.copy(alpha = 0.48f),
+                    1.0f to Color.Black.copy(alpha = 0.78f),
+                ),
+            ),
+    )
+}
+
+private val VIEWER_BOTTOM_SCRIM_HEIGHT = 190.dp
 
 /** Dark translucent scrim with a hairline highlight, matching the web viewer's pills. */
 private val ViewerPillColor = Color.Black.copy(alpha = 0.55f)

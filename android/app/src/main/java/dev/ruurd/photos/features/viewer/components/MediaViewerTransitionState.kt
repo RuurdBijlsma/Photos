@@ -81,6 +81,7 @@ internal class MediaViewerTransitionState(
     internal var onHiddenTimelineMediaChanged: (String?) -> Unit = onHiddenTimelineMediaChanged
     internal var onPreSyncScroll: (String) -> Unit = onPreSyncScroll
     internal var onDismissFinished: () -> Unit = onDismissFinished
+    internal var onVerticalDragStart: () -> Unit = {}
 
     val viewerSize: IntSize get() = geometry.viewerSize
 
@@ -231,6 +232,7 @@ internal class MediaViewerTransitionState(
 
     fun requestOpenInfoPanel() {
         if (isClosing || panel.isDragging) return
+        onVerticalDragStart()
         // Zoom and the opening hero own the gesture surface; retry once they release it.
         if (isZoomed || isOpeningHero) {
             panel.deferRequest()
@@ -260,6 +262,7 @@ internal class MediaViewerTransitionState(
         releaseBackdropAlpha: Float,
     ) {
         if (isClosing) return
+        onVerticalDragStart()
         drag.cancelSettle()
         panel.resetImmediate()
 
@@ -339,6 +342,7 @@ internal fun rememberMediaViewerTransitionState(
     onHiddenTimelineMediaChanged: (String?) -> Unit,
     onPreSyncScroll: (String) -> Unit,
     onDismissFinished: () -> Unit,
+    onVerticalDragStart: () -> Unit = {},
     systemBars: ViewerSystemBars = rememberViewerSystemBars(),
 ): MediaViewerTransitionState {
     val scope = rememberCoroutineScope()
@@ -388,6 +392,7 @@ internal fun rememberMediaViewerTransitionState(
         state.onHiddenTimelineMediaChanged = onHiddenTimelineMediaChanged
         state.onPreSyncScroll = onPreSyncScroll
         state.onDismissFinished = onDismissFinished
+        state.onVerticalDragStart = onVerticalDragStart
         state.setStatusBarHeight(statusBarHeightPx)
     }
 

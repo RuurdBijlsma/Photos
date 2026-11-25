@@ -10,10 +10,14 @@ import dev.ruurd.photos.core.common.MediaRefreshCoordinator
 import dev.ruurd.photos.core.database.entity.TimelineMediaProjection
 import dev.ruurd.photos.core.database.entity.toTimelineProjection
 import dev.ruurd.photos.core.image.FullResFileStore
+import dev.ruurd.photos.core.network.VideoPreferences
+import dev.ruurd.photos.core.network.VideoPreferencesSource
 import dev.ruurd.photos.data.datasource.local.LocalMediaInfoSource
 import dev.ruurd.photos.domain.model.FullResEligibility
 import dev.ruurd.photos.domain.model.LocalMediaInfo
 import dev.ruurd.photos.domain.model.MediaDetails
+import dev.ruurd.photos.domain.model.VideoQuality
+import dev.ruurd.photos.domain.model.VideoUnavailableReason
 import dev.ruurd.photos.domain.repository.MediaDetailsRepository
 import dev.ruurd.photos.domain.repository.MediaRepository
 import dev.ruurd.photos.domain.repository.TimelineProjectionSource
@@ -55,6 +59,11 @@ data class MediaViewerUiState(
     val failedDetailsIds: ImmutableSet<String> = persistentSetOf(),
     val isSharing: Boolean = false,
     val isCopying: Boolean = false,
+    val videoPreferences: VideoPreferences = VideoPreferences(),
+    val transientVideoQualityById: ImmutableMap<String, VideoQuality> = persistentMapOf(),
+    val localVideoFallbackIds: ImmutableSet<String> = persistentSetOf(),
+    val videoUnavailableOriginalIds: ImmutableSet<String> = persistentSetOf(),
+    val videoErrorById: ImmutableMap<String, VideoUnavailableReason> = persistentMapOf(),
 ) {
     val activeDetails: MediaDetails?
         get() = detailsById[activeMediaId]
@@ -72,19 +81,32 @@ class MediaViewerViewModel(
     private val localMediaInfoReader: LocalMediaInfoSource,
     private val mediaFileSharer: MediaFileSharer,
     private val dispatchers: AppDispatchers,
+    private val videoPreferencesStore: VideoPreferencesSource = InMemoryVideoPreferencesSource(),
+    private val isUnmeteredWithoutDataSaverProvider: () -> Boolean = { true },
     mediaRefreshCoordinator: MediaRefreshCoordinator? = null,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(
-        MediaViewerUiState(activeMediaId = initialMediaId),
+        MediaViewerUiState(
+            activeMediaId = initialMediaId,
+            videoPreferences = videoPreferencesStore.preferences.value,
+        ),
     )
     val uiState: StateFlow<MediaViewerUiState> = _uiState.asStateFlow()
 
     private var currentItemInfoJob: Job? = null
     private var settleJob: Job? = null
     private val fullResJobs = ConcurrentHashMap<String, Job>()
+    private var hasUserToggledChrome = false
+    private var hasResolvedInitialChrome = false
 
     init {
+        viewModelScope.launch {
+            videoPreferencesStore.preferences.collect { prefs ->
+                _uiState.update { it.copy(videoPreferences = prefs) }
+            }
+        }
+
         // Frame 1 in 0ms: check if projection store is already loaded
         val currentStore = timelineProjectionStore.state.value
         if (currentStore is TimelineProjectionState.Loaded) {
@@ -93,10 +115,12 @@ class MediaViewerViewModel(
             val initialDetails = initialItem
                 ?.cloudId
                 ?.let(mediaDetailsRepository::peek)
+            hasResolvedInitialChrome = true
             _uiState.value = MediaViewerUiState(
                 items = currentStore.items,
                 activeMediaId = initialMediaId,
                 initialIndex = idx.coerceAtLeast(0),
+                isChromeVisible = initialItem?.isVideo != true,
                 isActiveItemMissing = currentStore.items.isEmpty() || idx < 0,
                 isProjectionLoading = false,
                 detailsById = if (initialDetails != null) {
@@ -104,6 +128,7 @@ class MediaViewerViewModel(
                 } else {
                     persistentMapOf()
                 },
+                videoPreferences = videoPreferencesStore.preferences.value,
             )
             if (initialItem != null) {
                 loadActiveItemInfo(initialItem)
@@ -112,6 +137,7 @@ class MediaViewerViewModel(
             _uiState.value = MediaViewerUiState(
                 activeMediaId = initialMediaId,
                 isProjectionLoading = true,
+                videoPreferences = videoPreferencesStore.preferences.value,
             )
             // Fallback while store is Loading: fetch single item from repository
             viewModelScope.launch(dispatchers.io) {
@@ -119,17 +145,24 @@ class MediaViewerViewModel(
                 if (entity != null) {
                     val fallbackProjection = entity.toTimelineProjection()
                     _uiState.update { current ->
+                        val nextChrome = if (!hasUserToggledChrome && !hasResolvedInitialChrome) {
+                            hasResolvedInitialChrome = true
+                            !fallbackProjection.isVideo
+                        } else {
+                            current.isChromeVisible
+                        }
                         if (current.items.isEmpty() &&
                             timelineProjectionStore.state.value is TimelineProjectionState.Loading
                         ) {
                             current.copy(
                                 items = persistentListOf(fallbackProjection),
                                 initialIndex = 0,
+                                isChromeVisible = nextChrome,
                                 isActiveItemMissing = false,
                                 isProjectionLoading = true,
                             )
                         } else {
-                            current
+                            current.copy(isChromeVisible = nextChrome)
                         }
                     }
                     loadActiveItemInfo(fallbackProjection)
@@ -152,10 +185,17 @@ class MediaViewerViewModel(
                         }
 
                         val activeIdx = state.items.indexOfFirst { it.id == current.activeMediaId }
+                        val resolvedChrome = if (!hasUserToggledChrome && !hasResolvedInitialChrome && activeIdx >= 0) {
+                            hasResolvedInitialChrome = true
+                            !state.items[activeIdx].isVideo
+                        } else {
+                            current.isChromeVisible
+                        }
                         if (activeIdx >= 0) {
                             current.copy(
                                 items = state.items,
                                 initialIndex = activeIdx,
+                                isChromeVisible = resolvedChrome,
                                 isActiveItemMissing = false,
                                 isProjectionLoading = false,
                             )
@@ -166,6 +206,7 @@ class MediaViewerViewModel(
                                 items = state.items,
                                 activeMediaId = state.items[clampedIdx].id,
                                 initialIndex = clampedIdx,
+                                isChromeVisible = resolvedChrome,
                                 isActiveItemMissing = false,
                                 isProjectionLoading = false,
                             )
@@ -189,6 +230,7 @@ class MediaViewerViewModel(
         _uiState.update { current ->
             if (current.activeMediaId != mediaId) {
                 changed = true
+                hasResolvedInitialChrome = true
                 val newIndex = current.items.indexOfFirst { it.id == mediaId }
                 val newItem = if (newIndex >= 0) current.items[newIndex] else null
                 newActiveItem = newItem
@@ -205,6 +247,7 @@ class MediaViewerViewModel(
                     } else {
                         current.detailsById
                     },
+                    videoErrorById = (current.videoErrorById - mediaId).toPersistentMap(),
                 )
             } else {
                 current
@@ -244,6 +287,9 @@ class MediaViewerViewModel(
     fun retryActiveItemIfNeeded() {
         val state = _uiState.value
         val item = state.items.firstOrNull { it.id == state.activeMediaId } ?: return
+        if (item.isVideo && item.id in state.videoErrorById) {
+            retryVideoPlayback(item.id)
+        }
         val cloudId = item.cloudId ?: return
         val hasFreshDetails = state.detailsById[item.id]?.cloudId == cloudId &&
             item.id !in state.failedDetailsIds
@@ -319,7 +365,78 @@ class MediaViewerViewModel(
     }
 
     fun toggleChrome() {
+        hasUserToggledChrome = true
         _uiState.update { it.copy(isChromeVisible = !it.isChromeVisible) }
+    }
+
+    fun isUnmeteredWithoutDataSaver(): Boolean = isUnmeteredWithoutDataSaverProvider()
+
+    fun toggleVideoMute() {
+        val next = !_uiState.value.videoPreferences.isMuted
+        viewModelScope.launch { videoPreferencesStore.setMuted(next) }
+    }
+
+    fun toggleVideoLoop() {
+        val next = !_uiState.value.videoPreferences.isLoopEnabled
+        viewModelScope.launch { videoPreferencesStore.setLoopEnabled(next) }
+    }
+
+    fun setVideoPlaybackSpeed(speed: Float) {
+        viewModelScope.launch { videoPreferencesStore.setPlaybackSpeed(speed) }
+    }
+
+    fun selectVideoQuality(mediaId: String, quality: VideoQuality) {
+        _uiState.update { current ->
+            current.copy(
+                transientVideoQualityById = (current.transientVideoQualityById - mediaId).toPersistentMap(),
+                videoErrorById = (current.videoErrorById - mediaId).toPersistentMap(),
+            )
+        }
+        viewModelScope.launch { videoPreferencesStore.setPreferredQuality(quality) }
+    }
+
+    fun onLocalVideoFailed(mediaId: String) {
+        _uiState.update { current ->
+            val item = current.items.firstOrNull { it.id == mediaId }
+            if (item?.cloudId != null) {
+                current.copy(
+                    localVideoFallbackIds = (current.localVideoFallbackIds + mediaId).toPersistentSet(),
+                    videoErrorById = (current.videoErrorById - mediaId).toPersistentMap(),
+                )
+            } else {
+                current.copy(
+                    videoErrorById = (current.videoErrorById + (mediaId to VideoUnavailableReason.PLAYBACK_FAILED))
+                        .toPersistentMap(),
+                )
+            }
+        }
+    }
+
+    fun onCloudVideoFallbackTo480p(mediaId: String) {
+        _uiState.update { current ->
+            current.copy(
+                transientVideoQualityById = (current.transientVideoQualityById + (mediaId to VideoQuality.P480))
+                    .toPersistentMap(),
+                videoUnavailableOriginalIds = (current.videoUnavailableOriginalIds + mediaId).toPersistentSet(),
+                videoErrorById = (current.videoErrorById - mediaId).toPersistentMap(),
+            )
+        }
+    }
+
+    fun onCloudVideoError(mediaId: String, reason: VideoUnavailableReason) {
+        _uiState.update { current ->
+            current.copy(
+                videoErrorById = (current.videoErrorById + (mediaId to reason)).toPersistentMap(),
+            )
+        }
+    }
+
+    fun retryVideoPlayback(mediaId: String) {
+        _uiState.update { current ->
+            current.copy(
+                videoErrorById = (current.videoErrorById - mediaId).toPersistentMap(),
+            )
+        }
     }
 
     private fun invalidateCloudIds(changedCloudIds: Set<String>) {
@@ -505,13 +622,44 @@ class MediaViewerViewModel(
             }
             val nextLoading = current.loadingDetailsIds.filter { it in infoKeep }.toPersistentSet()
             val nextFailed = current.failedDetailsIds.filter { it in infoKeep }.toPersistentSet()
+            val nextTransientQuality = current.transientVideoQualityById.filterKeys { it in infoKeep }.toPersistentMap()
+            val nextLocalFallbacks = current.localVideoFallbackIds.filter { it in infoKeep }.toPersistentSet()
+            val nextUnavailableOriginals = current.videoUnavailableOriginalIds.filter { it in infoKeep }.toPersistentSet()
+            val nextVideoErrors = current.videoErrorById.filterKeys { it in infoKeep }.toPersistentMap()
             current.copy(
                 fullResFiles = nextFullRes,
                 detailsById = nextDetails,
                 localInfoById = nextLocalInfo,
                 loadingDetailsIds = nextLoading,
                 failedDetailsIds = nextFailed,
+                transientVideoQualityById = nextTransientQuality,
+                localVideoFallbackIds = nextLocalFallbacks,
+                videoUnavailableOriginalIds = nextUnavailableOriginals,
+                videoErrorById = nextVideoErrors,
             )
         }
+    }
+}
+
+class InMemoryVideoPreferencesSource(
+    initial: VideoPreferences = VideoPreferences(),
+) : VideoPreferencesSource {
+    private val _preferences = MutableStateFlow(initial)
+    override val preferences: StateFlow<VideoPreferences> = _preferences.asStateFlow()
+
+    override suspend fun setLoopEnabled(enabled: Boolean) {
+        _preferences.value = _preferences.value.copy(isLoopEnabled = enabled)
+    }
+
+    override suspend fun setPlaybackSpeed(speed: Float) {
+        _preferences.value = _preferences.value.copy(playbackSpeed = speed.coerceIn(0.25f, 3.0f))
+    }
+
+    override suspend fun setMuted(muted: Boolean) {
+        _preferences.value = _preferences.value.copy(isMuted = muted)
+    }
+
+    override suspend fun setPreferredQuality(quality: VideoQuality) {
+        _preferences.value = _preferences.value.copy(preferredQuality = quality)
     }
 }

@@ -129,6 +129,11 @@ dependencies {
     implementation(libs.telephoto.zoomable.image.coil3)
     implementation(libs.telephoto.zoomable)
 
+    // Media3
+    implementation(libs.androidx.media3.exoplayer)
+    implementation(libs.androidx.media3.datasource.okhttp)
+    implementation(libs.androidx.media3.ui.compose)
+
     // Lint
     lintChecks(libs.compose.lint.checks)
 
