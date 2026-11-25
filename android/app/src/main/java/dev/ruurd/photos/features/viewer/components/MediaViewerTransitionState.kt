@@ -1,7 +1,5 @@
 package dev.ruurd.photos.features.viewer.components
 
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
@@ -11,23 +9,14 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.lerp
-import androidx.compose.ui.input.pointer.PointerEventPass
-import androidx.compose.ui.input.pointer.changedToUpIgnoreConsumed
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.input.pointer.util.VelocityTracker
-import androidx.compose.ui.input.pointer.util.addPointerInputChange
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntSize
-import androidx.compose.ui.unit.Velocity
 import coil3.ImageLoader
 import coil3.SingletonImageLoader
 import dev.ruurd.photos.core.database.entity.TimelineMediaProjection
@@ -40,13 +29,6 @@ import dev.ruurd.photos.core.image.lerp
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.CoroutineScope
-import kotlin.math.abs
-
-private enum class VerticalGestureMode {
-    NONE,
-    DISMISS_VIEWER,
-    INFO_PANEL,
-}
 
 /**
  * Owns the viewer's hero open/close animation, the drag-to-dismiss gesture, and the inline
@@ -62,7 +44,7 @@ internal class MediaViewerTransitionState(
     imageLoader: ImageLoader,
     memoryCacheKeyRegistry: MemoryCacheKeyRegistry,
     private val boundsRegistry: TimelineTileBoundsRegistry,
-    private val metrics: ViewerMetrics,
+    internal val metrics: ViewerMetrics,
     initialPagerState: PagerState,
     initialSize: IntSize,
     initialOpenSourceRect: Rect?,
@@ -79,11 +61,11 @@ internal class MediaViewerTransitionState(
     )
     private val hero = ViewerHeroTransition(
         initiallyHasOpenSource = initialOpenSourceRect != null &&
-            initialSize.width > 0 &&
-            initialSize.height > 0,
+                initialSize.width > 0 &&
+                initialSize.height > 0,
     )
-    private val panel = ViewerInfoPanelState(scope, geometry, metrics)
-    private val drag = ViewerDragState(scope)
+    internal val panel = ViewerInfoPanelState(scope, geometry, metrics)
+    internal val drag = ViewerDragState(scope)
 
     init {
         geometry.viewerSize = initialSize
@@ -98,7 +80,7 @@ internal class MediaViewerTransitionState(
     internal var openSourceCorners: TileCornerRadii = initialOpenSourceCorners
     internal var onHiddenTimelineMediaChanged: (String?) -> Unit = onHiddenTimelineMediaChanged
     internal var onPreSyncScroll: (String) -> Unit = onPreSyncScroll
-    internal var onDismissFinished: (Unit) -> Unit = { onDismissFinished() }
+    internal var onDismissFinished: () -> Unit = onDismissFinished
 
     val viewerSize: IntSize get() = geometry.viewerSize
 
@@ -121,7 +103,7 @@ internal class MediaViewerTransitionState(
         panel.isOpenOrAnimating && !isClosing && !isOpeningHero
     }
 
-    private val currentActiveItem: TimelineMediaProjection?
+    internal val currentActiveItem: TimelineMediaProjection?
         get() = items.getOrNull(pagerState.currentPage)?.takeIf { it.id == activeMediaId }
             ?: items.firstOrNull { it.id == activeMediaId }
             ?: items.getOrNull(pagerState.currentPage)
@@ -244,7 +226,7 @@ internal class MediaViewerTransitionState(
         hero.playClosing()
         if (hero.closingState == null) return
         onHiddenTimelineMediaChanged(null)
-        onDismissFinished(Unit)
+        onDismissFinished()
     }
 
     fun requestOpenInfoPanel() {
@@ -286,7 +268,7 @@ internal class MediaViewerTransitionState(
         if (activeItem == null || viewerSize.width <= 0 || viewerSize.height <= 0) {
             systemBars.restoreForTimeline()
             onHiddenTimelineMediaChanged(null)
-            onDismissFinished(Unit)
+            onDismissFinished()
             return
         }
 
@@ -341,205 +323,6 @@ internal class MediaViewerTransitionState(
                 startBackdropAlpha = startAlpha,
             ),
         )
-    }
-
-    /**
-     * Unified vertical gesture handler on the untransformed viewer root, running on
-     * [PointerEventPass.Main] so child detectors (Telephoto quick-zoom / pinch / pan and
-     * HorizontalPager) always take precedence before viewer dismiss or info-sheet drag activates.
-     */
-    fun Modifier.dismissDragModifier(): Modifier = pointerInput(Unit) {
-        val velocityTracker = VelocityTracker()
-
-        awaitEachGesture {
-            val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Main)
-            if (isClosing || isOpeningHero || isZoomed) {
-                return@awaitEachGesture
-            }
-
-            val panelAlreadyActive = panel.isOpenBeyondThreshold
-            val isQuickZoomCandidate = !panelAlreadyActive &&
-                lastTapUpTimeMs > 0L &&
-                (down.uptimeMillis - lastTapUpTimeMs) in 0L..metrics.doubleTapTimeoutMs &&
-                (down.position - lastTapUpPosition).getDistance() <= metrics.doubleTapSlopPx
-            if (isQuickZoomCandidate) {
-                // Consume the tap memory and yield the entire second press + drag to Telephoto.
-                lastTapUpTimeMs = 0L
-                return@awaitEachGesture
-            }
-
-            if (panelAlreadyActive) {
-                panel.stopFlingUnderFinger()
-            }
-
-            val pointerId = down.id
-            var totalDx = 0f
-            var totalDy = 0f
-            var maxDisplacementPx = 0f
-            var wasMultiTouch = false
-            var gestureMode = VerticalGestureMode.NONE
-            var gestureItem: TimelineMediaProjection? = null
-            val gestureStartTravel = currentActiveItem?.let(::pageInfoPanelTravelPx) ?: 0f
-            var lastEventTimeMs = down.uptimeMillis
-            var lastSampleTimeMs = down.uptimeMillis
-
-            velocityTracker.resetTracking()
-            velocityTracker.addPointerInputChange(down)
-
-            try {
-                while (true) {
-                    val event = awaitPointerEvent(PointerEventPass.Main)
-                    val change = event.changes.firstOrNull { it.id == pointerId } ?: break
-                    lastEventTimeMs = change.uptimeMillis
-
-                    if (event.changes.count { it.pressed } > 1) {
-                        wasMultiTouch = true
-                        break
-                    }
-
-                    if (isClosing || isOpeningHero || isZoomed) {
-                        break
-                    }
-
-                    val displacement = (change.position - down.position).getDistance()
-                    if (displacement > maxDisplacementPx) {
-                        maxDisplacementPx = displacement
-                    }
-
-                    if (!change.pressed) {
-                        // Record clean single-taps (note Telephoto consumes the up event on tap).
-                        if (gestureMode == VerticalGestureMode.NONE &&
-                            !wasMultiTouch &&
-                            !panelAlreadyActive &&
-                            maxDisplacementPx <= metrics.touchSlopPx &&
-                            (change.uptimeMillis - down.uptimeMillis) < metrics.longPressTimeoutMs
-                        ) {
-                            lastTapUpTimeMs = change.uptimeMillis
-                            lastTapUpPosition = change.position
-                        }
-                        break
-                    }
-
-                    if (gestureMode == VerticalGestureMode.NONE && change.isConsumed) {
-                        // A child (Telephoto quick-zoom / pan or HorizontalPager) claimed it.
-                        break
-                    }
-
-                    velocityTracker.addPointerInputChange(change)
-                    if (!change.changedToUpIgnoreConsumed() &&
-                        change.position != change.previousPosition
-                    ) {
-                        lastSampleTimeMs = change.uptimeMillis
-                    }
-
-                    val dx = change.position.x - change.previousPosition.x
-                    val dy = change.position.y - change.previousPosition.y
-                    totalDx += dx
-                    totalDy += dy
-
-                    when (gestureMode) {
-                        VerticalGestureMode.NONE -> {
-                            val isVerticalDrag = abs(totalDy) > metrics.touchSlopPx &&
-                                abs(totalDy) > abs(totalDx) * VERTICAL_AXIS_BIAS
-
-                            if (isVerticalDrag) {
-                                lastTapUpTimeMs = 0L
-                                if (panelAlreadyActive || totalDy < 0f) {
-                                    val targetItem = currentActiveItem
-                                    if (targetItem != null) {
-                                        gestureMode = VerticalGestureMode.INFO_PANEL
-                                        gestureItem = targetItem
-                                        panel.beginDrag(
-                                            item = targetItem,
-                                            panelAlreadyActive = panelAlreadyActive,
-                                            dy = dy,
-                                            totalDy = totalDy,
-                                        )
-                                        change.consume()
-                                    }
-                                } else {
-                                    gestureMode = VerticalGestureMode.DISMISS_VIEWER
-                                    val draggedId = items.getOrNull(pagerState.currentPage)?.id
-                                        ?: activeMediaId
-                                    onHiddenTimelineMediaChanged(draggedId)
-                                    drag.beginDrag(Offset(totalDx, totalDy))
-                                    change.consume()
-                                }
-                            } else if (abs(totalDx) > metrics.touchSlopPx && abs(totalDx) >= abs(totalDy)) {
-                                lastTapUpTimeMs = 0L
-                                // Horizontal swipe belongs to HorizontalPager (open or closed).
-                                break
-                            }
-                        }
-
-                        VerticalGestureMode.DISMISS_VIEWER -> {
-                            change.consume()
-                            drag.dragBy(Offset(dx, dy))
-                        }
-
-                        VerticalGestureMode.INFO_PANEL -> {
-                            change.consume()
-                            val targetItem = gestureItem
-                            if (targetItem != null) {
-                                panel.dragBy(targetItem, dy)
-                            }
-                        }
-                    }
-                }
-            } finally {
-                val velocityY = if (lastEventTimeMs - lastSampleTimeMs > STALE_RELEASE_MS) {
-                    0f
-                } else {
-                    velocityTracker
-                        .calculateVelocity(Velocity(metrics.maxFlingVelocityPx, metrics.maxFlingVelocityPx))
-                        .y
-                }
-
-                when (gestureMode) {
-                    VerticalGestureMode.DISMISS_VIEWER -> if (!isClosing) {
-                        val releaseY = drag.rawDragOffset.y.coerceAtLeast(0f)
-                        val shouldDismiss = !isZoomed && (
-                            releaseY > metrics.dismissThresholdPx ||
-                                (velocityY > 1000f && releaseY > metrics.fastFlickMinDistancePx)
-                            )
-
-                        if (shouldDismiss) {
-                            val releaseScale = (1f - (releaseY / 1400f)).coerceIn(0.55f, 1f)
-                            val releaseAlpha = (1f - (releaseY / 500f)).coerceIn(0f, 1f)
-                            startClosing(drag.rawDragOffset, releaseScale, releaseAlpha)
-                        } else {
-                            drag.settleBack {
-                                if (!drag.isDragging && !isClosing) {
-                                    onHiddenTimelineMediaChanged(null)
-                                }
-                            }
-                        }
-                    }
-
-                    VerticalGestureMode.INFO_PANEL -> {
-                        val targetItem = gestureItem
-                        if (isClosing || targetItem == null) {
-                            panel.cancelDrag()
-                        } else if (isZoomed) {
-                            panel.closeFromDrag(targetItem)
-                        } else {
-                            panel.settleAfterDrag(targetItem, velocityY, gestureStartTravel)
-                        }
-                    }
-
-                    VerticalGestureMode.NONE -> Unit
-                }
-            }
-        }
-    }
-
-    // Tracks the previous clean single tap so double-tap + drag yields to Telephoto quick-zoom.
-    private var lastTapUpTimeMs: Long = 0L
-    private var lastTapUpPosition: Offset = Offset.Zero
-
-    private companion object {
-        const val VERTICAL_AXIS_BIAS = 1.05f
-        const val STALE_RELEASE_MS = 100L
     }
 }
 
@@ -604,7 +387,7 @@ internal fun rememberMediaViewerTransitionState(
         state.openSourceCorners = openSourceCorners
         state.onHiddenTimelineMediaChanged = onHiddenTimelineMediaChanged
         state.onPreSyncScroll = onPreSyncScroll
-        state.onDismissFinished = { onDismissFinished() }
+        state.onDismissFinished = onDismissFinished
         state.setStatusBarHeight(statusBarHeightPx)
     }
 

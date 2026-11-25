@@ -2,6 +2,7 @@ package dev.ruurd.photos.features.viewer.components
 
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Rect
@@ -24,7 +25,7 @@ internal class ViewerGeometry(
 ) {
     /** Assigned by the viewer on every composition and layout change. */
     var viewerSize: IntSize by mutableStateOf(IntSize.Zero)
-    var statusBarHeightPx: Float = 0f
+    var statusBarHeightPx: Float by mutableFloatStateOf(0f)
 
     private val infoContentHeights = HashMap<String, Int>()
 

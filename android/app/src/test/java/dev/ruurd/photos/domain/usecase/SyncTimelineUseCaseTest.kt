@@ -50,10 +50,6 @@ class SyncTimelineUseCaseTest {
 
         override suspend fun login(request: RequestBody): Response<ResponseBody> = Response.success(null)
 
-        override suspend fun refresh(): Response<ResponseBody> = Response.success(null)
-
-        override suspend fun logout(): Response<ResponseBody> = Response.success(null)
-
         override suspend fun getMe(): Response<ResponseBody> = Response.success(null)
 
         override suspend fun getTimelineSync(since: Long?): Response<TimelineSyncResponse> {

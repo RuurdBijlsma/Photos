@@ -4,7 +4,7 @@ import android.content.Context
 import dev.ruurd.photos.core.common.AppDispatchers
 import dev.ruurd.photos.core.common.SingleFlightGroup
 import dev.ruurd.photos.core.network.SessionManager
-import dev.ruurd.photos.core.network.await
+import dev.ruurd.photos.core.network.downloadMediaFile
 import dev.ruurd.photos.domain.model.MediaFileNames
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -13,9 +13,7 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.job
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
-import okhttp3.Request
 import java.io.File
-import java.io.IOException
 
 /**
  * `cacheDir/full_res_cache/` — a ~500 MB LRU of `/api/photos/{cloudId}/download` originals kept out
@@ -38,7 +36,7 @@ class FullResFileCache internal constructor(
     private val directory: File,
     private val okHttpClient: OkHttpClient,
     private val serverUrlProvider: () -> String,
-    private val scope: CoroutineScope,
+    scope: CoroutineScope,
     private val dispatchers: AppDispatchers,
     private val maxSizeBytes: Long = DEFAULT_MAX_SIZE_BYTES,
 ) : FullResFileStore {
@@ -101,79 +99,55 @@ class FullResFileCache internal constructor(
         expectedGeneration: Long,
     ): File? = withContext(dispatchers.io) {
         val job = currentCoroutineContext().job
-        val url = "${serverUrlProvider()}/api/photos/$cloudId/download"
         val targetDirectory = directoryFor(cloudId)
         var temp: File? = null
 
         try {
-            val request = Request.Builder().url(url).build()
-            val resolvedName = okHttpClient.newCall(request).await().use { response ->
-                if (!response.isSuccessful) return@withContext null
-
-                val responseMime = response.header("Content-Type")?.substringBefore(';')?.trim()
-                val name = fileName?.takeIf { it.isNotBlank() }
-                    ?: MediaFileNames.parseContentDispositionFilename(
-                        response.header("Content-Disposition"),
-                    )
-                    ?: MediaFileNames.fallbackName(
-                        cloudId = cloudId,
-                        isVideo = false,
-                        mimeType = responseMime,
-                    )
+            okHttpClient.downloadMediaFile(
+                serverUrl = serverUrlProvider(),
+                cloudId = cloudId,
+                isVideo = false,
+                knownFileName = fileName,
+            ) { meta, copyBody ->
                 val sanitized = MediaFileNames.sanitize(
-                    fileName = name,
+                    fileName = meta.fileName,
                     isVideo = false,
-                    mimeType = responseMime,
+                    mimeType = meta.mimeType,
                 )
-
                 targetDirectory.mkdirs()
-                val partFile = File(targetDirectory, "$sanitized$TEMP_SUFFIX")
-                temp = partFile
+                val partFile = File(targetDirectory, "$sanitized$TEMP_SUFFIX").also { temp = it }
 
-                val buffer = ByteArray(STREAM_BUFFER_BYTES)
-                response.body.byteStream().use { input ->
-                    partFile.outputStream().use { output ->
-                        while (true) {
-                            job.ensureActive()
-                            val read = input.read(buffer)
-                            if (read < 0) break
-                            output.write(buffer, 0, read)
-                        }
+                try {
+                    partFile.outputStream().use(copyBody)
+                } catch (t: Throwable) {
+                    partFile.delete()
+                    throw t
+                }
+
+                synchronized(trimLock) {
+                    job.ensureActive()
+                    if (downloads.generation != expectedGeneration ||
+                        !partFile.exists() ||
+                        partFile.length() <= 0L
+                    ) {
+                        partFile.delete()
+                        return@downloadMediaFile null
                     }
-                }
-                sanitized
-            }
 
-            val partFile = temp ?: return@withContext null
-            synchronized(trimLock) {
-                job.ensureActive()
-                if (downloads.generation != expectedGeneration ||
-                    !partFile.exists() ||
-                    partFile.length() <= 0L
-                ) {
-                    partFile.delete()
-                    return@withContext null
+                    val target = File(targetDirectory, sanitized)
+                    target.delete()
+                    if (!partFile.renameTo(target)) {
+                        partFile.delete()
+                        return@downloadMediaFile null
+                    }
+                    target.setLastModified(System.currentTimeMillis())
+                    trimLocked()
+                    target
                 }
-
-                val target = File(targetDirectory, resolvedName)
-                target.delete()
-                if (!partFile.renameTo(target)) {
-                    partFile.delete()
-                    return@withContext null
-                }
-                target.setLastModified(System.currentTimeMillis())
-                trimLocked()
-                target
             }
         } catch (e: CancellationException) {
             temp?.delete()
             throw e
-        } catch (_: IOException) {
-            temp?.delete()
-            null
-        } catch (_: Exception) {
-            temp?.delete()
-            null
         }
     }
 
@@ -205,7 +179,6 @@ class FullResFileCache internal constructor(
     private companion object {
         const val CACHE_DIR = "full_res_cache"
         const val TEMP_SUFFIX = ".part"
-        const val STREAM_BUFFER_BYTES = 16 * 1024
         const val DEFAULT_MAX_SIZE_BYTES = 500L * 1024 * 1024
     }
 }

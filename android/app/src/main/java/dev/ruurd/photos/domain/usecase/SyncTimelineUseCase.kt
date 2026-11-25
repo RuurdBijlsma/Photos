@@ -116,19 +116,24 @@ class SyncTimelineUseCase(
                                     continue
                                 }
 
-                                val localMatch = localBySize[item.sizeBytes]?.firstOrNull { candidate ->
-                                    candidate.id !in matchedLocalIds &&
-                                        PassOneDeduplication.isMatch(
-                                            cloudRatio = item.ratio,
-                                            cloudSortTimestamp = item.sortTimestamp,
-                                            localRatio = candidate.ratio,
-                                            localTimestampMs = candidate.sortTimestamp,
-                                        )
+                                val localMatch = localBySize[item.sizeBytes]?.let { candidates ->
+                                    PassOneDeduplication.findMatch(
+                                        candidates = candidates,
+                                        excludeIds = matchedLocalIds,
+                                        ratio = item.ratio,
+                                        sortTimestamp = item.sortTimestamp,
+                                    )
                                 }
 
                                 if (localMatch != null) {
                                     matchedLocalIds.add(localMatch.id)
-                                    itemsToUpsert.add(toSyncedMediaEntity(item, localMatch))
+                                    itemsToUpsert.add(
+                                        PassOneDeduplication.mergeSynced(
+                                            local = localMatch,
+                                            cloud = toMediaEntity(item, existing = null),
+                                            id = localMatch.id,
+                                        ),
+                                    )
                                 } else {
                                     itemsToUpsert.add(toMediaEntity(item, existing = null))
                                 }
@@ -164,26 +169,6 @@ class SyncTimelineUseCase(
                 Result.failure(e)
             }
         }
-    }
-
-    private fun toSyncedMediaEntity(item: CompactTimelineItem, local: MediaEntity): MediaEntity {
-        val yearMonth = computeYearMonth(item.sortTimestamp, item.timezoneOffsetMinutes)
-        val durationMs = if (item.hasDurationMs()) item.durationMs else null
-
-        return local.copy(
-            cloudId = item.id,
-            syncStatus = SyncStatus.SYNCED,
-            isVisibleInTimeline = true,
-            autoBackupSuppressed = false,
-            sortTimestamp = item.sortTimestamp,
-            timezoneOffsetMinutes = item.timezoneOffsetMinutes,
-            yearMonth = yearMonth,
-            ratio = item.ratio,
-            isVideo = item.isVideo,
-            durationMs = durationMs,
-            hasThumbnails = item.hasThumbnails,
-            sizeBytes = item.sizeBytes,
-        )
     }
 
     private fun toMediaEntity(item: CompactTimelineItem, existing: MediaEntity?): MediaEntity {
@@ -226,7 +211,7 @@ class SyncTimelineUseCase(
     }
 
     private companion object {
-        /** Also keeps the `IN (…)` bind count well below SQLite's limit. */
+        /** Keeps per-chunk query batches bounded while loading rows & dedup candidates. */
         const val UPSERT_BATCH_SIZE = 500
     }
 }

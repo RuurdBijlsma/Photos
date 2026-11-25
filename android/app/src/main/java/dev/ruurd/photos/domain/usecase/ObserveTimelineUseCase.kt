@@ -2,9 +2,9 @@ package dev.ruurd.photos.domain.usecase
 
 import dev.ruurd.photos.core.common.AppDispatchers
 import dev.ruurd.photos.core.database.entity.TimelineMediaProjection
-import dev.ruurd.photos.data.repository.TimelineProjectionState
-import dev.ruurd.photos.data.repository.TimelineProjectionStore
 import dev.ruurd.photos.domain.repository.MediaRepository
+import dev.ruurd.photos.domain.repository.TimelineProjectionSource
+import dev.ruurd.photos.domain.repository.TimelineProjectionState
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
@@ -24,7 +24,7 @@ import kotlinx.coroutines.flow.map
 class ObserveTimelineUseCase(
     private val mediaRepository: MediaRepository,
     private val dispatchers: AppDispatchers,
-    private val timelineProjectionStore: TimelineProjectionStore? = null,
+    private val timelineProjectionStore: TimelineProjectionSource? = null,
 ) {
     operator fun invoke(): Flow<List<TimelineMediaProjection>> = channelFlow {
         send(mediaRepository.getTimelineStage1().first())

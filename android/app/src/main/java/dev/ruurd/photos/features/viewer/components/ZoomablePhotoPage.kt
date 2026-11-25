@@ -24,16 +24,15 @@ import androidx.compose.ui.platform.LocalContext
 import coil3.BitmapImage
 import coil3.SingletonImageLoader
 import coil3.compose.AsyncImage
-import coil3.compose.asPainter
-import coil3.request.CachePolicy
 import coil3.request.ImageRequest
 import dev.ruurd.photos.core.database.entity.TimelineMediaProjection
 import dev.ruurd.photos.core.image.LocalMemoryCacheKeyRegistry
-import dev.ruurd.photos.core.image.MediaImageRequests
 import kotlinx.coroutines.delay
 import me.saket.telephoto.zoomable.DoubleClickToZoomListener
 import me.saket.telephoto.zoomable.ZoomSpec
 import me.saket.telephoto.zoomable.ZoomableContentLocation
+import me.saket.telephoto.zoomable.ZoomableImageState
+import me.saket.telephoto.zoomable.ZoomableState
 import me.saket.telephoto.zoomable.coil3.ZoomableAsyncImage
 import me.saket.telephoto.zoomable.rememberZoomableImageState
 import me.saket.telephoto.zoomable.rememberZoomableState
@@ -128,8 +127,8 @@ fun ZoomablePhotoPage(
     }
 
     val fullResReady = showDualOverlay &&
-        hasDisplayedFullResInFullQuality &&
-        !isPreviewZoomed
+            hasDisplayedFullResInFullQuality &&
+            !isPreviewZoomed
 
     val activeZoomableState = if (fullResReady && fullResZoomableState != null) {
         fullResZoomableState
@@ -208,9 +207,7 @@ fun ZoomablePhotoPage(
 
     // Synchronous O(1) memory-cache painter so frame 1 is never blank while Coil resolves.
     val syncFallbackPainter = remember(item.id, memoryCacheKeyRegistry, imageLoader, context) {
-        memoryCacheKeyRegistry.get(item.id)
-            ?.let { key -> imageLoader.memoryCache?.get(key)?.image }
-            ?.asPainter(context)
+        memoryCacheKeyRegistry.peekPainter(imageLoader, context, item.id)
     }
 
     val previewRequest = rememberPhotoPreviewRequest(
@@ -256,7 +253,7 @@ fun ZoomablePhotoPage(
     }
 
     val hasSubSamplingLayer = (showDualOverlay && fullResImageState?.isImageDisplayed == true) ||
-        (upgradedInPreview && fullResData != null)
+            (upgradedInPreview && fullResData != null)
     val currentOnHdrStateChanged by rememberUpdatedState(onHdrStateChanged)
     val currentOnSyncWindowColorMode by rememberUpdatedState(onSyncWindowColorMode)
     val currentOnPageDisposed by rememberUpdatedState(onPageDisposed)
@@ -305,35 +302,56 @@ fun ZoomablePhotoPage(
         }
 
         if (!fullResReady) {
-            if (useSimpleZoomablePreview) {
-                AsyncImage(
-                    model = previewRequest,
-                    contentDescription = null,
-                    contentScale = ContentScale.Fit,
-                    onSuccess = { state ->
-                        isPreviewDisplayed = true
-                        previewIntrinsicSize = state.painter.intrinsicSize
-                    },
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .zoomable(
-                            state = previewZoomableState,
-                            onClick = { onTap() },
-                            onDoubleClick = DoubleClickToZoomListener.cycle(DOUBLE_TAP_MAX_ZOOM_FACTOR),
-                        ),
-                )
-            } else {
-                ZoomableAsyncImage(
-                    model = inPlaceUpgradeRequest,
-                    contentDescription = null,
-                    state = previewImageState,
+            PreviewZoomableLayer(
+                useSimplePreview = useSimpleZoomablePreview,
+                previewRequest = previewRequest,
+                inPlaceUpgradeRequest = inPlaceUpgradeRequest,
+                previewZoomableState = previewZoomableState,
+                previewImageState = previewImageState,
+                onTap = onTap,
+                onSimplePreviewReady = { intrinsicSize ->
+                    isPreviewDisplayed = true
+                    previewIntrinsicSize = intrinsicSize
+                },
+            )
+        }
+    }
+}
+
+@Composable
+private fun PreviewZoomableLayer(
+    useSimplePreview: Boolean,
+    previewRequest: ImageRequest?,
+    inPlaceUpgradeRequest: ImageRequest?,
+    previewZoomableState: ZoomableState,
+    previewImageState: ZoomableImageState,
+    onTap: () -> Unit,
+    onSimplePreviewReady: (Size) -> Unit,
+) {
+    if (useSimplePreview) {
+        AsyncImage(
+            model = previewRequest,
+            contentDescription = null,
+            contentScale = ContentScale.Fit,
+            onSuccess = { state -> onSimplePreviewReady(state.painter.intrinsicSize) },
+            modifier = Modifier
+                .fillMaxSize()
+                .zoomable(
+                    state = previewZoomableState,
                     onClick = { onTap() },
                     onDoubleClick = DoubleClickToZoomListener.cycle(DOUBLE_TAP_MAX_ZOOM_FACTOR),
-                    contentScale = ContentScale.Fit,
-                    modifier = Modifier.fillMaxSize(),
-                )
-            }
-        }
+                ),
+        )
+    } else {
+        ZoomableAsyncImage(
+            model = inPlaceUpgradeRequest,
+            contentDescription = null,
+            state = previewImageState,
+            onClick = { onTap() },
+            onDoubleClick = DoubleClickToZoomListener.cycle(DOUBLE_TAP_MAX_ZOOM_FACTOR),
+            contentScale = ContentScale.Fit,
+            modifier = Modifier.fillMaxSize(),
+        )
     }
 }
 

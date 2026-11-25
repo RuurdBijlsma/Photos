@@ -1,5 +1,7 @@
 package dev.ruurd.photos.domain.model
 
+import dev.ruurd.photos.core.database.entity.MediaEntity
+import dev.ruurd.photos.core.database.entity.SyncStatus
 import kotlin.math.abs
 
 /**
@@ -29,4 +31,40 @@ object PassOneDeduplication {
         val remainder = diff % OFFSET_STEP_MS
         return remainder < TIMESTAMP_TOLERANCE_MS || OFFSET_STEP_MS - remainder < TIMESTAMP_TOLERANCE_MS
     }
+
+    /** First unlinked [candidates] row matching [ratio] and [sortTimestamp], skipping [excludeIds]. */
+    fun findMatch(
+        candidates: Iterable<MediaEntity>,
+        excludeIds: Set<String>,
+        ratio: Float,
+        sortTimestamp: Long,
+    ): MediaEntity? = candidates.firstOrNull { candidate ->
+        candidate.id !in excludeIds &&
+                isMatch(
+                    cloudRatio = ratio,
+                    cloudSortTimestamp = sortTimestamp,
+                    localRatio = candidate.ratio,
+                    localTimestampMs = candidate.sortTimestamp,
+                )
+    }
+
+    /**
+     * Merges a local file row with its matching cloud item into one canonical `SYNCED` row,
+     * keeping the local URI/folder details and the server's authoritative media metadata.
+     */
+    fun mergeSynced(
+        local: MediaEntity,
+        cloud: MediaEntity,
+        id: String,
+    ): MediaEntity = cloud.copy(
+        id = id,
+        localContentUri = local.localContentUri,
+        bucketId = local.bucketId,
+        bucketName = local.bucketName,
+        relativePath = local.relativePath,
+        blake3Hash = local.blake3Hash,
+        isVisibleInTimeline = true,
+        autoBackupSuppressed = false,
+        syncStatus = SyncStatus.SYNCED,
+    )
 }

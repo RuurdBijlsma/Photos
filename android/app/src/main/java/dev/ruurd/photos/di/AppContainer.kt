@@ -42,6 +42,7 @@ import dev.ruurd.photos.domain.repository.DeviceFolderRepository
 import dev.ruurd.photos.domain.repository.LocalMediaStore
 import dev.ruurd.photos.domain.repository.MediaDetailsRepository
 import dev.ruurd.photos.domain.repository.MediaRepository
+import dev.ruurd.photos.domain.repository.TimelineProjectionSource
 import dev.ruurd.photos.domain.usecase.CalculateTimelineLayoutUseCase
 import dev.ruurd.photos.domain.usecase.ObserveTimelineUseCase
 import dev.ruurd.photos.domain.usecase.ScanLocalMediaUseCase
@@ -87,7 +88,7 @@ interface AppContainer {
     val lanServerScanner: LanServerScanner
     val imageLoader: ImageLoader
     val memoryCacheKeyRegistry: MemoryCacheKeyRegistry
-    val timelineProjectionStore: TimelineProjectionStore
+    val timelineProjectionStore: TimelineProjectionSource
     val bootstrapState: BootstrapState
     val mediaDetailsRepository: MediaDetailsRepository
     val fullResFileCache: FullResFileStore
@@ -330,7 +331,7 @@ class DefaultAppContainer(private val context: Context) : AppContainer {
         // Reached only after `SessionManager` loaded its persisted state, since that gates auth.
         BootstrapState(
             needsBootstrap = sessionManager.latestSyncTimestamp.value <= 0L &&
-                !sessionManager.hasScanSignature.value,
+                    !sessionManager.hasScanSignature.value,
         )
     }
 

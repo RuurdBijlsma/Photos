@@ -1,6 +1,7 @@
 package dev.ruurd.photos.data.repository
 
 import dev.ruurd.photos.core.database.entity.MediaEntity
+import dev.ruurd.photos.domain.repository.TimelineProjectionState
 import dev.ruurd.photos.testing.FakeMediaRepository
 import dev.ruurd.photos.testing.TestAppDispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi

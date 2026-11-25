@@ -66,6 +66,54 @@ class ViewerSystemBars(private val window: Window?, private val isDarkTheme: Boo
     }
 }
 
+/**
+ * Coordinates `window.colorMode` across pager transitions so disposing an outgoing page's
+ * `SubSamplingImage` does not briefly drop HDR before the incoming page upgrades to full-res.
+ */
+@Stable
+class ViewerHdrCoordinator(
+    private val systemBars: ViewerSystemBars,
+) {
+    private val visiblePreviewHdrPages = HashSet<String>()
+    private val visibleSubSamplingPages = HashSet<String>()
+    var isViewerActive: Boolean = false
+
+    fun updatePage(
+        mediaId: String,
+        isVisible: Boolean,
+        previewHasGainmap: Boolean,
+        hasSubSamplingLayer: Boolean,
+    ) {
+        if (isVisible && previewHasGainmap) {
+            visiblePreviewHdrPages.add(mediaId)
+        } else {
+            visiblePreviewHdrPages.remove(mediaId)
+        }
+        if (isVisible && hasSubSamplingLayer) {
+            visibleSubSamplingPages.add(mediaId)
+        } else {
+            visibleSubSamplingPages.remove(mediaId)
+        }
+    }
+
+    fun removePage(mediaId: String) {
+        visiblePreviewHdrPages.remove(mediaId)
+        visibleSubSamplingPages.remove(mediaId)
+    }
+
+    fun syncWindowColorMode() {
+        if (!isViewerActive) return
+        when {
+            visiblePreviewHdrPages.isNotEmpty() -> systemBars.setHdrColorMode(true)
+
+            visibleSubSamplingPages.isEmpty() -> systemBars.setHdrColorMode(false)
+
+            // When a visible page has a SubSamplingImage mounted and no visible preview carries a
+            // gainmap (e.g., cloud-only HDR JPEG whose AVIF preview is SDR), Telephoto owns HDR.
+        }
+    }
+}
+
 @Composable
 fun rememberViewerSystemBars(): ViewerSystemBars {
     val window = LocalActivity.current?.window

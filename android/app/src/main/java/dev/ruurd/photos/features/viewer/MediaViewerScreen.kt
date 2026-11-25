@@ -13,7 +13,6 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
-import androidx.compose.runtime.Stable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -41,13 +40,14 @@ import dev.ruurd.photos.features.viewer.components.HeroImageOverlay
 import dev.ruurd.photos.features.viewer.components.MediaInfoPanel
 import dev.ruurd.photos.features.viewer.components.VideoPlayBadge
 import dev.ruurd.photos.features.viewer.components.ViewerChromeOverlay
+import dev.ruurd.photos.features.viewer.components.ViewerHdrCoordinator
 import dev.ruurd.photos.features.viewer.components.ViewerPreSyncScrollEffect
 import dev.ruurd.photos.features.viewer.components.ViewerPrefetchEffect
-import dev.ruurd.photos.features.viewer.components.ViewerSystemBars
 import dev.ruurd.photos.features.viewer.components.ViewerSystemBarsEffect
 import dev.ruurd.photos.features.viewer.components.ZoomablePhotoPage
 import dev.ruurd.photos.features.viewer.components.rememberMediaViewerTransitionState
 import dev.ruurd.photos.features.viewer.components.rememberViewerSystemBars
+import dev.ruurd.photos.features.viewer.components.viewerVerticalGestures
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.filterNotNull
@@ -280,7 +280,7 @@ fun MediaViewerScreen(
         modifier = modifier
             .fillMaxSize()
             .onSizeChanged(transition::onSizeChanged)
-            .then(with(transition) { Modifier.dismissDragModifier() }),
+            .viewerVerticalGestures(transition),
     ) {
         // Backdrop scrim
         Box(
@@ -292,7 +292,7 @@ fun MediaViewerScreen(
         // Interactive Pager Layer (hidden only while ClosingHeroOverlay is flying back to the tile)
         if (transition.closingState == null && items.isNotEmpty()) {
             val isPagerScrollEnabled = !isZoomed && !transition.isDragging &&
-                !transition.isDraggingInfo && !transition.isOpeningHero
+                    !transition.isDraggingInfo && !transition.isOpeningHero
 
             Box(
                 modifier = Modifier
@@ -320,10 +320,10 @@ fun MediaViewerScreen(
                             val isOffscreen by remember(pagerState, page) {
                                 derivedStateOf {
                                     (!pagerState.isScrollInProgress && pagerState.settledPage != page) ||
-                                        abs(
-                                            (page - pagerState.currentPage) -
-                                                pagerState.currentPageOffsetFraction,
-                                        ) >= 1f
+                                            abs(
+                                                (page - pagerState.currentPage) -
+                                                        pagerState.currentPageOffsetFraction,
+                                            ) >= 1f
                                 }
                             }
                             val itemDetails = uiState.detailsById[item.id]
@@ -356,7 +356,7 @@ fun MediaViewerScreen(
                                         },
                                         fullResFile = uiState.fullResFiles[item.id],
                                         isInfoPanelRequested = isCurrentPage &&
-                                            transition.isInfoPanelRequested,
+                                                transition.isInfoPanelRequested,
                                         onFullResRequested = { viewModel.requestFullRes(item) },
                                         onZoomFractionChanged = { fraction ->
                                             if (page == pagerState.currentPage) {
@@ -408,9 +408,9 @@ fun MediaViewerScreen(
                                         },
                                     ) { measurables, constraints ->
                                         val minSheetHeight = (
-                                            constraints.maxHeight -
-                                                transition.sheetRestTopPx.roundToInt()
-                                            ).coerceAtLeast(0)
+                                                constraints.maxHeight -
+                                                        transition.sheetRestTopPx.roundToInt()
+                                                ).coerceAtLeast(0)
                                         val childConstraints = constraints.copy(
                                             minHeight = minSheetHeight,
                                             maxHeight = Constraints.Infinity,
@@ -463,7 +463,7 @@ fun MediaViewerScreen(
         val backButtonAlpha = transition.backButtonAlpha(chromeVisibilityAlpha)
         if (chromeAlpha > 0.01f || backButtonAlpha > 0.01f) {
             val hasLocalOrExistingServer = activeItem != null &&
-                (activeItem.localContentUri != null || activeDetails?.isMissing != true)
+                    (activeItem.localContentUri != null || activeDetails?.isMissing != true)
             ViewerChromeOverlay(
                 alpha = chromeAlpha,
                 backButtonAlpha = backButtonAlpha,
@@ -506,52 +506,6 @@ fun MediaViewerScreen(
                     }
                 },
             )
-        }
-    }
-}
-
-/**
- * Coordinates `window.colorMode` across pager transitions so disposing an outgoing page's
- * `SubSamplingImage` does not briefly drop HDR before the incoming page upgrades to full-res.
- */
-@Stable
-private class ViewerHdrCoordinator(
-    private val systemBars: ViewerSystemBars,
-) {
-    private val visiblePreviewHdrPages = HashSet<String>()
-    private val visibleSubSamplingPages = HashSet<String>()
-    var isViewerActive: Boolean = false
-
-    fun updatePage(
-        mediaId: String,
-        isVisible: Boolean,
-        previewHasGainmap: Boolean,
-        hasSubSamplingLayer: Boolean,
-    ) {
-        if (isVisible && previewHasGainmap) {
-            visiblePreviewHdrPages.add(mediaId)
-        } else {
-            visiblePreviewHdrPages.remove(mediaId)
-        }
-        if (isVisible && hasSubSamplingLayer) {
-            visibleSubSamplingPages.add(mediaId)
-        } else {
-            visibleSubSamplingPages.remove(mediaId)
-        }
-    }
-
-    fun removePage(mediaId: String) {
-        visiblePreviewHdrPages.remove(mediaId)
-        visibleSubSamplingPages.remove(mediaId)
-    }
-
-    fun syncWindowColorMode() {
-        if (!isViewerActive) return
-        when {
-            visiblePreviewHdrPages.isNotEmpty() -> systemBars.setHdrColorMode(true)
-            visibleSubSamplingPages.isEmpty() -> systemBars.setHdrColorMode(false)
-            // When a visible page has a SubSamplingImage mounted and no visible preview carries a
-            // gainmap (e.g., cloud-only HDR JPEG whose AVIF preview is SDR), Telephoto owns HDR.
         }
     }
 }

@@ -1,10 +1,12 @@
 package dev.ruurd.photos.features.viewer.components
 
+import android.content.Context
 import android.net.Uri
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import coil3.BitmapImage
+import coil3.memory.MemoryCache
 import coil3.request.CachePolicy
 import coil3.request.ImageRequest
 import dev.ruurd.photos.core.database.entity.TimelineMediaProjection
@@ -50,28 +52,21 @@ internal fun rememberPhotoFullResRequest(
     localUri: Uri?,
     memoryCacheKeyRegistry: MemoryCacheKeyRegistry,
     onLocalFullResFailed: () -> Unit,
-): ImageRequest? {
+): ImageRequest {
     val context = LocalContext.current
     return remember(item.id, data, fullResFile, localUri) {
-        ImageRequest.Builder(context)
-            .data(data)
-            .apply {
-                // Full-res originals live in full_res_cache/, never in Coil's 1 GB image cache.
-                if (fullResFile != null) diskCachePolicy(CachePolicy.DISABLED)
-            }
-            // Omit placeholderMemoryCacheKey on the dual-layer fullResZoomableState so it doesn't
-            // emit a PainterDelegate before SubSamplingDelegate; the preview layer covers it.
-            .listener(
-                onSuccess = { _, result ->
-                    result.memoryCacheKey?.let { key ->
-                        memoryCacheKeyRegistry.put(item.id, key)
-                    }
-                },
-                onError = { _, _ ->
-                    if (fullResFile == null && localUri != null) onLocalFullResFailed()
-                },
-            )
-            .build()
+        // Omit placeholderMemoryCacheKey on the dual-layer fullResZoomableState so it doesn't
+        // emit a PainterDelegate before SubSamplingDelegate; the preview layer covers it.
+        buildFullResImageRequest(
+            context = context,
+            itemId = item.id,
+            data = data,
+            fullResFile = fullResFile,
+            localUri = localUri,
+            placeholderKey = null,
+            memoryCacheKeyRegistry = memoryCacheKeyRegistry,
+            onLocalFullResFailed = onLocalFullResFailed,
+        )
     }
 }
 
@@ -98,26 +93,46 @@ internal fun rememberPhotoInPlaceUpgradeRequest(
         memoryCacheKeyRegistry,
     ) {
         if (upgradedInPreview && data != null) {
-            val placeholderKey = memoryCacheKeyRegistry.get(item.id)
-            ImageRequest.Builder(context)
-                .data(data)
-                .apply {
-                    if (fullResFile != null) diskCachePolicy(CachePolicy.DISABLED)
-                    placeholderKey?.let(::placeholderMemoryCacheKey)
-                }
-                .listener(
-                    onSuccess = { _, result ->
-                        result.memoryCacheKey?.let { key ->
-                            memoryCacheKeyRegistry.put(item.id, key)
-                        }
-                    },
-                    onError = { _, _ ->
-                        if (fullResFile == null && localUri != null) onLocalFullResFailed()
-                    },
-                )
-                .build()
+            buildFullResImageRequest(
+                context = context,
+                itemId = item.id,
+                data = data,
+                fullResFile = fullResFile,
+                localUri = localUri,
+                placeholderKey = memoryCacheKeyRegistry.get(item.id),
+                memoryCacheKeyRegistry = memoryCacheKeyRegistry,
+                onLocalFullResFailed = onLocalFullResFailed,
+            )
         } else {
             previewRequest
         }
     }
 }
+
+private fun buildFullResImageRequest(
+    context: Context,
+    itemId: String,
+    data: Any?,
+    fullResFile: File?,
+    localUri: Uri?,
+    placeholderKey: MemoryCache.Key?,
+    memoryCacheKeyRegistry: MemoryCacheKeyRegistry,
+    onLocalFullResFailed: () -> Unit,
+): ImageRequest = ImageRequest.Builder(context)
+    .data(data)
+    .apply {
+        // Full-res originals live in full_res_cache/, never in Coil's 1 GB image cache.
+        if (fullResFile != null) diskCachePolicy(CachePolicy.DISABLED)
+        placeholderKey?.let(::placeholderMemoryCacheKey)
+    }
+    .listener(
+        onSuccess = { _, result ->
+            result.memoryCacheKey?.let { key ->
+                memoryCacheKeyRegistry.put(itemId, key)
+            }
+        },
+        onError = { _, _ ->
+            if (fullResFile == null && localUri != null) onLocalFullResFailed()
+        },
+    )
+    .build()

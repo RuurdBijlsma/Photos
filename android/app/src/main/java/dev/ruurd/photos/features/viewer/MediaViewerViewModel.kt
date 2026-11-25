@@ -11,13 +11,13 @@ import dev.ruurd.photos.core.database.entity.TimelineMediaProjection
 import dev.ruurd.photos.core.database.entity.toTimelineProjection
 import dev.ruurd.photos.core.image.FullResFileStore
 import dev.ruurd.photos.data.datasource.local.LocalMediaInfoSource
-import dev.ruurd.photos.data.repository.TimelineProjectionState
-import dev.ruurd.photos.data.repository.TimelineProjectionStore
 import dev.ruurd.photos.domain.model.FullResEligibility
 import dev.ruurd.photos.domain.model.LocalMediaInfo
 import dev.ruurd.photos.domain.model.MediaDetails
 import dev.ruurd.photos.domain.repository.MediaDetailsRepository
 import dev.ruurd.photos.domain.repository.MediaRepository
+import dev.ruurd.photos.domain.repository.TimelineProjectionSource
+import dev.ruurd.photos.domain.repository.TimelineProjectionState
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.ImmutableMap
 import kotlinx.collections.immutable.ImmutableSet
@@ -65,7 +65,7 @@ data class MediaViewerUiState(
 
 class MediaViewerViewModel(
     private val initialMediaId: String,
-    private val timelineProjectionStore: TimelineProjectionStore,
+    private val timelineProjectionStore: TimelineProjectionSource,
     private val mediaRepository: MediaRepository,
     private val mediaDetailsRepository: MediaDetailsRepository,
     private val fullResFileCache: FullResFileStore,
@@ -137,7 +137,7 @@ class MediaViewerViewModel(
             }
         }
 
-        // Observe continuous Stage 2 emissions from TimelineProjectionStore
+        // Observe continuous Stage 2 emissions from TimelineProjectionSource
         viewModelScope.launch(dispatchers.default) {
             timelineProjectionStore.state.collectLatest { state ->
                 if (state is TimelineProjectionState.Loaded) {
@@ -246,7 +246,7 @@ class MediaViewerViewModel(
         val item = state.items.firstOrNull { it.id == state.activeMediaId } ?: return
         val cloudId = item.cloudId ?: return
         val hasFreshDetails = state.detailsById[item.id]?.cloudId == cloudId &&
-            item.id !in state.failedDetailsIds
+                item.id !in state.failedDetailsIds
         if (!hasFreshDetails && currentItemInfoJob?.isActive != true) {
             loadActiveItemInfo(item)
         }

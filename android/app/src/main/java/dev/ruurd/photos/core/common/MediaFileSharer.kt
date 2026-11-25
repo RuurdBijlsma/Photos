@@ -10,17 +10,12 @@ import dev.ruurd.photos.core.database.entity.TimelineMediaProjection
 import dev.ruurd.photos.core.image.FullResFileStore
 import dev.ruurd.photos.core.image.ShareCache
 import dev.ruurd.photos.core.network.SessionManager
-import dev.ruurd.photos.core.network.await
+import dev.ruurd.photos.core.network.downloadMediaFile
 import dev.ruurd.photos.domain.model.LocalMediaInfo
 import dev.ruurd.photos.domain.model.MediaDetails
 import dev.ruurd.photos.domain.model.MediaFileNames
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.ensureActive
-import kotlinx.coroutines.job
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
-import okhttp3.Request
 import java.io.File
 import java.io.IOException
 import java.util.Locale
@@ -161,7 +156,22 @@ class DefaultMediaFileSharer(
         shareCache.peek(key, expectedFileName = expectedName)?.let { return it }
 
         return if (isVideo) {
-            downloadToShareCache(cloudId, key, details?.fileName, details?.mimeType)
+            // Large cloud videos bypass the 500 MB photo cache and land in `share_cache` directly.
+            okHttpClient.downloadMediaFile(
+                serverUrl = sessionManager.getServerUrl(),
+                cloudId = cloudId,
+                isVideo = true,
+                knownFileName = details?.fileName,
+                knownMimeType = details?.mimeType,
+            ) { meta, copyBody ->
+                shareCache.stageInto(
+                    id = key,
+                    fileName = meta.fileName,
+                    isVideo = true,
+                    mimeType = meta.mimeType,
+                    write = copyBody,
+                )
+            }
         } else {
             val cached = fullResFileCache.get(cloudId, details?.fileName) ?: return null
             val targetName = details?.fileName ?: cached.name
@@ -173,57 +183,6 @@ class DefaultMediaFileSharer(
             ) { output ->
                 cached.inputStream().use { it.copyTo(output) }
             }
-        }
-    }
-
-    /** Large cloud videos bypass the 500 MB photo cache and land in `share_cache` directly. */
-    private suspend fun downloadToShareCache(
-        cloudId: String,
-        key: String,
-        knownFileName: String?,
-        knownMimeType: String?,
-    ): File? = withContext(dispatchers.io) {
-        val job = currentCoroutineContext().job
-        val request = Request.Builder()
-            .url("${sessionManager.getServerUrl()}/api/photos/$cloudId/download")
-            .build()
-        try {
-            okHttpClient.newCall(request).await().use { response ->
-                if (!response.isSuccessful) return@withContext null
-                val responseMime = knownMimeType
-                    ?: response.header("Content-Type")?.substringBefore(';')?.trim()
-                val fileName = knownFileName?.takeIf { it.isNotBlank() }
-                    ?: MediaFileNames.parseContentDispositionFilename(
-                        response.header("Content-Disposition"),
-                    )
-                    ?: MediaFileNames.fallbackName(
-                        cloudId = cloudId,
-                        isVideo = true,
-                        mimeType = responseMime,
-                    )
-                val buffer = ByteArray(STREAM_BUFFER_BYTES)
-                shareCache.stageInto(
-                    id = key,
-                    fileName = fileName,
-                    isVideo = true,
-                    mimeType = responseMime,
-                ) { output ->
-                    response.body.byteStream().use { input ->
-                        while (true) {
-                            job.ensureActive()
-                            val read = input.read(buffer)
-                            if (read < 0) break
-                            output.write(buffer, 0, read)
-                        }
-                    }
-                }
-            }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (_: IOException) {
-            null
-        } catch (_: Exception) {
-            null
         }
     }
 
@@ -277,8 +236,4 @@ class DefaultMediaFileSharer(
     }
 
     private fun defaultMime(isVideo: Boolean): String = if (isVideo) "video/*" else "image/*"
-
-    private companion object {
-        const val STREAM_BUFFER_BYTES = 16 * 1024
-    }
 }

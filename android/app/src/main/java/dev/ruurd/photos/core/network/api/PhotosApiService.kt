@@ -12,6 +12,11 @@ import retrofit2.http.POST
 import retrofit2.http.Path
 import retrofit2.http.Query
 
+/**
+ * Authenticated Retrofit endpoints. Note that `/api/auth/refresh` and `/api/auth/logout` are
+ * called directly via dedicated short-timeout OkHttp clients in `AuthAuthenticator` and
+ * `AuthRepositoryImpl` (to avoid recursive 401 loops and offline sign-out hangs).
+ */
 interface PhotosApiService {
 
     @GET("api/health")
@@ -22,12 +27,6 @@ interface PhotosApiService {
     suspend fun login(
         @Body request: RequestBody,
     ): Response<ResponseBody>
-
-    @POST("api/auth/refresh")
-    suspend fun refresh(): Response<ResponseBody>
-
-    @POST("api/auth/logout")
-    suspend fun logout(): Response<ResponseBody>
 
     @GET("api/auth/me")
     suspend fun getMe(): Response<ResponseBody>

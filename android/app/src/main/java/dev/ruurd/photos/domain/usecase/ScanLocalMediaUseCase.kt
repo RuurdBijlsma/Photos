@@ -107,11 +107,11 @@ class ScanLocalMediaUseCase(
             // to CLOUD_ONLY before Pass 1 links the replacement MediaStore URI.
             val removed =
                 reconcileRemovalsFromFiles(access.isFull(images = true), images, initialImageRows) +
-                    reconcileRemovalsFromFiles(access.isFull(images = false), videos, initialVideoRows)
+                        reconcileRemovalsFromFiles(access.isFull(images = false), videos, initialVideoRows)
 
             val currentLocalRows = if (removed > 0) {
                 mediaRepository.getLocalRows(isVideo = false) +
-                    mediaRepository.getLocalRows(isVideo = true)
+                        mediaRepository.getLocalRows(isVideo = true)
             } else {
                 initialImageRows + initialVideoRows
             }
@@ -361,17 +361,13 @@ class ScanLocalMediaUseCase(
         matchedCloudRowIds: MutableSet<String>,
         toUpsert: MutableList<MediaEntity>,
     ): Boolean {
-        val match = mediaRepository
-            .findBySizesAndStatus(listOf(local.sizeBytes), SyncStatus.CLOUD_ONLY)
-            .firstOrNull { candidate ->
-                candidate.id !in matchedCloudRowIds &&
-                    PassOneDeduplication.isMatch(
-                        cloudRatio = candidate.ratio,
-                        cloudSortTimestamp = candidate.sortTimestamp,
-                        localRatio = local.ratio,
-                        localTimestampMs = local.sortTimestamp,
-                    )
-            }
+        val candidates = mediaRepository.findBySizesAndStatus(listOf(local.sizeBytes), SyncStatus.CLOUD_ONLY)
+        val match = PassOneDeduplication.findMatch(
+            candidates = candidates,
+            excludeIds = matchedCloudRowIds,
+            ratio = local.ratio,
+            sortTimestamp = local.sortTimestamp,
+        )
 
         if (match == null) {
             toUpsert.add(local)
@@ -379,16 +375,7 @@ class ScanLocalMediaUseCase(
         }
 
         matchedCloudRowIds.add(match.id)
-        toUpsert.add(
-            match.copy(
-                localContentUri = local.localContentUri,
-                bucketId = local.bucketId,
-                bucketName = local.bucketName,
-                relativePath = local.relativePath,
-                syncStatus = SyncStatus.SYNCED,
-                isVisibleInTimeline = true,
-            ),
-        )
+        toUpsert.add(PassOneDeduplication.mergeSynced(local = local, cloud = match, id = match.id))
         return true
     }
 
@@ -446,10 +433,10 @@ class ScanLocalMediaUseCase(
         val generation: Long,
     ) {
         fun matchesContext(other: ScanWatermark): Boolean = dbVersion == other.dbVersion &&
-            mediaStoreVersion == other.mediaStoreVersion &&
-            imageAccess == other.imageAccess &&
-            videoAccess == other.videoAccess &&
-            zoneId == other.zoneId
+                mediaStoreVersion == other.mediaStoreVersion &&
+                imageAccess == other.imageAccess &&
+                videoAccess == other.videoAccess &&
+                zoneId == other.zoneId
 
         fun serialize(): String = "$dbVersion|$mediaStoreVersion|$imageAccess|$videoAccess|$zoneId|$generation"
 

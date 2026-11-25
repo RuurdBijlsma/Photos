@@ -1,4 +1,3 @@
-
 package dev.ruurd.photos.data.repository
 
 import dev.ruurd.photos.core.network.api.PhotosApiService
@@ -40,8 +39,6 @@ class MediaDetailsRepositoryImplTest {
 
         override suspend fun healthCheck(): Response<String> = Response.success("OK")
         override suspend fun login(request: RequestBody): Response<ResponseBody> = Response.success(null)
-        override suspend fun refresh(): Response<ResponseBody> = Response.success(null)
-        override suspend fun logout(): Response<ResponseBody> = Response.success(null)
         override suspend fun getMe(): Response<ResponseBody> = Response.success(null)
         override suspend fun getTimelineSync(since: Long?): Response<TimelineSyncResponse> = Response.success(TimelineSyncResponse.getDefaultInstance())
     }
