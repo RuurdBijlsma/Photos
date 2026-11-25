@@ -240,11 +240,12 @@ class ViewerVideoController(
 
         val sameItemSwitch = activeMediaId == mediaId && activeSourceKey != null
         if (sameItemSwitch) {
-            val resumePosMs = player.currentPosition.coerceAtLeast(0L)
-            val resumePlayWhenReady = if (player.playbackState == Player.STATE_IDLE) {
-                autoPlay
-            } else {
-                player.playWhenReady
+            val isEndedState = player.playbackState == Player.STATE_ENDED
+            val resumePosMs = if (isEndedState) 0L else player.currentPosition.coerceAtLeast(0L)
+            val resumePlayWhenReady = when {
+                player.playbackState == Player.STATE_IDLE -> autoPlay
+                isEndedState -> false
+                else -> player.playWhenReady
             }
             isQualitySwitch = hasRenderedFirstFrame
             activeSourceKey = sourceKey
@@ -255,6 +256,9 @@ class ViewerVideoController(
             player.setMediaItem(MediaItem.fromUri(uri), resumePosMs)
             player.playWhenReady = resumePlayWhenReady
             player.prepare()
+            if (isEndedState) {
+                positionMsState = 0L
+            }
         } else {
             isQualitySwitch = false
             hasRenderedFirstFrame = false
@@ -372,10 +376,16 @@ class ViewerVideoController(
         hasThumbnails: Boolean,
         isOnline: Boolean,
     ): VideoUnavailableReason {
-        if (!hasThumbnails && httpStatus == 404) {
+        if (httpStatus == 404 ||
+            httpStatus == 500 ||
+            error.errorCode == PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND
+        ) {
+            return VideoUnavailableReason.MISSING_SOURCE
+        }
+        if (!hasThumbnails && (httpStatus == 415 || error.errorCode in CODEC_OR_PARSING_ERROR_CODES)) {
             return VideoUnavailableReason.PROCESSING
         }
-        if (httpStatus in MISSING_HTTP_CODES || error.errorCode == PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND) {
+        if (httpStatus == 415) {
             return VideoUnavailableReason.MISSING_SOURCE
         }
         if (!isOnline ||
@@ -393,7 +403,6 @@ class ViewerVideoController(
         private const val BUFFER_FOR_PLAYBACK_MS = 1_000
         private const val BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS = 2_000
         private const val MAX_CAUSE_DEPTH = 8
-        private val MISSING_HTTP_CODES = setOf(404, 415, 500)
 
         private val CODEC_OR_PARSING_ERROR_CODES = setOf(
             PlaybackException.ERROR_CODE_PARSING_CONTAINER_MALFORMED,

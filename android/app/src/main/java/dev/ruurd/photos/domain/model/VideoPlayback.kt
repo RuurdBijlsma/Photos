@@ -1,5 +1,6 @@
 package dev.ruurd.photos.domain.model
 
+import androidx.compose.runtime.Immutable
 import java.util.Locale
 
 enum class VideoQuality(val storageKey: String) {
@@ -14,21 +15,26 @@ enum class VideoQuality(val storageKey: String) {
     }
 }
 
+@Immutable
 data class VideoQualityOption(
     val quality: VideoQuality,
     val label: String,
     val isEnabled: Boolean,
 )
 
+@Immutable
 sealed interface ResolvedVideoSource {
+    @Immutable
     data class Local(val uri: String) : ResolvedVideoSource
 
+    @Immutable
     data class Cloud(
         val url: String,
         val quality: VideoQuality,
         val requiresAuth: Boolean,
     ) : ResolvedVideoSource
 
+    @Immutable
     data class Unavailable(val reason: VideoUnavailableReason) : ResolvedVideoSource
 }
 

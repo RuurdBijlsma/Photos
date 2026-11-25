@@ -113,6 +113,9 @@ fun VideoPlayerPage(
         contentAlignment = Alignment.Center,
     ) {
         if (canAttachPlayer) {
+            // Guard against Video A's last frame flashing before Video B's first frame renders.
+            val awaitingFirstFrame = videoController.activeMediaId != item.id ||
+                    (!videoController.hasRenderedFirstFrame && !videoController.isQualitySwitch)
             ContentFrame(
                 player = videoController.player,
                 surfaceType = SURFACE_TYPE_TEXTURE_VIEW,
@@ -120,17 +123,16 @@ fun VideoPlayerPage(
                 keepContentOnReset = videoController.isQualitySwitch,
                 modifier = Modifier.fillMaxSize(),
                 shutter = {
-                    VideoThumbnailShutter(
-                        item = item,
-                        baseUrl = baseUrl,
-                        modifier = Modifier.fillMaxSize(),
-                    )
+                    if (!awaitingFirstFrame) {
+                        VideoThumbnailShutter(
+                            item = item,
+                            baseUrl = baseUrl,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
                 },
             )
 
-            // Guard against Video A's last frame flashing before Video B's first frame renders.
-            val awaitingFirstFrame = videoController.activeMediaId != item.id ||
-                    (!videoController.hasRenderedFirstFrame && !videoController.isQualitySwitch)
             if (awaitingFirstFrame) {
                 VideoThumbnailShutter(
                     item = item,
