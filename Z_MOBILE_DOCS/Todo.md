@@ -286,29 +286,29 @@ still photos.)*
 
 ### 2B: Media Details, Full-Res Photo Cache, Info Sheet, Share & Copy
 
-* Add Retrofit `converter-kotlinx-serialization` (configured with `Json { ignoreUnknownKeys = true }`),
+* [✅ Done] Add Retrofit `converter-kotlinx-serialization` (configured with `Json { ignoreUnknownKeys = true }`),
   `androidx.exifinterface:exifinterface`, `ACCESS_MEDIA_LOCATION` in `AndroidManifest.xml` +
   `MediaPermissions.requestedPermissions`, and `FileProvider` (`AndroidManifest.xml` + `res/xml/file_paths.xml`
   including `<cache-path name="share_cache" path="share_cache/" />`). For existing Phase 1 upgraders who already granted
   `READ_MEDIA_IMAGES` / `READ_MEDIA_VIDEO` without `ACCESS_MEDIA_LOCATION`, request `ACCESS_MEDIA_LOCATION` once when
   needed or rely cleanly on the `try/catch` fallback around `MediaStore.setRequireOriginal(uri)`.
-* Implement `GET /api/photos/{cloudId}/item` (`MediaItemWithAlbums` `snake_case` DTOs with nullable `panorama_config`,
+* [✅ Done] Implement `GET /api/photos/{cloudId}/item` (`MediaItemWithAlbums` `snake_case` DTOs with nullable `panorama_config`,
   noting that every server photo endpoint takes `cloudId`) and `MediaDetailsRepository` (in-memory LRU cache, loading
   `currentPage` immediately while running `currentPage ± 1` neighbor prefetch inside the debounced/cancellable
   `settledPage` `collectLatest` alongside 2A's preview thumbnail prefetch). Hook `SyncTimelineUseCase` (via
   `MediaRefreshCoordinator`) to evict `upserted` and `deleted_ids` `cloudId`s from `MediaDetailsRepository` so edits
   made on the web client never leave stale metadata in the Info sheet.
-* Add `full_res_cache/` (~500 MB LRU) and `share_cache/`, and extend `SessionManager`'s `onClearSessionData` to clear
+* [✅ Done] Add `full_res_cache/` (~500 MB LRU) and `share_cache/`, and extend `SessionManager`'s `onClearSessionData` to clear
   `TimelineProjectionStore`, `MemoryCacheKeyRegistry`, `full_res_cache/`, `share_cache/`, and `MediaDetailsRepository`
   on sign-out / 401 token revocation.
-* Upgrade `ZoomableAsyncImage` for `CLOUD_ONLY` **photos** (`!isVideo`, including panoramas): wait for `/item` so
+* [✅ Done] Upgrade `ZoomableAsyncImage` for `CLOUD_ONLY` **photos** (`!isVideo`, including panoramas): wait for `/item` so
   `mime_type` and `missing_since == null` are known, then—only after `settledPage == pageIndex` settles for ~150–250ms
   (or immediately on zoom), cancelling on swipe away—fetch `/api/photos/{cloudId}/download` into `full_res_cache`
   (deduplicated per `cloudId` with temp-file atomic rename) and pass the `file://` URI (with
   `diskCachePolicy(CachePolicy.DISABLED)` and the captured `1440p` `MemoryCache.Key` placeholder) so JPEGs/PNGs/WebPs
   subsample with gainmaps while full-res AVIF/HEIC fall back to Coil without `BitmapRegionDecoder` failing; skip
   `/download` for videos, TIFF/TGA, or `missing_since != null`.
-* Build the swipe-up **Media Info Bottom Sheet** (`30.dp` rounded `surfaceContainerHigh`, gated on single-pointer
+* [✅ Done] Build the swipe-up **Media Info Bottom Sheet** (`30.dp` rounded `surfaceContainerHigh`, gated on single-pointer
   `zoomFraction <= 0.01f` on both photo and video pages and also opened via **About** in the top-right overflow menu):
     * Display capture date/time in photo's local timezone (parse naive `taken_at_local` via `LocalDateTime.parse(...)`
       online; `sortTimestamp + timezoneOffsetMinutes` offline), filename, resolution/size, user caption, weather
@@ -322,14 +322,14 @@ still photos.)*
     * Offline fallback via `MediaStore` display metadata + `ExifInterface` (photos, using
       `MediaStore.setRequireOriginal(uri)` guarded by `ACCESS_MEDIA_LOCATION` check + `try/catch` fallback) /
       `MediaMetadataRetriever` (videos) when `localContentUri != null`.
-* Implement **Share** (bottom pill — always shares the actual photo/video file via `Intent.ACTION_SEND` with
+* [✅ Done] Implement **Share** (bottom pill — always shares the actual photo/video file via `Intent.ACTION_SEND` with
   `FLAG_GRANT_READ_URI_PERMISSION`, using `localContentUri` directly when local with `share_cache` fallback on
   `SecurityException`, or staging `full_res_cache` into `share_cache/{id}/{filename}` + `FileProvider` when `CLOUD_ONLY`
   so receiving apps get the real filename and extension; fall back to `Content-Disposition` or
   `"photo_$cloudId.jpg"`/`"video_$cloudId.mp4"` if `/item` isn't loaded yet, download `TIFF`/`TGA` on demand unlike
   automatic viewer prefetch, stream large `CLOUD_ONLY` videos directly to `share_cache` without evicting the 500 MB
   photo cache, disable/guard when `missing_since != null`, and prune stale `share_cache` files periodically).
-* Implement **Copy** (top-right menu, photos only — hidden on videos and `missing_since != null`; copies image URI to
+* [✅ Done] Implement **Copy** (top-right menu, photos only — hidden on videos and `missing_since != null`; copies image URI to
   Android clipboard via `ClipData.newUri`, staging via `share_cache` + `FileProvider` for both `CLOUD_ONLY` and
   local/synced photos so third-party paste targets without `READ_MEDIA_IMAGES` or under partial access can always read
   clipboard data).
