@@ -1,7 +1,6 @@
 package dev.ruurd.photos.features.viewer
 
 import android.content.Intent
-import androidx.activity.result.IntentSenderRequest
 import androidx.compose.runtime.Immutable
 import androidx.core.net.toUri
 import androidx.lifecycle.ViewModel
@@ -39,6 +38,7 @@ import kotlinx.collections.immutable.persistentSetOf
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.collections.immutable.toPersistentMap
 import kotlinx.collections.immutable.toPersistentSet
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Job
@@ -84,6 +84,8 @@ data class MediaViewerUiState(
     val pendingRotationById: ImmutableMap<String, Int> = persistentMapOf(),
     /** Media ids with a rotate or reprocess request in flight. */
     val mutatingIds: ImmutableSet<String> = persistentSetOf(),
+    /** Bumped after in-place mutations (`SYNCED`/`LOCAL_ONLY`) so Telephoto/Coil reload the file. */
+    val imageRevisionById: ImmutableMap<String, Int> = persistentMapOf(),
 ) {
     val activeDetails: MediaDetails?
         get() = detailsById[activeMediaId]
@@ -123,10 +125,6 @@ class MediaViewerViewModel(
 
     private val _messages = MutableSharedFlow<String>(extraBufferCapacity = 4)
     val messages: SharedFlow<String> = _messages.asSharedFlow()
-
-    /** Consent dialogs the viewer's launcher has to show; `null` when nothing is pending. */
-    val writeConsentRequests: StateFlow<IntentSenderRequest?> =
-        mediaWriteConsent?.requests ?: MutableStateFlow<IntentSenderRequest?>(null).asStateFlow()
 
     private var currentItemInfoJob: Job? = null
     private var settleJob: Job? = null
@@ -225,13 +223,17 @@ class MediaViewerViewModel(
                         }
 
                         val activeIdx = state.items.indexOfFirst { it.id == current.activeMediaId }
+                        val redirectedNewId = if (activeIdx < 0) {
+                            redirectedIds[current.activeMediaId]
+                        } else {
+                            null
+                        }
                         // A CLOUD_ONLY rotate renames the row in Room; follow the new id instead of
                         // treating the old one as deleted.
                         val resolvedIdx = if (activeIdx >= 0) {
                             activeIdx
                         } else {
-                            redirectedIds[current.activeMediaId]
-                                ?.let { newId -> state.items.indexOfFirst { it.id == newId } }
+                            redirectedNewId?.let { newId -> state.items.indexOfFirst { it.id == newId } }
                                 ?: -1
                         }
                         val resolvedChrome = if (!hasUserToggledChrome && !hasResolvedInitialChrome && resolvedIdx >= 0) {
@@ -241,13 +243,20 @@ class MediaViewerViewModel(
                             current.isChromeVisible
                         }
                         if (resolvedIdx >= 0) {
+                            val resolvedId = state.items[resolvedIdx].id
+                            val migratedMutating = if (redirectedNewId != null && current.activeMediaId in current.mutatingIds) {
+                                (current.mutatingIds - current.activeMediaId + resolvedId).toPersistentSet()
+                            } else {
+                                current.mutatingIds
+                            }
                             current.copy(
                                 items = state.items,
-                                activeMediaId = state.items[resolvedIdx].id,
+                                activeMediaId = resolvedId,
                                 initialIndex = resolvedIdx,
                                 isChromeVisible = resolvedChrome,
                                 isActiveItemMissing = false,
                                 isProjectionLoading = false,
+                                mutatingIds = migratedMutating,
                             )
                         } else {
                             // Active item was deleted from Room while open: clamp to nearest index
@@ -523,10 +532,6 @@ class MediaViewerViewModel(
         }
     }
 
-    fun onWriteConsentResult(granted: Boolean) {
-        mediaWriteConsent?.onResult(granted)
-    }
-
     /** Asks the server to re-run ingest for the active item and refreshes its metadata. */
     fun reprocessActiveItem() {
         val state = _uiState.value
@@ -577,10 +582,10 @@ class MediaViewerViewModel(
         val useCase = rotateMediaUseCase ?: return
 
         val details = state.detailsFor(item)
-        val baseDegrees = MediaMutationPolicy.baseRotationDegrees(details, state.localInfoById[mediaId])
-        val targetDegrees = (baseDegrees + degrees) % 360
-        val targetOrientation = MediaMutationPolicy.orientationForDegrees(targetDegrees)
-        val newRatio = MediaMutationPolicy.rotatedRatio(item.ratio, baseDegrees, targetDegrees)
+        val localInfo = state.localInfoById[mediaId]
+        val baseOrientation = MediaMutationPolicy.baseOrientation(details, localInfo)
+        val targetOrientation = MediaMutationPolicy.rotatedOrientationByDegrees(baseOrientation, degrees)
+        val newRatio = MediaMutationPolicy.rotatedRatio(item.ratio, degrees)
 
         _uiState.update { current ->
             current.copy(mutatingIds = (current.mutatingIds + mediaId).toPersistentSet())
@@ -591,9 +596,23 @@ class MediaViewerViewModel(
                 _messages.tryEmit("Rotation cancelled")
                 return@launch
             }
-            useCase.commit(item, details, targetOrientation, newRatio)
+            useCase.commit(
+                item = item,
+                details = details,
+                targetOrientation = targetOrientation,
+                newRatio = newRatio,
+                onIdRedirect = { oldId, newId -> redirectedIds[oldId] = newId },
+            )
                 .onSuccess { outcome ->
-                    onRotationCommitted(mediaId, item, details, targetOrientation, newRatio, outcome)
+                    onRotationCommitted(
+                        mediaId = mediaId,
+                        item = item,
+                        details = details,
+                        localInfo = localInfo,
+                        targetOrientation = targetOrientation,
+                        newRatio = newRatio,
+                        outcome = outcome,
+                    )
                 }
                 .onFailure {
                     clearPendingRotation(mediaId)
@@ -602,10 +621,11 @@ class MediaViewerViewModel(
         }
     }
 
-    private fun onRotationCommitted(
+    private suspend fun onRotationCommitted(
         mediaId: String,
         item: TimelineMediaProjection,
         details: MediaDetails?,
+        localInfo: LocalMediaInfo?,
         targetOrientation: Int,
         newRatio: Float,
         outcome: RotateMediaUseCase.Outcome,
@@ -614,67 +634,117 @@ class MediaViewerViewModel(
         val newCloudId = outcome.newCloudId
         if (newMediaId != mediaId) redirectedIds[mediaId] = newMediaId
 
-        _uiState.update { current ->
-            var next = current.copy(
-                pendingRotationById = (current.pendingRotationById - mediaId).toPersistentMap(),
-                mutatingIds = (current.mutatingIds - mediaId).toPersistentSet(),
+        // Evict Coil & MemoryCacheKeyRegistry before clearing the optimistic preview turn or
+        // bumping imageRevisionById so re-composed tiles/pages never read the pre-rotation decode.
+        imageCacheEvictor?.evict(item)
+        if (newMediaId != mediaId) {
+            imageCacheEvictor?.evict(
+                item.copy(id = newMediaId, cloudId = newCloudId, hasThumbnails = false),
             )
-            if (details != null) {
-                next = next.copy(
-                    detailsById = (
-                        next.detailsById - mediaId + (
-                            newMediaId to details.copy(
-                                cloudId = newCloudId ?: details.cloudId,
-                                orientation = targetOrientation,
-                            )
-                            )
-                        ).toPersistentMap(),
-                )
-            }
-            if (newMediaId == mediaId) {
-                next.copy(
-                    items = next.items
-                        .map { if (it.id == mediaId) it.copy(ratio = newRatio) else it }
-                        .toImmutableList(),
-                )
-            } else {
-                next.copy(
-                    items = next.items
-                        .map {
-                            if (it.id == mediaId) {
-                                it.copy(
-                                    id = newMediaId,
-                                    cloudId = newCloudId,
-                                    ratio = newRatio,
-                                    hasThumbnails = false,
-                                )
-                            } else {
-                                it
-                            }
-                        }
-                        .toImmutableList(),
-                    activeMediaId = if (next.activeMediaId == mediaId) newMediaId else next.activeMediaId,
-                    localInfoById = next.localInfoById[mediaId]?.let { info ->
-                        (next.localInfoById - mediaId + (newMediaId to info)).toPersistentMap()
-                    } ?: next.localInfoById,
-                    fullResFiles = next.fullResFiles[mediaId]?.let { file ->
-                        (next.fullResFiles - mediaId + (newMediaId to file)).toPersistentMap()
-                    } ?: next.fullResFiles,
-                )
-            }
         }
 
-        val oldCloudId = item.cloudId
+        val fallbackUpdatedSize = outcome.updatedSizeBytes ?: outcome.warmedFullResFile?.length()?.takeIf { it > 0L }
+
+        _uiState.update { current ->
+            val nextRevision = (current.imageRevisionById[mediaId] ?: 0) + 1
+            val nextRevisions = (
+                current.imageRevisionById - mediaId + (newMediaId to nextRevision)
+                ).toPersistentMap()
+
+            // Drop the old/evicted fullRes entry and bind the freshly warmed rotated original if present.
+            val cleanedFullRes = current.fullResFiles - mediaId
+            val nextFullRes = if (outcome.warmedFullResFile != null && item.localContentUri == null) {
+                (cleanedFullRes + (newMediaId to outcome.warmedFullResFile)).toPersistentMap()
+            } else {
+                cleanedFullRes.toPersistentMap()
+            }
+
+            val nextDetails = if (details != null) {
+                (
+                    current.detailsById - mediaId + (
+                        newMediaId to details.copy(
+                            cloudId = newCloudId ?: details.cloudId,
+                            orientation = targetOrientation,
+                            sizeBytes = fallbackUpdatedSize ?: details.sizeBytes,
+                        )
+                        )
+                    ).toPersistentMap()
+            } else {
+                current.detailsById
+            }
+
+            val nextLocalInfo = if (localInfo != null) {
+                (
+                    current.localInfoById - mediaId + (
+                        newMediaId to localInfo.copy(
+                            orientation = targetOrientation,
+                            sizeBytes = fallbackUpdatedSize ?: localInfo.sizeBytes,
+                        )
+                        )
+                    ).toPersistentMap()
+            } else {
+                current.localInfoById
+            }
+
+            val nextItems = current.items.map { entry ->
+                when (entry.id) {
+                    mediaId -> entry.copy(
+                        id = newMediaId,
+                        cloudId = newCloudId,
+                        ratio = newRatio,
+                        hasThumbnails = if (newCloudId != null) false else entry.hasThumbnails,
+                    )
+
+                    newMediaId -> entry.copy(
+                        cloudId = newCloudId,
+                        ratio = newRatio,
+                        hasThumbnails = if (newCloudId != null) false else entry.hasThumbnails,
+                    )
+
+                    else -> entry
+                }
+            }.toImmutableList()
+
+            current.copy(
+                items = nextItems,
+                activeMediaId = if (current.activeMediaId == mediaId) newMediaId else current.activeMediaId,
+                pendingRotationById = (current.pendingRotationById - mediaId - newMediaId).toPersistentMap(),
+                mutatingIds = (current.mutatingIds - mediaId - newMediaId).toPersistentSet(),
+                imageRevisionById = nextRevisions,
+                fullResFiles = nextFullRes,
+                detailsById = nextDetails,
+                localInfoById = nextLocalInfo,
+            )
+        }
+
         if (!outcome.localOverwriteSucceeded) {
             _messages.tryEmit("Rotated on the server, but this phone's copy wasn't updated")
         }
-        commitScope().launch {
-            imageCacheEvictor?.evict(item)
-            if (oldCloudId != null) {
-                imageCacheEvictor?.evict(
-                    item.copy(id = newMediaId, cloudId = newCloudId, hasThumbnails = false),
-                )
-                mediaRefreshCoordinator?.invalidateCloudItems(listOf(oldCloudId))
+
+        val oldCloudId = item.cloudId
+        if (oldCloudId != null) {
+            mediaDetailsRepository.evict(listOf(oldCloudId))
+            mediaRefreshCoordinator?.invalidateCloudItems(listOf(oldCloudId))
+        }
+
+        if (newCloudId != null) {
+            val freshDetails = try {
+                mediaDetailsRepository.get(newCloudId)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                null
+            }
+            if (freshDetails != null) {
+                _uiState.update { current ->
+                    if (current.items.none { it.id == newMediaId }) {
+                        current
+                    } else {
+                        current.copy(
+                            detailsById = (current.detailsById + (newMediaId to freshDetails)).toPersistentMap(),
+                        )
+                    }
+                }
             }
         }
     }

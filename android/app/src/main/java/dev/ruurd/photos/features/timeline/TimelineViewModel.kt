@@ -7,6 +7,8 @@ import dev.ruurd.photos.domain.model.TimelineLayoutIndex
 import dev.ruurd.photos.domain.usecase.CalculateTimelineLayoutUseCase
 import dev.ruurd.photos.domain.usecase.ObserveTimelineUseCase
 import dev.ruurd.photos.domain.usecase.TimelineLayoutParams
+import kotlinx.collections.immutable.ImmutableMap
+import kotlinx.collections.immutable.persistentMapOf
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -29,6 +31,7 @@ class TimelineViewModel(
     private val calculateTimelineLayoutUseCase: CalculateTimelineLayoutUseCase,
     private val dispatchers: AppDispatchers,
     isBootstrapping: Flow<Boolean>,
+    val imageRevisions: StateFlow<ImmutableMap<String, Int>> = MutableStateFlow(persistentMapOf()),
 ) : ViewModel() {
 
     private val viewport = MutableStateFlow(Viewport())

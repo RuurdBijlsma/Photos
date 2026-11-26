@@ -1,5 +1,8 @@
 package dev.ruurd.photos.features.main
 
+import android.app.Activity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -110,6 +113,18 @@ private fun AuthenticatedSession(
         }
     }
     val boundsRegistry = remember(user.id) { TimelineTileBoundsRegistry() }
+
+    // Hosted above the viewer overlay so dismissing the viewer while MediaStore.createWriteRequest
+    // is visible never drops the activity result callback.
+    val writeConsentLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartIntentSenderForResult(),
+    ) { result ->
+        container.mediaWriteConsent.onResult(result.resultCode == Activity.RESULT_OK)
+    }
+    val writeConsentRequest by container.mediaWriteConsent.requests.collectAsState()
+    LaunchedEffect(writeConsentRequest) {
+        writeConsentRequest?.let(writeConsentLauncher::launch)
+    }
 
     CompositionLocalProvider(
         LocalViewModelStoreOwner provides sessionOwner,

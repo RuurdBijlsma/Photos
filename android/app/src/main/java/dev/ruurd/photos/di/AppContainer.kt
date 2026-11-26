@@ -19,6 +19,7 @@ import dev.ruurd.photos.core.database.dao.MediaDao
 import dev.ruurd.photos.core.image.FullResFileCache
 import dev.ruurd.photos.core.image.FullResFileStore
 import dev.ruurd.photos.core.image.MediaImageCacheEvictor
+import dev.ruurd.photos.core.image.MediaImageRevisions
 import dev.ruurd.photos.core.image.MemoryCacheKeyRegistry
 import dev.ruurd.photos.core.image.PhotosImageLoader
 import dev.ruurd.photos.core.image.ShareCache
@@ -97,6 +98,8 @@ interface AppContainer {
     val lanServerScanner: LanServerScanner
     val imageLoader: ImageLoader
     val memoryCacheKeyRegistry: MemoryCacheKeyRegistry
+    val mediaImageRevisions: MediaImageRevisions
+    val mediaWriteConsent: MediaWriteConsent
     val timelineProjectionStore: TimelineProjectionSource
     val bootstrapState: BootstrapState
     val mediaDetailsRepository: MediaDetailsRepository
@@ -139,6 +142,8 @@ class DefaultAppContainer(private val context: Context) : AppContainer {
             scope = applicationScope,
             onClearSessionData = {
                 bootstrapState.reset()
+                mediaWriteConsent.onResult(false)
+                mediaImageRevisions.clear()
                 withContext(dispatchers.io) {
                     mediaRepository.clearAll()
                     imageLoader.memoryCache?.clear()
@@ -305,8 +310,12 @@ class DefaultAppContainer(private val context: Context) : AppContainer {
         )
     }
 
-    private val mediaWriteConsent: MediaWriteConsent by lazy {
+    override val mediaWriteConsent: MediaWriteConsent by lazy {
         MediaWriteConsent(context)
+    }
+
+    override val mediaImageRevisions: MediaImageRevisions by lazy {
+        MediaImageRevisions()
     }
 
     private val imageCacheEvictor: MediaImageCacheEvictor by lazy {
@@ -314,6 +323,8 @@ class DefaultAppContainer(private val context: Context) : AppContainer {
             imageLoader = imageLoader,
             baseUrlProvider = sessionManager::getServerUrl,
             dispatchers = dispatchers,
+            memoryCacheKeyRegistry = memoryCacheKeyRegistry,
+            imageRevisions = mediaImageRevisions,
         )
     }
 
@@ -411,6 +422,7 @@ class DefaultAppContainer(private val context: Context) : AppContainer {
                 calculateTimelineLayoutUseCase = calculateTimelineLayoutUseCase,
                 dispatchers = dispatchers,
                 isBootstrapping = bootstrapState.isBootstrapping,
+                imageRevisions = mediaImageRevisions.revisions,
             )
         }
     }

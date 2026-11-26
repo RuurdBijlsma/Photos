@@ -37,12 +37,17 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.TemporaryFolder
 import java.io.File
 import java.io.IOException
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class MediaViewerViewModelTest {
+
+    @get:Rule
+    val tempFolder = TemporaryFolder()
 
     private val testDispatcher = StandardTestDispatcher()
     private val testScope = TestScope(testDispatcher)
@@ -556,9 +561,16 @@ class MediaViewerViewModelTest {
         val repo = rotationRepository()
         val store = TimelineProjectionStore(repo, backgroundScope, dispatchers)
         runCurrent()
+        val oldFile = tempFolder.newFile("old.jpg").apply { writeBytes(ByteArray(100)) }
+        val newFile = tempFolder.newFile("new.jpg").apply { writeBytes(ByteArray(200)) }
+        val fullResStore = FakeFullResFileStore(mapOf("c1" to oldFile, "c1b" to newFile))
         val mutations = FakeRotationMutationRepository("c1b")
-        val viewModel = createRotationViewModel(repo, store, mutations)
+        val viewModel = createRotationViewModel(repo, store, mutations, fullResStore)
         runCurrent()
+
+        viewModel.onSettledPage("cloud_c1")
+        runCurrent()
+        assertEquals(oldFile, viewModel.uiState.value.fullResFiles["cloud_c1"])
 
         viewModel.rotateActiveItem()
         assertEquals(90, viewModel.uiState.value.pendingRotationById["cloud_c1"])
@@ -572,6 +584,8 @@ class MediaViewerViewModelTest {
         assertTrue(viewModel.uiState.value.pendingRotationById.isEmpty())
         assertTrue(viewModel.uiState.value.mutatingIds.isEmpty())
         assertEquals(6, viewModel.uiState.value.detailsById["cloud_c1b"]?.orientation)
+        assertNull(viewModel.uiState.value.fullResFiles["cloud_c1"])
+        assertEquals(newFile, viewModel.uiState.value.fullResFiles["cloud_c1b"])
         assertEquals("c1b", repo.getById("cloud_c1b")?.cloudId)
         assertNull(repo.getById("cloud_c1"))
 
@@ -643,6 +657,63 @@ class MediaViewerViewModelTest {
         store.stop()
     }
 
+    @Test
+    fun `local-only rotate updates orientation and image revision for subsequent turns`() = testScope.runTest {
+        val repo = FakeMediaRepository()
+        repo.upsert(
+            MediaEntity(
+                id = "local_1",
+                localContentUri = "content://media/external/images/media/1",
+                ratio = 2f,
+                sortTimestamp = 1000L,
+                yearMonth = 202611,
+                syncStatus = SyncStatus.LOCAL_ONLY,
+            ),
+        )
+        val store = TimelineProjectionStore(repo, backgroundScope, dispatchers)
+        runCurrent()
+        val overwrite = FakeRotationOverwriteHelper()
+        val viewModel = MediaViewerViewModel(
+            initialMediaId = "local_1",
+            timelineProjectionStore = store,
+            mediaRepository = repo,
+            mediaDetailsRepository = detailsRepository,
+            fullResFileCache = FakeFullResFileStore(),
+            localMediaInfoReader = FakeLocalMediaInfoSource(
+                LocalMediaInfo(fileName = "local.jpg", mimeType = "image/jpeg", orientation = 1),
+            ),
+            mediaFileSharer = FakeMediaFileSharer(),
+            dispatchers = dispatchers,
+            rotateMediaUseCase = RotateMediaUseCase(
+                mediaRepository = repo,
+                mediaMutationRepository = FakeRotationMutationRepository(null),
+                localFileOverwriteHelper = overwrite,
+                fullResFileCache = FakeFullResFileStore(),
+            ),
+            appScope = backgroundScope,
+        )
+        runCurrent()
+
+        // First 90-degree turn: orientation 1 -> 6
+        viewModel.rotateActiveItem()
+        advanceTimeBy(2_501L)
+        runCurrent()
+        assertEquals(6, overwrite.writtenOrientations.last())
+        assertEquals(6, viewModel.uiState.value.localInfoById["local_1"]?.orientation)
+        assertEquals(1, viewModel.uiState.value.imageRevisionById["local_1"])
+
+        // Second 90-degree turn: orientation 6 -> 3
+        viewModel.rotateActiveItem()
+        advanceTimeBy(2_501L)
+        runCurrent()
+        assertEquals(3, overwrite.writtenOrientations.last())
+        assertEquals(3, viewModel.uiState.value.localInfoById["local_1"]?.orientation)
+        assertEquals(2, viewModel.uiState.value.imageRevisionById["local_1"])
+
+        viewModel.viewModelScope.cancel()
+        store.stop()
+    }
+
     private suspend fun rotationRepository(): FakeMediaRepository {
         val repo = FakeMediaRepository()
         repo.upsertAll(
@@ -664,12 +735,13 @@ class MediaViewerViewModelTest {
         repo: FakeMediaRepository,
         store: TimelineProjectionStore,
         mutations: FakeRotationMutationRepository,
+        fullResStore: FullResFileStore = FakeFullResFileStore(),
     ): MediaViewerViewModel = MediaViewerViewModel(
         initialMediaId = "cloud_c1",
         timelineProjectionStore = store,
         mediaRepository = repo,
         mediaDetailsRepository = detailsRepository,
-        fullResFileCache = FakeFullResFileStore(),
+        fullResFileCache = fullResStore,
         localMediaInfoReader = FakeLocalMediaInfoSource(),
         mediaFileSharer = FakeMediaFileSharer(),
         dispatchers = dispatchers,
@@ -678,7 +750,7 @@ class MediaViewerViewModelTest {
             mediaRepository = repo,
             mediaMutationRepository = mutations,
             localFileOverwriteHelper = FakeRotationOverwriteHelper(),
-            fullResFileCache = FakeFullResFileStore(),
+            fullResFileCache = fullResStore,
         ),
         appScope = backgroundScope,
     )
@@ -703,14 +775,16 @@ private class FakeMediaDetailsRepository(
     override fun clear() = Unit
 }
 
-private class FakeFullResFileStore : FullResFileStore {
+private class FakeFullResFileStore(
+    private val filesByCloudId: Map<String, File> = emptyMap(),
+) : FullResFileStore {
     val requestedCloudIds = mutableListOf<String>()
 
-    override fun peek(cloudId: String): File? = null
+    override fun peek(cloudId: String): File? = filesByCloudId[cloudId]
 
     override suspend fun get(cloudId: String, fileName: String?): File? {
         requestedCloudIds += cloudId
-        return null
+        return filesByCloudId[cloudId]
     }
 
     override suspend fun evict(cloudId: String) = Unit
@@ -758,11 +832,16 @@ private class FakeRotationMutationRepository(private val newCloudId: String?) : 
 }
 
 private class FakeRotationOverwriteHelper : LocalFileOverwriteHelper {
-    override suspend fun writeOrientation(contentUri: String, orientation: Int): Long? = 100L
+    val writtenOrientations = mutableListOf<Int>()
+
+    override suspend fun writeOrientation(contentUri: String, orientation: Int): Long {
+        writtenOrientations += orientation
+        return 100L
+    }
 
     override suspend fun overwriteFromCloud(
         cloudId: String,
         contentUri: String,
         fileName: String?,
-    ): Boolean = true
+    ): Long = 100L
 }

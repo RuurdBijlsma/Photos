@@ -62,6 +62,8 @@ import dev.ruurd.photos.features.timeline.components.TimelineTile
 import dev.ruurd.photos.features.timeline.components.TimelineTopPinEffect
 import dev.ruurd.photos.ui.theme.MontserratFontFamily
 import dev.ruurd.photos.ui.theme.PhotosRadii
+import kotlinx.collections.immutable.ImmutableMap
+import kotlin.math.roundToInt
 
 /**
  * Read-only justified timeline: a `LazyColumn` of typed month headers and precomputed photo rows, plus
@@ -88,6 +90,7 @@ fun TimelineScreen(
     ) -> Unit = { _, _, _ -> },
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val imageRevisions by viewModel.imageRevisions.collectAsState()
     val layout = uiState.layout
     val density = LocalDensity.current
 
@@ -183,6 +186,7 @@ fun TimelineScreen(
                                 baseUrl = baseUrl,
                                 isScrubbing = isScrubbing,
                                 hiddenMediaId = hiddenMediaId,
+                                imageRevisions = imageRevisions,
                                 onMediaClick = onMediaClick,
                                 modifier = cascadeModifier,
                             )
@@ -346,6 +350,7 @@ private fun TimelineRow(
     baseUrl: String,
     isScrubbing: Boolean,
     hiddenMediaId: String?,
+    imageRevisions: ImmutableMap<String, Int>,
     onMediaClick: (mediaId: String, sourceRect: Rect?, sourceCorners: TileCornerRadii) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -394,6 +399,7 @@ private fun TimelineRow(
                     isScrubbing = isScrubbing,
                     isHidden = hiddenMediaId == gridItem.id,
                     cornerRadii = cornerRadii,
+                    imageRevision = imageRevisions[gridItem.id] ?: 0,
                     onClick = { rect -> onMediaClick(gridItem.id, rect, cornerRadii) },
                 )
             }

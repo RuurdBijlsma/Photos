@@ -49,6 +49,7 @@ fun ZoomablePhotoPage(
     isOpeningTransition: Boolean,
     onTap: () -> Unit,
     modifier: Modifier = Modifier,
+    imageRevision: Int = 0,
     /** Downloaded `/download` original for a cloud-only photo; `null` while it is not ready. */
     fullResFile: File? = null,
     /** A programmatic info-panel open waiting on this page, so it can reset zoom first. */
@@ -67,18 +68,18 @@ fun ZoomablePhotoPage(
     val previewImageState = rememberZoomableImageState(previewZoomableState)
 
     val localUri = remember(item.localContentUri) { item.localContentUri?.let(Uri::parse) }
-    var localFullResFailed by remember(item.id, localUri) { mutableStateOf(false) }
+    var localFullResFailed by remember(item.id, localUri, imageRevision) { mutableStateOf(false) }
     val effectiveLocalUri = localUri?.takeUnless { localFullResFailed }
 
     // Local photos upgrade after settling; cloud-only (or unreadable synced) photos upgrade once /download has landed.
     val canUpgrade = !item.isVideo && (effectiveLocalUri != null || fullResFile != null)
-    var isUpgradedToFullRes by remember(item.id) { mutableStateOf(false) }
-    var upgradedInPreview by remember(item.id) { mutableStateOf(false) }
+    var isUpgradedToFullRes by remember(item.id, imageRevision) { mutableStateOf(false) }
+    var upgradedInPreview by remember(item.id, imageRevision) { mutableStateOf(false) }
 
-    var previewIntrinsicSize by remember(item.id) { mutableStateOf(Size.Unspecified) }
-    var isPreviewDisplayed by remember(item.id) { mutableStateOf(false) }
+    var previewIntrinsicSize by remember(item.id, imageRevision) { mutableStateOf(Size.Unspecified) }
+    var isPreviewDisplayed by remember(item.id, imageRevision) { mutableStateOf(false) }
 
-    var previewHasGainmap by remember(item.id, memoryCacheKeyRegistry, imageLoader) {
+    var previewHasGainmap by remember(item.id, imageRevision, memoryCacheKeyRegistry, imageLoader) {
         val cachedHasGainmap = memoryCacheKeyRegistry.get(item.id)
             ?.let { key -> imageLoader.memoryCache?.get(key)?.image as? BitmapImage }
             ?.bitmap
@@ -116,11 +117,11 @@ fun ZoomablePhotoPage(
 
     // Latch once full quality is reached so zooming in later (which briefly swaps higher-detail
     // tiles) never tears down fullResImageState or swaps back to previewImageState mid-pinch.
-    var hasDisplayedFullResInFullQuality by remember(item.id, showDualOverlay) {
+    var hasDisplayedFullResInFullQuality by remember(item.id, imageRevision, showDualOverlay) {
         mutableStateOf(false)
     }
     val isFullResFullQuality = fullResImageState?.isImageDisplayedInFullQuality == true
-    LaunchedEffect(item.id, showDualOverlay, isFullResFullQuality) {
+    LaunchedEffect(item.id, imageRevision, showDualOverlay, isFullResFullQuality) {
         if (showDualOverlay && isFullResFullQuality) {
             hasDisplayedFullResInFullQuality = true
         }
@@ -168,6 +169,7 @@ fun ZoomablePhotoPage(
     // away never drops HDR/gainmap mid-transition.
     LaunchedEffect(
         item.id,
+        imageRevision,
         item.isVideo,
         canUpgrade,
         effectiveLocalUri,
@@ -206,13 +208,18 @@ fun ZoomablePhotoPage(
     }
 
     // Synchronous O(1) memory-cache painter so frame 1 is never blank while Coil resolves.
-    val syncFallbackPainter = remember(item.id, memoryCacheKeyRegistry, imageLoader, context) {
+    val syncFallbackPainter = remember(item.id, imageRevision, memoryCacheKeyRegistry, imageLoader, context) {
         memoryCacheKeyRegistry.peekPainter(imageLoader, context, item.id)
     }
 
+    // Snapshot fullResFile at mount time so post-rotation cloud_new uses its warmed local file
+    // immediately for the preview layer instead of hitting /thumbnail, while normal swipes don't
+    // restart previewRequest when fullResFile arrives asynchronously.
+    val initialFullResFile = remember(item.id, imageRevision) { fullResFile }
     val previewRequest = rememberPhotoPreviewRequest(
         item = item,
         baseUrl = baseUrl,
+        initialFullResFile = initialFullResFile,
         memoryCacheKeyRegistry = memoryCacheKeyRegistry,
     ) { hasGainmap ->
         previewHasGainmap = hasGainmap
@@ -266,7 +273,7 @@ fun ZoomablePhotoPage(
         currentOnSyncWindowColorMode()
     }
 
-    DisposableEffect(item.id) {
+    DisposableEffect(item.id, imageRevision) {
         onDispose {
             currentOnPageDisposed()
             currentOnSyncWindowColorMode()

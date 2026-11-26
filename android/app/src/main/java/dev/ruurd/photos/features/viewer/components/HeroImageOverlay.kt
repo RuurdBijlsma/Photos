@@ -1,5 +1,6 @@
 package dev.ruurd.photos.features.viewer.components
 
+import android.net.Uri
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -20,11 +21,16 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import coil3.SingletonImageLoader
 import coil3.compose.AsyncImage
+import coil3.request.CachePolicy
+import coil3.request.ImageRequest
+import coil3.size.Dimension
 import dev.ruurd.photos.core.database.entity.TimelineMediaProjection
 import dev.ruurd.photos.core.image.LocalMemoryCacheKeyRegistry
 import dev.ruurd.photos.core.image.MediaImageRequests
 import dev.ruurd.photos.core.image.TileCornerRadii
+import java.io.File
 import kotlin.math.roundToInt
+import coil3.size.Size as CoilSize
 
 /**
  * The tile↔viewer hero image: a single bitmap placed at [rect] and cropped to it, so the open and
@@ -38,6 +44,7 @@ fun HeroImageOverlay(
     alpha: Float,
     modifier: Modifier = Modifier,
     cornerRadii: TileCornerRadii = TileCornerRadii.Zero,
+    fullResFile: File? = null,
     onImageReady: () -> Unit = {},
 ) {
     val context = LocalContext.current
@@ -54,16 +61,30 @@ fun HeroImageOverlay(
         }
     }
 
-    val previewRequest = remember(item, baseUrl) {
-        MediaImageRequests.previewRequest(
-            context = context,
-            localContentUri = item.localContentUri,
-            cloudId = item.cloudId,
-            isVideo = item.isVideo,
-            hasThumbnails = item.hasThumbnails,
-            baseUrl = baseUrl,
-            onCacheKey = { key -> memoryCacheKeyRegistry.put(item.id, key) },
-        )
+    val previewRequest = remember(item, baseUrl, fullResFile) {
+        if (item.localContentUri == null && fullResFile != null && fullResFile.exists()) {
+            val heightPx = MediaImageRequests.previewHeightPx(item.isVideo)
+            ImageRequest.Builder(context)
+                .data(Uri.fromFile(fullResFile))
+                .size(CoilSize(Dimension.Undefined, Dimension.Pixels(heightPx)))
+                .diskCachePolicy(CachePolicy.DISABLED)
+                .listener(
+                    onSuccess = { _, result ->
+                        result.memoryCacheKey?.let { key -> memoryCacheKeyRegistry.put(item.id, key) }
+                    },
+                )
+                .build()
+        } else {
+            MediaImageRequests.previewRequest(
+                context = context,
+                localContentUri = item.localContentUri,
+                cloudId = item.cloudId,
+                isVideo = item.isVideo,
+                hasThumbnails = item.hasThumbnails,
+                baseUrl = baseUrl,
+                onCacheKey = { key -> memoryCacheKeyRegistry.put(item.id, key) },
+            )
+        }
     }
 
     val shape = if (cornerRadii.isZero) {

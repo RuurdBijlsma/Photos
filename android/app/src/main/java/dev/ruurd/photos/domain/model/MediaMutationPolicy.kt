@@ -6,7 +6,7 @@ import kotlin.math.min
 
 /**
  * EXIF-orientation math, rotate/reprocess eligibility, and the optimistic preview scale used while a
- * rotation commit is still debouncing. Mirrors the web client's 8-entry orientation table.
+ * rotation commit is still debouncing. Uses the same 8-entry orientation lookup table as web.
  */
 object MediaMutationPolicy {
 
@@ -16,15 +16,36 @@ object MediaMutationPolicy {
     /** Rotation each EXIF orientation needs to display upright, indexed by `orientation - 1`. */
     private val EXIF_ROTATION_DEGREES = intArrayOf(0, 0, 180, 180, 90, 90, 270, 270)
 
+    /** Web's 8-entry EXIF orientation lookup table for 0°/90°/180°/270° clockwise turns. */
+    private val ROTATION_TABLE = arrayOf(
+        intArrayOf(1, 6, 3, 8), // 1
+        intArrayOf(2, 5, 4, 7), // 2
+        intArrayOf(3, 8, 1, 6), // 3
+        intArrayOf(4, 7, 2, 5), // 4
+        intArrayOf(5, 4, 7, 2), // 5
+        intArrayOf(6, 3, 8, 1), // 6
+        intArrayOf(7, 2, 5, 4), // 7
+        intArrayOf(8, 1, 6, 3), // 8
+    )
+
     fun rotationDegrees(orientation: Int): Int = EXIF_ROTATION_DEGREES[(orientation - 1).coerceIn(0, 7)]
 
-    /** The non-mirrored orientation for a clockwise rotation; mirrors are dropped on rotate. */
+    /** The non-mirrored orientation for a clockwise rotation from upright. */
     fun orientationForDegrees(degrees: Int): Int = when (((degrees % 360) + 360) % 360) {
         90 -> 6
         180 -> 3
         270 -> 8
         else -> 1
     }
+
+    /** Applies [degrees] clockwise rotation to [orientation], preserving mirror state when present. */
+    fun rotatedOrientationByDegrees(orientation: Int, degrees: Int): Int {
+        val row = ROTATION_TABLE[(orientation - 1).coerceIn(0, 7)]
+        val quarterTurns = (((degrees / 90) % 4) + 4) % 4
+        return row[quarterTurns]
+    }
+
+    fun rotatedRatio(ratio: Float, netDegrees: Int): Float = if (((netDegrees % 180) + 180) % 180 != 0) 1f / ratio else ratio
 
     fun rotatedRatio(ratio: Float, baseDegrees: Int, targetDegrees: Int): Float = if (isQuarterTurn(baseDegrees, targetDegrees)) 1f / ratio else ratio
 
@@ -82,6 +103,9 @@ object MediaMutationPolicy {
         return details?.isMissing != true
     }
 
-    /** Orientation the optimistic rotation starts from. */
-    fun baseRotationDegrees(details: MediaDetails?, localInfo: LocalMediaInfo?): Int = rotationDegrees(details?.orientation ?: localInfo?.orientation ?: 1)
+    /** EXIF orientation (1–8) the optimistic rotation starts from. */
+    fun baseOrientation(details: MediaDetails?, localInfo: LocalMediaInfo?): Int = details?.orientation ?: localInfo?.orientation ?: 1
+
+    /** Orientation degrees the optimistic rotation starts from. */
+    fun baseRotationDegrees(details: MediaDetails?, localInfo: LocalMediaInfo?): Int = rotationDegrees(baseOrientation(details, localInfo))
 }

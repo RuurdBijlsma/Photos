@@ -51,11 +51,27 @@ class MediaMutationPolicyTest {
     }
 
     @Test
+    fun `8-entry table rotates standard and mirrored orientations like web`() {
+        assertEquals(6, MediaMutationPolicy.rotatedOrientationByDegrees(1, 90))
+        assertEquals(3, MediaMutationPolicy.rotatedOrientationByDegrees(6, 90))
+        assertEquals(8, MediaMutationPolicy.rotatedOrientationByDegrees(6, 180))
+        assertEquals(1, MediaMutationPolicy.rotatedOrientationByDegrees(6, 270))
+
+        // Mirrored orientations preserve mirroring across clockwise turns.
+        assertEquals(5, MediaMutationPolicy.rotatedOrientationByDegrees(2, 90))
+        assertEquals(4, MediaMutationPolicy.rotatedOrientationByDegrees(5, 90))
+        assertEquals(7, MediaMutationPolicy.rotatedOrientationByDegrees(4, 90))
+        assertEquals(2, MediaMutationPolicy.rotatedOrientationByDegrees(7, 90))
+    }
+
+    @Test
     fun `ratio only flips for quarter turns`() {
         assertEquals(0.5f, MediaMutationPolicy.rotatedRatio(2f, baseDegrees = 0, targetDegrees = 90), 0.0001f)
         assertEquals(2f, MediaMutationPolicy.rotatedRatio(2f, baseDegrees = 0, targetDegrees = 180), 0.0001f)
         assertEquals(2f, MediaMutationPolicy.rotatedRatio(2f, baseDegrees = 0, targetDegrees = 0), 0.0001f)
         assertEquals(0.5f, MediaMutationPolicy.rotatedRatio(2f, baseDegrees = 270, targetDegrees = 0), 0.0001f)
+        assertEquals(0.5f, MediaMutationPolicy.rotatedRatio(2f, netDegrees = 90), 0.0001f)
+        assertEquals(2f, MediaMutationPolicy.rotatedRatio(2f, netDegrees = 180), 0.0001f)
     }
 
     @Test

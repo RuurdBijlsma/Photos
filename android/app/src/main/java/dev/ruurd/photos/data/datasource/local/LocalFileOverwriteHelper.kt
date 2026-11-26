@@ -24,8 +24,11 @@ interface LocalFileOverwriteHelper {
     /** Writes [orientation] into the local photo's EXIF; returns the new size, or `null` on failure. */
     suspend fun writeOrientation(contentUri: String, orientation: Int): Long?
 
-    /** Replaces the local file with the (already rotated) server original. */
-    suspend fun overwriteFromCloud(cloudId: String, contentUri: String, fileName: String?): Boolean
+    /**
+     * Replaces the local file with the (already updated) server original; returns the new file size
+     * in bytes, or `null` on failure.
+     */
+    suspend fun overwriteFromCloud(cloudId: String, contentUri: String, fileName: String?): Long?
 }
 
 class MediaStoreFileOverwriteHelper(
@@ -38,48 +41,52 @@ class MediaStoreFileOverwriteHelper(
 
     override suspend fun writeOrientation(contentUri: String, orientation: Int): Long? = withContext(dispatchers.io) {
         val uri = contentUri.toUri()
-        try {
+        val fdSize = try {
             resolver.openFileDescriptor(uri, "rw")?.use { pfd ->
                 // The descriptor must stay open until saveAttributes() flushes.
                 ExifInterface(pfd.fileDescriptor).apply {
                     setAttribute(ExifInterface.TAG_ORIENTATION, orientation.toString())
                     saveAttributes()
                 }
+                pfd.statSize.takeIf { it > 0L }
             } ?: return@withContext null
         } catch (e: CancellationException) {
             throw e
         } catch (_: Exception) {
             return@withContext null
         }
-        // MediaProvider only refreshes ORIENTATION/SIZE after the scanner sees the file change.
-        awaitMediaScan(queryDataPath(uri) ?: return@withContext null)
-        querySize(uri)
+
+        // MediaProvider only refreshes ORIENTATION/SIZE after the scanner sees the file change;
+        // treat DATA lookup as best-effort so a missing DATA column does not report failure after
+        // the file was already written.
+        queryDataPath(uri)?.let { awaitMediaScan(it) }
+        querySize(uri) ?: fdSize
     }
 
     override suspend fun overwriteFromCloud(
         cloudId: String,
         contentUri: String,
         fileName: String?,
-    ): Boolean = withContext(dispatchers.io) {
+    ): Long? = withContext(dispatchers.io) {
         val uri = contentUri.toUri()
-        val source = fullResFileCache.get(cloudId, fileName) ?: return@withContext false
-        if (!source.isFile || source.length() <= 0L) return@withContext false
+        val source = fullResFileCache.get(cloudId, fileName) ?: return@withContext null
+        val sourceLength = source.length()
+        if (!source.isFile || sourceLength <= 0L) return@withContext null
 
         try {
             resolver.openOutputStream(uri, "wt")?.use { output ->
                 source.inputStream().use { input -> input.copyTo(output) }
-            } ?: return@withContext false
+            } ?: return@withContext null
         } catch (e: CancellationException) {
             throw e
         } catch (_: IOException) {
-            return@withContext false
+            return@withContext null
         } catch (_: Exception) {
-            return@withContext false
+            return@withContext null
         }
 
-        awaitMediaScan(queryDataPath(uri) ?: return@withContext false)
-        val size = querySize(uri) ?: return@withContext false
-        size > 0L
+        queryDataPath(uri)?.let { awaitMediaScan(it) }
+        querySize(uri) ?: sourceLength
     }
 
     /** `DATA` is deprecated but still answers for the user's own media rows. */

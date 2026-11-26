@@ -65,6 +65,7 @@ internal fun TimelineTile(
     isHidden: Boolean,
     cornerRadii: TileCornerRadii,
     onClick: (sourceRect: Rect?) -> Unit,
+    imageRevision: Int = 0,
 ) {
     val context = LocalContext.current
     val density = LocalDensity.current.density
@@ -74,7 +75,7 @@ internal fun TimelineTile(
     val heightPx = (heightDp * density).roundToInt().coerceAtLeast(1)
 
     // Plain holders, not state: updating these must not recompose the tile during scroll.
-    val loadState = remember(item, thumbnailTargetHeightPx, baseUrl, widthPx, heightPx) {
+    val loadState = remember(item, thumbnailTargetHeightPx, baseUrl, widthPx, heightPx, imageRevision) {
         TileLoadState()
     }
     val coordsHolder = remember { arrayOfNulls<LayoutCoordinates>(1) }
@@ -93,7 +94,7 @@ internal fun TimelineTile(
         }
     }
 
-    var gateLoads by remember(item, thumbnailTargetHeightPx, baseUrl, widthPx, heightPx) {
+    var gateLoads by remember(item, thumbnailTargetHeightPx, baseUrl, widthPx, heightPx, imageRevision) {
         mutableStateOf(isScrubbing)
     }
     if (gateLoads) {
@@ -111,6 +112,7 @@ internal fun TimelineTile(
         widthPx,
         heightPx,
         gateLoads,
+        imageRevision,
     ) {
         val model = MediaImageRequests.previewModel(
             localContentUri = item.localContentUri,
@@ -149,9 +151,9 @@ internal fun TimelineTile(
                 onClick(rect)
             },
     ) {
-        // Coil 3's default model equality ignores CachePolicy changes, so uncached tiles that were
-        // skipped during scrubbing must re-mount once scrubbing stops.
-        key(gateLoads) {
+        // Coil 3's default model equality ignores CachePolicy changes, and local mutations keep
+        // the same URI, so re-mount on scrub stop or image revision bumps.
+        key(gateLoads, imageRevision) {
             AsyncImage(
                 model = request,
                 contentDescription = null,

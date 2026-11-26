@@ -8,10 +8,11 @@ import dev.ruurd.photos.domain.model.MediaDetails
 import dev.ruurd.photos.domain.repository.MediaMutationRepository
 import dev.ruurd.photos.domain.repository.MediaRepository
 import kotlinx.coroutines.CancellationException
+import java.io.File
 
 /**
  * Commits one Rotate tap after the preview already turned optimistically. Persists the new EXIF
- * orientation per sync status and reports the ids the pager has to follow.
+ * orientation per sync status and reports the ids and warmed files the pager has to follow.
  */
 class RotateMediaUseCase(
     private val mediaRepository: MediaRepository,
@@ -23,8 +24,10 @@ class RotateMediaUseCase(
         val oldMediaId: String,
         val newMediaId: String,
         val newCloudId: String?,
+        val warmedFullResFile: File? = null,
         /** False when the server rotated but the phone's copy could not be rewritten. */
         val localOverwriteSucceeded: Boolean = true,
+        val updatedSizeBytes: Long? = null,
     )
 
     suspend fun commit(
@@ -32,10 +35,19 @@ class RotateMediaUseCase(
         details: MediaDetails?,
         targetOrientation: Int,
         newRatio: Float,
+        onIdRedirect: (oldMediaId: String, newMediaId: String) -> Unit = { _, _ -> },
     ): Result<Outcome> = try {
         val outcome = when (item.syncStatus) {
-            SyncStatus.CLOUD_ONLY -> commitCloudOnly(item, details, targetOrientation, newRatio)
+            SyncStatus.CLOUD_ONLY -> commitCloudOnly(
+                item = item,
+                details = details,
+                targetOrientation = targetOrientation,
+                newRatio = newRatio,
+                onIdRedirect = onIdRedirect,
+            )
+
             SyncStatus.SYNCED -> commitSynced(item, details, targetOrientation, newRatio)
+
             SyncStatus.LOCAL_ONLY -> commitLocalOnly(item, targetOrientation, newRatio)
         }
         Result.success(outcome)
@@ -51,12 +63,22 @@ class RotateMediaUseCase(
         details: MediaDetails?,
         targetOrientation: Int,
         newRatio: Float,
+        onIdRedirect: (oldMediaId: String, newMediaId: String) -> Unit,
     ): Outcome {
         val oldCloudId = requireNotNull(item.cloudId) { "Cloud-only item without a cloudId" }
         val newCloudId = mediaMutationRepository
             .updateOrientation(oldCloudId, targetOrientation)
             .getOrThrow()
         val newMediaId = "cloud_$newCloudId"
+
+        onIdRedirect(item.id, newMediaId)
+        fullResFileCache.evict(oldCloudId)
+
+        // Download the rotated original before swapping Room / clearing the optimistic visual turn
+        // so we never flash an unrotated IFD1 thumbnail while IngestThumbnails is pending, and
+        // still commit the Room ID swap even if warm-up fails.
+        val warmedFile = warmUpOriginal(newCloudId, details?.fileName)
+        val warmedSize = warmedFile?.length()?.takeIf { it > 0L }
 
         mediaRepository.withTransaction {
             val row = mediaRepository.getById(item.id) ?: return@withTransaction
@@ -67,15 +89,18 @@ class RotateMediaUseCase(
                     cloudId = newCloudId,
                     ratio = newRatio,
                     hasThumbnails = false,
+                    sizeBytes = warmedSize ?: row.sizeBytes,
                 ),
             )
         }
 
-        fullResFileCache.evict(oldCloudId)
-        // Warm the rotated original before the caller drops the optimistic rotation; a failure
-        // here still leaves the Room swap in place.
-        warmUpOriginal(newCloudId, details?.fileName)
-        return Outcome(item.id, newMediaId, newCloudId)
+        return Outcome(
+            oldMediaId = item.id,
+            newMediaId = newMediaId,
+            newCloudId = newCloudId,
+            warmedFullResFile = warmedFile,
+            updatedSizeBytes = warmedSize,
+        )
     }
 
     /**
@@ -93,6 +118,11 @@ class RotateMediaUseCase(
             .updateOrientation(oldCloudId, targetOrientation)
             .getOrThrow()
 
+        fullResFileCache.evict(oldCloudId)
+        val newSizeBytes = item.localContentUri?.let { uri ->
+            localFileOverwriteHelper.overwriteFromCloud(newCloudId, uri, details?.fileName)
+        }
+
         mediaRepository.withTransaction {
             val row = mediaRepository.getById(item.id) ?: return@withTransaction
             // A sync racing the PUT may already have inserted the new cloud row; drop it so the
@@ -104,22 +134,19 @@ class RotateMediaUseCase(
                     ratio = newRatio,
                     hasThumbnails = false,
                     autoBackupSuppressed = false,
+                    sizeBytes = newSizeBytes ?: row.sizeBytes,
                 ),
             )
         }
 
-        fullResFileCache.evict(oldCloudId)
-        val overwritten = item.localContentUri?.let { uri ->
-            localFileOverwriteHelper.overwriteFromCloud(newCloudId, uri, details?.fileName)
-        } ?: false
-        if (overwritten) {
-            details?.sizeBytes?.let { size ->
-                mediaRepository.getById(item.id)?.let { row ->
-                    mediaRepository.upsert(row.copy(sizeBytes = size))
-                }
-            }
-        }
-        return Outcome(item.id, item.id, newCloudId, localOverwriteSucceeded = overwritten)
+        return Outcome(
+            oldMediaId = item.id,
+            newMediaId = item.id,
+            newCloudId = newCloudId,
+            warmedFullResFile = fullResFileCache.peek(newCloudId),
+            localOverwriteSucceeded = newSizeBytes != null,
+            updatedSizeBytes = newSizeBytes,
+        )
     }
 
     /** Rewrites the EXIF orientation in place; `MediaProvider` refreshes size and orientation. */
@@ -137,16 +164,20 @@ class RotateMediaUseCase(
         mediaRepository.getById(item.id)?.let { row ->
             mediaRepository.upsert(row.copy(ratio = newRatio, sizeBytes = newSize))
         }
-        return Outcome(item.id, item.id, null)
+        return Outcome(
+            oldMediaId = item.id,
+            newMediaId = item.id,
+            newCloudId = null,
+            updatedSizeBytes = newSize,
+        )
     }
 
-    private suspend fun warmUpOriginal(cloudId: String, fileName: String?) {
-        try {
-            fullResFileCache.get(cloudId, fileName)
-        } catch (e: CancellationException) {
-            throw e
-        } catch (_: Exception) {
-            // The pager retries the download when it settles on the item.
-        }
+    private suspend fun warmUpOriginal(cloudId: String, fileName: String?): File? = try {
+        fullResFileCache.get(cloudId, fileName)
+    } catch (e: CancellationException) {
+        throw e
+    } catch (_: Exception) {
+        // The pager retries the download when it settles on the item.
+        null
     }
 }

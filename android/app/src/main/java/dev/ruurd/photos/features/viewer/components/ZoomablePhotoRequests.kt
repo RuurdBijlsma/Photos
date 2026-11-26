@@ -9,34 +9,58 @@ import coil3.BitmapImage
 import coil3.memory.MemoryCache
 import coil3.request.CachePolicy
 import coil3.request.ImageRequest
+import coil3.size.Dimension
 import dev.ruurd.photos.core.database.entity.TimelineMediaProjection
 import dev.ruurd.photos.core.image.MediaImageRequests
 import dev.ruurd.photos.core.image.MemoryCacheKeyRegistry
 import java.io.File
+import coil3.size.Size as CoilSize
 
-/** The lightweight preview a page shows first: local thumbnail, or the 1440p cloud AVIF. */
+/**
+ * The lightweight preview a page shows first: local thumbnail, the already-warmed original when
+ * mounted post-rotation, or the 1440p cloud AVIF.
+ */
 @Composable
 internal fun rememberPhotoPreviewRequest(
     item: TimelineMediaProjection,
     baseUrl: String,
+    initialFullResFile: File?,
     memoryCacheKeyRegistry: MemoryCacheKeyRegistry,
     onGainmapChanged: (Boolean) -> Unit,
 ): ImageRequest? {
     val context = LocalContext.current
-    return remember(item, baseUrl, memoryCacheKeyRegistry) {
-        MediaImageRequests.previewRequest(
-            context = context,
-            localContentUri = item.localContentUri,
-            cloudId = item.cloudId,
-            isVideo = item.isVideo,
-            hasThumbnails = item.hasThumbnails,
-            baseUrl = baseUrl,
-            placeholderKey = memoryCacheKeyRegistry.get(item.id),
-            onCacheKey = { memoryCacheKeyRegistry.put(item.id, it) },
-            onImageSuccess = { image ->
-                onGainmapChanged((image as? BitmapImage)?.bitmap?.hasGainmap() == true)
-            },
-        )
+    return remember(item, baseUrl, initialFullResFile, memoryCacheKeyRegistry) {
+        if (item.localContentUri == null && initialFullResFile != null && initialFullResFile.exists()) {
+            val heightPx = MediaImageRequests.previewHeightPx(item.isVideo)
+            ImageRequest.Builder(context)
+                .data(Uri.fromFile(initialFullResFile))
+                .size(CoilSize(Dimension.Undefined, Dimension.Pixels(heightPx)))
+                .diskCachePolicy(CachePolicy.DISABLED)
+                .apply {
+                    memoryCacheKeyRegistry.get(item.id)?.let(::placeholderMemoryCacheKey)
+                }
+                .listener(
+                    onSuccess = { _, result ->
+                        result.memoryCacheKey?.let { memoryCacheKeyRegistry.put(item.id, it) }
+                        onGainmapChanged((result.image as? BitmapImage)?.bitmap?.hasGainmap() == true)
+                    },
+                )
+                .build()
+        } else {
+            MediaImageRequests.previewRequest(
+                context = context,
+                localContentUri = item.localContentUri,
+                cloudId = item.cloudId,
+                isVideo = item.isVideo,
+                hasThumbnails = item.hasThumbnails,
+                baseUrl = baseUrl,
+                placeholderKey = memoryCacheKeyRegistry.get(item.id),
+                onCacheKey = { memoryCacheKeyRegistry.put(item.id, it) },
+                onImageSuccess = { image ->
+                    onGainmapChanged((image as? BitmapImage)?.bitmap?.hasGainmap() == true)
+                },
+            )
+        }
     }
 }
 

@@ -1,11 +1,8 @@
 ﻿package dev.ruurd.photos.features.viewer
 
-import android.app.Activity
 import android.content.Intent
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -116,17 +113,6 @@ fun MediaViewerScreen(
     }
     val activeLocalInfo = activeItem?.let { item ->
         uiState.localInfoById[item.id]
-    }
-
-    // `MediaStore.createWriteRequest` for the photo a rotate is about to rewrite in place.
-    val writeConsentLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.StartIntentSenderForResult(),
-    ) { result ->
-        viewModel.onWriteConsentResult(result.resultCode == Activity.RESULT_OK)
-    }
-    val writeConsentRequest by viewModel.writeConsentRequests.collectAsState()
-    LaunchedEffect(writeConsentRequest) {
-        writeConsentRequest?.let(writeConsentLauncher::launch)
     }
 
     LaunchedEffect(viewModel) {
@@ -301,13 +287,21 @@ fun MediaViewerScreen(
         baseUrl = baseUrl,
     )
 
-    // ~130 ms after settling, trigger neighbor prefetch + cloud-only full-res download.
+    // ~130 ms after settling (or after a CLOUD_ONLY rotation swaps the active item's id on the
+    // settled page), trigger neighbor prefetch + cloud-only full-res download.
     LaunchedEffect(pagerState) {
-        snapshotFlow { if (currentItems.isEmpty()) null else pagerState.settledPage }
+        snapshotFlow {
+            if (currentItems.isEmpty()) {
+                null
+            } else {
+                val page = pagerState.settledPage
+                currentItems.getOrNull(page)?.id?.let { page to it }
+            }
+        }
             .filterNotNull()
-            .collectLatest { page ->
+            .collectLatest { (_, mediaId) ->
                 delay(SETTLED_DETAILS_DELAY_MS)
-                currentItems.getOrNull(page)?.let { viewModel.onSettledPage(it.id) }
+                viewModel.onSettledPage(mediaId)
             }
     }
 
@@ -387,6 +381,7 @@ fun MediaViewerScreen(
                                 ?.takeIf { it.cloudId == item.cloudId }
                             val itemLocalInfo = uiState.localInfoById[item.id]
                             val pendingRotationDegrees = uiState.pendingRotationById[item.id] ?: 0
+                            val itemRevision = uiState.imageRevisionById[item.id] ?: 0
 
                             Box(modifier = Modifier.fillMaxSize()) {
                                 Box(
@@ -466,43 +461,46 @@ fun MediaViewerScreen(
                                             modifier = Modifier.fillMaxSize(),
                                         )
                                     } else {
-                                        ZoomablePhotoPage(
-                                            item = item,
-                                            baseUrl = baseUrl,
-                                            isActivePage = isCurrentPage,
-                                            isSettledPage = isSettledPage,
-                                            isOffscreen = isOffscreen,
-                                            isOpeningTransition = transition.isOpeningHero,
-                                            onTap = {
-                                                if (!transition.isOpeningHero && !transition.isClosing) {
-                                                    if (transition.isInfoPanelActive) {
-                                                        transition.requestCloseInfoPanel()
-                                                    } else {
-                                                        viewModel.toggleChrome()
+                                        key(itemRevision) {
+                                            ZoomablePhotoPage(
+                                                item = item,
+                                                baseUrl = baseUrl,
+                                                isActivePage = isCurrentPage,
+                                                isSettledPage = isSettledPage,
+                                                isOffscreen = isOffscreen,
+                                                isOpeningTransition = transition.isOpeningHero,
+                                                onTap = {
+                                                    if (!transition.isOpeningHero && !transition.isClosing) {
+                                                        if (transition.isInfoPanelActive) {
+                                                            transition.requestCloseInfoPanel()
+                                                        } else {
+                                                            viewModel.toggleChrome()
+                                                        }
                                                     }
-                                                }
-                                            },
-                                            fullResFile = uiState.fullResFiles[item.id],
-                                            isInfoPanelRequested = isCurrentPage &&
-                                                transition.isInfoPanelRequested,
-                                            onFullResRequested = { viewModel.requestFullRes(item) },
-                                            onZoomFractionChanged = { fraction ->
-                                                if (page == pagerState.currentPage) {
-                                                    activePageZoomFraction = fraction
-                                                }
-                                            },
-                                            onHdrStateChanged = { hasPreviewGainmap, hasSubSamplingLayer ->
-                                                hdrCoordinator.updatePage(
-                                                    mediaId = item.id,
-                                                    isVisible = !isOffscreen,
-                                                    previewHasGainmap = hasPreviewGainmap,
-                                                    hasSubSamplingLayer = hasSubSamplingLayer,
-                                                )
-                                            },
-                                            onSyncWindowColorMode = hdrCoordinator::syncWindowColorMode,
-                                            onPageDisposed = { hdrCoordinator.removePage(item.id) },
-                                            modifier = Modifier.fillMaxSize(),
-                                        )
+                                                },
+                                                imageRevision = itemRevision,
+                                                fullResFile = uiState.fullResFiles[item.id],
+                                                isInfoPanelRequested = isCurrentPage &&
+                                                    transition.isInfoPanelRequested,
+                                                onFullResRequested = { viewModel.requestFullRes(item) },
+                                                onZoomFractionChanged = { fraction ->
+                                                    if (page == pagerState.currentPage) {
+                                                        activePageZoomFraction = fraction
+                                                    }
+                                                },
+                                                onHdrStateChanged = { hasPreviewGainmap, hasSubSamplingLayer ->
+                                                    hdrCoordinator.updatePage(
+                                                        mediaId = item.id,
+                                                        isVisible = !isOffscreen,
+                                                        previewHasGainmap = hasPreviewGainmap,
+                                                        hasSubSamplingLayer = hasSubSamplingLayer,
+                                                    )
+                                                },
+                                                onSyncWindowColorMode = hdrCoordinator::syncWindowColorMode,
+                                                onPageDisposed = { hdrCoordinator.removePage(item.id) },
+                                                modifier = Modifier.fillMaxSize(),
+                                            )
+                                        }
                                     }
                                 }
 
@@ -578,6 +576,7 @@ fun MediaViewerScreen(
                 rect = transition.closingRect(closing),
                 alpha = transition.closingAlpha(closing),
                 cornerRadii = transition.closingCornerRadii(closing),
+                fullResFile = uiState.fullResFiles[closing.item.id],
             )
         }
 

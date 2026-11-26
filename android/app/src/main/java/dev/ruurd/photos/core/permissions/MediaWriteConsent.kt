@@ -10,8 +10,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 /**
- * `MediaStore.createWriteRequest` for a photo the app wants to rewrite in place. The viewer observes
- * [requests] with an `IntentSenderRequest` launcher and reports the outcome through [onResult].
+ * `MediaStore.createWriteRequest` for a photo the app wants to rewrite in place. The session root
+ * observes [requests] with an `IntentSenderRequest` launcher and reports the outcome through
+ * [onResult].
  */
 class MediaWriteConsent(private val context: Context) {
 
@@ -22,13 +23,26 @@ class MediaWriteConsent(private val context: Context) {
 
     /** Shows the system confirmation for [uri]. A newer request supersedes an older one as denied. */
     suspend fun request(uri: Uri): Boolean {
+        val request = try {
+            IntentSenderRequest.Builder(
+                MediaStore.createWriteRequest(context.contentResolver, listOf(uri)).intentSender,
+            ).build()
+        } catch (_: Exception) {
+            return false
+        }
+
         pending?.complete(false)
         val deferred = CompletableDeferred<Boolean>()
         pending = deferred
-        _requests.value = IntentSenderRequest.Builder(
-            MediaStore.createWriteRequest(context.contentResolver, listOf(uri)).intentSender,
-        ).build()
-        return deferred.await()
+        _requests.value = request
+        return try {
+            deferred.await()
+        } finally {
+            if (pending === deferred) {
+                pending = null
+                _requests.value = null
+            }
+        }
     }
 
     fun onResult(granted: Boolean) {
