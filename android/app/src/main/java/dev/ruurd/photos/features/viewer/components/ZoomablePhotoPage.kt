@@ -291,7 +291,7 @@ fun ZoomablePhotoPage(
                 contentDescription = null,
                 state = fullResImageState,
                 onClick = { onTap() },
-                onDoubleClick = DoubleClickToZoomListener.cycle(DOUBLE_TAP_MAX_ZOOM_FACTOR),
+                onDoubleClick = DoubleTapZoomListener,
                 contentScale = ContentScale.Fit,
                 modifier = Modifier
                     .fillMaxSize()
@@ -353,7 +353,7 @@ private fun PreviewZoomableLayer(
                 .zoomable(
                     state = previewZoomableState,
                     onClick = { onTap() },
-                    onDoubleClick = DoubleClickToZoomListener.cycle(DOUBLE_TAP_MAX_ZOOM_FACTOR),
+                    onDoubleClick = DoubleTapZoomListener,
                 ),
         )
     } else {
@@ -362,7 +362,7 @@ private fun PreviewZoomableLayer(
             contentDescription = null,
             state = previewImageState,
             onClick = { onTap() },
-            onDoubleClick = DoubleClickToZoomListener.cycle(DOUBLE_TAP_MAX_ZOOM_FACTOR),
+            onDoubleClick = DoubleTapZoomListener,
             contentScale = ContentScale.Fit,
             modifier = Modifier.fillMaxSize(),
         )
@@ -372,3 +372,16 @@ private fun PreviewZoomableLayer(
 private const val FULL_RES_SETTLE_DELAY_MS = 180L
 private const val MAX_ZOOM_FACTOR = 8f
 private const val DOUBLE_TAP_MAX_ZOOM_FACTOR = 2.5f
+private const val DOUBLE_TAP_RESET_ZOOM_THRESHOLD = 0.001f
+
+private val DoubleTapCycleListener = DoubleClickToZoomListener.cycle(DOUBLE_TAP_MAX_ZOOM_FACTOR)
+
+private val DoubleTapZoomListener = DoubleClickToZoomListener { state, centroid ->
+    if ((state.zoomFraction ?: 0f) > DOUBLE_TAP_RESET_ZOOM_THRESHOLD) {
+        state.resetZoom()
+    } else {
+        with(DoubleTapCycleListener) {
+            onDoubleClick(state, centroid)
+        }
+    }
+}
