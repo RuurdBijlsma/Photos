@@ -1,39 +1,55 @@
 package dev.ruurd.photos.features.viewer
 
 import android.content.Intent
+import androidx.activity.result.IntentSenderRequest
 import androidx.compose.runtime.Immutable
+import androidx.core.net.toUri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.ruurd.photos.core.common.AppDispatchers
 import dev.ruurd.photos.core.common.MediaFileSharer
 import dev.ruurd.photos.core.common.MediaRefreshCoordinator
+import dev.ruurd.photos.core.database.entity.SyncStatus
 import dev.ruurd.photos.core.database.entity.TimelineMediaProjection
 import dev.ruurd.photos.core.database.entity.toTimelineProjection
 import dev.ruurd.photos.core.image.FullResFileStore
+import dev.ruurd.photos.core.image.MediaImageCacheEvictor
 import dev.ruurd.photos.core.network.VideoPreferences
 import dev.ruurd.photos.core.network.VideoPreferencesSource
+import dev.ruurd.photos.core.permissions.MediaWriteConsent
 import dev.ruurd.photos.data.datasource.local.LocalMediaInfoSource
 import dev.ruurd.photos.domain.model.FullResEligibility
 import dev.ruurd.photos.domain.model.LocalMediaInfo
 import dev.ruurd.photos.domain.model.MediaDetails
+import dev.ruurd.photos.domain.model.MediaMutationPolicy
 import dev.ruurd.photos.domain.model.VideoQuality
 import dev.ruurd.photos.domain.model.VideoUnavailableReason
 import dev.ruurd.photos.domain.repository.MediaDetailsRepository
+import dev.ruurd.photos.domain.repository.MediaMutationRepository
 import dev.ruurd.photos.domain.repository.MediaRepository
 import dev.ruurd.photos.domain.repository.TimelineProjectionSource
 import dev.ruurd.photos.domain.repository.TimelineProjectionState
+import dev.ruurd.photos.domain.usecase.RotateMediaUseCase
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.ImmutableMap
 import kotlinx.collections.immutable.ImmutableSet
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.persistentMapOf
 import kotlinx.collections.immutable.persistentSetOf
+import kotlinx.collections.immutable.toImmutableList
 import kotlinx.collections.immutable.toPersistentMap
 import kotlinx.collections.immutable.toPersistentSet
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.update
@@ -64,6 +80,10 @@ data class MediaViewerUiState(
     val localVideoFallbackIds: ImmutableSet<String> = persistentSetOf(),
     val videoUnavailableOriginalIds: ImmutableSet<String> = persistentSetOf(),
     val videoErrorById: ImmutableMap<String, VideoUnavailableReason> = persistentMapOf(),
+    /** Clockwise degrees from Rotate taps that are not committed yet, keyed by media id. */
+    val pendingRotationById: ImmutableMap<String, Int> = persistentMapOf(),
+    /** Media ids with a rotate or reprocess request in flight. */
+    val mutatingIds: ImmutableSet<String> = persistentSetOf(),
 ) {
     val activeDetails: MediaDetails?
         get() = detailsById[activeMediaId]
@@ -83,7 +103,14 @@ class MediaViewerViewModel(
     private val dispatchers: AppDispatchers,
     private val videoPreferencesStore: VideoPreferencesSource = InMemoryVideoPreferencesSource(),
     private val isUnmeteredWithoutDataSaverProvider: () -> Boolean = { true },
-    mediaRefreshCoordinator: MediaRefreshCoordinator? = null,
+    private val mediaRefreshCoordinator: MediaRefreshCoordinator? = null,
+    private val mediaMutationRepository: MediaMutationRepository? = null,
+    private val rotateMediaUseCase: RotateMediaUseCase? = null,
+    private val mediaWriteConsent: MediaWriteConsent? = null,
+    private val imageCacheEvictor: MediaImageCacheEvictor? = null,
+    private val isOnlineProvider: () -> Boolean = { true },
+    /** Application-scoped coroutine scope, so a commit survives the viewer being dismissed. */
+    private val appScope: CoroutineScope? = null,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(
@@ -94,11 +121,24 @@ class MediaViewerViewModel(
     )
     val uiState: StateFlow<MediaViewerUiState> = _uiState.asStateFlow()
 
+    private val _messages = MutableSharedFlow<String>(extraBufferCapacity = 4)
+    val messages: SharedFlow<String> = _messages.asSharedFlow()
+
+    /** Consent dialogs the viewer's launcher has to show; `null` when nothing is pending. */
+    val writeConsentRequests: StateFlow<IntentSenderRequest?> =
+        mediaWriteConsent?.requests ?: MutableStateFlow<IntentSenderRequest?>(null).asStateFlow()
+
     private var currentItemInfoJob: Job? = null
     private var settleJob: Job? = null
     private val fullResJobs = ConcurrentHashMap<String, Job>()
     private var hasUserToggledChrome = false
     private var hasResolvedInitialChrome = false
+
+    /** `oldMediaId -> newMediaId` after a CLOUD_ONLY rotate renamed the item in Room. */
+    private val redirectedIds = ConcurrentHashMap<String, String>()
+    private val pendingRotationJobs = ConcurrentHashMap<String, Job>()
+    private val writeConsentJobs = ConcurrentHashMap<String, Deferred<Boolean>>()
+    private val grantedConsentIds = ConcurrentHashMap.newKeySet<String>()
 
     init {
         viewModelScope.launch {
@@ -185,16 +225,26 @@ class MediaViewerViewModel(
                         }
 
                         val activeIdx = state.items.indexOfFirst { it.id == current.activeMediaId }
-                        val resolvedChrome = if (!hasUserToggledChrome && !hasResolvedInitialChrome && activeIdx >= 0) {
+                        // A CLOUD_ONLY rotate renames the row in Room; follow the new id instead of
+                        // treating the old one as deleted.
+                        val resolvedIdx = if (activeIdx >= 0) {
+                            activeIdx
+                        } else {
+                            redirectedIds[current.activeMediaId]
+                                ?.let { newId -> state.items.indexOfFirst { it.id == newId } }
+                                ?: -1
+                        }
+                        val resolvedChrome = if (!hasUserToggledChrome && !hasResolvedInitialChrome && resolvedIdx >= 0) {
                             hasResolvedInitialChrome = true
-                            !state.items[activeIdx].isVideo
+                            !state.items[resolvedIdx].isVideo
                         } else {
                             current.isChromeVisible
                         }
-                        if (activeIdx >= 0) {
+                        if (resolvedIdx >= 0) {
                             current.copy(
                                 items = state.items,
-                                initialIndex = activeIdx,
+                                activeMediaId = state.items[resolvedIdx].id,
+                                initialIndex = resolvedIdx,
                                 isChromeVisible = resolvedChrome,
                                 isActiveItemMissing = false,
                                 isProjectionLoading = false,
@@ -224,6 +274,7 @@ class MediaViewerViewModel(
     }
 
     fun onPageChanged(mediaId: String) {
+        flushPendingRotation()
         var newActiveItem: TimelineMediaProjection? = null
         var changed = false
 
@@ -438,6 +489,225 @@ class MediaViewerViewModel(
             )
         }
     }
+
+    // --- Rotate & reprocess ---------------------------------------------------------------
+
+    /** Adds a quarter turn to the active photo and (re)starts the commit debounce. */
+    fun rotateActiveItem() {
+        val state = _uiState.value
+        val item = state.activeItem() ?: return
+        if (item.id in state.mutatingIds) return
+        val details = state.detailsFor(item)
+        val localInfo = state.localInfoById[item.id]
+        if (!MediaMutationPolicy.canRotate(item, details, localInfo, isOnlineProvider())) {
+            _messages.tryEmit("Can't rotate this photo")
+            return
+        }
+
+        val degrees = ((state.pendingRotationById[item.id] ?: 0) + 90) % 360
+        _uiState.update { current ->
+            current.copy(
+                pendingRotationById = (current.pendingRotationById + (item.id to degrees))
+                    .toPersistentMap(),
+            )
+        }
+        requestWriteConsent(item)
+        scheduleRotationCommit(item.id)
+    }
+
+    /** Commits every pending rotation now; called on page change and when the viewer closes. */
+    fun flushPendingRotation() {
+        for (mediaId in pendingRotationJobs.keys.toList()) {
+            pendingRotationJobs.remove(mediaId)?.cancel()
+            commitRotation(mediaId)
+        }
+    }
+
+    fun onWriteConsentResult(granted: Boolean) {
+        mediaWriteConsent?.onResult(granted)
+    }
+
+    /** Asks the server to re-run ingest for the active item and refreshes its metadata. */
+    fun reprocessActiveItem() {
+        val state = _uiState.value
+        val item = state.activeItem() ?: return
+        val cloudId = item.cloudId ?: return
+        val repository = mediaMutationRepository ?: return
+        if (item.id in state.mutatingIds) return
+        if (!MediaMutationPolicy.canReprocess(item, state.detailsFor(item), isOnlineProvider())) {
+            _messages.tryEmit("Can't reprocess this item")
+            return
+        }
+
+        _uiState.update { current ->
+            current.copy(mutatingIds = (current.mutatingIds + item.id).toPersistentSet())
+        }
+        commitScope().launch {
+            repository.reprocess(cloudId)
+                .onSuccess {
+                    mediaRefreshCoordinator?.invalidateCloudItems(listOf(cloudId))
+                    mediaRefreshCoordinator?.syncNow()
+                }
+                .onFailure { _messages.tryEmit("Couldn't reprocess this item") }
+            _uiState.update { current ->
+                current.copy(mutatingIds = (current.mutatingIds - item.id).toPersistentSet())
+            }
+        }
+    }
+
+    private fun scheduleRotationCommit(mediaId: String) {
+        pendingRotationJobs.remove(mediaId)?.cancel()
+        pendingRotationJobs[mediaId] = viewModelScope.launch {
+            delay(ROTATION_DEBOUNCE_MS)
+            pendingRotationJobs.remove(mediaId)
+            commitRotation(mediaId)
+        }
+    }
+
+    private fun commitRotation(mediaId: String) {
+        val state = _uiState.value
+        val item = state.items.firstOrNull { it.id == mediaId } ?: return
+        val degrees = state.pendingRotationById[mediaId] ?: return
+        if (mediaId in state.mutatingIds) return
+        // Four taps are back where the photo started, so there is nothing to send.
+        if (degrees == 0) {
+            clearPendingRotation(mediaId)
+            return
+        }
+        val useCase = rotateMediaUseCase ?: return
+
+        val details = state.detailsFor(item)
+        val baseDegrees = MediaMutationPolicy.baseRotationDegrees(details, state.localInfoById[mediaId])
+        val targetDegrees = (baseDegrees + degrees) % 360
+        val targetOrientation = MediaMutationPolicy.orientationForDegrees(targetDegrees)
+        val newRatio = MediaMutationPolicy.rotatedRatio(item.ratio, baseDegrees, targetDegrees)
+
+        _uiState.update { current ->
+            current.copy(mutatingIds = (current.mutatingIds + mediaId).toPersistentSet())
+        }
+        commitScope().launch {
+            if (!awaitWriteConsent(mediaId)) {
+                clearPendingRotation(mediaId)
+                _messages.tryEmit("Rotation cancelled")
+                return@launch
+            }
+            useCase.commit(item, details, targetOrientation, newRatio)
+                .onSuccess { outcome ->
+                    onRotationCommitted(mediaId, item, details, targetOrientation, newRatio, outcome)
+                }
+                .onFailure {
+                    clearPendingRotation(mediaId)
+                    _messages.tryEmit("Couldn't rotate this photo")
+                }
+        }
+    }
+
+    private fun onRotationCommitted(
+        mediaId: String,
+        item: TimelineMediaProjection,
+        details: MediaDetails?,
+        targetOrientation: Int,
+        newRatio: Float,
+        outcome: RotateMediaUseCase.Outcome,
+    ) {
+        val newMediaId = outcome.newMediaId
+        val newCloudId = outcome.newCloudId
+        if (newMediaId != mediaId) redirectedIds[mediaId] = newMediaId
+
+        _uiState.update { current ->
+            var next = current.copy(
+                pendingRotationById = (current.pendingRotationById - mediaId).toPersistentMap(),
+                mutatingIds = (current.mutatingIds - mediaId).toPersistentSet(),
+            )
+            if (details != null) {
+                next = next.copy(
+                    detailsById = (
+                        next.detailsById - mediaId + (
+                            newMediaId to details.copy(
+                                cloudId = newCloudId ?: details.cloudId,
+                                orientation = targetOrientation,
+                            )
+                            )
+                        ).toPersistentMap(),
+                )
+            }
+            if (newMediaId == mediaId) {
+                next.copy(
+                    items = next.items
+                        .map { if (it.id == mediaId) it.copy(ratio = newRatio) else it }
+                        .toImmutableList(),
+                )
+            } else {
+                next.copy(
+                    items = next.items
+                        .map {
+                            if (it.id == mediaId) {
+                                it.copy(
+                                    id = newMediaId,
+                                    cloudId = newCloudId,
+                                    ratio = newRatio,
+                                    hasThumbnails = false,
+                                )
+                            } else {
+                                it
+                            }
+                        }
+                        .toImmutableList(),
+                    activeMediaId = if (next.activeMediaId == mediaId) newMediaId else next.activeMediaId,
+                    localInfoById = next.localInfoById[mediaId]?.let { info ->
+                        (next.localInfoById - mediaId + (newMediaId to info)).toPersistentMap()
+                    } ?: next.localInfoById,
+                    fullResFiles = next.fullResFiles[mediaId]?.let { file ->
+                        (next.fullResFiles - mediaId + (newMediaId to file)).toPersistentMap()
+                    } ?: next.fullResFiles,
+                )
+            }
+        }
+
+        val oldCloudId = item.cloudId
+        if (!outcome.localOverwriteSucceeded) {
+            _messages.tryEmit("Rotated on the server, but this phone's copy wasn't updated")
+        }
+        commitScope().launch {
+            imageCacheEvictor?.evict(item)
+            if (oldCloudId != null) {
+                imageCacheEvictor?.evict(
+                    item.copy(id = newMediaId, cloudId = newCloudId, hasThumbnails = false),
+                )
+                mediaRefreshCoordinator?.invalidateCloudItems(listOf(oldCloudId))
+            }
+        }
+    }
+
+    private fun clearPendingRotation(mediaId: String) {
+        _uiState.update { current ->
+            current.copy(
+                pendingRotationById = (current.pendingRotationById - mediaId).toPersistentMap(),
+                mutatingIds = (current.mutatingIds - mediaId).toPersistentSet(),
+            )
+        }
+    }
+
+    private fun requestWriteConsent(item: TimelineMediaProjection) {
+        if (item.syncStatus == SyncStatus.CLOUD_ONLY) return
+        val consent = mediaWriteConsent ?: return
+        val uri = item.localContentUri?.toUri() ?: return
+        if (item.id in grantedConsentIds || writeConsentJobs.containsKey(item.id)) return
+        writeConsentJobs[item.id] = commitScope().async { consent.request(uri) }
+    }
+
+    private suspend fun awaitWriteConsent(mediaId: String): Boolean {
+        val deferred = writeConsentJobs.remove(mediaId) ?: return true
+        return deferred.await().also { granted ->
+            if (granted) grantedConsentIds.add(mediaId)
+        }
+    }
+
+    private fun commitScope(): CoroutineScope = appScope ?: viewModelScope
+
+    private fun MediaViewerUiState.activeItem(): TimelineMediaProjection? = items.firstOrNull { it.id == activeMediaId }
+
+    private fun MediaViewerUiState.detailsFor(item: TimelineMediaProjection): MediaDetails? = detailsById[item.id]?.takeIf { it.cloudId == item.cloudId }
 
     private fun invalidateCloudIds(changedCloudIds: Set<String>) {
         if (changedCloudIds.isEmpty()) return
@@ -663,3 +933,6 @@ class InMemoryVideoPreferencesSource(
         _preferences.value = _preferences.value.copy(preferredQuality = quality)
     }
 }
+
+/** Rotate taps inside this window collapse into one `PUT`. */
+private const val ROTATION_DEBOUNCE_MS = 2500L

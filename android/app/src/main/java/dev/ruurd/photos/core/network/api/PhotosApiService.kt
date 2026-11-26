@@ -1,6 +1,8 @@
 package dev.ruurd.photos.core.network.api
 
 import dev.ruurd.photos.core.network.dto.MediaItemWithAlbumsDto
+import dev.ruurd.photos.core.network.dto.UpdateMediaItemRequestDto
+import dev.ruurd.photos.core.network.dto.UpdateMediaItemResponseDto
 import dev.ruurd.photos.core.network.proto.TimelineSyncResponse
 import okhttp3.RequestBody
 import okhttp3.ResponseBody
@@ -9,6 +11,7 @@ import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.Headers
 import retrofit2.http.POST
+import retrofit2.http.PUT
 import retrofit2.http.Path
 import retrofit2.http.Query
 
@@ -40,4 +43,17 @@ interface PhotosApiService {
     suspend fun getMediaItem(
         @Path("cloudId") cloudId: String,
     ): Response<MediaItemWithAlbumsDto>
+
+    /** Partial update; an orientation change answers with the item's new `cloudId`. */
+    @Headers("Content-Type: application/json")
+    @PUT("api/photos/{cloudId}/item")
+    suspend fun updateMediaItem(
+        @Path("cloudId") cloudId: String,
+        @Body request: UpdateMediaItemRequestDto,
+    ): Response<UpdateMediaItemResponseDto>
+
+    @POST("api/photos/{cloudId}/reprocess")
+    suspend fun reprocessMediaItem(
+        @Path("cloudId") cloudId: String,
+    ): Response<Unit>
 }

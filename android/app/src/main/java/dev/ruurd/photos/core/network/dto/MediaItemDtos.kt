@@ -44,6 +44,32 @@ data class FullMediaItemDto(
     @SerialName("user_caption") val userCaption: String? = null,
 )
 
+/**
+ * `PUT /api/photos/{cloudId}/item`. The server renames this struct to camelCase, and every field is
+ * optional: leave the fields you are not editing at their defaults so they are omitted from the body.
+ */
+@Serializable
+data class UpdateMediaItemRequestDto(
+    val userCaption: PatchField<String> = PatchField.Ignore,
+    /** Naive wall clock, `"yyyy-MM-dd'T'HH:mm:ss"`. */
+    val takenAtLocal: String? = null,
+    val timezoneOffsetSeconds: PatchField<Int> = PatchField.Ignore,
+    val orientation: Int? = null,
+    val gps: PatchField<GpsEditDto> = PatchField.Ignore,
+)
+
+@Serializable
+data class GpsEditDto(
+    val latitude: Double,
+    val longitude: Double,
+)
+
+/** The only camelCase response: an orientation change assigns a new `cloudId`. */
+@Serializable
+data class UpdateMediaItemResponseDto(
+    val mediaItemId: String = "",
+)
+
 @Serializable
 data class GpsDto(
     val latitude: Double = 0.0,

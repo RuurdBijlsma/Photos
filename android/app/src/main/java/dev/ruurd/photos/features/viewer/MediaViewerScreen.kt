@@ -1,8 +1,11 @@
 ﻿package dev.ruurd.photos.features.viewer
 
+import android.app.Activity
 import android.content.Intent
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -11,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
@@ -35,6 +39,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.IntSize
 import dev.ruurd.photos.core.image.TileCornerRadii
+import dev.ruurd.photos.domain.model.MediaMutationPolicy
 import dev.ruurd.photos.domain.model.ResolvedVideoSource
 import dev.ruurd.photos.domain.model.VideoPlaybackPolicy
 import dev.ruurd.photos.features.viewer.components.HeroImageOverlay
@@ -112,6 +117,34 @@ fun MediaViewerScreen(
     val activeLocalInfo = activeItem?.let { item ->
         uiState.localInfoById[item.id]
     }
+
+    // `MediaStore.createWriteRequest` for the photo a rotate is about to rewrite in place.
+    val writeConsentLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartIntentSenderForResult(),
+    ) { result ->
+        viewModel.onWriteConsentResult(result.resultCode == Activity.RESULT_OK)
+    }
+    val writeConsentRequest by viewModel.writeConsentRequests.collectAsState()
+    LaunchedEffect(writeConsentRequest) {
+        writeConsentRequest?.let(writeConsentLauncher::launch)
+    }
+
+    LaunchedEffect(viewModel) {
+        viewModel.messages.collect { message ->
+            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    // A pending rotation must reach the server even if the viewer goes away first.
+    DisposableEffect(viewModel) {
+        onDispose { viewModel.flushPendingRotation() }
+    }
+
+    val isMutating = activeItem != null && activeItem.id in uiState.mutatingIds
+    val canRotate = activeItem != null && !isMutating &&
+        MediaMutationPolicy.canRotate(activeItem, activeDetails, activeLocalInfo, isOnline)
+    val canReprocess = activeItem != null && !isMutating &&
+        MediaMutationPolicy.canReprocess(activeItem, activeDetails, isOnline)
 
     var activePageZoomFraction by remember { mutableFloatStateOf(0f) }
     val isZoomed = activePageZoomFraction > 0.01f
@@ -316,7 +349,7 @@ fun MediaViewerScreen(
         // Interactive Pager Layer (hidden only while ClosingHeroOverlay is flying back to the tile)
         if (transition.closingState == null && items.isNotEmpty()) {
             val isPagerScrollEnabled = !isZoomed && !transition.isDragging &&
-                    !transition.isDraggingInfo && !transition.isOpeningHero
+                !transition.isDraggingInfo && !transition.isOpeningHero
 
             Box(
                 modifier = Modifier
@@ -344,15 +377,16 @@ fun MediaViewerScreen(
                             val isOffscreen by remember(pagerState, page) {
                                 derivedStateOf {
                                     (!pagerState.isScrollInProgress && pagerState.settledPage != page) ||
-                                            abs(
-                                                (page - pagerState.currentPage) -
-                                                        pagerState.currentPageOffsetFraction,
-                                            ) >= 1f
+                                        abs(
+                                            (page - pagerState.currentPage) -
+                                                pagerState.currentPageOffsetFraction,
+                                        ) >= 1f
                                 }
                             }
                             val itemDetails = uiState.detailsById[item.id]
                                 ?.takeIf { it.cloudId == item.cloudId }
                             val itemLocalInfo = uiState.localInfoById[item.id]
+                            val pendingRotationDegrees = uiState.pendingRotationById[item.id] ?: 0
 
                             Box(modifier = Modifier.fillMaxSize()) {
                                 Box(
@@ -360,6 +394,17 @@ fun MediaViewerScreen(
                                         .fillMaxSize()
                                         .graphicsLayer {
                                             translationY = -transition.pagePhotoTravelPx(item)
+                                            if (pendingRotationDegrees != 0) {
+                                                rotationZ = pendingRotationDegrees.toFloat()
+                                                val scale = MediaMutationPolicy.optimisticRotationScale(
+                                                    containerWidth = size.width,
+                                                    containerHeight = size.height,
+                                                    ratio = item.ratio,
+                                                    degrees = pendingRotationDegrees,
+                                                )
+                                                scaleX = scale
+                                                scaleY = scale
+                                            }
                                         },
                                 ) {
                                     if (item.isVideo) {
@@ -373,7 +418,7 @@ fun MediaViewerScreen(
                                         val transientQuality = uiState.transientVideoQualityById[item.id]
                                         val localFailed = item.id in uiState.localVideoFallbackIds
                                         val isOriginalMissing = itemDetails?.isMissing == true ||
-                                                item.id in uiState.videoUnavailableOriginalIds
+                                            item.id in uiState.videoUnavailableOriginalIds
                                         val resolvedSource = remember(
                                             item.localContentUri,
                                             localFailed,
@@ -439,7 +484,7 @@ fun MediaViewerScreen(
                                             },
                                             fullResFile = uiState.fullResFiles[item.id],
                                             isInfoPanelRequested = isCurrentPage &&
-                                                    transition.isInfoPanelRequested,
+                                                transition.isInfoPanelRequested,
                                             onFullResRequested = { viewModel.requestFullRes(item) },
                                             onZoomFractionChanged = { fraction ->
                                                 if (page == pagerState.currentPage) {
@@ -485,9 +530,9 @@ fun MediaViewerScreen(
                                         },
                                     ) { measurables, constraints ->
                                         val minSheetHeight = (
-                                                constraints.maxHeight -
-                                                        transition.sheetRestTopPx.roundToInt()
-                                                ).coerceAtLeast(0)
+                                            constraints.maxHeight -
+                                                transition.sheetRestTopPx.roundToInt()
+                                            ).coerceAtLeast(0)
                                         val childConstraints = constraints.copy(
                                             minHeight = minSheetHeight,
                                             maxHeight = Constraints.Infinity,
@@ -540,7 +585,7 @@ fun MediaViewerScreen(
         val backButtonAlpha = transition.backButtonAlpha(chromeVisibilityAlpha)
         if (chromeAlpha > 0.01f || backButtonAlpha > 0.01f) {
             val hasLocalOrExistingServer = activeItem != null &&
-                    (activeItem.localContentUri != null || activeDetails?.isMissing != true)
+                (activeItem.localContentUri != null || activeDetails?.isMissing != true)
             val videoChromeState = if (activeItem?.isVideo == true) {
                 val activeSourceHeight = remember(activeDetails, activeLocalInfo) {
                     val w = activeDetails?.width ?: activeLocalInfo?.width
@@ -548,7 +593,7 @@ fun MediaViewerScreen(
                     if (w != null && h != null && w > 0 && h > 0) minOf(w, h) else null
                 }
                 val isOriginalMissing = activeDetails?.isMissing == true ||
-                        activeItem.id in uiState.videoUnavailableOriginalIds
+                    activeItem.id in uiState.videoUnavailableOriginalIds
                 val qualityOptions = remember(
                     activeItem.hasThumbnails,
                     isOriginalMissing,
@@ -569,7 +614,7 @@ fun MediaViewerScreen(
                     (activeItem.durationMs ?: 0).toLong()
                 }
                 val isCloudPlayback = activeItem.localContentUri == null ||
-                        activeItem.id in uiState.localVideoFallbackIds
+                    activeItem.id in uiState.localVideoFallbackIds
                 val activeQuality = if (isCloudPlayback && videoController.activeMediaId == activeItem.id) {
                     videoController.activeCloudQuality
                 } else {
@@ -606,6 +651,10 @@ fun MediaViewerScreen(
                 currentLocalInfo = activeLocalInfo,
                 isShareEnabled = hasLocalOrExistingServer,
                 isCopyEnabled = hasLocalOrExistingServer,
+                isRotateEnabled = canRotate,
+                isReprocessEnabled = canReprocess,
+                onRotate = viewModel::rotateActiveItem,
+                onReprocess = viewModel::reprocessActiveItem,
                 videoChromeState = videoChromeState,
                 onBack = {
                     if (transition.isInfoPanelActive) {

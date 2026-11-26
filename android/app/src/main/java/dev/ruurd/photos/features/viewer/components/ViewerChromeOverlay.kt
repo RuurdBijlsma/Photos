@@ -113,6 +113,10 @@ fun ViewerChromeOverlay(
     backButtonAlpha: Float = alpha,
     isSharing: Boolean = false,
     isCopying: Boolean = false,
+    isRotateEnabled: Boolean = false,
+    isReprocessEnabled: Boolean = false,
+    onRotate: () -> Unit = {},
+    onReprocess: () -> Unit = {},
     videoChromeState: ViewerVideoChromeState? = null,
 ) {
     // Ignoring visibility keeps the top bar anchored when statusBars() animates back in on tap.
@@ -305,29 +309,33 @@ fun ViewerChromeOverlay(
                             )
                             DropdownMenuItem(
                                 text = { Text("Rotate clockwise") },
-                                // Wired in Phase 2D.
-                                enabled = false,
+                                enabled = isRotateEnabled,
                                 leadingIcon = {
                                     Icon(
                                         imageVector = Icons.AutoMirrored.Outlined.RotateRight,
                                         contentDescription = null,
                                     )
                                 },
-                                onClick = { isMenuExpanded = false },
+                                onClick = {
+                                    isMenuExpanded = false
+                                    onRotate()
+                                },
                             )
                         }
                         if (currentItem?.cloudId != null) {
                             DropdownMenuItem(
                                 text = { Text("Reprocess") },
-                                // Wired in Phase 2D.
-                                enabled = false,
+                                enabled = isReprocessEnabled,
                                 leadingIcon = {
                                     Icon(
                                         imageVector = Icons.Outlined.Refresh,
                                         contentDescription = null,
                                     )
                                 },
-                                onClick = { isMenuExpanded = false },
+                                onClick = {
+                                    isMenuExpanded = false
+                                    onReprocess()
+                                },
                             )
                         }
                     }

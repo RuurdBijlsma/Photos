@@ -18,6 +18,7 @@ import dev.ruurd.photos.core.database.dao.DeviceFolderDao
 import dev.ruurd.photos.core.database.dao.MediaDao
 import dev.ruurd.photos.core.image.FullResFileCache
 import dev.ruurd.photos.core.image.FullResFileStore
+import dev.ruurd.photos.core.image.MediaImageCacheEvictor
 import dev.ruurd.photos.core.image.MemoryCacheKeyRegistry
 import dev.ruurd.photos.core.image.PhotosImageLoader
 import dev.ruurd.photos.core.image.ShareCache
@@ -30,23 +31,29 @@ import dev.ruurd.photos.core.network.auth.AuthAuthenticator
 import dev.ruurd.photos.core.network.cookie.PersistentCookieJar
 import dev.ruurd.photos.core.network.discovery.LanServerScanner
 import dev.ruurd.photos.core.network.interceptor.DynamicBaseUrlInterceptor
+import dev.ruurd.photos.core.permissions.MediaWriteConsent
 import dev.ruurd.photos.core.state.BootstrapState
+import dev.ruurd.photos.data.datasource.local.LocalFileOverwriteHelper
 import dev.ruurd.photos.data.datasource.local.LocalMediaInfoReader
 import dev.ruurd.photos.data.datasource.local.LocalMediaInfoSource
 import dev.ruurd.photos.data.datasource.local.MediaStoreDataSource
+import dev.ruurd.photos.data.datasource.local.MediaStoreFileOverwriteHelper
 import dev.ruurd.photos.data.repository.AuthRepositoryImpl
 import dev.ruurd.photos.data.repository.DeviceFolderRepositoryImpl
 import dev.ruurd.photos.data.repository.MediaDetailsRepositoryImpl
+import dev.ruurd.photos.data.repository.MediaMutationRepositoryImpl
 import dev.ruurd.photos.data.repository.MediaRepositoryImpl
 import dev.ruurd.photos.data.repository.TimelineProjectionStore
 import dev.ruurd.photos.domain.repository.AuthRepository
 import dev.ruurd.photos.domain.repository.DeviceFolderRepository
 import dev.ruurd.photos.domain.repository.LocalMediaStore
 import dev.ruurd.photos.domain.repository.MediaDetailsRepository
+import dev.ruurd.photos.domain.repository.MediaMutationRepository
 import dev.ruurd.photos.domain.repository.MediaRepository
 import dev.ruurd.photos.domain.repository.TimelineProjectionSource
 import dev.ruurd.photos.domain.usecase.CalculateTimelineLayoutUseCase
 import dev.ruurd.photos.domain.usecase.ObserveTimelineUseCase
+import dev.ruurd.photos.domain.usecase.RotateMediaUseCase
 import dev.ruurd.photos.domain.usecase.ScanLocalMediaUseCase
 import dev.ruurd.photos.domain.usecase.SyncTimelineUseCase
 import dev.ruurd.photos.features.auth.AuthViewModel
@@ -277,11 +284,45 @@ class DefaultAppContainer(private val context: Context) : AppContainer {
         VideoPreferencesStore(context = context, scope = applicationScope)
     }
 
+    private val mediaMutationRepository: MediaMutationRepository by lazy {
+        MediaMutationRepositoryImpl(apiService = photosApiService)
+    }
+
+    private val localFileOverwriteHelper: LocalFileOverwriteHelper by lazy {
+        MediaStoreFileOverwriteHelper(
+            context = context,
+            fullResFileCache = fullResFileCache,
+            dispatchers = dispatchers,
+        )
+    }
+
+    private val rotateMediaUseCase: RotateMediaUseCase by lazy {
+        RotateMediaUseCase(
+            mediaRepository = mediaRepository,
+            mediaMutationRepository = mediaMutationRepository,
+            localFileOverwriteHelper = localFileOverwriteHelper,
+            fullResFileCache = fullResFileCache,
+        )
+    }
+
+    private val mediaWriteConsent: MediaWriteConsent by lazy {
+        MediaWriteConsent(context)
+    }
+
+    private val imageCacheEvictor: MediaImageCacheEvictor by lazy {
+        MediaImageCacheEvictor(
+            imageLoader = imageLoader,
+            baseUrlProvider = sessionManager::getServerUrl,
+            dispatchers = dispatchers,
+        )
+    }
+
     private val mediaRefreshCoordinator: MediaRefreshCoordinator by lazy {
         DefaultMediaRefreshCoordinator(
             mediaDetailsRepository = mediaDetailsRepository,
             fullResFileCache = fullResFileCache,
             scope = applicationScope,
+            syncRunner = { syncTimelineUseCase() },
         )
     }
 
@@ -390,6 +431,12 @@ class DefaultAppContainer(private val context: Context) : AppContainer {
                 videoPreferencesStore = videoPreferencesStore,
                 isUnmeteredWithoutDataSaverProvider = networkMonitor::isUnmeteredWithoutDataSaver,
                 mediaRefreshCoordinator = mediaRefreshCoordinator,
+                mediaMutationRepository = mediaMutationRepository,
+                rotateMediaUseCase = rotateMediaUseCase,
+                mediaWriteConsent = mediaWriteConsent,
+                imageCacheEvictor = imageCacheEvictor,
+                isOnlineProvider = { networkMonitor.isOnline.value },
+                appScope = applicationScope,
             )
         }
     }

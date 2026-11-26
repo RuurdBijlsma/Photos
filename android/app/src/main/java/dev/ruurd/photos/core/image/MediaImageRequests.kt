@@ -112,6 +112,28 @@ object MediaImageRequests {
         }
     }
 
+    /** Every disk-cache key a preview for this item can have written. */
+    fun previewDiskCacheKeys(
+        baseUrl: String,
+        localContentUri: String?,
+        cloudId: String?,
+        isVideo: Boolean,
+        hasThumbnails: Boolean,
+    ): List<String> = buildList {
+        cloudThumbnailUrl(baseUrl, cloudId, hasThumbnails, previewHeightPx(isVideo))?.let(::add)
+        if (localContentUri != null) {
+            val heightPx = previewHeightPx(isVideo)
+            add(
+                mediaStoreThumbnailCacheKey(
+                    uri = localContentUri,
+                    width = heightPx,
+                    height = heightPx,
+                    bypassPlatformThumbnail = !isVideo,
+                ),
+            )
+        }
+    }
+
     private const val PHOTO_PREVIEW_HEIGHT_PX = 1440
     private const val VIDEO_PREVIEW_HEIGHT_PX = 720
 }

@@ -21,12 +21,21 @@ interface MediaRefreshCoordinator {
         get() = emptyFlow()
 
     fun onCloudItemsChanged(upserted: Collection<String>, deleted: Collection<String>)
+
+    /** Drops cached `/item` metadata for [cloudIds] and lets open screens refetch those rows. */
+    fun invalidateCloudItems(cloudIds: Collection<String>) {
+        onCloudItemsChanged(upserted = cloudIds, deleted = emptyList())
+    }
+
+    /** Runs a timeline delta sync now, e.g. after a reprocess started server-side work. */
+    fun syncNow() {}
 }
 
 class DefaultMediaRefreshCoordinator(
     private val mediaDetailsRepository: MediaDetailsRepository,
     private val fullResFileCache: FullResFileStore,
     private val scope: CoroutineScope,
+    private val syncRunner: suspend () -> Unit = {},
 ) : MediaRefreshCoordinator {
 
     private val _changedCloudIds = MutableSharedFlow<Set<String>>(
@@ -43,5 +52,9 @@ class DefaultMediaRefreshCoordinator(
             scope.launch { fullResFileCache.evict(cloudId) }
         }
         _changedCloudIds.tryEmit(changed)
+    }
+
+    override fun syncNow() {
+        scope.launch { syncRunner() }
     }
 }

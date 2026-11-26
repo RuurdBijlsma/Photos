@@ -119,6 +119,7 @@ class LocalMediaInfoReader(
                 exif.getAttribute(ExifInterface.TAG_DATETIME_ORIGINAL)
                     ?: exif.getAttribute(ExifInterface.TAG_DATETIME)
                 )?.let(::parseExifDateTime),
+            orientation = exif.getAttributeInt(ExifInterface.TAG_ORIENTATION, 1),
             camera = CameraDetails(
                 make = exif.getAttribute(ExifInterface.TAG_MAKE),
                 model = exif.getAttribute(ExifInterface.TAG_MODEL),

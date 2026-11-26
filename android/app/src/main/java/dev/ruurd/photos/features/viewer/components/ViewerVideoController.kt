@@ -421,10 +421,9 @@ class ViewerVideoController(
             PlaybackException.ERROR_CODE_AUDIO_TRACK_OFFLOAD_INIT_FAILED,
         )
 
-        internal fun isLocalAccessOrMissingError(error: PlaybackException): Boolean =
-            error.errorCode == PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND ||
-                    error.errorCode == PlaybackException.ERROR_CODE_IO_NO_PERMISSION ||
-                    hasLocalAccessOrMissingCause(error)
+        internal fun isLocalAccessOrMissingError(error: PlaybackException): Boolean = error.errorCode == PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND ||
+            error.errorCode == PlaybackException.ERROR_CODE_IO_NO_PERMISSION ||
+            hasLocalAccessOrMissingCause(error)
 
         internal fun hasLocalAccessOrMissingCause(error: PlaybackException): Boolean = generateSequence(error.cause) { it.cause }
             .take(MAX_CAUSE_DEPTH)

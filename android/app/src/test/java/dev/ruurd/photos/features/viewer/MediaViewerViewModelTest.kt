@@ -7,6 +7,8 @@ import dev.ruurd.photos.core.database.entity.MediaEntity
 import dev.ruurd.photos.core.database.entity.SyncStatus
 import dev.ruurd.photos.core.database.entity.TimelineMediaProjection
 import dev.ruurd.photos.core.image.FullResFileStore
+import dev.ruurd.photos.core.network.dto.UpdateMediaItemRequestDto
+import dev.ruurd.photos.data.datasource.local.LocalFileOverwriteHelper
 import dev.ruurd.photos.data.datasource.local.LocalMediaInfoSource
 import dev.ruurd.photos.data.repository.TimelineProjectionStore
 import dev.ruurd.photos.domain.model.LocalMediaInfo
@@ -14,6 +16,8 @@ import dev.ruurd.photos.domain.model.MediaDetails
 import dev.ruurd.photos.domain.model.VideoQuality
 import dev.ruurd.photos.domain.model.VideoUnavailableReason
 import dev.ruurd.photos.domain.repository.MediaDetailsRepository
+import dev.ruurd.photos.domain.repository.MediaMutationRepository
+import dev.ruurd.photos.domain.usecase.RotateMediaUseCase
 import dev.ruurd.photos.testing.FakeMediaRepository
 import dev.ruurd.photos.testing.TestAppDispatchers
 import kotlinx.coroutines.Dispatchers
@@ -35,6 +39,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import java.io.File
+import java.io.IOException
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class MediaViewerViewModelTest {
@@ -545,6 +550,138 @@ class MediaViewerViewModelTest {
         viewModel.viewModelScope.cancel()
         store.stop()
     }
+
+    @Test
+    fun `rotate tap turns optimistically and commits once after the debounce`() = testScope.runTest {
+        val repo = rotationRepository()
+        val store = TimelineProjectionStore(repo, backgroundScope, dispatchers)
+        runCurrent()
+        val mutations = FakeRotationMutationRepository("c1b")
+        val viewModel = createRotationViewModel(repo, store, mutations)
+        runCurrent()
+
+        viewModel.rotateActiveItem()
+        assertEquals(90, viewModel.uiState.value.pendingRotationById["cloud_c1"])
+        assertEquals(0, mutations.updateCalls)
+
+        advanceTimeBy(2_501L)
+        runCurrent()
+
+        assertEquals(1, mutations.updateCalls)
+        assertEquals("cloud_c1b", viewModel.uiState.value.activeMediaId)
+        assertTrue(viewModel.uiState.value.pendingRotationById.isEmpty())
+        assertTrue(viewModel.uiState.value.mutatingIds.isEmpty())
+        assertEquals(6, viewModel.uiState.value.detailsById["cloud_c1b"]?.orientation)
+        assertEquals("c1b", repo.getById("cloud_c1b")?.cloudId)
+        assertNull(repo.getById("cloud_c1"))
+
+        viewModel.viewModelScope.cancel()
+        store.stop()
+    }
+
+    @Test
+    fun `four rotate taps cancel out without a request`() = testScope.runTest {
+        val repo = rotationRepository()
+        val store = TimelineProjectionStore(repo, backgroundScope, dispatchers)
+        runCurrent()
+        val mutations = FakeRotationMutationRepository("c1b")
+        val viewModel = createRotationViewModel(repo, store, mutations)
+        runCurrent()
+
+        repeat(4) { viewModel.rotateActiveItem() }
+        assertEquals(0, viewModel.uiState.value.pendingRotationById["cloud_c1"])
+
+        advanceTimeBy(2_501L)
+        runCurrent()
+
+        assertEquals(0, mutations.updateCalls)
+        assertTrue(viewModel.uiState.value.pendingRotationById.isEmpty())
+
+        viewModel.viewModelScope.cancel()
+        store.stop()
+    }
+
+    @Test
+    fun `flush commits a pending rotation immediately`() = testScope.runTest {
+        val repo = rotationRepository()
+        val store = TimelineProjectionStore(repo, backgroundScope, dispatchers)
+        runCurrent()
+        val mutations = FakeRotationMutationRepository("c1b")
+        val viewModel = createRotationViewModel(repo, store, mutations)
+        runCurrent()
+
+        viewModel.rotateActiveItem()
+        viewModel.flushPendingRotation()
+        runCurrent()
+
+        assertEquals(1, mutations.updateCalls)
+        assertEquals("cloud_c1b", viewModel.uiState.value.activeMediaId)
+
+        viewModel.viewModelScope.cancel()
+        store.stop()
+    }
+
+    @Test
+    fun `a failed rotate drops the optimistic turn`() = testScope.runTest {
+        val repo = rotationRepository()
+        val store = TimelineProjectionStore(repo, backgroundScope, dispatchers)
+        runCurrent()
+        val mutations = FakeRotationMutationRepository(newCloudId = null)
+        val viewModel = createRotationViewModel(repo, store, mutations)
+        runCurrent()
+
+        viewModel.rotateActiveItem()
+        viewModel.flushPendingRotation()
+        runCurrent()
+
+        assertEquals(1, mutations.updateCalls)
+        assertEquals("cloud_c1", viewModel.uiState.value.activeMediaId)
+        assertTrue(viewModel.uiState.value.pendingRotationById.isEmpty())
+        assertTrue(viewModel.uiState.value.mutatingIds.isEmpty())
+
+        viewModel.viewModelScope.cancel()
+        store.stop()
+    }
+
+    private suspend fun rotationRepository(): FakeMediaRepository {
+        val repo = FakeMediaRepository()
+        repo.upsertAll(
+            listOf(
+                MediaEntity(
+                    id = "cloud_c1",
+                    cloudId = "c1",
+                    ratio = 2f,
+                    sortTimestamp = 1000L,
+                    yearMonth = 202611,
+                    syncStatus = SyncStatus.CLOUD_ONLY,
+                ),
+            ),
+        )
+        return repo
+    }
+
+    private fun TestScope.createRotationViewModel(
+        repo: FakeMediaRepository,
+        store: TimelineProjectionStore,
+        mutations: FakeRotationMutationRepository,
+    ): MediaViewerViewModel = MediaViewerViewModel(
+        initialMediaId = "cloud_c1",
+        timelineProjectionStore = store,
+        mediaRepository = repo,
+        mediaDetailsRepository = detailsRepository,
+        fullResFileCache = FakeFullResFileStore(),
+        localMediaInfoReader = FakeLocalMediaInfoSource(),
+        mediaFileSharer = FakeMediaFileSharer(),
+        dispatchers = dispatchers,
+        mediaMutationRepository = mutations,
+        rotateMediaUseCase = RotateMediaUseCase(
+            mediaRepository = repo,
+            mediaMutationRepository = mutations,
+            localFileOverwriteHelper = FakeRotationOverwriteHelper(),
+            fullResFileCache = FakeFullResFileStore(),
+        ),
+        appScope = backgroundScope,
+    )
 }
 
 private class FakeMediaDetailsRepository(
@@ -604,4 +741,28 @@ private class FakeMediaFileSharer : MediaFileSharer {
         details: MediaDetails?,
         localInfo: LocalMediaInfo?,
     ): Boolean = false
+}
+
+private class FakeRotationMutationRepository(private val newCloudId: String?) : MediaMutationRepository {
+    var updateCalls = 0
+
+    override suspend fun updateItem(
+        cloudId: String,
+        request: UpdateMediaItemRequestDto,
+    ): Result<String> {
+        updateCalls++
+        return newCloudId?.let { Result.success(it) } ?: Result.failure(IOException("offline"))
+    }
+
+    override suspend fun reprocess(cloudId: String): Result<Unit> = Result.success(Unit)
+}
+
+private class FakeRotationOverwriteHelper : LocalFileOverwriteHelper {
+    override suspend fun writeOrientation(contentUri: String, orientation: Int): Long? = 100L
+
+    override suspend fun overwriteFromCloud(
+        cloudId: String,
+        contentUri: String,
+        fileName: String?,
+    ): Boolean = true
 }

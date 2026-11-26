@@ -91,8 +91,8 @@ fun VideoPlayerPage(
 
     var showBufferingSpinner by remember(item.id) { mutableStateOf(false) }
     val isBufferingActive = canAttachPlayer &&
-            videoController.activeMediaId == item.id &&
-            videoController.isBuffering
+        videoController.activeMediaId == item.id &&
+        videoController.isBuffering
     LaunchedEffect(isBufferingActive, item.id) {
         if (isBufferingActive) {
             delay(BUFFERING_SPINNER_DELAY_MS)
@@ -115,7 +115,7 @@ fun VideoPlayerPage(
         if (canAttachPlayer) {
             // Guard against Video A's last frame flashing before Video B's first frame renders.
             val awaitingFirstFrame = videoController.activeMediaId != item.id ||
-                    (!videoController.hasRenderedFirstFrame && !videoController.isQualitySwitch)
+                (!videoController.hasRenderedFirstFrame && !videoController.isQualitySwitch)
             ContentFrame(
                 player = videoController.player,
                 surfaceType = SURFACE_TYPE_TEXTURE_VIEW,

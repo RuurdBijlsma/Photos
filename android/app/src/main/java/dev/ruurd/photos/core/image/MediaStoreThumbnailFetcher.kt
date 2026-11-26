@@ -178,8 +178,12 @@ class MediaStoreThumbnailFetcher(
         override fun key(data: MediaStoreThumbnail, options: Options): String {
             val width = (options.size.width as? Dimension.Pixels)?.px ?: DEFAULT_SIZE_PX
             val height = (options.size.height as? Dimension.Pixels)?.px ?: DEFAULT_SIZE_PX
-            val prefix = if (data.bypassPlatformThumbnail && !data.isVideo) "mediastore_full" else "mediastore"
-            return "$prefix:${data.uri}?size=${width}x$height"
+            return mediaStoreThumbnailCacheKey(
+                uri = data.uri.toString(),
+                width = width,
+                height = height,
+                bypassPlatformThumbnail = data.bypassPlatformThumbnail && !data.isVideo,
+            )
         }
     }
 
@@ -187,4 +191,15 @@ class MediaStoreThumbnailFetcher(
         const val DEFAULT_SIZE_PX = 480
         const val DEFAULT_MAX_PARALLELISM = 4
     }
+}
+
+/** Cache key of a local preview, shared with [MediaImageCacheEvictor] so both stay in sync. */
+internal fun mediaStoreThumbnailCacheKey(
+    uri: String,
+    width: Int,
+    height: Int,
+    bypassPlatformThumbnail: Boolean,
+): String {
+    val prefix = if (bypassPlatformThumbnail) "mediastore_full" else "mediastore"
+    return "$prefix:$uri?size=${width}x$height"
 }

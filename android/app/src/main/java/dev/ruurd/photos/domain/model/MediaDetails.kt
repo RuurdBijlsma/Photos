@@ -44,6 +44,8 @@ data class LocalMediaInfo(
     val height: Int? = null,
     val dateTakenMs: Long? = null,
     val durationMs: Long? = null,
+    /** EXIF orientation (1–8) for photos; `1` when unknown. */
+    val orientation: Int = 1,
     val camera: CameraDetails? = null,
     val latitude: Double? = null,
     val longitude: Double? = null,

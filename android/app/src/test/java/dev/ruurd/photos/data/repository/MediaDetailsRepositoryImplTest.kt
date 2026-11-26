@@ -3,6 +3,8 @@ package dev.ruurd.photos.data.repository
 import dev.ruurd.photos.core.network.api.PhotosApiService
 import dev.ruurd.photos.core.network.dto.FullMediaItemDto
 import dev.ruurd.photos.core.network.dto.MediaItemWithAlbumsDto
+import dev.ruurd.photos.core.network.dto.UpdateMediaItemRequestDto
+import dev.ruurd.photos.core.network.dto.UpdateMediaItemResponseDto
 import dev.ruurd.photos.core.network.proto.TimelineSyncResponse
 import dev.ruurd.photos.testing.TestAppDispatchers
 import kotlinx.coroutines.CompletableDeferred
@@ -36,6 +38,13 @@ class MediaDetailsRepositoryImplTest {
             calls++
             return gate?.await() ?: nextResponse(cloudId)
         }
+
+        override suspend fun updateMediaItem(
+            cloudId: String,
+            request: UpdateMediaItemRequestDto,
+        ): Response<UpdateMediaItemResponseDto> = Response.success(UpdateMediaItemResponseDto())
+
+        override suspend fun reprocessMediaItem(cloudId: String): Response<Unit> = Response.success(Unit)
 
         override suspend fun healthCheck(): Response<String> = Response.success("OK")
         override suspend fun login(request: RequestBody): Response<ResponseBody> = Response.success(null)
