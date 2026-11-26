@@ -12,6 +12,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -23,7 +24,7 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Collections
@@ -77,7 +78,7 @@ import dev.ruurd.photos.features.timeline.TimelineScreen
 import dev.ruurd.photos.features.timeline.TimelineViewModel
 import kotlinx.coroutines.launch
 
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
 @Composable
 fun MainScreen(
     viewModel: MainViewModel,
@@ -174,10 +175,14 @@ fun MainScreen(
     }
 
     // The grid runs edge to edge behind both floating bars, so the insets are content padding only.
-    val statusBarHeight = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    // Ignoring status bar visibility keeps the timeline and top bar anchored when the viewer hides
+    // the status bar, so closing transitions target the exact tile position.
+    val statusBarHeight = WindowInsets.statusBarsIgnoringVisibility
+        .asPaddingValues()
+        .calculateTopPadding()
     val topInset = statusBarHeight + PhotosTopBarHeight
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() +
-        FloatingBottomNavHeight
+            FloatingBottomNavHeight
 
     // Hide on scroll-down, reveal on scroll-up or near the top; ignore non-scroll layout shifts.
     val topBarVisibility = rememberTopBarVisibilityState(timelineListState)
