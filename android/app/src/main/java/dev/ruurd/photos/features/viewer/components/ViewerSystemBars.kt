@@ -1,6 +1,9 @@
 package dev.ruurd.photos.features.viewer.components
 
 import android.content.pm.ActivityInfo
+import android.os.SystemClock
+import android.util.Log
+import android.view.Display
 import android.view.Window
 import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -10,8 +13,11 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
+import java.util.function.Consumer
 
 /**
  * Status/navigation bar appearance and HDR color mode for the viewer. Kept out of the screen so
@@ -52,6 +58,10 @@ class ViewerSystemBars(private val window: Window?, private val isDarkTheme: Boo
     fun setHdrColorMode(enabled: Boolean) {
         val target = if (enabled) ActivityInfo.COLOR_MODE_HDR else ActivityInfo.COLOR_MODE_DEFAULT
         if (window != null && window.colorMode != target) {
+            Log.d(
+                "HDR_TRACE",
+                "t=${SystemClock.uptimeMillis()} our setHdrColorMode: ${window.colorMode} -> $target (desiredHeadroom=${window.desiredHdrHeadroom})",
+            )
             window.colorMode = target
         }
     }
@@ -149,6 +159,32 @@ fun ViewerSystemBarsEffect(
                 isInfoVisible = isInfoVisible,
                 isInfoCoveringStatusBar = isInfoCoveringStatusBar,
             )
+        }
+    }
+
+    val activityWindow = LocalActivity.current?.window
+    val view = LocalView.current
+    val context = LocalContext.current
+
+    DisposableEffect(activityWindow, view) {
+        val display = activityWindow?.decorView?.display ?: view.display
+        if (display == null) {
+            onDispose {}
+        } else {
+            Log.d(
+                "HDR_TRACE",
+                "t=${SystemClock.uptimeMillis()} listener start: hdrSdrRatio=${display.hdrSdrRatio} colorMode=${activityWindow?.colorMode} desiredHeadroom=${activityWindow?.desiredHdrHeadroom}",
+            )
+            val listener = Consumer<Display> { d ->
+                Log.d(
+                    "HDR_TRACE",
+                    "t=${SystemClock.uptimeMillis()} OS hdrSdrRatio=${d.hdrSdrRatio} colorMode=${activityWindow?.colorMode} desiredHeadroom=${activityWindow?.desiredHdrHeadroom}",
+                )
+            }
+            display.registerHdrSdrRatioChangedListener(context.mainExecutor, listener)
+            onDispose {
+                display.unregisterHdrSdrRatioChangedListener(listener)
+            }
         }
     }
 }

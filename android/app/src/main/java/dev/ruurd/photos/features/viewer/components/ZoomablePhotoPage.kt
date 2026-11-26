@@ -1,6 +1,9 @@
 package dev.ruurd.photos.features.viewer.components
 
 import android.net.Uri
+import android.os.SystemClock
+import android.util.Log
+import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -20,6 +23,7 @@ import androidx.compose.ui.geometry.isSpecified
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import coil3.BitmapImage
 import coil3.SingletonImageLoader
 import coil3.compose.AsyncImage
@@ -72,7 +76,9 @@ fun ZoomablePhotoPage(
 
     // Local photos upgrade after settling; cloud-only (or unreadable synced) photos upgrade once /download has landed.
     val canUpgrade = !item.isVideo && (effectiveLocalUri != null || fullResFile != null)
-    var isUpgradedToFullRes by remember(item.id, imageRevision) { mutableStateOf(false) }
+    var isUpgradedToFullRes by remember(item.id, imageRevision) {
+        mutableStateOf(TEST_SUBSAMPLING_ONLY && canUpgrade)
+    }
     var upgradedInPreview by remember(item.id, imageRevision) { mutableStateOf(false) }
 
     var isPreviewDisplayed by remember(item.id, imageRevision) { mutableStateOf(false) }
@@ -121,13 +127,46 @@ fun ZoomablePhotoPage(
     val isFullResFullQuality = fullResImageState?.isImageDisplayedInFullQuality == true
     LaunchedEffect(item.id, imageRevision, showDualOverlay, isFullResFullQuality) {
         if (showDualOverlay && isFullResFullQuality) {
+            if (TEST_DELAY_PREVIEW_UNMOUNT_MS > 0L) {
+                delay(TEST_DELAY_PREVIEW_UNMOUNT_MS)
+            }
             hasDisplayedFullResInFullQuality = true
         }
     }
 
-    val fullResReady = showDualOverlay &&
-        hasDisplayedFullResInFullQuality &&
-        !isPreviewZoomed
+    val fullResReady = if (TEST_SUBSAMPLING_ONLY) {
+        showDualOverlay && !isPreviewZoomed
+    } else {
+        showDualOverlay &&
+                hasDisplayedFullResInFullQuality &&
+                !isPreviewZoomed
+    }
+
+    val traceWindow = LocalActivity.current?.window
+    val traceView = LocalView.current
+    val isFullResDisplayed = fullResImageState?.isImageDisplayed == true
+
+    LaunchedEffect(
+        item.id,
+        isActivePage,
+        isSettledPage,
+        showDualOverlay,
+        isFullResDisplayed,
+        isFullResFullQuality,
+        fullResReady,
+        previewHasGainmap,
+    ) {
+        if (!isActivePage) return@LaunchedEffect
+        val ratio = (traceWindow?.decorView?.display ?: traceView.display)?.hdrSdrRatio
+        Log.d(
+            "HDR_TRACE",
+            "t=${SystemClock.uptimeMillis()} page=${item.id} settled=$isSettledPage " +
+                    "dual=$showDualOverlay displayed=$isFullResDisplayed " +
+                    "fullQ=$isFullResFullQuality fullResReady=$fullResReady " +
+                    "previewGainmap=$previewHasGainmap colorMode=${traceWindow?.colorMode} " +
+                    "desiredHeadroom=${traceWindow?.desiredHdrHeadroom} hdrSdrRatio=$ratio",
+        )
+    }
 
     val activeZoomableState = if (fullResReady && fullResZoomableState != null) {
         fullResZoomableState
@@ -178,6 +217,10 @@ fun ZoomablePhotoPage(
         isOffscreen,
         isOpeningTransition,
     ) {
+        if (TEST_SUBSAMPLING_ONLY) {
+            isUpgradedToFullRes = canUpgrade
+            return@LaunchedEffect
+        }
         if (isOffscreen) {
             isUpgradedToFullRes = false
             return@LaunchedEffect
@@ -251,7 +294,7 @@ fun ZoomablePhotoPage(
     val useSimpleZoomablePreview = effectiveLocalUri == null && !upgradedInPreview
 
     val hasSubSamplingLayer = (showDualOverlay && fullResImageState?.isImageDisplayed == true) ||
-        (upgradedInPreview && fullResData != null)
+            (upgradedInPreview && fullResData != null)
     val currentOnHdrStateChanged by rememberUpdatedState(onHdrStateChanged)
     val currentOnSyncWindowColorMode by rememberUpdatedState(onSyncWindowColorMode)
     val currentOnPageDisposed by rememberUpdatedState(onPageDisposed)
@@ -276,7 +319,7 @@ fun ZoomablePhotoPage(
         contentAlignment = Alignment.Center,
     ) {
         val previewReady = isPreviewDisplayed || previewImageState.isImageDisplayed
-        if (syncFallbackPainter != null && !previewReady && !fullResReady) {
+        if (!TEST_SUBSAMPLING_ONLY && syncFallbackPainter != null && !previewReady && !fullResReady) {
             Image(
                 painter = syncFallbackPainter,
                 contentDescription = null,
@@ -295,7 +338,13 @@ fun ZoomablePhotoPage(
                 contentScale = ContentScale.Fit,
                 modifier = Modifier
                     .fillMaxSize()
-                    .graphicsLayer { alpha = if (fullResReady) 1f else 0f },
+                    .then(
+                        if (TEST_USE_FULL_RES_ALPHA) {
+                            Modifier.graphicsLayer { alpha = if (fullResReady) 1f else 0f }
+                        } else {
+                            Modifier
+                        },
+                    ),
             )
         }
 
@@ -369,7 +418,10 @@ private fun PreviewZoomableLayer(
     }
 }
 
-private const val FULL_RES_SETTLE_DELAY_MS = 180L
+private const val TEST_SUBSAMPLING_ONLY = false
+private const val TEST_USE_FULL_RES_ALPHA = false
+private const val TEST_DELAY_PREVIEW_UNMOUNT_MS = 200L
+private const val FULL_RES_SETTLE_DELAY_MS = 1800L
 private const val MAX_ZOOM_FACTOR = 8f
 private const val DOUBLE_TAP_MAX_ZOOM_FACTOR = 2.5f
 private const val DOUBLE_TAP_RESET_ZOOM_THRESHOLD = 0.001f

@@ -30,7 +30,11 @@ internal fun rememberPhotoPreviewRequest(
 ): ImageRequest? {
     val context = LocalContext.current
     return remember(item, baseUrl, initialFullResFile, memoryCacheKeyRegistry) {
-        if (item.localContentUri == null && initialFullResFile != null && initialFullResFile.exists()) {
+        if (!TEST_SDR_PREVIEW &&
+            item.localContentUri == null &&
+            initialFullResFile != null &&
+            initialFullResFile.exists()
+        ) {
             val heightPx = MediaImageRequests.previewHeightPx(item.isVideo)
             ImageRequest.Builder(context)
                 .data(Uri.fromFile(initialFullResFile))
@@ -54,6 +58,7 @@ internal fun rememberPhotoPreviewRequest(
                 isVideo = item.isVideo,
                 hasThumbnails = item.hasThumbnails,
                 baseUrl = baseUrl,
+                bypassPlatformThumbnail = if (TEST_SDR_PREVIEW) false else !item.isVideo,
                 placeholderKey = memoryCacheKeyRegistry.get(item.id),
                 onCacheKey = { memoryCacheKeyRegistry.put(item.id, it) },
                 onImageSuccess = { image ->
@@ -160,3 +165,5 @@ private fun buildFullResImageRequest(
         },
     )
     .build()
+
+private const val TEST_SDR_PREVIEW = false
