@@ -27,14 +27,18 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.util.UnstableApi
-import androidx.media3.ui.compose.ContentFrame
+import androidx.media3.ui.compose.PlayerSurface
 import androidx.media3.ui.compose.SURFACE_TYPE_TEXTURE_VIEW
+import androidx.media3.ui.compose.modifiers.resizeWithContentScale
+import androidx.media3.ui.compose.state.rememberPresentationState
 import coil3.SingletonImageLoader
 import coil3.compose.AsyncImage
 import dev.ruurd.photos.core.database.entity.TimelineMediaProjection
@@ -48,7 +52,9 @@ import kotlinx.coroutines.delay
 /**
  * Video page inside the viewer's `HorizontalPager`. Offscreen/unsettled pages render only the
  * lightweight thumbnail shutter; once settled, the single shared `ExoPlayer` attaches via
- * `ContentFrame(SURFACE_TYPE_TEXTURE_VIEW)`. Tapping toggles chrome rather than play/pause.
+ * `PlayerSurface(SURFACE_TYPE_TEXTURE_VIEW)` pre-sized to `item.ratio` and hidden until both the
+ * first frame and presentation `videoSizeDp` are ready. Tapping toggles chrome rather than
+ * play/pause.
  */
 @OptIn(UnstableApi::class)
 @Composable
@@ -91,8 +97,8 @@ fun VideoPlayerPage(
 
     var showBufferingSpinner by remember(item.id) { mutableStateOf(false) }
     val isBufferingActive = canAttachPlayer &&
-        videoController.activeMediaId == item.id &&
-        videoController.isBuffering
+            videoController.activeMediaId == item.id &&
+            videoController.isBuffering
     LaunchedEffect(isBufferingActive, item.id) {
         if (isBufferingActive) {
             delay(BUFFERING_SPINNER_DELAY_MS)
@@ -113,27 +119,34 @@ fun VideoPlayerPage(
         contentAlignment = Alignment.Center,
     ) {
         if (canAttachPlayer) {
-            // Guard against Video A's last frame flashing before Video B's first frame renders.
+            // Guard against Video A's last frame or an un-resized TextureView flashing before
+            // Video B's first frame and videoSizeDp are ready.
             val awaitingFirstFrame = videoController.activeMediaId != item.id ||
-                (!videoController.hasRenderedFirstFrame && !videoController.isQualitySwitch)
-            ContentFrame(
+                    (!videoController.hasRenderedFirstFrame && !videoController.isQualitySwitch)
+            val presentationState = rememberPresentationState(
+                player = videoController.player,
+                keepContentOnReset = videoController.isQualitySwitch,
+            )
+            val showShutter = awaitingFirstFrame ||
+                    presentationState.coverSurface ||
+                    presentationState.videoSizeDp == null
+            val fallbackSizeDp = remember(item.ratio) {
+                item.ratio
+                    .takeIf { it.isFinite() && it > 0f }
+                    ?.let { ratio -> Size(ratio * 1000f, 1000f) }
+            }
+            val sourceSizeDp = presentationState.videoSizeDp ?: fallbackSizeDp
+
+            PlayerSurface(
                 player = videoController.player,
                 surfaceType = SURFACE_TYPE_TEXTURE_VIEW,
-                contentScale = ContentScale.Fit,
-                keepContentOnReset = videoController.isQualitySwitch,
-                modifier = Modifier.fillMaxSize(),
-                shutter = {
-                    if (!awaitingFirstFrame) {
-                        VideoThumbnailShutter(
-                            item = item,
-                            baseUrl = baseUrl,
-                            modifier = Modifier.fillMaxSize(),
-                        )
-                    }
-                },
+                modifier = Modifier
+                    .fillMaxSize()
+                    .resizeWithContentScale(ContentScale.Fit, sourceSizeDp)
+                    .graphicsLayer { alpha = if (showShutter) 0f else 1f },
             )
 
-            if (awaitingFirstFrame) {
+            if (showShutter) {
                 VideoThumbnailShutter(
                     item = item,
                     baseUrl = baseUrl,
