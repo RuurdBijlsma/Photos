@@ -97,8 +97,8 @@ fun VideoPlayerPage(
 
     var showBufferingSpinner by remember(item.id) { mutableStateOf(false) }
     val isBufferingActive = canAttachPlayer &&
-            videoController.activeMediaId == item.id &&
-            videoController.isBuffering
+        videoController.activeMediaId == item.id &&
+        videoController.isBuffering
     LaunchedEffect(isBufferingActive, item.id) {
         if (isBufferingActive) {
             delay(BUFFERING_SPINNER_DELAY_MS)
@@ -122,14 +122,14 @@ fun VideoPlayerPage(
             // Guard against Video A's last frame or an un-resized TextureView flashing before
             // Video B's first frame and videoSizeDp are ready.
             val awaitingFirstFrame = videoController.activeMediaId != item.id ||
-                    (!videoController.hasRenderedFirstFrame && !videoController.isQualitySwitch)
+                (!videoController.hasRenderedFirstFrame && !videoController.isQualitySwitch)
             val presentationState = rememberPresentationState(
                 player = videoController.player,
                 keepContentOnReset = videoController.isQualitySwitch,
             )
             val showShutter = awaitingFirstFrame ||
-                    presentationState.coverSurface ||
-                    presentationState.videoSizeDp == null
+                presentationState.coverSurface ||
+                presentationState.videoSizeDp == null
             val fallbackSizeDp = remember(item.ratio) {
                 item.ratio
                     .takeIf { it.isFinite() && it > 0f }

@@ -163,11 +163,11 @@ fun PhotosTopBar(
 
         // Center: Connectivity / Sync / Pull-to-refresh Status Pill
         val showStatusPill = !isOnline ||
-                isPulling ||
-                isSyncing ||
-                syncState == SyncState.SERVER_UNREACHABLE ||
-                syncState == SyncState.ERROR ||
-                hasSyncError
+            isPulling ||
+            isSyncing ||
+            syncState == SyncState.SERVER_UNREACHABLE ||
+            syncState == SyncState.ERROR ||
+            hasSyncError
 
         AnimatedVisibility(
             visible = showStatusPill,
