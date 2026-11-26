@@ -16,7 +16,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.geometry.isSpecified
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
@@ -76,7 +75,6 @@ fun ZoomablePhotoPage(
     var isUpgradedToFullRes by remember(item.id, imageRevision) { mutableStateOf(false) }
     var upgradedInPreview by remember(item.id, imageRevision) { mutableStateOf(false) }
 
-    var previewIntrinsicSize by remember(item.id, imageRevision) { mutableStateOf(Size.Unspecified) }
     var isPreviewDisplayed by remember(item.id, imageRevision) { mutableStateOf(false) }
 
     var previewHasGainmap by remember(item.id, imageRevision, memoryCacheKeyRegistry, imageLoader) {
@@ -128,8 +126,8 @@ fun ZoomablePhotoPage(
     }
 
     val fullResReady = showDualOverlay &&
-        hasDisplayedFullResInFullQuality &&
-        !isPreviewZoomed
+            hasDisplayedFullResInFullQuality &&
+            !isPreviewZoomed
 
     val activeZoomableState = if (fullResReady && fullResZoomableState != null) {
         fullResZoomableState
@@ -251,16 +249,9 @@ fun ZoomablePhotoPage(
     // Cloud-only 1440p.avif previews stay on AsyncImage + Modifier.zoomable so Telephoto does not
     // open a Coil DiskCache snapshot for an un-subsamplable AVIF (saket/telephoto#181).
     val useSimpleZoomablePreview = effectiveLocalUri == null && !upgradedInPreview
-    LaunchedEffect(useSimpleZoomablePreview, previewZoomableState, previewIntrinsicSize) {
-        if (useSimpleZoomablePreview && previewIntrinsicSize.isSpecified) {
-            previewZoomableState.setContentLocation(
-                ZoomableContentLocation.scaledInsideAndCenterAligned(previewIntrinsicSize),
-            )
-        }
-    }
 
     val hasSubSamplingLayer = (showDualOverlay && fullResImageState?.isImageDisplayed == true) ||
-        (upgradedInPreview && fullResData != null)
+            (upgradedInPreview && fullResData != null)
     val currentOnHdrStateChanged by rememberUpdatedState(onHdrStateChanged)
     val currentOnSyncWindowColorMode by rememberUpdatedState(onSyncWindowColorMode)
     val currentOnPageDisposed by rememberUpdatedState(onPageDisposed)
@@ -316,10 +307,7 @@ fun ZoomablePhotoPage(
                 previewZoomableState = previewZoomableState,
                 previewImageState = previewImageState,
                 onTap = onTap,
-                onSimplePreviewReady = { intrinsicSize ->
-                    isPreviewDisplayed = true
-                    previewIntrinsicSize = intrinsicSize
-                },
+                onSimplePreviewReady = { isPreviewDisplayed = true },
             )
         }
     }
@@ -333,14 +321,33 @@ private fun PreviewZoomableLayer(
     previewZoomableState: ZoomableState,
     previewImageState: ZoomableImageState,
     onTap: () -> Unit,
-    onSimplePreviewReady: (Size) -> Unit,
+    onSimplePreviewReady: () -> Unit,
 ) {
     if (useSimplePreview) {
         AsyncImage(
             model = previewRequest,
             contentDescription = null,
-            contentScale = ContentScale.Fit,
-            onSuccess = { state -> onSimplePreviewReady(state.painter.intrinsicSize) },
+            // Modifier.zoomable scales from ContentScale.Inside up to previewZoomableState.contentScale
+            // (ContentScale.Fit); using Fit here would upscale portrait previews twice.
+            contentScale = ContentScale.Inside,
+            alignment = Alignment.Center,
+            onLoading = { state ->
+                val intrinsicSize = state.painter?.intrinsicSize
+                if (intrinsicSize != null && intrinsicSize.isSpecified) {
+                    previewZoomableState.setContentLocation(
+                        ZoomableContentLocation.scaledInsideAndCenterAligned(intrinsicSize),
+                    )
+                }
+            },
+            onSuccess = { state ->
+                val intrinsicSize = state.painter.intrinsicSize
+                if (intrinsicSize.isSpecified) {
+                    previewZoomableState.setContentLocation(
+                        ZoomableContentLocation.scaledInsideAndCenterAligned(intrinsicSize),
+                    )
+                }
+                onSimplePreviewReady()
+            },
             modifier = Modifier
                 .fillMaxSize()
                 .zoomable(
