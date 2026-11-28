@@ -35,7 +35,7 @@ class AuthRepositoryImpl(
     private val sessionManager: SessionManager,
     private val cookieJar: PersistentCookieJar,
     private val directClient: OkHttpClient,
-    private val lanServerScanner: LanServerScanner,
+    private val lanServerScanner: Lazy<LanServerScanner>,
     private val dispatchers: AppDispatchers,
     private val applicationScope: CoroutineScope,
 ) : AuthRepository {
@@ -56,7 +56,7 @@ class AuthRepositoryImpl(
         sessionManager.setServerUrl(url)
     }
 
-    override fun scanLocalServers(prioritizedHost: String?): Flow<LanScanEvent> = lanServerScanner.scan(prioritizedHost)
+    override fun scanLocalServers(prioritizedHost: String?): Flow<LanScanEvent> = lanServerScanner.value.scan(prioritizedHost)
 
     override suspend fun testServerConnection(url: String): Result<Unit> = withContext(dispatchers.io) {
         try {

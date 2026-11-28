@@ -32,9 +32,17 @@ class TimelineViewModel(
     private val dispatchers: AppDispatchers,
     isBootstrapping: Flow<Boolean>,
     val imageRevisions: StateFlow<ImmutableMap<String, Int>> = MutableStateFlow(persistentMapOf()),
+    initialWidthPx: Int = 0,
+    initialDensity: Float = 1f,
 ) : ViewModel() {
 
-    private val viewport = MutableStateFlow(Viewport())
+    private val viewport = MutableStateFlow(
+        if (initialWidthPx > 0 && initialDensity > 0f) {
+            Viewport(widthPx = initialWidthPx, density = initialDensity)
+        } else {
+            Viewport()
+        },
+    )
 
     @OptIn(ExperimentalCoroutinesApi::class)
     val uiState: StateFlow<TimelineUiState> = isBootstrapping
@@ -67,7 +75,7 @@ class TimelineViewModel(
             }
         }
         .flowOn(dispatchers.default)
-        .stateIn(viewModelScope, SharingStarted.Lazily, TimelineUiState())
+        .stateIn(viewModelScope, SharingStarted.Eagerly, TimelineUiState())
 
     fun onViewportChanged(widthPx: Int, density: Float) {
         if (widthPx <= 0 || density <= 0f) return

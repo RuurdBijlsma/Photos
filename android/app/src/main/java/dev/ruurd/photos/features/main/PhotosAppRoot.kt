@@ -64,7 +64,8 @@ import kotlinx.coroutines.launch
  */
 @Composable
 fun PhotosAppRoot(container: AppContainer) {
-    val authState by container.authRepository.authState.collectAsState()
+    // Read directly from SessionManager so Frame 1 never instantiates Retrofit/OkHttp/NetworkMonitor.
+    val authState by container.sessionManager.authState.collectAsState()
     val sessionHolder: SessionViewModelStoreHolder = viewModel(
         factory = SessionViewModelStoreHolder.FACTORY,
     )

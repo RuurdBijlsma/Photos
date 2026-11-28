@@ -116,9 +116,9 @@ interface AppContainer {
     fun mediaViewerViewModelFactory(initialMediaId: String): ViewModelProvider.Factory
 
     /**
-     * Opens the database on a background thread at process start. The first timeline paint needs it,
-     * and it would otherwise only open after auth state has loaded, putting the open on the critical
-     * path to first content.
+     * Warms up the persisted session, Room database, connectivity monitor, networking stack, and
+     * image loader off the main thread at process start so Frame 1 doesn't stall on initialization
+     * or DataStore I/O.
      */
     fun warmUp()
 }
@@ -234,7 +234,7 @@ class DefaultAppContainer(private val context: Context) : AppContainer {
             sessionManager = sessionManager,
             cookieJar = cookieJar,
             directClient = directClient,
-            lanServerScanner = lanServerScanner,
+            lanServerScanner = lazy { lanServerScanner },
             dispatchers = dispatchers,
             applicationScope = applicationScope,
         )
@@ -408,6 +408,15 @@ class DefaultAppContainer(private val context: Context) : AppContainer {
 
     override fun warmUp() {
         applicationScope.launch(dispatchers.io) {
+            // Start loading persisted auth state off the main thread so Frame 1 can skip Loading.
+            sessionManager
+            // Warm up connectivity, HTTP, and Coil off the main thread before AuthenticatedSession.
+            networkMonitor
+            okHttpClient
+            photosApiService
+            imageLoader
+        }
+        applicationScope.launch(dispatchers.io) {
             // Touching the open helper is what actually opens SQLite; the builder alone is lazy.
             database.openHelper.writableDatabase
         }
@@ -432,12 +441,15 @@ class DefaultAppContainer(private val context: Context) : AppContainer {
 
     override fun timelineViewModelFactory(): ViewModelProvider.Factory = viewModelFactory {
         initializer {
+            val metrics = context.resources.displayMetrics
             TimelineViewModel(
                 observeTimelineUseCase = observeTimelineUseCase,
                 calculateTimelineLayoutUseCase = calculateTimelineLayoutUseCase,
                 dispatchers = dispatchers,
                 isBootstrapping = bootstrapState.isBootstrapping,
                 imageRevisions = mediaImageRevisions.revisions,
+                initialWidthPx = metrics.widthPixels,
+                initialDensity = metrics.density,
             )
         }
     }

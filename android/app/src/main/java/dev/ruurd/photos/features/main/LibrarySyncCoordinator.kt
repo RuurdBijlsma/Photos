@@ -16,6 +16,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
@@ -46,6 +47,7 @@ class LibrarySyncCoordinator(
 
     private var hasRefreshedProfile = false
     private var isFirstLaunchScan = true
+    private var isFirstLaunchSync = true
     private var profileRefreshJob: Job? = null
     private var syncJob: Job? = null
     private var scanJob: Job? = null
@@ -58,17 +60,25 @@ class LibrarySyncCoordinator(
                 (auth is AuthState.Authenticated) to online
             }
                 .distinctUntilChanged()
-                .collect { (isAuthenticated, isOnline) ->
+                .collectLatest { (isAuthenticated, isOnline) ->
                     if (!isAuthenticated) {
                         resetForSignOut()
                         onSignedOut()
-                        return@collect
+                        return@collectLatest
                     }
 
                     if (isOnline) {
+                        val shouldDelayStartupSync = isFirstLaunchSync && bootstrapState.isSyncSettled
+                        isFirstLaunchSync = false
+                        if (shouldDelayStartupSync) {
+                            // Let the first timeline frame and visible thumbnails land before
+                            // competing for SQLite writes, OkHttp threads, and main-thread layouts.
+                            delay(STARTUP_SYNC_DELAY_MS)
+                        }
                         refreshProfileIfNeeded()
                         syncNow(forceFullSnapshot = false)
                     } else {
+                        isFirstLaunchSync = false
                         bootstrapState.onSyncSettled()
                     }
                 }
@@ -96,6 +106,7 @@ class LibrarySyncCoordinator(
         // Reset per-session state so a later login does not inherit it.
         hasRefreshedProfile = false
         isFirstLaunchScan = true
+        isFirstLaunchSync = true
         pendingScanAccess = null
         profileRefreshJob?.cancel()
         profileRefreshJob = null
@@ -209,6 +220,7 @@ class LibrarySyncCoordinator(
 
     private companion object {
         const val TAG = "LibrarySyncCoordinator"
+        const val STARTUP_SYNC_DELAY_MS = 150L
         const val STARTUP_SCAN_DELAY_MS = 500L
     }
 }
