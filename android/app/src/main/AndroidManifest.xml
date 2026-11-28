@@ -37,6 +37,17 @@
             </intent-filter>
         </activity>
 
+        <!-- Nothing uses EmojiCompat, so drop its startup initializer from bindApplication. -->
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
+            android:exported="false"
+            tools:node="merge">
+            <meta-data
+                android:name="androidx.emoji2.text.EmojiCompatInitializer"
+                tools:node="remove" />
+        </provider>
+
         <!-- Shares/copies staged files from cacheDir/share_cache with a real filename + extension. -->
         <provider
             android:name="androidx.core.content.FileProvider"

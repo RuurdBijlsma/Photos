@@ -16,6 +16,7 @@ class PhotosApplication :
     override fun onCreate() {
         super.onCreate()
         container = DefaultAppContainer(this)
+        container.warmUp()
     }
 
     override fun newImageLoader(context: android.content.Context): ImageLoader = container.imageLoader

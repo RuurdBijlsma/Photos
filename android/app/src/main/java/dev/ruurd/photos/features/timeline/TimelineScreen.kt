@@ -1,5 +1,6 @@
 package dev.ruurd.photos.features.timeline
 
+import androidx.activity.compose.LocalActivity
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.fadeIn
@@ -28,6 +29,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -35,6 +37,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -107,6 +110,17 @@ fun TimelineScreen(
     )
 
     val isEmptyState = !uiState.isLoading && layout.isEmpty && !isSyncing
+
+    // Startup ends when the first real content is on screen, not when the spinner is. Reported once
+    // so the system (and macrobenchmark's timeToFullDisplayMs) can measure past the first frame.
+    val activity = LocalActivity.current
+    val hasContent = !uiState.isLoading && layout.rows.isNotEmpty()
+    LaunchedEffect(hasContent) {
+        if (hasContent) {
+            withFrameNanos { }
+            activity?.reportFullyDrawn()
+        }
+    }
 
     // Rows scroll under the floating top bar and bottom nav; the padding only offsets the content
     // edges so the first and last rows are reachable.

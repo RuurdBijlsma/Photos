@@ -34,6 +34,42 @@ timeline is non-empty.
 ./gradlew :benchmark:benchmarkAndCheck
 ```
 
+## Startup profiling
+
+Findings, numbers and rejected ideas live in `../docs/profiling-findings.md`. Read it before
+changing anything on the startup path. Practical rules:
+
+- The benchmark variant is the build to profile: minified, not debuggable, closest to release.
+  `./gradlew :app:assembleBenchmark`, then
+  `adb install -r -t app/build/outputs/apk/benchmark/app-benchmark.apk`. `-r -t` keeps the signed-in
+  session; a `connectedBenchmarkAndroidTest` run uninstalls the app instead.
+- `app/src/benchmark/AndroidManifest.xml` declares `<profileable android:shell="true" />`. Without
+  it Perfetto captures no app-level `atrace` slices (`Choreographer#doFrame`, `Compose:*`) and the
+  trace is useless. Do not remove it.
+- Startup work runs in `PhotosApplication.onCreate` and `DefaultAppContainer`'s `lazy` fields.
+  Keep new work out of `onCreate` unless it is measured to help; anything added there lands in
+  `bindApplication` on every cold start.
+- `androidx.startup` initializers from transitive dependencies run before `Application.onCreate`.
+  Check the merged manifest (`app/build/intermediates/merged_manifest/benchmark/...`) before
+  assuming a dependency is not initialized; remove unused ones with `tools:node="remove"` on the
+  `androidx.startup.InitializationProvider` meta-data rather than by adding `tools:node="replace"`.
+- Call `Activity.reportFullyDrawn()` only when real content is on screen. It is idempotent in the
+  framework, so re-reporting is harmless, but reporting on a spinner makes TTFD meaningless.
+- `timeToFullDisplayMs` is `null` until something calls `reportFullyDrawn()`. `null` there means
+  "not measured", not "fast".
+- Two consecutive benchmark runs differ by ~50 ms on this device (200 vs 253 ms median TTID for
+  the same code). Judge a change against several runs, not one, and do not chase sub-50 ms deltas.
+- `am start -W` is the quick loop (`adb shell am force-stop dev.ruurd.photos; adb shell am start -W
+  -n dev.ruurd.photos/.MainActivity`); for TTID and TTFD together read `adb logcat -s
+  ActivityTaskManager` and look for `Displayed … +Nms` / `Fully drawn … +Nms`. 10 samples is the
+  minimum useful count.
+- Perfetto callstack sampling does not pick up an app launched after the trace starts. Either use
+  atrace slices, or start the trace with a `target_cmdline` filter and launch afterwards.
+- `:benchmark:checkPerfRegression` compares the newest result against `perf/baseline.json` and can
+  fail on the scroll/scrub benchmarks because the timeline content changed (a wiped database
+  repopulated from MediaStore scrolls different images), not because of a code change. Check that
+  the failing metric is one you touched before believing it.
+
 ## Networking & media data
 
 - Retrofit converter order is `Scalars` → `Proto` → `kotlinx-serialization` (`photosApiConverterFactories()` in

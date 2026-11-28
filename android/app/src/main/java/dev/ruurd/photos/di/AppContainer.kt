@@ -64,6 +64,7 @@ import dev.ruurd.photos.features.viewer.MediaViewerViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import okhttp3.Dispatcher
@@ -113,6 +114,13 @@ interface AppContainer {
     fun mainViewModelFactory(): ViewModelProvider.Factory
     fun timelineViewModelFactory(): ViewModelProvider.Factory
     fun mediaViewerViewModelFactory(initialMediaId: String): ViewModelProvider.Factory
+
+    /**
+     * Opens the database on a background thread at process start. The first timeline paint needs it,
+     * and it would otherwise only open after auth state has loaded, putting the open on the critical
+     * path to first content.
+     */
+    fun warmUp()
 }
 
 class DefaultAppContainer(private val context: Context) : AppContainer {
@@ -396,6 +404,13 @@ class DefaultAppContainer(private val context: Context) : AppContainer {
 
     override val imageLoader: ImageLoader by lazy {
         PhotosImageLoader.create(context, okHttpClient)
+    }
+
+    override fun warmUp() {
+        applicationScope.launch(dispatchers.io) {
+            // Touching the open helper is what actually opens SQLite; the builder alone is lazy.
+            database.openHelper.writableDatabase
+        }
     }
 
     override fun authViewModelFactory(): ViewModelProvider.Factory = viewModelFactory {
